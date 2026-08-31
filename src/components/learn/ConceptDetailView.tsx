@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ConceptDetail, SubjectId } from '../../types/curriculum';
 import { InteractiveWidgets } from './InteractiveWidgets';
+import { FormattedMathText } from '../common/FormattedMathText';
 import {
   BookOpen,
   CheckCircle2,
@@ -185,9 +186,9 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                 <BookOpen className="w-4 h-4" />
                 Formal Mathematical / Scientific Definition
               </h3>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-serif">
-                {concept.formalDefinition}
-              </p>
+              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-serif">
+                <FormattedMathText text={concept.formalDefinition} />
+              </div>
             </div>
 
             {/* First Principles Intuition */}
@@ -196,9 +197,9 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                 <Sparkles className="w-4 h-4" />
                 First-Principles Intuition
               </h3>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                {concept.intuitiveExplanation}
-              </p>
+              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <FormattedMathText text={concept.intuitiveExplanation} />
+              </div>
             </div>
 
             {/* Key Formulas */}
@@ -211,10 +212,12 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                   {concept.keyFormulas.map((f, i) => (
                     <div key={i} className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                       <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">{f.label}</div>
-                      <div className="text-sm font-mono font-medium text-slate-900 dark:text-slate-100 mb-1.5 overflow-x-auto py-1">
-                        {f.latex}
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1.5 overflow-x-auto py-1">
+                        <FormattedMathText text={f.latex.startsWith('$') ? f.latex : `$${f.latex}$`} />
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{f.explanation}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        <FormattedMathText text={f.explanation} inline />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -231,7 +234,9 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                   {concept.keyObservations.map((obs, i) => (
                     <li key={i} className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
                       <span className="text-emerald-500 font-bold">•</span>
-                      <span>{obs}</span>
+                      <div className="flex-1">
+                        <FormattedMathText text={obs} inline />
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -248,9 +253,9 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                   </h4>
                 </div>
 
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
-                  {concept.miniCheckQuestion.prompt}
-                </p>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
+                  <FormattedMathText text={concept.miniCheckQuestion.prompt} />
+                </div>
 
                 <div className="space-y-2 mb-4">
                   {concept.miniCheckQuestion.options.map((opt, idx) => {
@@ -274,7 +279,7 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span>{opt}</span>
+                          <FormattedMathText text={opt} inline />
                           {showMiniExplanation && isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
                           {showMiniExplanation && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-rose-500 shrink-0" />}
                         </div>
@@ -292,7 +297,7 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                     }`}
                   >
                     <span className="font-bold">{isMiniCorrect ? 'Correct! ' : 'Incorrect. '}</span>
-                    {concept.miniCheckQuestion.explanation}
+                    <FormattedMathText text={concept.miniCheckQuestion.explanation} inline />
                   </div>
                 )}
               </div>
@@ -317,7 +322,7 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                   </div>
 
                   <div className="text-sm font-medium text-slate-800 dark:text-slate-100 p-3 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                    {ex.problemStatement}
+                    <FormattedMathText text={ex.problemStatement} />
                   </div>
 
                   <div>
@@ -334,20 +339,24 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                       <div className="space-y-1.5">
                         {ex.stepByStepSolution.map((step, sIdx) => (
                           <div key={sIdx} className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2">
-                            <span className="font-mono text-indigo-500 font-bold">{sIdx + 1}.</span>
-                            <span>{step}</span>
+                            <span className="font-mono text-indigo-500 font-bold shrink-0">{sIdx + 1}.</span>
+                            <div className="flex-1">
+                              <FormattedMathText text={step} inline />
+                            </div>
                           </div>
                         ))}
                       </div>
 
                       <div className="p-2.5 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-xs">
                         <span className="font-bold text-emerald-700 dark:text-emerald-400">Final Answer: </span>
-                        <span className="text-emerald-900 dark:text-emerald-200 font-medium">{ex.finalAnswer}</span>
+                        <span className="text-emerald-900 dark:text-emerald-200 font-medium">
+                          <FormattedMathText text={ex.finalAnswer} inline />
+                        </span>
                       </div>
 
                       <div className="text-xs text-slate-500 dark:text-slate-400 italic">
                         <span className="font-semibold text-slate-700 dark:text-slate-300">Key Takeaway: </span>
-                        {ex.keyTakeaway}
+                        <FormattedMathText text={ex.keyTakeaway} inline />
                       </div>
                     </div>
                   )}

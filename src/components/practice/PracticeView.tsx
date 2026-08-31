@@ -15,6 +15,7 @@ import { PracticeConfigModal } from '../learn/PracticeConfigModal';
 import { RecommendedPracticeView } from './RecommendedPracticeView';
 import { WeakTopicsView } from './WeakTopicsView';
 import { PracticeHistoryView } from './PracticeHistoryView';
+import { FormattedMathText } from '../common/FormattedMathText';
 import {
   Target,
   Zap,
@@ -423,7 +424,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
                       </div>
 
                       <div className="text-sm text-slate-800 dark:text-slate-200 font-serif leading-relaxed">
-                        {q.questionText}
+                        <FormattedMathText text={q.questionText} />
                       </div>
                     </div>
                   ))

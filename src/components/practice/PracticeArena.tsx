@@ -5,6 +5,7 @@ import { LearningClient } from '../../services/learningClient';
 import { sounds } from '../../utils/sound';
 import { recordDailyActivity } from '../../utils/streakManager';
 import confetti from 'canvas-confetti';
+import { FormattedMathText } from '../common/FormattedMathText';
 import {
   Clock,
   Sparkles,
@@ -378,7 +379,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
 
         {/* Question Statement */}
         <div className="text-base sm:text-lg font-medium text-slate-900 dark:text-slate-100 leading-relaxed font-serif">
-          {currentQuestion.questionText}
+          <FormattedMathText text={currentQuestion.questionText} />
         </div>
 
         {/* Optional Code Snippet */}
@@ -433,7 +434,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                     >
                       {letter}
                     </span>
-                    <span>{opt}</span>
+                    <span className="flex-1">
+                      <FormattedMathText text={opt} inline />
+                    </span>
                   </div>
 
                   {isCorrectOpt && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
@@ -484,7 +487,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                     >
                       {letter}
                     </span>
-                    <span>{opt}</span>
+                    <span className="flex-1">
+                      <FormattedMathText text={opt} inline />
+                    </span>
                   </div>
                   {isCorrectOpt && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
                   {isWrongSelected && <XCircle className="w-5 h-5 text-rose-500 shrink-0" />}
@@ -594,8 +599,10 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                   key={hIdx}
                   className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2"
                 >
-                  <span className="font-bold text-amber-600 dark:text-amber-400">Hint {hIdx + 1}:</span>
-                  <span>{hintText}</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400 shrink-0">Hint {hIdx + 1}:</span>
+                  <div className="flex-1">
+                    <FormattedMathText text={hintText} inline />
+                  </div>
                 </div>
               ))}
             </div>
@@ -610,9 +617,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                   className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/40 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2"
                 >
                   <Bot className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
-                  <div>
+                  <div className="flex-1">
                     <span className="font-bold block mb-0.5">Socratic Tutor Observation:</span>
-                    <span>{aiH}</span>
+                    <FormattedMathText text={aiH} />
                   </div>
                 </div>
               ))}
@@ -661,15 +668,19 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
             {/* Explanation & Step-by-Step Breakdown */}
             <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-800 dark:text-slate-200">
               <div className="font-semibold text-slate-900 dark:text-white">Explanation:</div>
-              <p className="leading-relaxed">{currentQuestion.explanation}</p>
+              <div className="leading-relaxed">
+                <FormattedMathText text={currentQuestion.explanation} />
+              </div>
 
               {currentQuestion.stepByStepSolution && currentQuestion.stepByStepSolution.length > 0 && (
                 <div className="space-y-1.5 pt-2">
                   <div className="font-semibold text-slate-900 dark:text-white">Step-by-Step Invariant Derivation:</div>
                   {currentQuestion.stepByStepSolution.map((st, sIdx) => (
                     <div key={sIdx} className="flex items-start gap-2">
-                      <span className="font-mono text-indigo-500 font-bold">{sIdx + 1}.</span>
-                      <span>{st}</span>
+                      <span className="font-mono text-indigo-500 font-bold shrink-0">{sIdx + 1}.</span>
+                      <div className="flex-1">
+                        <FormattedMathText text={st} inline />
+                      </div>
                     </div>
                   ))}
                 </div>

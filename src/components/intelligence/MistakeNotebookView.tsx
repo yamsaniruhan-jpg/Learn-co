@@ -16,6 +16,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { AnalyticsClient } from '../../services/analyticsClient';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface MistakeNotebookViewProps {
   summary: MistakeAnalyticsSummary;
@@ -297,9 +298,9 @@ export const MistakeNotebookView: React.FC<MistakeNotebookViewProps> = ({
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                     Problem Statement
                   </span>
-                  <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-                    {mistake.questionText}
-                  </p>
+                  <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-serif">
+                    <FormattedMathText text={mistake.questionText} />
+                  </div>
                 </div>
 
                 {/* Answers Comparison */}
@@ -309,9 +310,9 @@ export const MistakeNotebookView: React.FC<MistakeNotebookViewProps> = ({
                     <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block mb-1">
                       Your Answer (Trap / Misconception)
                     </span>
-                    <p className="text-xs text-rose-950 dark:text-rose-200 font-medium font-mono">
-                      {mistake.userAnswer || 'Incorrect option chosen'}
-                    </p>
+                    <div className="text-xs text-rose-950 dark:text-rose-200 font-medium font-mono">
+                      <FormattedMathText text={String(mistake.userAnswer ?? 'Incorrect option chosen')} inline />
+                    </div>
                   </div>
 
                   {/* Correct Invariant */}
@@ -319,17 +320,17 @@ export const MistakeNotebookView: React.FC<MistakeNotebookViewProps> = ({
                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">
                       Correct Invariant / Solution
                     </span>
-                    <p className="text-xs text-emerald-950 dark:text-emerald-200 font-medium font-mono">
-                      {mistake.correctAnswer}
-                    </p>
+                    <div className="text-xs text-emerald-950 dark:text-emerald-200 font-medium font-mono">
+                      <FormattedMathText text={String(mistake.correctAnswer ?? '')} inline />
+                    </div>
                   </div>
                 </div>
 
                 {/* Invariant Explanation */}
                 {mistake.explanation && (
                   <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50/50 dark:bg-slate-900/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/60">
-                    <span className="font-semibold text-slate-900 dark:text-slate-100">Derivation Invariant: </span>
-                    {mistake.explanation}
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 block mb-1">Derivation Invariant: </span>
+                    <FormattedMathText text={mistake.explanation} />
                   </div>
                 )}
 

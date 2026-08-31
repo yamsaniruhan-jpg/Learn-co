@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QuestionBankItem } from '../../types/curriculum';
+import { FormattedMathText } from '../common/FormattedMathText';
 import {
   Award,
   Zap,
@@ -221,7 +222,7 @@ export const PracticeResultsView: React.FC<PracticeResultsViewProps> = ({
 
               {/* Question Text */}
               <div className="text-sm text-slate-800 dark:text-slate-200 font-serif leading-relaxed">
-                {review.question.questionText}
+                <FormattedMathText text={review.question.questionText} />
               </div>
 
               {/* Answers Comparison */}
@@ -236,7 +237,12 @@ export const PracticeResultsView: React.FC<PracticeResultsViewProps> = ({
                   <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5 opacity-80">
                     Your Response
                   </span>
-                  <div className="font-medium">{Array.isArray(review.userAnswer) ? review.userAnswer.join(', ') : review.userAnswer?.toString() || 'None'}</div>
+                  <div className="font-medium">
+                    <FormattedMathText
+                      text={Array.isArray(review.userAnswer) ? review.userAnswer.join(', ') : review.userAnswer?.toString() || 'None'}
+                      inline
+                    />
+                  </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200">
@@ -244,9 +250,14 @@ export const PracticeResultsView: React.FC<PracticeResultsViewProps> = ({
                     Authoritative Correct Answer
                   </span>
                   <div className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {Array.isArray(review.question.correctAnswer)
-                      ? review.question.correctAnswer.join(', ')
-                      : review.question.correctAnswer}
+                    <FormattedMathText
+                      text={
+                        Array.isArray(review.question.correctAnswer)
+                          ? review.question.correctAnswer.join(', ')
+                          : review.question.correctAnswer.toString()
+                      }
+                      inline
+                    />
                   </div>
                 </div>
               </div>
@@ -255,17 +266,19 @@ export const PracticeResultsView: React.FC<PracticeResultsViewProps> = ({
               {isExp && (
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
                   <div className="font-bold text-slate-900 dark:text-white">Explanation:</div>
-                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {review.question.explanation}
-                  </p>
+                  <div className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <FormattedMathText text={review.question.explanation} />
+                  </div>
 
                   {review.question.stepByStepSolution && (
                     <div className="space-y-1.5 pt-2">
                       <div className="font-bold text-slate-900 dark:text-white">Step-by-Step Invariant Derivation:</div>
                       {review.question.stepByStepSolution.map((s, sI) => (
                         <div key={sI} className="text-slate-600 dark:text-slate-300 flex items-start gap-2">
-                          <span className="font-mono text-indigo-500 font-bold">{sI + 1}.</span>
-                          <span>{s}</span>
+                          <span className="font-mono text-indigo-500 font-bold shrink-0">{sI + 1}.</span>
+                          <div className="flex-1">
+                            <FormattedMathText text={s} inline />
+                          </div>
                         </div>
                       ))}
                     </div>
