@@ -6,9 +6,11 @@ import { ConceptDetailView } from './ConceptDetailView';
 import { PracticeConfigModal } from './PracticeConfigModal';
 import { PracticeArena } from '../practice/PracticeArena';
 import { PracticeResultsView } from '../practice/PracticeResultsView';
+import { CognitiveWarmUpModal, UserMoodState } from './CognitiveWarmUpModal';
 import { QuestionBankItem } from '../../types/curriculum';
-import { BookOpen, Sparkles, Zap, Bot, ArrowLeft } from 'lucide-react';
+import { BookOpen, Sparkles, Zap, Bot, ArrowLeft, Brain } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { sounds } from '../../utils/sound';
 
 interface LearnViewProps {
   initialSubjectId?: SubjectId;
@@ -46,6 +48,7 @@ export const LearnView: React.FC<LearnViewProps> = ({
   } | null>(null);
 
   const [sessionResults, setSessionResults] = useState<any | null>(null);
+  const [isWarmUpOpen, setIsWarmUpOpen] = useState<boolean>(false);
 
   const dailyQuotaRemaining = Math.max(0, 25 - (gamification?.dailyQuestionsSolvedToday || 0));
 
@@ -193,7 +196,18 @@ export const LearnView: React.FC<LearnViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setIsWarmUpOpen(true);
+                }}
+                className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <Brain className="w-4 h-4 text-amber-500" />
+                <span>Focus Warm-Up</span>
+              </button>
+
               <button
                 onClick={() =>
                   onOpenCopilotWithContext(
@@ -248,6 +262,17 @@ export const LearnView: React.FC<LearnViewProps> = ({
         initialConceptId={modalTargetConcept}
         initialTitle={modalTitle}
         dailyQuotaRemaining={dailyQuotaRemaining}
+      />
+
+      {/* Cognitive Focus & Warm-Up Modal */}
+      <CognitiveWarmUpModal
+        isOpen={isWarmUpOpen}
+        onClose={() => setIsWarmUpOpen(false)}
+        onWarmUpComplete={(xp, mood) => {
+          refreshUserData();
+          // Optionally trigger quick practice modal calibrated to mood
+          handleStartPracticeModal(undefined, selectedSubject);
+        }}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Zap,
   Flame,
@@ -16,6 +16,7 @@ import {
   ChevronRight,
   BarChart2,
   Trophy,
+  Shield,
 } from 'lucide-react';
 import { UserProfile, ConceptMastery, QuestionAttempt, SubjectId } from '../../types';
 import { Card } from '../ui/Card';
@@ -25,6 +26,7 @@ import { Badge } from '../ui/Badge';
 import { XPIndicator, StreakIndicator, MasteryIndicator } from '../ui/GamificationIndicators';
 import { SEED_SUBJECTS, SEED_STUDY_SESSIONS } from '../../data/seedData';
 import { Leaderboard } from '../leaderboard/Leaderboard';
+import { loadUserStreak, getWeeklyStreakPills, StreakData } from '../../utils/streakManager';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -43,6 +45,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onLaunchPractice = () => onNavigate('practice'),
   onSelectSubject,
 }) => {
+  const [streakData, setStreakData] = useState<StreakData>(() =>
+    loadUserStreak(user.id || 'default_user', user.currentStreak || 4)
+  );
+
+  useEffect(() => {
+    const fresh = loadUserStreak(user.id || 'default_user', user.currentStreak || 4);
+    setStreakData(fresh);
+  }, [user.id, user.currentStreak]);
+
+  const weeklyPills = getWeeklyStreakPills(streakData);
+  const activeStreakCount = streakData.currentStreak || user.currentStreak || 4;
+  const longestStreakCount = Math.max(streakData.longestStreak || 0, user.longestStreak || 12);
+
   const allowanceRemaining = Math.max(
     0,
     user.dailyAllowanceLimit - user.dailyQuestionsSolvedToday
@@ -74,12 +89,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="absolute bottom-0 right-1/4 -mb-12 w-64 h-64 bg-cyan-500/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2.5">
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2.5">
               <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-xs text-xs font-bold text-indigo-200 border border-white/15">
                 Level {user.level} Scholar
               </span>
-              <span className="text-xs text-indigo-200 font-medium">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 text-orange-200 text-xs font-bold border border-orange-400/30">
+                <Flame className="w-3.5 h-3.5 fill-orange-400 text-orange-400 animate-pulse" />
+                <span>{activeStreakCount}-Day Active Streak</span>
+              </div>
+              <span className="text-xs text-indigo-200/80 font-medium">
                 Target: {user.targetExam || 'Advanced STEM Mastery'}
               </span>
             </div>
@@ -87,8 +106,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Welcome back, {user.fullName.split(' ')[0]}
             </h1>
             <p className="text-sm sm:text-base text-indigo-100/80 leading-relaxed">
-              Your 4-day study streak is active. Complete today's calibrated diagnostic ladder to reinforce your retention curve.
+              Your {activeStreakCount}-day study streak is active. Complete today's calibrated diagnostic ladder to reinforce your retention curve.
             </p>
+
+            {/* Streak Week Visualizer */}
+            <div className="pt-2 flex items-center gap-2">
+              <span className="text-xs text-indigo-200 font-semibold mr-1">Weekly Streak:</span>
+              <div className="flex items-center gap-1.5">
+                {weeklyPills.map((pill) => (
+                  <div
+                    key={pill.dateKey}
+                    title={`${pill.dayName} (${pill.dateKey}): ${pill.isCompleted ? 'Completed' : 'Pending'}`}
+                    className={`flex flex-col items-center justify-center w-8 h-8 rounded-lg text-[10px] font-bold border transition-all ${
+                      pill.isCompleted
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs'
+                        : pill.isToday
+                        ? 'bg-white/15 text-white border-white/40 ring-1 ring-amber-300'
+                        : 'bg-white/5 text-white/40 border-white/10'
+                    }`}
+                  >
+                    <span>{pill.dayName.slice(0, 1)}</span>
+                    {pill.isCompleted && <Flame className="w-2.5 h-2.5 fill-current" />}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Quick Launch Practice CTA Box */}
@@ -117,15 +159,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Hero Goal Progress Bar */}
         <div className="mt-8 pt-6 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <span className="text-xs text-indigo-200/70 block">Daily Target</span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-black text-white">{user.dailyQuestionsSolvedToday}</span>
-              <span className="text-xs text-indigo-200">/ {user.dailyAllowanceLimit} solved</span>
+            <div className="flex items-center justify-between text-xs text-indigo-200/70 mb-0.5">
+              <span>Study Streak</span>
+              <span className="text-[10px] text-amber-300 font-bold">Best: {longestStreakCount}d</span>
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <Flame className="w-4 h-4 fill-orange-400 text-orange-400 inline shrink-0 self-center" />
+              <span className="text-xl font-black text-amber-300">{activeStreakCount}</span>
+              <span className="text-xs text-indigo-200">consecutive days</span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
               <div
-                className="bg-amber-400 h-1.5 rounded-full"
-                style={{ width: `${dailyProgressPercent}%` }}
+                className="bg-orange-400 h-1.5 rounded-full"
+                style={{ width: `${Math.min(100, (activeStreakCount / 7) * 100)}%` }}
               />
             </div>
           </div>

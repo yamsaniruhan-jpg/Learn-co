@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { QuestionBankItem, PracticeSessionConfig } from '../../types/curriculum';
 import { AuthClient } from '../../services/authClient';
 import { LearningClient } from '../../services/learningClient';
+import { sounds } from '../../utils/sound';
+import { recordDailyActivity } from '../../utils/streakManager';
 import confetti from 'canvas-confetti';
 import {
   Clock,
@@ -205,6 +207,13 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
 
       const data = await submitRes.json();
 
+      // Record daily streak activity in gamification system
+      recordDailyActivity('default_user', {
+        questionsSolved: 1,
+        xpEarned: isCorrect ? (data.xpEarned || 5) : 0,
+        minutesStudied: Math.ceil((timeSpentPerQuestion[questionId] || 15) / 60),
+      });
+
       setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
       setSubmissionFeedback((prev) => ({
         ...prev,
@@ -217,14 +226,18 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
       }));
 
       if (isCorrect) {
+        sounds.playSuccess();
         setTotalXpAwarded((prev) => prev + (data.xpEarned || 5));
         confetti({
           particleCount: 40,
           spread: 60,
           origin: { y: 0.7 },
         });
+      } else {
+        sounds.playFailure();
       }
     } catch (err) {
+      sounds.playFailure();
       // Fallback local submission
       setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
       setSubmissionFeedback((prev) => ({
@@ -252,11 +265,14 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
       const correctCount = questionReviews.filter((r) => r.isCorrect).length;
 
       if (correctCount === questions.length) {
+        sounds.playLevelUp();
         confetti({
           particleCount: 100,
           spread: 90,
           origin: { y: 0.5 },
         });
+      } else if (correctCount > 0) {
+        sounds.playSuccess();
       }
 
       onFinishSession({

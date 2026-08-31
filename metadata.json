@@ -1,6 +1,6 @@
 {
-  "name": "Learn.co",
-  "description": "Intelligent STEM learning platform combining interactive studios, AI copilot, personalized mentorship, and adaptive study planner.",
+  "name": "learn.co — Immersive, Gamified Mastery",
+  "description": "Pre-seeded 4000-question library, adaptive AI mentors, Creator Studio, Personal Lab, and an Omni Co-Pilot. Built for deep, immersive study.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
