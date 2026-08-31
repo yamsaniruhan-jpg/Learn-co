@@ -1,0 +1,8 @@
+{
+  "name": "Learn.co",
+  "description": "Intelligent STEM learning platform combining interactive studios, AI copilot, personalized mentorship, and adaptive study planner.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
