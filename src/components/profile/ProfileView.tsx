@@ -377,10 +377,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                  {stats?.accuracyPercentage || 75}%
+                  {stats?.accuracyPercentage ?? 0}%
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  ({stats?.correctAnswers || 3}/{stats?.completedAttempts || 4} verified)
+                  ({stats?.correctAnswers || 0}/{stats?.completedAttempts || 0} verified)
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 block pt-1">
@@ -394,10 +394,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-black text-amber-500">
-                  {gamification?.xp || 85} XP
+                  {gamification?.xp ?? 0} XP
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  Level {gamification?.level || 2}
+                  Level {gamification?.level ?? 1}
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 block pt-1">
@@ -412,10 +412,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-black text-orange-500 flex items-center gap-1">
                   <Flame className="w-5 h-5 fill-orange-500" />
-                  {gamification?.currentStreak || 4}d
+                  {gamification?.currentStreak ?? 0}d
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  Max: {gamification?.longestStreak || 12}d
+                  Max: {gamification?.longestStreak ?? 0}d
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 block pt-1">
@@ -429,14 +429,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-black text-slate-800 dark:text-slate-200">
-                  {profile?.studyTimeMinutesThisWeek || 180}m
+                  {profile?.studyTimeMinutesThisWeek ?? 0}m
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  Target: {profile?.preferredStudyTimeMinutes || 45}m/d
+                  Target: {profile?.preferredStudyTimeMinutes || 30}m/d
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 block pt-1">
-                On track for weekly goal
+                {(profile?.studyTimeMinutesThisWeek ?? 0) > 0 ? 'On track for weekly goal' : 'Start first session today'}
               </span>
             </Card>
           </div>

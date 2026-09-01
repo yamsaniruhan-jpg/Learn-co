@@ -71,15 +71,17 @@ export function getDaysDifference(dateStr1: string, dateStr2: string): number {
 /**
  * Get initial default streak state
  */
-export function getDefaultStreakData(initialStreak = 4, longestStreak = 12): StreakData {
+export function getDefaultStreakData(initialStreak = 0, longestStreak = 0): StreakData {
   const today = formatDateToDateKey();
   const history: string[] = [];
   
-  // Seed past days for initial realistic streak
-  for (let i = initialStreak - 1; i >= 0; i--) {
-    const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - i);
-    history.push(formatDateToDateKey(pastDate));
+  if (initialStreak > 0) {
+    // Seed past days if a positive initial streak was specified
+    for (let i = initialStreak - 1; i >= 0; i--) {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - i);
+      history.push(formatDateToDateKey(pastDate));
+    }
   }
 
   const dailyActivities: StreakData['dailyActivities'] = {};
@@ -95,27 +97,27 @@ export function getDefaultStreakData(initialStreak = 4, longestStreak = 12): Str
   return {
     currentStreak: initialStreak,
     longestStreak: Math.max(longestStreak, initialStreak),
-    lastActiveDate: today,
+    lastActiveDate: initialStreak > 0 ? today : '',
     streakHistory: history,
     dailyActivities,
     freezeDaysRemaining: 1,
-    isStreakActiveToday: true,
-    streakStatus: 'ACTIVE_TODAY',
+    isStreakActiveToday: initialStreak > 0,
+    streakStatus: initialStreak > 0 ? 'ACTIVE_TODAY' : 'BROKEN',
   };
 }
 
 /**
  * Load persisted streak data for a user with safety fallbacks
  */
-export function loadUserStreak(userId: string = DEFAULT_USER_ID, initialFallbackStreak = 4): StreakData {
+export function loadUserStreak(userId: string = DEFAULT_USER_ID, initialFallbackStreak = 0): StreakData {
   if (typeof window === 'undefined') {
-    return getDefaultStreakData(initialFallbackStreak);
+    return getDefaultStreakData(initialFallbackStreak, initialFallbackStreak);
   }
 
   try {
     const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}`);
     if (!raw) {
-      const initial = getDefaultStreakData(initialFallbackStreak);
+      const initial = getDefaultStreakData(initialFallbackStreak, initialFallbackStreak);
       saveUserStreak(userId, initial);
       return initial;
     }

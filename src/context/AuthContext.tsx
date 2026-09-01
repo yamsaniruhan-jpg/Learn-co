@@ -20,7 +20,13 @@ interface AuthContextType {
   authError: string | null;
   signInWithEmail: (email: string, password?: string) => Promise<void>;
   signUpWithEmail: (email: string, password?: string, fullName?: string) => Promise<void>;
-  signInWithGoogle: (email?: string, name?: string, avatarUrl?: string) => Promise<void>;
+  signInWithGoogle: (
+    email?: string,
+    name?: string,
+    avatarUrl?: string,
+    intent?: 'signin' | 'signup' | 'auto',
+    idToken?: string
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<UserProfile>;
   updateSettings: (updates: Partial<UserSettings>) => Promise<UserSettings>;
@@ -46,12 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const token = AuthClient.getToken();
       if (!token) {
-        // Fallback or auto-sign in with demo user if no token exists yet
-        const demoRes = await AuthClient.signIn('learner@learn.co', 'LearnCo2026!');
-        setUser(demoRes.user);
-        setProfile(demoRes.profile);
-        setGamification(demoRes.gamification);
-        setSettings(demoRes.settings);
+        // No active session: Start in clean guest / unauthenticated state
+        setUser(null);
+        setProfile(null);
+        setGamification(null);
+        setSettings(null);
         return;
       }
 
@@ -61,20 +66,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setGamification(res.gamification);
       setSettings(res.settings);
     } catch (err: any) {
-      console.warn('Session verification failed, logging into demo profile', err);
-      try {
-        const demoRes = await AuthClient.signIn('learner@learn.co', 'LearnCo2026!');
-        setUser(demoRes.user);
-        setProfile(demoRes.profile);
-        setGamification(demoRes.gamification);
-        setSettings(demoRes.settings);
-      } catch {
-        AuthClient.removeToken();
-        setUser(null);
-        setProfile(null);
-        setGamification(null);
-        setSettings(null);
-      }
+      console.warn('Session verification failed or expired:', err?.message || err);
+      AuthClient.removeToken();
+      setUser(null);
+      setProfile(null);
+      setGamification(null);
+      setSettings(null);
     } finally {
       setIsLoading(false);
     }
@@ -113,13 +110,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async (
-    email: string = 'google.learner@learn.co',
-    name: string = 'Google Scholar',
-    avatarUrl?: string
+    email?: string,
+    name?: string,
+    avatarUrl?: string,
+    intent: 'signin' | 'signup' | 'auto' = 'auto',
+    idToken?: string
   ) => {
     setAuthError(null);
     try {
-      const res = await AuthClient.signInWithGoogle({ email, name, avatarUrl });
+      if (!email || !email.includes('@')) {
+        throw new Error('Please select or provide a valid Google Account email.');
+      }
+      const res = await AuthClient.signInWithGoogle({
+        email: email.trim().toLowerCase(),
+        name: name || email.split('@')[0],
+        avatarUrl,
+        intent,
+        idToken,
+      });
       setUser(res.user);
       setProfile(res.profile);
       setGamification(res.gamification);

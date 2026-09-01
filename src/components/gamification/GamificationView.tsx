@@ -27,9 +27,9 @@ import { Leaderboard } from '../leaderboard/Leaderboard';
 export const GamificationView: React.FC = () => {
   const { profile, gamification } = useAuth();
 
-  const xp = gamification?.xp || 85;
-  const currentStreak = gamification?.currentStreak || 4;
-  const longestStreak = gamification?.longestStreak || 12;
+  const xp = gamification?.xp ?? 0;
+  const currentStreak = gamification?.currentStreak ?? 0;
+  const longestStreak = gamification?.longestStreak ?? 0;
 
   const levelInfo = calculateLevelFromXp(xp);
   const currentTier =
@@ -147,7 +147,7 @@ export const GamificationView: React.FC = () => {
               Daily Practice Limit
             </span>
             <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
-              {gamification?.dailyQuestionsSolvedToday || 4} / 25 Questions Solved
+              {gamification?.dailyQuestionsSolvedToday ?? 0} / 25 Questions Solved
             </span>
           </div>
         </div>

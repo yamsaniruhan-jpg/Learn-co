@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard,
   BookOpen,
+  Library,
   Target,
   Calendar,
   Sparkles,
@@ -48,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const coreNav: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'concepts', label: 'Concept Library', icon: Library, highlight: true },
     { id: 'learn', label: 'Learn & Explore', icon: BookOpen },
     { id: 'practice', label: 'Practice Arena', icon: Target, badge: `${dailyAllowanceRemaining} left` },
     { id: 'planner', label: 'Study Planner', icon: Calendar },

@@ -7,6 +7,7 @@ import {
   StudyPlanSession,
   AchievementBadge,
   NotificationItem,
+  ConceptMastery,
 } from '../types';
 
 export const SEED_SUBJECTS: Subject[] = [
@@ -18,7 +19,7 @@ export const SEED_SUBJECTS: Subject[] = [
     color: '#4f46e5',
     courseCount: 6,
     conceptCount: 48,
-    masteryPercentage: 82,
+    masteryPercentage: 0,
   },
   {
     id: 'cs',
@@ -28,7 +29,7 @@ export const SEED_SUBJECTS: Subject[] = [
     color: '#f59e0b',
     courseCount: 5,
     conceptCount: 45,
-    masteryPercentage: 74,
+    masteryPercentage: 0,
   },
   {
     id: 'physics',
@@ -38,7 +39,7 @@ export const SEED_SUBJECTS: Subject[] = [
     color: '#0284c7',
     courseCount: 5,
     conceptCount: 40,
-    masteryPercentage: 68,
+    masteryPercentage: 0,
   },
   {
     id: 'chemistry',
@@ -48,7 +49,7 @@ export const SEED_SUBJECTS: Subject[] = [
     color: '#059669',
     courseCount: 5,
     conceptCount: 36,
-    masteryPercentage: 54,
+    masteryPercentage: 0,
   },
   {
     id: 'biology',
@@ -58,7 +59,7 @@ export const SEED_SUBJECTS: Subject[] = [
     color: '#e11d48',
     courseCount: 5,
     conceptCount: 35,
-    masteryPercentage: 62,
+    masteryPercentage: 0,
   },
 ];
 
@@ -556,67 +557,22 @@ export const SEED_NOTIFICATIONS: NotificationItem[] = [
 export const INITIAL_USER = {
   id: 'user-001',
   email: 'learner@learn.co',
-  fullName: 'Alex Vance',
+  fullName: 'Learner',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  xp: 85,
-  level: 2,
-  currentStreak: 4,
-  longestStreak: 12,
-  dailyQuestionsSolvedToday: 4,
+  xp: 0,
+  level: 1,
+  currentStreak: 0,
+  longestStreak: 0,
+  dailyQuestionsSolvedToday: 0,
   dailyAllowanceLimit: 25,
   role: 'student' as const,
-  targetExam: 'Advanced STEM Mastery & JEE/AP',
-  targetScore: '99th Percentile',
-  examDate: '2026-10-15',
-  weakTopics: ['Applications of Derivatives'],
-  studyTimeMinutesThisWeek: 180,
-  joinedDate: '2026-08-01',
+  targetExam: 'STEM Mastery',
+  targetScore: '100%',
+  examDate: '',
+  weakTopics: [],
+  studyTimeMinutesThisWeek: 0,
+  joinedDate: new Date().toISOString().split('T')[0],
 };
 
-export const INITIAL_MASTERIES = [
-  {
-    conceptId: 'concept-deriv-inc-dec',
-    conceptTitle: 'Monotonicity & First Derivative Test',
-    subjectId: 'math' as const,
-    masteryScore: 84,
-    attemptsCount: 8,
-    correctCount: 7,
-    lastPracticedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-    retentionStrength: 92,
-    isWeakArea: false,
-  },
-  {
-    conceptId: 'concept-grad-descent',
-    conceptTitle: 'Gradient Descent & Learning Rate Convergence',
-    subjectId: 'cs' as const,
-    masteryScore: 78,
-    attemptsCount: 6,
-    correctCount: 5,
-    lastPracticedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    retentionStrength: 88,
-    isWeakArea: false,
-  },
-  {
-    conceptId: 'concept-energy-cons',
-    conceptTitle: 'Work-Energy Theorem in Conservative Systems',
-    subjectId: 'physics' as const,
-    masteryScore: 71,
-    attemptsCount: 4,
-    correctCount: 3,
-    lastPracticedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    retentionStrength: 81,
-    isWeakArea: false,
-  },
-  {
-    conceptId: 'concept-sn1-sn2',
-    conceptTitle: 'Stereochemistry of SN2 & Walden Inversion',
-    subjectId: 'chemistry' as const,
-    masteryScore: 54,
-    attemptsCount: 3,
-    correctCount: 1,
-    lastPracticedAt: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(),
-    retentionStrength: 65,
-    isWeakArea: true,
-  },
-];
+export const INITIAL_MASTERIES: ConceptMastery[] = [];
 

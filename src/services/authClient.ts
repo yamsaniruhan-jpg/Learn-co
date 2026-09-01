@@ -110,8 +110,11 @@ export class AuthClient {
     name?: string;
     avatarUrl?: string;
     timezone?: string;
+    intent?: 'signin' | 'signup' | 'auto';
+    idToken?: string;
   }): Promise<{
     token: string;
+    googleToken?: string;
     user: any;
     profile: UserProfile;
     gamification: UserGamification;
@@ -125,7 +128,10 @@ export class AuthClient {
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Google authentication failed.');
+      const err: any = new Error(data.error || 'Google authentication failed.');
+      err.notFound = data.notFound;
+      err.email = data.email;
+      throw err;
     }
 
     if (data.token) {

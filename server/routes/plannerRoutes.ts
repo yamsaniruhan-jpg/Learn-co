@@ -1,9 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { Database, withUserLock } from '../db';
+import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { PlannerEngine } from '../services/plannerEngine';
 import { PlanGenerationInput, StudyPlan, StudyTask, StudyGoal } from '../../src/types/planner';
 
 const router = Router();
+
+// Ensure all planner routes require an authenticated user
+router.use(requireAuth);
 
 function resolveUserId(req: Request): string {
   const authHeader = req.headers.authorization;
@@ -12,7 +16,7 @@ function resolveUserId(req: Request): string {
     const sessionUser = Database.getSessionUser(token);
     if (sessionUser) return sessionUser.id;
   }
-  return 'user-alex-001';
+  return '';
 }
 
 // -------------------------------------------------------------

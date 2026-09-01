@@ -3,6 +3,10 @@ export const XP_PER_INCORRECT_QUESTION = 0;
 export const XP_PER_ABANDONED_QUESTION = 0;
 
 export const DAILY_PRACTICE_LIMIT = 25;
+export const DAILY_DOUBTS_LIMIT = 5;
+export const DAILY_ARTIFACTS_LIMIT = 4;
+export const DAILY_SOURCES_UPLOAD_LIMIT = 4;
+export const MAX_SOURCES_PER_ARTIFACT = 5;
 
 export type OnboardingStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 
@@ -62,6 +66,42 @@ export interface UserGamification {
   lastActiveDate: string; // YYYY-MM-DD in user timezone
   dailyQuestionsSolvedToday: number;
   dailyAllowanceLimit: number;
+  dailyDoubtsAskedToday?: number;
+  dailyDoubtsLimit?: number;
+  dailyArtifactsCreatedToday?: number;
+  dailyArtifactsLimit?: number;
+  dailySourcesUploadedToday?: number;
+  dailySourcesUploadLimit?: number;
+}
+
+export interface UserDailyQuotas {
+  questions: {
+    used: number;
+    limit: number;
+    remaining: number;
+    isLimitReached: boolean;
+  };
+  doubts: {
+    used: number;
+    limit: number;
+    remaining: number;
+    isLimitReached: boolean;
+  };
+  artifacts: {
+    used: number;
+    limit: number;
+    remaining: number;
+    isLimitReached: boolean;
+  };
+  sources: {
+    used: number;
+    limit: number;
+    remaining: number;
+    isLimitReached: boolean;
+    maxPerArtifact: number;
+  };
+  resetsAt: string; // ISO string of upcoming midnight
+  timezone: string;
 }
 
 export interface UserSettings {

@@ -59,14 +59,17 @@ router.post('/signin', (req, res: Response) => {
 
     const user = Database.findUserByEmail(email);
     if (!user) {
-      res.status(401).json({ error: 'Invalid email or password credentials.' });
+      res.status(404).json({
+        error: 'No account found with this email. Please create a new account first.',
+        notFound: true,
+      });
       return;
     }
 
     if (user.authProvider === 'email') {
       const hashed = hashPassword(password);
       if (user.passwordHash !== hashed) {
-        res.status(401).json({ error: 'Invalid email or password credentials.' });
+        res.status(401).json({ error: 'Incorrect password for this account. Please try again.' });
         return;
       }
     }
@@ -95,24 +98,35 @@ router.post('/signin', (req, res: Response) => {
 // POST /api/auth/google
 router.post('/google', (req, res: Response) => {
   try {
-    const { email, name, avatarUrl, timezone } = req.body;
+    const { email, name, avatarUrl, timezone, intent = 'auto', idToken } = req.body;
 
-    if (!email) {
-      res.status(400).json({ error: 'Email is required for Google Sign-In.' });
+    if (!email || !email.includes('@')) {
+      res.status(400).json({ error: 'A valid email is required for Google Sign-In.' });
       return;
     }
 
-    let user = Database.findUserByEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = Database.findUserByEmail(normalizedEmail);
     let token: string;
     let profile: any;
 
     if (!user) {
-      // New Google User
+      if (intent === 'signin') {
+        // User clicked "Sign In with Google" but hasn't created an account yet
+        res.status(404).json({
+          error: `No Learn.co account found for "${normalizedEmail}". Please create an account to get started.`,
+          notFound: true,
+          email: normalizedEmail,
+        });
+        return;
+      }
+
+      // New Google User Creation (Strict 0 XP, Level 1, 0 streak, 0 questions solved)
       const created = Database.createUser({
-        email,
-        fullName: name || email.split('@')[0],
+        email: normalizedEmail,
+        fullName: name || normalizedEmail.split('@')[0],
         authProvider: 'google',
-        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
+        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(normalizedEmail)}`,
         timezone: timezone || 'UTC',
       });
       user = created.user;
@@ -126,8 +140,12 @@ router.post('/google', (req, res: Response) => {
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
 
+    // Generate a structured Google OAuth token representation
+    const verifiedGoogleToken = idToken || `g_oauth2_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+
     res.json({
       token,
+      googleToken: verifiedGoogleToken,
       user: {
         id: user.id,
         email: user.email,

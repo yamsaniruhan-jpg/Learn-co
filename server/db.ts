@@ -12,6 +12,11 @@ import {
   UserStatistics,
   LeaderboardEntry,
   DAILY_PRACTICE_LIMIT,
+  DAILY_DOUBTS_LIMIT,
+  DAILY_ARTIFACTS_LIMIT,
+  DAILY_SOURCES_UPLOAD_LIMIT,
+  MAX_SOURCES_PER_ARTIFACT,
+  UserDailyQuotas,
   XP_PER_CORRECT_QUESTION,
   calculateLevelFromXp,
 } from '../src/types/auth';
@@ -204,631 +209,6 @@ export function getDateInTimezone(timezone: string = 'UTC', dateInput: Date = ne
  */
 function seedDatabase() {
   const now = new Date().toISOString();
-  const demoUserId = 'user-alex-001';
-  const demoEmail = 'learner@learn.co';
-
-  // Seed Alex Vance (Main user)
-  const alexUser: UserAccount = {
-    id: demoUserId,
-    email: demoEmail,
-    passwordHash: hashPassword('LearnCo2026!'),
-    authProvider: 'email',
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: now,
-    lastLoginAt: now,
-  };
-
-  const alexProfile: UserProfile = {
-    id: 'prof-alex-001',
-    userId: demoUserId,
-    email: demoEmail,
-    fullName: 'Alex Vance',
-    displayName: 'Alex V.',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    educationLevel: 'Undergraduate STEM / Pre-Eng',
-    targetExam: 'Advanced STEM Mastery & JEE/AP',
-    targetScore: '99th Percentile',
-    examDate: '2026-10-15',
-    subjects: ['math', 'cs', 'physics', 'chemistry'],
-    learningGoals: ['Master Monotonicity & Differential Operators', 'Score Top 1% in Diagnostic Practice'],
-    preferredStudyTimeMinutes: 45,
-    studyTimeMinutesThisWeek: 180,
-    role: 'student',
-    onboardingStatus: 'COMPLETED',
-    timezone: 'America/New_York',
-    joinedDate: '2026-08-01',
-    bio: 'Pursuing deep mathematical intuition and algorithmic mastery.',
-    institution: 'Institute of Applied Sciences',
-  };
-
-  const alexGamification: UserGamification = {
-    userId: demoUserId,
-    xp: 85,
-    level: 2,
-    currentStreak: 4,
-    longestStreak: 12,
-    lastActiveDate: getDateInTimezone(alexProfile.timezone),
-    dailyQuestionsSolvedToday: 4,
-    dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
-  };
-
-  const alexSettings: UserSettings = {
-    userId: demoUserId,
-    theme: 'system',
-    notifications: {
-      studyReminders: true,
-      streakAlerts: true,
-      achievementAlerts: true,
-      mentorAlerts: true,
-      copilotAlerts: true,
-    },
-    privacy: {
-      profileVisibility: 'public',
-      leaderboardVisibility: true,
-      analyticsSharing: true,
-    },
-    learningPreferences: {
-      socraticGuidanceLevel: 'high',
-      showDetailedDerivations: true,
-      timerVisible: true,
-      soundEffects: true,
-    },
-  };
-
-  memoryDb.users[demoUserId] = alexUser;
-  memoryDb.usersByEmail[demoEmail.toLowerCase()] = demoUserId;
-  memoryDb.profiles[demoUserId] = alexProfile;
-  memoryDb.gamification[demoUserId] = alexGamification;
-  memoryDb.settings[demoUserId] = alexSettings;
-
-  // Seed sample initial transactions
-  memoryDb.xpTransactions.push(
-    {
-      id: 'tx-001',
-      userId: demoUserId,
-      amount: 25,
-      reason: 'INITIAL_BONUS',
-      timestamp: '2026-08-01T10:00:00.000Z',
-    },
-    {
-      id: 'tx-002',
-      userId: demoUserId,
-      amount: 60,
-      reason: 'QUESTION_CORRECT',
-      timestamp: '2026-08-27T14:30:00.000Z',
-    }
-  );
-
-  // Seed other cohort students for leaderboard
-  const cohortData = [
-    {
-      id: 'user-elena-002',
-      email: 'elena@learn.co',
-      name: 'Elena Rostova',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      xp: 1420,
-      level: 5,
-      streak: 18,
-    },
-    {
-      id: 'user-marcus-003',
-      email: 'marcus@learn.co',
-      name: 'Marcus Chen',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      xp: 1180,
-      level: 4,
-      streak: 12,
-    },
-    {
-      id: 'user-devon-004',
-      email: 'devon@learn.co',
-      name: 'Devon Patel',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-      xp: 75,
-      level: 2,
-      streak: 3,
-    },
-    {
-      id: 'user-sarah-005',
-      email: 'sarah@learn.co',
-      name: 'Sarah Lin',
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&auto=format&fit=crop&q=80',
-      xp: 60,
-      level: 1,
-      streak: 2,
-    },
-  ];
-
-  for (const student of cohortData) {
-    memoryDb.users[student.id] = {
-      id: student.id,
-      email: student.email,
-      passwordHash: hashPassword('Cohort2026!'),
-      authProvider: 'email',
-      createdAt: '2026-08-01T00:00:00.000Z',
-      updatedAt: now,
-      lastLoginAt: now,
-    };
-    memoryDb.usersByEmail[student.email.toLowerCase()] = student.id;
-    memoryDb.profiles[student.id] = {
-      id: `prof-${student.id}`,
-      userId: student.id,
-      email: student.email,
-      fullName: student.name,
-      displayName: student.name,
-      avatarUrl: student.avatar,
-      educationLevel: 'Undergraduate',
-      targetExam: 'GRE/STEM Olympiad',
-      targetScore: 'Top 1%',
-      examDate: '2026-11-20',
-      subjects: ['math', 'cs'],
-      learningGoals: ['Complete Curriculum'],
-      preferredStudyTimeMinutes: 60,
-      studyTimeMinutesThisWeek: 240,
-      role: 'student',
-      onboardingStatus: 'COMPLETED',
-      timezone: 'UTC',
-      joinedDate: '2026-08-01',
-    };
-    memoryDb.gamification[student.id] = {
-      userId: student.id,
-      xp: student.xp,
-      level: student.level,
-      currentStreak: student.streak,
-      longestStreak: student.streak + 5,
-      lastActiveDate: getDateInTimezone('UTC'),
-      dailyQuestionsSolvedToday: 8,
-      dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
-    };
-    memoryDb.settings[student.id] = {
-      userId: student.id,
-      theme: 'system',
-      notifications: {
-        studyReminders: true,
-        streakAlerts: true,
-        achievementAlerts: true,
-        mentorAlerts: true,
-        copilotAlerts: true,
-      },
-      privacy: {
-        profileVisibility: 'public',
-        leaderboardVisibility: true,
-        analyticsSharing: true,
-      },
-      learningPreferences: {
-        socraticGuidanceLevel: 'medium',
-        showDetailedDerivations: true,
-        timerVisible: true,
-        soundEffects: true,
-      },
-    };
-  }
-
-  // Seed sample initial mistake for Alex
-  const sampleMistake: MistakeRecord = {
-    id: 'mistake-init-001',
-    userId: demoUserId,
-    attemptId: 'att-init-001',
-    questionId: 'q-chem-sn2-01',
-    subjectId: 'chemistry',
-    topicId: 'Stereochemistry of SN2 & Walden Inversion',
-    subtopicId: 'Nucleophilic Substitution',
-    conceptId: 'concept-sn1-sn2',
-    difficulty: 'medium',
-    questionText: 'What is the stereochemical outcome when (R)-2-bromobutane undergoes an SN2 reaction with hydroxide ion (OH⁻)?',
-    userAnswer: 'Racemic mixture (50% R and 50% S)',
-    correctAnswer: '100% Walden inversion to (S)-butan-2-ol',
-    explanation: 'SN2 reactions proceed via a concerted backside attack opposite to the leaving group, resulting in complete inversion of stereocenter configuration.',
-    resolved: false,
-    createdAt: '2026-08-25T16:20:00.000Z',
-  };
-  memoryDb.mistakes.push(sampleMistake);
-
-  // Seed realistic question attempts for Alex across subjects
-  const sampleAttempts: QuestionAttemptRecord[] = [
-    {
-      id: 'att-init-001',
-      userId: demoUserId,
-      questionId: 'q-chem-sn2-01',
-      subjectId: 'chemistry',
-      topicId: 'Stereochemistry of SN2 & Walden Inversion',
-      subtopicId: 'Nucleophilic Substitution',
-      conceptId: 'concept-sn1-sn2',
-      difficulty: 'medium',
-      questionText: 'What is the stereochemical outcome when (R)-2-bromobutane undergoes an SN2 reaction with hydroxide ion (OH⁻)?',
-      selectedAnswer: 'Racemic mixture (50% R and 50% S)',
-      correctAnswer: '100% Walden inversion to (S)-butan-2-ol',
-      isCorrect: false,
-      status: 'INCORRECT',
-      xpAwarded: 5,
-      solvingTimeSeconds: 48,
-      hintsRevealedCount: 1,
-      explanation: 'SN2 reactions proceed via a concerted backside attack opposite to the leaving group, resulting in complete inversion of stereocenter configuration.',
-      startedAt: '2026-08-25T16:19:12.000Z',
-      submittedAt: '2026-08-25T16:20:00.000Z',
-    },
-    {
-      id: 'att-init-002',
-      userId: demoUserId,
-      questionId: 'q-cs-grad-01',
-      subjectId: 'cs',
-      topicId: 'Optimization Algorithms',
-      subtopicId: 'First-Order Optimization',
-      conceptId: 'concept-grad-descent',
-      difficulty: 'easy_medium',
-      questionText: 'In gradient descent with learning rate $\\eta$, what is the parameter update rule?',
-      selectedAnswer: '$\\theta_{t+1} = \\theta_t - \\eta \\nabla L(\\theta_t)$',
-      correctAnswer: '$\\theta_{t+1} = \\theta_t - \\eta \\nabla L(\\theta_t)$',
-      isCorrect: true,
-      status: 'CORRECT',
-      xpAwarded: 25,
-      solvingTimeSeconds: 32,
-      hintsRevealedCount: 0,
-      explanation: 'Gradient descent steps in the direction of steepest decrease, which is opposite to the gradient vector.',
-      startedAt: '2026-08-26T11:14:28.000Z',
-      submittedAt: '2026-08-26T11:15:00.000Z',
-    },
-    {
-      id: 'att-init-003',
-      userId: demoUserId,
-      questionId: 'q-phys-energy-01',
-      subjectId: 'physics',
-      topicId: 'Work-Energy Theorem & Invariants',
-      subtopicId: 'Conservative Forces',
-      conceptId: 'concept-energy-cons',
-      difficulty: 'medium',
-      questionText: 'Which condition guarantees mechanical energy conservation in a closed system?',
-      selectedAnswer: 'Work done by non-conservative forces is zero',
-      correctAnswer: 'Work done by non-conservative forces is zero',
-      isCorrect: true,
-      status: 'CORRECT',
-      xpAwarded: 25,
-      solvingTimeSeconds: 41,
-      hintsRevealedCount: 0,
-      explanation: 'When $W_{nc} = 0$, $\\Delta K + \\Delta U = 0 \\implies E_{total} = \\text{constant}$.',
-      startedAt: '2026-08-27T09:29:19.000Z',
-      submittedAt: '2026-08-27T09:30:00.000Z',
-    },
-    {
-      id: 'att-init-004',
-      userId: demoUserId,
-      questionId: 'q-math-deriv-01',
-      subjectId: 'math',
-      topicId: 'Monotonicity & Extrema Optimization',
-      subtopicId: 'math-sub-first-deriv',
-      conceptId: 'concept-deriv-inc-dec',
-      difficulty: 'easy',
-      questionText: 'Find all critical points of $f(x) = x^3 - 3x^2 - 9x + 7$ on $\\mathbb{R}$.',
-      selectedAnswer: '$x = -1$ and $x = 3$',
-      correctAnswer: '$x = -1$ and $x = 3$',
-      isCorrect: true,
-      status: 'CORRECT',
-      xpAwarded: 25,
-      solvingTimeSeconds: 28,
-      hintsRevealedCount: 0,
-      explanation: 'Differentiating gives $f\'(x) = 3x^2 - 6x - 9 = 3(x-3)(x+1)$. Setting $f\'(x)=0$ yields $x = 3$ and $x = -1$.',
-      startedAt: '2026-08-28T14:09:32.000Z',
-      submittedAt: '2026-08-28T14:10:00.000Z',
-    },
-    {
-      id: 'att-init-005',
-      userId: demoUserId,
-      questionId: 'q-math-deriv-02',
-      subjectId: 'math',
-      topicId: 'Monotonicity & Extrema Optimization',
-      subtopicId: 'math-sub-first-deriv',
-      conceptId: 'concept-deriv-inc-dec',
-      difficulty: 'easy_medium',
-      questionText: 'On which interval is the function $f(x) = 2x^3 - 9x^2 + 12x + 5$ strictly decreasing?',
-      selectedAnswer: '$(1, 2)$',
-      correctAnswer: '$(1, 2)$',
-      isCorrect: true,
-      status: 'CORRECT',
-      xpAwarded: 25,
-      solvingTimeSeconds: 35,
-      hintsRevealedCount: 0,
-      explanation: 'Derivative $f\'(x) = 6x^2 - 18x + 12 = 6(x-1)(x-2)$. For strict decrease, $f\'(x) < 0 \\implies (x-1)(x-2) < 0$, which holds on $(1, 2)$.',
-      startedAt: '2026-08-29T09:59:25.000Z',
-      submittedAt: '2026-08-29T10:00:00.000Z',
-    },
-    {
-      id: 'att-init-006',
-      userId: demoUserId,
-      questionId: 'q-math-deriv-03',
-      subjectId: 'math',
-      topicId: 'Monotonicity & Extrema Optimization',
-      subtopicId: 'math-sub-first-deriv',
-      conceptId: 'concept-deriv-inc-dec',
-      difficulty: 'medium',
-      questionText: 'Let $g(x) = x^4 - 4x^3 + 4x^2 + 1$. Which of the following statements are TRUE?',
-      selectedAnswer: '$g(x)$ has local minima at $x = 0$ and $x = 2$',
-      correctAnswer: '$g(x)$ has local minima at $x = 0$ and $x = 2$',
-      isCorrect: true,
-      status: 'CORRECT',
-      xpAwarded: 25,
-      solvingTimeSeconds: 52,
-      hintsRevealedCount: 1,
-      explanation: 'Derivative $g\'(x) = 4x^3 - 12x^2 + 8x = 4x(x-1)(x-2)$. Second derivative test verifies minima at 0 and 2, and maximum at 1.',
-      startedAt: '2026-08-29T16:14:08.000Z',
-      submittedAt: '2026-08-29T16:15:00.000Z',
-    },
-  ];
-
-  for (const att of sampleAttempts) {
-    memoryDb.questionAttempts.push(att);
-  }
-
-  // Seed sample Creator Studio Source & Resources
-  const sampleSource1: CreatorSource = {
-    id: 'src-calc-001',
-    userId: demoUserId,
-    title: 'Differential Calculus & Extrema Theorems',
-    sourceType: 'text',
-    originalContent: `Theorem (First Derivative Test for Local Extrema):
-Let f be continuous on [a, b] and differentiable on (a, b), except possibly at c.
-1. If f'(x) changes from positive to negative at c, then f has a local maximum at c.
-2. If f'(x) changes from negative to positive at c, then f has a local minimum at c.
-3. If f'(x) does not change sign at c, then f has no local extremum at c.
-
-Theorem (Second Derivative Test):
-Suppose f'' is continuous near c, and f'(c) = 0.
-- If f''(c) > 0, then f has a local minimum at c.
-- If f''(c) < 0, then f has a local maximum at c.
-- If f''(c) = 0, the test is inconclusive.`,
-    extractedText: `Theorem (First Derivative Test for Local Extrema):
-Let f be continuous on [a, b] and differentiable on (a, b), except possibly at c.
-1. If f'(x) changes from positive to negative at c, then f has a local maximum at c.
-2. If f'(x) changes from negative to positive at c, then f has a local minimum at c.
-3. If f'(x) does not change sign at c, then f has no local extremum at c.`,
-    wordCount: 88,
-    status: 'ready',
-    createdAt: '2026-08-27T08:00:00.000Z',
-    updatedAt: '2026-08-27T08:00:00.000Z',
-  };
-  memoryDb.creatorSources[sampleSource1.id] = sampleSource1;
-
-  const sampleResource1: CreatorResource = {
-    id: 'res-flash-001',
-    userId: demoUserId,
-    sourceId: sampleSource1.id,
-    title: 'Calculus Extrema & Monotonicity Mastery',
-    resourceType: 'flashcards',
-    subjectId: 'math',
-    difficulty: 'medium',
-    tags: ['calculus', 'derivatives', 'optimization'],
-    version: 1,
-    status: 'ready',
-    isPublic: true,
-    createdAt: '2026-08-27T08:05:00.000Z',
-    updatedAt: '2026-08-27T08:05:00.000Z',
-    content: {
-      flashcards: [
-        {
-          id: 'fc-1',
-          front: 'What is the First Derivative Criterion for monotonicity?',
-          back: 'If $f\'(x) > 0$ on $(a, b)$, then $f$ is strictly increasing. If $f\'(x) < 0$, $f$ is strictly decreasing.',
-          formula: 'f\'(x) > 0 \\implies f \\text{ strictly increasing}',
-          hint: 'Think about the slope of the tangent line across the interval.',
-          tags: ['derivatives', 'monotonicity'],
-          mastered: false,
-        },
-        {
-          id: 'fc-2',
-          front: 'Under what condition does $f\'(c) = 0$ NOT guarantee a local extremum?',
-          back: 'When $f\'(x)$ maintains the same sign on both sides of $c$ (e.g., $f(x) = x^3$ at $x=0$, which is a saddle point / stationary inflection).',
-          formula: 'f\'(x) = 3x^2 \\geq 0 \\quad \\forall x \\in \\mathbb{R}',
-          hint: 'Recall that stationary inflection points can have zero slope without extrema.',
-          tags: ['critical points', 'inflection'],
-          mastered: true,
-        },
-        {
-          id: 'fc-3',
-          front: 'State the Second Derivative Test for Concavity and Local Minima.',
-          back: 'If $f\'(c) = 0$ and $f\'\'(c) > 0$, the curve is concave up at $c$, establishing a strict local minimum.',
-          formula: 'f\'(c) = 0 \\land f\'\'(c) > 0 \\implies \\text{Local Min at } c',
-          tags: ['concavity', 'second derivative'],
-          mastered: false,
-        },
-      ],
-    },
-  };
-  memoryDb.creatorResources[sampleResource1.id] = sampleResource1;
-  memoryDb.creatorResourceVersions[sampleResource1.id] = [
-    {
-      id: 'ver-001-1',
-      resourceId: sampleResource1.id,
-      versionNumber: 1,
-      content: sampleResource1.content,
-      changelog: 'Initial AI Synthesis from Calculus Extrema Notes',
-      createdAt: sampleResource1.createdAt,
-    },
-  ];
-
-  const sampleResource2: CreatorResource = {
-    id: 'res-quiz-002',
-    userId: demoUserId,
-    sourceId: sampleSource1.id,
-    title: 'Differential Extrema Diagnostic Quiz',
-    resourceType: 'quiz',
-    subjectId: 'math',
-    difficulty: 'medium',
-    tags: ['quiz', 'calculus', 'diagnostic'],
-    version: 1,
-    status: 'ready',
-    isPublic: true,
-    createdAt: '2026-08-27T08:15:00.000Z',
-    updatedAt: '2026-08-27T08:15:00.000Z',
-    content: {
-      quiz: [
-        {
-          id: 'qz-1',
-          question: 'Let $f(x) = x^4 - 4x^3$. At $x = 3$, what type of critical point occurs?',
-          options: [
-            'Local minimum with negative second derivative',
-            'Strict local minimum because $f\'(3)=0$ and $f\'\'(3) = 12 > 0$',
-            'Local maximum because $f\'(3)=0$',
-            'Inflection point without extremum',
-          ],
-          correctIndex: 1,
-          explanation: 'Differentiating: $f\'(x) = 4x^3 - 12x^2 = 4x^2(x-3)$. Thus $f\'(3) = 0$. $f\'\'(x) = 12x^2 - 24x$, so $f\'\'(3) = 108 - 72 = 36 > 0$, confirming a strict local minimum.',
-          bloomLevel: 'Apply',
-          difficulty: 'medium',
-        },
-        {
-          id: 'qz-2',
-          question: 'If $f\'(c) = 0$ and $f\'\'(c) = 0$, what is the conclusion regarding extrema at $c$?',
-          options: [
-            'There is definitely no extremum at $c$',
-            'The Second Derivative Test is inconclusive; must test first derivative sign change',
-            'There is definitely a saddle point',
-            'The function is discontinuous at $c$',
-          ],
-          correctIndex: 1,
-          explanation: 'When both $f\'(c)=0$ and $f\'\'(c)=0$, the second derivative test yields no information (e.g. $y=x^4$ has a minimum, $y=-x^4$ has a maximum, $y=x^3$ has neither).',
-          bloomLevel: 'Understand',
-          difficulty: 'medium',
-        },
-      ],
-    },
-  };
-  memoryDb.creatorResources[sampleResource2.id] = sampleResource2;
-  memoryDb.creatorResourceVersions[sampleResource2.id] = [
-    {
-      id: 'ver-002-1',
-      resourceId: sampleResource2.id,
-      versionNumber: 1,
-      content: sampleResource2.content,
-      changelog: 'Initial Quiz Generation',
-      createdAt: sampleResource2.createdAt,
-    },
-  ];
-
-  // Seed Initial Copilot Conversations for Alex
-  const conv1Id = 'conv-calc-001';
-  const conv1: CopilotConversation = {
-    id: conv1Id,
-    userId: demoUserId,
-    title: 'Monotonicity & Inconclusive Second Derivatives',
-    mode: 'conceptual_explainer',
-    learnerLevel: 'advanced',
-    subjectId: 'math',
-    pinned: true,
-    messageCount: 2,
-    lastMessageSnippet: 'Stationary points where f\'\'(c) = 0 require testing sign change in f\'(x).',
-    createdAt: '2026-08-27T10:00:00.000Z',
-    updatedAt: '2026-08-27T10:05:00.000Z',
-  };
-
-  const conv1Msgs: CopilotMessage[] = [
-    {
-      id: 'msg-conv1-1',
-      conversationId: conv1Id,
-      userId: demoUserId,
-      role: 'user',
-      content: 'Why is the Second Derivative Test inconclusive when $f\'\'(c) = 0$?',
-      mode: 'conceptual_explainer',
-      timestamp: '2026-08-27T10:00:00.000Z',
-    },
-    {
-      id: 'msg-conv1-2',
-      conversationId: conv1Id,
-      userId: demoUserId,
-      role: 'assistant',
-      content: `### Intuition: The Zero-Curvature Inconclusiveness
-
-When $f'(c) = 0$ and $f''(c) = 0$, the quadratic term in the Taylor polynomial vanishes:
-
-$$f(x) = f(c) + f'(c)(x-c) + \\frac{f''(c)}{2!}(x-c)^2 + \\frac{f'''(c)}{3!}(x-c)^3 + \\mathcal{O}((x-c)^4)$$
-
-Because the first non-zero derivative might be odd or even, three distinct geometric behaviors can occur:
-
-1. **Local Minimum**: For $f(x) = x^4$ at $x=0$, $f'(0)=0, f''(0)=0, f^{(4)}(0)=24 > 0$. The curve stays strictly above $y=0$.
-2. **Local Maximum**: For $f(x) = -x^4$ at $x=0$, $f'(0)=0, f''(0)=0, f^{(4)}(0)=-24 < 0$. The curve stays strictly below $y=0$.
-3. **Stationary Inflection Point**: For $f(x) = x^3$ at $x=0$, $f'(0)=0, f''(0)=0, f'''(0)=6 \\neq 0$. The slope does not change sign across $x=0$.
-
-**Authoritative Recommendation**: When $f''(c) = 0$, fall back immediately to the **First Derivative Test** by inspecting whether $f'(x)$ changes sign in $(c-\\epsilon, c+\\epsilon)$.`,
-      mode: 'conceptual_explainer',
-      modelUsed: 'gemini-2.5-flash',
-      citations: [
-        {
-          sourceId: sampleSource1.id,
-          title: 'Differential Calculus & Extrema Theorems',
-          sourceType: 'creator_studio',
-          snippet: 'If f\'\'(c) = 0, the second derivative test is inconclusive.',
-        },
-      ],
-      timestamp: '2026-08-27T10:05:00.000Z',
-    },
-  ];
-
-  const conv2Id = 'conv-chem-002';
-  const conv2: CopilotConversation = {
-    id: conv2Id,
-    userId: demoUserId,
-    title: 'SN2 Walden Inversion & Stereochemistry',
-    mode: 'mistake_doctor',
-    learnerLevel: 'intermediate',
-    subjectId: 'chemistry',
-    pinned: false,
-    messageCount: 2,
-    lastMessageSnippet: 'Analyzing your recent mistake on (R)-2-bromobutane backside displacement.',
-    createdAt: '2026-08-28T14:10:00.000Z',
-    updatedAt: '2026-08-28T14:15:00.000Z',
-  };
-
-  const conv2Msgs: CopilotMessage[] = [
-    {
-      id: 'msg-conv2-1',
-      conversationId: conv2Id,
-      userId: demoUserId,
-      role: 'user',
-      content: 'Can you analyze my mistake on the stereochemistry of SN2 reactions?',
-      mode: 'mistake_doctor',
-      timestamp: '2026-08-28T14:10:00.000Z',
-    },
-    {
-      id: 'msg-conv2-2',
-      conversationId: conv2Id,
-      userId: demoUserId,
-      role: 'assistant',
-      content: `### Mistake Diagnosis & Targeted Invariant Tutoring
-
-I reviewed your recorded mistake on **Question \`q-chem-sn2-01\`**:
-
-* **Your Answer**: *Racemic mixture (50% R and 50% S)*
-* **Correct Answer**: *100% Walden inversion to (S)-butan-2-ol*
-
-#### 1. Why Racemization is Impossible in Pure $S_N2$
-Racemization requires a **planar carbocation intermediate** where the incoming nucleophile has equal probability ($50\\% / 50\\%$) of attacking from either top or bottom face. That is the hallmark of the two-step **$S_N1$** mechanism.
-
-#### 2. The $S_N2$ Backside Attack Invariant
-In an $S_N2$ transition state:
-- The reaction is **bimolecular** and concerted (single step).
-- The incoming nucleophile ($\text{OH}^-$) donates electron density directly into the **antibonding orbital** ($\\sigma^*_{\\text{C-Br}}$).
-- Because $\\sigma^*$ has maximum orbital lobe density at $180^\\circ$ opposite the $\\text{C-Br}$ bond, the nucleophile must attack from the **backside**.
-
-$$\\text{Nucleophile} \\longrightarrow [\\text{HO}\\cdots\\text{C}\\cdots\\text{Br}]^{\\ddagger} \\longrightarrow \\text{Complete Walden Inversion}$$
-
-This flips the chiral umbrella, turning $(R)\\text{-2-bromobutane}$ cleanly into $(S)\\text{-butan-2-ol}$.`,
-      mode: 'mistake_doctor',
-      modelUsed: 'gemini-2.5-flash',
-      citations: [
-        {
-          sourceId: 'mistake-init-001',
-          title: 'Stereochemistry of SN2 & Walden Inversion (Mistake Record)',
-          sourceType: 'mistake_record',
-          snippet: 'SN2 reactions proceed via concerted backside attack resulting in complete inversion of stereocenter.',
-        },
-      ],
-      timestamp: '2026-08-28T14:15:00.000Z',
-    },
-  ];
-
-  memoryDb.copilotConversations[conv1.id] = conv1;
-  memoryDb.copilotMessages[conv1.id] = conv1Msgs;
-
-  memoryDb.copilotConversations[conv2.id] = conv2;
-  memoryDb.copilotMessages[conv2.id] = conv2Msgs;
 
   // Seed Mentorship Data
   for (const mentor of SEED_MENTOR_PROFILES) {
@@ -913,16 +293,128 @@ export class Database {
     const gam = memoryDb.gamification[userId];
     if (!gam) return null;
 
-    // Check if daily practice count needs to be reset for a new day in user timezone
+    // Check if daily counts need to be reset for a new day in user timezone
     const userTimezone = profile?.timezone || 'UTC';
     const today = getDateInTimezone(userTimezone);
 
     if (gam.lastActiveDate !== today) {
-      // New calendar day in user's timezone: reset daily questions count
+      // New calendar day in user's timezone: reset daily counts
       gam.dailyQuestionsSolvedToday = 0;
+      gam.dailyDoubtsAskedToday = 0;
+      gam.dailyArtifactsCreatedToday = 0;
+      gam.dailySourcesUploadedToday = 0;
+      gam.lastActiveDate = today;
     }
 
+    // Ensure all quota fields exist with defaults
+    gam.dailyAllowanceLimit = gam.dailyAllowanceLimit || DAILY_PRACTICE_LIMIT;
+    gam.dailyDoubtsLimit = gam.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT;
+    gam.dailyArtifactsLimit = gam.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
+    gam.dailySourcesUploadLimit = gam.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
+    gam.dailyDoubtsAskedToday = gam.dailyDoubtsAskedToday || 0;
+    gam.dailyArtifactsCreatedToday = gam.dailyArtifactsCreatedToday || 0;
+    gam.dailySourcesUploadedToday = gam.dailySourcesUploadedToday || 0;
+
     return gam;
+  }
+
+  static getUserDailyQuotas(userId: string): UserDailyQuotas {
+    const gam = this.getGamification(userId);
+    const questionsUsed = gam?.dailyQuestionsSolvedToday || 0;
+    const questionsLimit = gam?.dailyAllowanceLimit || DAILY_PRACTICE_LIMIT;
+    const doubtsUsed = gam?.dailyDoubtsAskedToday || 0;
+    const doubtsLimit = gam?.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT;
+    const artifactsUsed = gam?.dailyArtifactsCreatedToday || 0;
+    const artifactsLimit = gam?.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
+    const sourcesUsed = gam?.dailySourcesUploadedToday || 0;
+    const sourcesLimit = gam?.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
+
+    return {
+      questions: {
+        used: questionsUsed,
+        limit: questionsLimit,
+        remaining: Math.max(0, questionsLimit - questionsUsed),
+        isLimitReached: questionsUsed >= questionsLimit,
+      },
+      doubts: {
+        used: doubtsUsed,
+        limit: doubtsLimit,
+        remaining: Math.max(0, doubtsLimit - doubtsUsed),
+        isLimitReached: doubtsUsed >= doubtsLimit,
+      },
+      artifacts: {
+        used: artifactsUsed,
+        limit: artifactsLimit,
+        remaining: Math.max(0, artifactsLimit - artifactsUsed),
+        isLimitReached: artifactsUsed >= artifactsLimit,
+      },
+      sources: {
+        used: sourcesUsed,
+        limit: sourcesLimit,
+        remaining: Math.max(0, sourcesLimit - sourcesUsed),
+        isLimitReached: sourcesUsed >= sourcesLimit,
+        maxPerArtifact: MAX_SOURCES_PER_ARTIFACT,
+      },
+      resetsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      timezone: 'UTC',
+    };
+  }
+
+  static checkAndIncrementDoubtQuota(userId: string): { remaining: number; used: number } {
+    const gam = this.getGamification(userId);
+    if (!gam) {
+      throw new Error('User gamification record not found.');
+    }
+    const current = gam.dailyDoubtsAskedToday || 0;
+    const limit = gam.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT;
+    if (current >= limit) {
+      throw new Error(`Daily doubt limit reached (${limit}/${limit}). Your quota will refresh at midnight in your timezone.`);
+    }
+    gam.dailyDoubtsAskedToday = current + 1;
+    return {
+      used: gam.dailyDoubtsAskedToday,
+      remaining: Math.max(0, limit - gam.dailyDoubtsAskedToday),
+    };
+  }
+
+  static checkAndIncrementSourceQuota(userId: string): { remaining: number; used: number } {
+    const gam = this.getGamification(userId);
+    if (!gam) {
+      throw new Error('User gamification record not found.');
+    }
+    const current = gam.dailySourcesUploadedToday || 0;
+    const limit = gam.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
+    if (current >= limit) {
+      throw new Error(`Daily source upload limit reached (${limit}/${limit}). You can upload up to 4 sources per day (refreshes at midnight).`);
+    }
+    gam.dailySourcesUploadedToday = current + 1;
+    return {
+      used: gam.dailySourcesUploadedToday,
+      remaining: Math.max(0, limit - gam.dailySourcesUploadedToday),
+    };
+  }
+
+  static checkAndIncrementArtifactQuota(
+    userId: string,
+    sourceCount?: number
+  ): { remaining: number; used: number } {
+    if (sourceCount !== undefined && sourceCount > MAX_SOURCES_PER_ARTIFACT) {
+      throw new Error(`Cannot attach more than ${MAX_SOURCES_PER_ARTIFACT} sources per artifact generation.`);
+    }
+    const gam = this.getGamification(userId);
+    if (!gam) {
+      throw new Error('User gamification record not found.');
+    }
+    const current = gam.dailyArtifactsCreatedToday || 0;
+    const limit = gam.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
+    if (current >= limit) {
+      throw new Error(`Daily artifact creation limit reached (${limit}/${limit}). You can synthesize up to 4 artifacts per day (refreshes at midnight).`);
+    }
+    gam.dailyArtifactsCreatedToday = current + 1;
+    return {
+      used: gam.dailyArtifactsCreatedToday,
+      remaining: Math.max(0, limit - gam.dailyArtifactsCreatedToday),
+    };
   }
 
   static getSettings(userId: string): UserSettings | null {
@@ -1016,6 +508,12 @@ export class Database {
       lastActiveDate: '',
       dailyQuestionsSolvedToday: 0,
       dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
+      dailyDoubtsAskedToday: 0,
+      dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
+      dailyArtifactsCreatedToday: 0,
+      dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
+      dailySourcesUploadedToday: 0,
+      dailySourcesUploadLimit: DAILY_SOURCES_UPLOAD_LIMIT,
     };
 
     const newSettings: UserSettings = {
@@ -1222,7 +720,10 @@ export class Database {
 
       let calculatedXp = gam.xp;
 
-      if (timeframe === 'daily') {
+      if (gam.xp === 0) {
+        // Brand new users or zero-XP users always have 0 XP across all filters
+        calculatedXp = 0;
+      } else if (timeframe === 'daily') {
         // Calculate daily XP from today's transactions + today's questions solved
         const todayTxs = memoryDb.xpTransactions.filter(
           (t) => t.userId === userId && t.timestamp.startsWith(todayStr)
@@ -1232,7 +733,7 @@ export class Database {
         calculatedXp = Math.max(txXp, (gam.dailyQuestionsSolvedToday || 0) * 5);
         
         // For cohort demo accounts without fresh transactions today, provide balanced daily practice activity
-        if (calculatedXp === 0 && userId.startsWith('user-')) {
+        if (calculatedXp === 0 && userId.startsWith('user-alex-001')) {
           const pseudoDaily = (gam.xp % 35) + 15;
           calculatedXp = pseudoDaily;
         }
@@ -1264,9 +765,11 @@ export class Database {
         );
         if (subjectAttempts.length > 0) {
           const subXp = subjectAttempts.reduce((sum, a) => sum + (a.xpAwarded || 0), 0);
-          calculatedXp = Math.min(calculatedXp, Math.max(10, subXp));
-        } else if (userId !== currentUserId) {
+          calculatedXp = Math.min(calculatedXp, Math.max(0, subXp));
+        } else if (userId !== currentUserId && gam.xp > 0) {
           calculatedXp = Math.max(10, Math.round(calculatedXp * 0.25));
+        } else {
+          calculatedXp = 0;
         }
       }
 

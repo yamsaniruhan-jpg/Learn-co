@@ -21,11 +21,13 @@ import { DocsViewer } from './components/docs/DocsViewer';
 import { ProfileView } from './components/profile/ProfileView';
 import { AuthView } from './components/auth/AuthView';
 import { Leaderboard } from './components/leaderboard/Leaderboard';
+import { ConceptLibraryView } from './components/concepts/ConceptLibraryView';
 
 import { useAuth } from './context/AuthContext';
 import { ConceptMastery, QuestionAttempt, SubjectId, UserProfile, NotificationItem } from './types';
 import { INITIAL_MASTERIES, SEED_NOTIFICATIONS } from './data/seedData';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
+import { BrandLogo } from './components/ui/BrandLogo';
 import {
   LayoutDashboard,
   BookOpen,
@@ -40,6 +42,8 @@ import {
   FileCode2,
   User,
   Loader2,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export default function App() {
@@ -82,8 +86,11 @@ export default function App() {
 
   // Concept masteries state
   const [masteries, setMasteries] = useState<ConceptMastery[]>(() => {
+    const savedAttempts = localStorage.getItem('learnco_attempts');
+    const hasAttempts = savedAttempts ? JSON.parse(savedAttempts).length > 0 : false;
+    if (!hasAttempts) return [];
     const saved = localStorage.getItem('learnco_masteries');
-    return saved ? JSON.parse(saved) : INITIAL_MASTERIES;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [attempts, setAttempts] = useState<QuestionAttempt[]>(() => {
@@ -146,23 +153,28 @@ export default function App() {
 
   // Convert auth profile to legacy UserProfile view format
   const effectiveLegacyUser: UserProfile = {
-    id: user?.id || 'user-alex-001',
-    fullName: profile?.displayName || profile?.fullName || user?.name || 'Learn.co Scholar',
-    email: user?.email || 'alex.vance@stanford.edu',
-    avatarUrl: profile?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    id: user?.id || 'guest-learner',
+    fullName:
+      profile?.displayName ||
+      profile?.fullName ||
+      (user?.email ? user.email.split('@')[0] : 'Guest Scholar'),
+    email: user?.email || 'guest@learn.co',
+    avatarUrl:
+      profile?.avatarUrl ||
+      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user?.email || 'guest-scholar')}`,
     role: (user?.role || 'student') as any,
-    joinedDate: profile?.joinedDate || 'August 2026',
-    xp: gamification?.xp || 85,
-    level: gamification?.level || 2,
-    currentStreak: gamification?.currentStreak || 4,
-    longestStreak: gamification?.longestStreak || 12,
+    joinedDate: profile?.joinedDate || new Date().toISOString().split('T')[0],
+    xp: gamification?.xp ?? 0,
+    level: gamification?.level ?? 1,
+    currentStreak: gamification?.currentStreak ?? 0,
+    longestStreak: gamification?.longestStreak ?? 0,
     dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
-    dailyQuestionsSolvedToday: gamification?.dailyQuestionsSolvedToday || 4,
+    dailyQuestionsSolvedToday: gamification?.dailyQuestionsSolvedToday || 0,
     targetExam: profile?.targetExam || 'Advanced STEM Diagnostics',
     targetScore: profile?.targetScore || 'Top 1% Percentile',
     examDate: profile?.examDate || '2026-11-15',
     subjects: profile?.subjects || ['math', 'cs'],
-    studyTimeMinutesThisWeek: profile?.preferredStudyTimeMinutes ? profile.preferredStudyTimeMinutes * 5 : 225,
+    studyTimeMinutesThisWeek: profile?.preferredStudyTimeMinutes ? profile.preferredStudyTimeMinutes * 5 : 0,
   };
 
   // Loading state
@@ -174,6 +186,31 @@ export default function App() {
           <h2 className="text-lg font-bold">Initializing Learn.co Secure Kernel</h2>
           <p className="text-xs text-slate-400">Verifying session token and loading user matrix...</p>
         </div>
+      </div>
+    );
+  }
+
+  // If user is not signed in: Strict Authentication Gating
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+        <header className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur px-6 py-4 flex items-center justify-between">
+          <BrandLogo size="md" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+          <div className="w-full max-w-2xl py-4">
+            <AuthView onNavigateToTab={() => setActiveTab('dashboard')} />
+          </div>
+        </main>
       </div>
     );
   }
@@ -211,7 +248,7 @@ export default function App() {
           setActiveTab={setActiveTab}
           dailyAllowanceRemaining={Math.max(
             0,
-            DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday || 4)
+            DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
           )}
         />
 
@@ -223,6 +260,13 @@ export default function App() {
               masteries={masteries}
               onNavigate={(tab) => setActiveTab(tab)}
               onSelectSubject={handleSelectSubject}
+            />
+          )}
+
+          {activeTab === 'concepts' && (
+            <ConceptLibraryView
+              onOpenCopilotWithContext={handleOpenCopilotWithContext}
+              onNavigateToPractice={() => setActiveTab('practice')}
             />
           )}
 

@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 
 import authRoutes from "./server/routes/authRoutes";
@@ -14,9 +13,6 @@ import copilotRoutes from "./server/routes/copilotRoutes";
 import { mentorshipRouter } from "./server/routes/mentorshipRoutes";
 import plannerRoutes from "./server/routes/plannerRoutes";
 import { analyticsRouter } from "./server/routes/analyticsRoutes";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();

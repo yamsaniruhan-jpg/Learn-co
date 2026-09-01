@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { Database } from '../db';
+import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { MentorMatchEngine } from '../services/mentorMatchEngine';
 import { AdaptiveAnalyticsEngine } from '../services/adaptiveAnalyticsEngine';
 
 export const mentorshipRouter = Router();
 
-// Middleware to extract user ID from auth headers / fallback for demo
+// Middleware to extract user ID from auth headers
 function getUserId(req: Request): string {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -15,7 +16,7 @@ function getUserId(req: Request): string {
       return session.userId;
     }
   }
-  return 'user-alex-001'; // Default active learner
+  return '';
 }
 
 // 1. GET /api/mentorship/mentors - Browse/search mentor directory

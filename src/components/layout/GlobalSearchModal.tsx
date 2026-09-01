@@ -87,6 +87,14 @@ const SEARCH_ITEMS: SearchItem[] = [
     detail: 'Calibrated diagnostic ladder with progressive hints & XP',
   },
   {
+    id: 'concept-library',
+    title: 'STEM Concept Library & Interactive Textbooks',
+    category: 'Tool',
+    tabId: 'concepts',
+    icon: <BookOpen className="w-4 h-4 text-indigo-500" />,
+    detail: 'Curated textbooks, calculus derivations, algorithms, and AI synthesis documents',
+  },
+  {
     id: 'creator-studio',
     title: 'AI Creator Studio (PDF & Notes to Flashcards/Quizzes)',
     category: 'Tool',

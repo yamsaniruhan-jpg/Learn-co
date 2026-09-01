@@ -30,6 +30,23 @@ function getGeminiClient(): GoogleGenAI | null {
 // SOURCES API
 // -------------------------------------------------------------
 
+// GET /api/creator/quota
+router.get('/quota', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const quotas = Database.getUserDailyQuotas(userId);
+    res.json({
+      success: true,
+      quotas: {
+        sources: quotas.sources,
+        artifacts: quotas.artifacts,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch creator quota.' });
+  }
+});
+
 // GET /api/creator/sources
 router.get('/sources', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -50,6 +67,20 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
 
     if (!sourceType || !['text', 'pdf', 'url'].includes(sourceType)) {
       res.status(400).json({ error: 'Invalid or missing sourceType (must be "text", "pdf", or "url").' });
+      return;
+    }
+
+    // Enforce daily source upload quota (4 sources per day)
+    let quotaResult;
+    try {
+      quotaResult = Database.checkAndIncrementSourceQuota(userId);
+    } catch (quotaErr: any) {
+      res.status(429).json({
+        error: quotaErr.message || 'Daily source upload limit reached (4/4).',
+        isLimitReached: true,
+        limit: 4,
+        remaining: 0,
+      });
       return;
     }
 
@@ -301,6 +332,7 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
     const userId = req.userId!;
     const {
       sourceId,
+      sourceIds,
       sourceText,
       sourceUrl,
       sourceType = 'text',
@@ -309,7 +341,27 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
       subjectId = 'math',
       difficulty = 'medium',
       options = {},
-    }: GenerateResourceRequest = req.body;
+    }: GenerateResourceRequest & { sourceIds?: string[] } = req.body;
+
+    const sourcesToUse = sourceIds || (sourceId ? [sourceId] : []);
+    if (sourcesToUse.length > 5) {
+      res.status(400).json({ error: 'Cannot attach more than 5 sources per artifact generation.' });
+      return;
+    }
+
+    // Enforce daily artifact quota (4 artifacts per day)
+    let quotaResult;
+    try {
+      quotaResult = Database.checkAndIncrementArtifactQuota(userId, sourcesToUse.length);
+    } catch (quotaErr: any) {
+      res.status(429).json({
+        error: quotaErr.message || 'Daily artifact generation limit reached (4/4).',
+        isLimitReached: true,
+        limit: 4,
+        remaining: 0,
+      });
+      return;
+    }
 
     // Get source content
     let rawContent = sourceText || '';

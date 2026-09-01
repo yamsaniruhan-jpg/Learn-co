@@ -14,7 +14,7 @@ import {
 
 const router = Router();
 
-// Middleware to resolve user ID (from token or fallback to demo user for seamless access)
+// Middleware to resolve user ID
 function resolveUserId(req: Request): string {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -22,8 +22,22 @@ function resolveUserId(req: Request): string {
     const sessionUser = Database.getSessionUser(token);
     if (sessionUser) return sessionUser.id;
   }
-  return 'user-alex-001';
+  return '';
 }
+
+// Ensure all copilot routes require an authenticated user
+router.use(requireAuth);
+
+// GET /api/copilot/quota
+router.get('/quota', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const quotas = Database.getUserDailyQuotas(userId);
+    res.json({ success: true, quota: quotas.doubts });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch doubt quota.' });
+  }
+});
 
 // -------------------------------------------------------------
 // 1. CONVERSATIONS MANAGEMENT API
@@ -162,6 +176,20 @@ router.post('/chat', async (req: Request, res: Response) => {
       return;
     }
 
+    // Enforce daily doubts quota (5 doubts per day, refreshes at midnight)
+    let quotaInfo;
+    try {
+      quotaInfo = Database.checkAndIncrementDoubtQuota(userId);
+    } catch (quotaErr: any) {
+      res.status(429).json({
+        error: quotaErr.message || 'Daily doubts quota exceeded.',
+        isLimitReached: true,
+        limit: 5,
+        remaining: 0,
+      });
+      return;
+    }
+
     // Ensure conversation exists or create one
     let targetConvId = conversationId;
     if (!targetConvId) {
@@ -211,6 +239,7 @@ router.post('/chat', async (req: Request, res: Response) => {
       toolCalls: genResult.toolCalls,
       artifact: genResult.artifact,
       modelUsed: genResult.modelUsed,
+      doubtQuota: quotaInfo,
     });
   } catch (err: any) {
     console.error('Error in /api/copilot/chat:', err);
@@ -233,6 +262,19 @@ router.post('/stream', async (req: Request, res: Response) => {
 
     if (!prompt || !prompt.trim()) {
       res.status(400).json({ error: 'Prompt is required.' });
+      return;
+    }
+
+    // Enforce daily doubts quota (5 doubts per day, refreshes at midnight)
+    try {
+      Database.checkAndIncrementDoubtQuota(userId);
+    } catch (quotaErr: any) {
+      res.status(429).json({
+        error: quotaErr.message || 'Daily doubts quota exceeded.',
+        isLimitReached: true,
+        limit: 5,
+        remaining: 0,
+      });
       return;
     }
 

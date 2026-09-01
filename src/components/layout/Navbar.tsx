@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, profile, gamification, isAuthenticated, signOut } = useAuth();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  const solvedToday = gamification?.dailyQuestionsSolvedToday || 4;
+  const solvedToday = gamification?.dailyQuestionsSolvedToday ?? 0;
   const allowanceRemaining = Math.max(0, DAILY_PRACTICE_LIMIT - solvedToday);
 
   return (
@@ -100,11 +100,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Streak Flame */}
           <div className="hidden sm:block">
-            <StreakIndicator streak={gamification?.currentStreak || 4} size="sm" />
+            <StreakIndicator streak={gamification?.currentStreak ?? 0} size="sm" />
           </div>
 
           {/* XP Pill */}
-          <XPIndicator xp={gamification?.xp || 85} size="sm" />
+          <XPIndicator xp={gamification?.xp ?? 0} size="sm" />
 
           {/* Notification Bell */}
           <button

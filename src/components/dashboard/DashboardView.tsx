@@ -46,17 +46,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectSubject,
 }) => {
   const [streakData, setStreakData] = useState<StreakData>(() =>
-    loadUserStreak(user.id || 'default_user', user.currentStreak || 4)
+    loadUserStreak(user.id || 'default_user', user.currentStreak ?? 0)
   );
 
   useEffect(() => {
-    const fresh = loadUserStreak(user.id || 'default_user', user.currentStreak || 4);
+    const fresh = loadUserStreak(user.id || 'default_user', user.currentStreak ?? 0);
     setStreakData(fresh);
   }, [user.id, user.currentStreak]);
 
   const weeklyPills = getWeeklyStreakPills(streakData);
-  const activeStreakCount = streakData.currentStreak || user.currentStreak || 4;
-  const longestStreakCount = Math.max(streakData.longestStreak || 0, user.longestStreak || 12);
+  const activeStreakCount = streakData.currentStreak ?? user.currentStreak ?? 0;
+  const longestStreakCount = Math.max(streakData.longestStreak ?? 0, user.longestStreak ?? 0);
 
   const allowanceRemaining = Math.max(
     0,
@@ -95,8 +95,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Level {user.level} Scholar
               </span>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 text-orange-200 text-xs font-bold border border-orange-400/30">
-                <Flame className="w-3.5 h-3.5 fill-orange-400 text-orange-400 animate-pulse" />
-                <span>{activeStreakCount}-Day Active Streak</span>
+                <Flame className="w-3.5 h-3.5 fill-orange-400 text-orange-400" />
+                <span>{activeStreakCount > 0 ? `${activeStreakCount}-Day Active Streak` : '0-Day Streak (Start Today)'}</span>
               </div>
               <span className="text-xs text-indigo-200/80 font-medium">
                 Target: {user.targetExam || 'Advanced STEM Mastery'}
@@ -106,7 +106,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Welcome back, {user.fullName.split(' ')[0]}
             </h1>
             <p className="text-sm sm:text-base text-indigo-100/80 leading-relaxed">
-              Your {activeStreakCount}-day study streak is active. Complete today's calibrated diagnostic ladder to reinforce your retention curve.
+              {activeStreakCount > 0
+                ? `Your ${activeStreakCount}-day study streak is active. Complete today's calibrated diagnostic ladder to reinforce your retention curve.`
+                : `Ready to begin your journey? Complete your first diagnostic practice session today to ignite your study streak.`}
             </p>
 
             {/* Streak Week Visualizer */}
@@ -243,51 +245,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {SEED_SUBJECTS.map((subject) => (
-                <Card
-                  key={subject.id}
-                  variant="interactive"
-                  padding="md"
-                  onClick={() => onNavigate('learn', { subjectId: subject.id })}
-                  className="group relative overflow-hidden"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-xs"
-                        style={{ backgroundColor: subject.color }}
-                      >
-                        {subject.name.slice(0, 2).toUpperCase()}
+              {SEED_SUBJECTS.map((subject) => {
+                const subjectMasteries = masteries.filter((m) => m.subjectId === subject.id);
+                const actualMastery =
+                  subjectMasteries.length > 0
+                    ? Math.round(
+                        subjectMasteries.reduce((sum, m) => sum + m.masteryScore, 0) /
+                          subjectMasteries.length
+                      )
+                    : 0;
+
+                return (
+                  <Card
+                    key={subject.id}
+                    variant="interactive"
+                    padding="md"
+                    onClick={() => onNavigate('learn', { subjectId: subject.id })}
+                    className="group relative overflow-hidden"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-xs"
+                          style={{ backgroundColor: subject.color }}
+                        >
+                          {subject.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            {subject.name}
+                          </h3>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {subject.courseCount} courses • {subject.conceptCount} concepts
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                          {subject.name}
-                        </h3>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {subject.courseCount} courses • {subject.conceptCount} concepts
-                        </span>
-                      </div>
+                      <Badge variant="default" size="sm">
+                        {actualMastery}% Mastered
+                      </Badge>
                     </div>
-                    <Badge variant="default" size="sm">
-                      {subject.masteryPercentage}% Mastered
-                    </Badge>
-                  </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-                    {subject.description}
-                  </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+                      {subject.description}
+                    </p>
 
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
-                    <div
-                      className="h-1.5 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${subject.masteryPercentage}%`,
-                        backgroundColor: subject.color,
-                      }}
-                    />
-                  </div>
-                </Card>
-              ))}
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                      <div
+                        className="h-1.5 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${actualMastery}%`,
+                          backgroundColor: subject.color,
+                        }}
+                      />
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           </div>
 

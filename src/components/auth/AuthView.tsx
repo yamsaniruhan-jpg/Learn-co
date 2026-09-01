@@ -25,6 +25,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
+import { GoogleSignInDialog } from './GoogleSignInDialog';
 
 interface AuthViewProps {
   initialMode?: 'signin' | 'signup' | 'session';
@@ -42,7 +43,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
     isAuthenticated,
     signInWithEmail,
     signUpWithEmail,
-    signInWithGoogle,
     signOut,
     authError,
     clearAuthError,
@@ -59,13 +59,17 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [accountNotFoundPrompt, setAccountNotFoundPrompt] = useState<boolean>(false);
+  const [isGoogleDialogOpen, setIsGoogleDialogOpen] = useState<boolean>(false);
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    setAccountNotFoundPrompt(false);
     clearAuthError();
 
-    if (!email || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setLocalError('Please enter a valid email address.');
       return;
     }
@@ -77,13 +81,17 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
     setIsSubmitting(true);
     try {
-      await signInWithEmail(email, password);
+      await signInWithEmail(cleanEmail, password);
       setSuccessMessage('Successfully signed in! Accessing scholar kernel...');
       setTimeout(() => {
         if (onNavigateToTab) onNavigateToTab('dashboard');
-      }, 1000);
+      }, 800);
     } catch (err: any) {
-      setLocalError(err.message || 'Invalid email or password combination.');
+      const errMsg = err.message || 'Invalid email or password combination.';
+      if (errMsg.toLowerCase().includes('invalid') || errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('credentials')) {
+        setAccountNotFoundPrompt(true);
+      }
+      setLocalError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -92,9 +100,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    setAccountNotFoundPrompt(false);
     clearAuthError();
 
-    if (!email || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setLocalError('Please enter a valid email address.');
       return;
     }
@@ -106,11 +116,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
     setIsSubmitting(true);
     try {
-      await signUpWithEmail(email, password, fullName || 'Learn.co Scholar');
-      setSuccessMessage('Account created successfully! Launching personalized onboarding...');
+      await signUpWithEmail(cleanEmail, password, fullName.trim() || cleanEmail.split('@')[0]);
+      setSuccessMessage('Account created successfully! Welcome to Learn.co...');
       setTimeout(() => {
         if (onNavigateToTab) onNavigateToTab('dashboard');
-      }, 1000);
+      }, 800);
     } catch (err: any) {
       setLocalError(err.message || 'Registration failed. Please try a different email.');
     } finally {
@@ -118,38 +128,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsSubmitting(true);
-    setLocalError(null);
-    clearAuthError();
-    try {
-      await signInWithGoogle('scholar.google@learn.co', 'Google Scholar');
-      setSuccessMessage('Google Single Sign-On verified! Loading dashboard...');
-      setTimeout(() => {
-        if (onNavigateToTab) onNavigateToTab('dashboard');
-      }, 1000);
-    } catch (err: any) {
-      setLocalError(err.message || 'Google Single Sign-On failed.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleQuickDemoSignIn = async (demoEmail: string, demoPass: string) => {
-    setIsSubmitting(true);
-    setLocalError(null);
-    clearAuthError();
-    try {
-      await signInWithEmail(demoEmail, demoPass);
-      setSuccessMessage(`Switched to demo account: ${demoEmail}`);
-      setTimeout(() => {
-        if (onNavigateToTab) onNavigateToTab('dashboard');
-      }, 1000);
-    } catch (err: any) {
-      setLocalError(err.message || 'Demo authentication failed.');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleGoogleSuccess = () => {
+    setSuccessMessage('Google Account authorized & verified! Loading dashboard...');
+    setTimeout(() => {
+      if (onNavigateToTab) onNavigateToTab('dashboard');
+    }, 800);
   };
 
   const handleSignOutAction = () => {
@@ -158,7 +141,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     setActiveMode('signin');
     setTimeout(() => {
       setSuccessMessage(null);
-    }, 4000);
+    }, 3000);
   };
 
   return (
@@ -242,201 +225,134 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
       {/* Error Banner */}
       {(localError || authError) && (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs sm:text-sm flex items-center gap-3 animate-in fade-in">
-          <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
-          <span className="font-semibold">{localError || authError}</span>
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs sm:text-sm space-y-2 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+            <span className="font-semibold">{localError || authError}</span>
+          </div>
+          {accountNotFoundPrompt && activeMode === 'signin' && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('signup');
+                setAccountNotFoundPrompt(false);
+                setLocalError(null);
+                clearAuthError();
+              }}
+              className="mt-1 w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Create New Account with {email || 'this email'}</span>
+            </button>
+          )}
         </div>
       )}
 
       {/* TAB: SIGN IN */}
       {activeMode === 'signin' && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-          {/* Left Main Form */}
-          <Card variant="elevated" padding="lg" className="md:col-span-7 space-y-6">
-            <div className="space-y-1">
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <LogIn className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                <span>Scholar Sign In</span>
-              </h3>
-              <p className="text-xs text-slate-400">
-                Enter your registered credentials to restore state and continue practice streaks.
-              </p>
-            </div>
-
-            {/* Google Single Sign On */}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-xs cursor-pointer"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>Continue with Google Single Sign-On</span>
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Or with Email & Password
-              </span>
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            </div>
-
-            <form onSubmit={handleSignInSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="learner@learn.co"
-                    className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Password
-                  </label>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-9 pr-9 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                disabled={isSubmitting}
-                className="w-full"
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-              >
-                {isSubmitting ? 'Authenticating...' : 'Sign In to Learn.co'}
-              </Button>
-            </form>
-          </Card>
-
-          {/* Right Demo Preset Cards */}
-          <div className="md:col-span-5 space-y-4">
-            <Card variant="bordered" padding="md" className="space-y-3">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-amber-500" />
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                  Instant Demo Accounts
-                </h4>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Click any pre-seeded persona to test authenticated sessions, level-ups, and streak tracking:
-              </p>
-
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoSignIn('learner@learn.co', 'LearnCo2026!')}
-                  className="w-full p-3 text-left rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                      Alex Vance (Student)
-                    </span>
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                      <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> 85 XP •{' '}
-                      <Flame className="w-3 h-3 text-orange-500 fill-orange-500" /> 4d Streak
-                    </span>
-                  </div>
-                  <Badge variant="primary" size="sm">
-                    Student
-                  </Badge>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoSignIn('elena@learn.co', 'Cohort2026!')}
-                  className="w-full p-3 text-left rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                      Elena Rostova (Top Scholar)
-                    </span>
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                      <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> 1,420 XP •{' '}
-                      <Flame className="w-3 h-3 text-orange-500 fill-orange-500" /> 18d Streak
-                    </span>
-                  </div>
-                  <Badge variant="default" size="sm">
-                    Master
-                  </Badge>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoSignIn('marcus@learn.co', 'Educator2026!')}
-                  className="w-full p-3 text-left rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                      Dr. Marcus Thorne (Educator)
-                    </span>
-                    <span className="text-[10px] text-slate-400">Educator Studio & Reviewer</span>
-                  </div>
-                  <Badge variant="cs" size="sm">
-                    Educator
-                  </Badge>
-                </button>
-              </div>
-            </Card>
-
-            <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
-              <div className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Cryptographically Signed JWT</span>
-              </div>
-              <p>
-                Tokens are stored in standard local storage and verified against server-side authorization endpoints on every request.
-              </p>
-            </div>
+        <Card variant="elevated" padding="lg" className="max-w-xl mx-auto space-y-6">
+          <div className="space-y-1">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <LogIn className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <span>Scholar Sign In</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Enter your registered credentials to restore state and continue practice streaks.
+            </p>
           </div>
-        </div>
+
+          {/* Google Single Sign On */}
+          <button
+            type="button"
+            onClick={() => setIsGoogleDialogOpen(true)}
+            disabled={isSubmitting}
+            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-xs cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+              />
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Or with Email & Password
+            </span>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          </div>
+
+          <form onSubmit={handleSignInSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your.email@example.com"
+                  className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Password
+                </label>
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-9 pr-9 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              disabled={isSubmitting}
+              className="w-full"
+              rightIcon={<ArrowRight className="w-4 h-4" />}
+            >
+              {isSubmitting ? 'Authenticating...' : 'Sign In to Learn.co'}
+            </Button>
+          </form>
+        </Card>
       )}
 
       {/* TAB: CREATE ACCOUNT */}
@@ -565,7 +481,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 Current XP
               </span>
               <span className="text-base font-black text-amber-500">
-                {gamification?.xp || 85} XP
+                {gamification?.xp ?? 0} XP
               </span>
             </div>
 
@@ -574,7 +490,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 Daily Streak
               </span>
               <span className="text-base font-black text-orange-500">
-                {gamification?.currentStreak || 4} Days
+                {gamification?.currentStreak ?? 0} Days
               </span>
             </div>
 
@@ -620,6 +536,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </div>
         </Card>
       )}
+
+      {/* Google Authentication Dialog */}
+      <GoogleSignInDialog
+        isOpen={isGoogleDialogOpen}
+        onClose={() => setIsGoogleDialogOpen(false)}
+        initialIntent={activeMode === 'signup' ? 'signup' : 'signin'}
+        onSuccess={handleGoogleSuccess}
+      />
     </div>
   );
 };
