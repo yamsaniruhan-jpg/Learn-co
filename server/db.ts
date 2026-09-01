@@ -1711,31 +1711,25 @@ export class Database {
 
     // Include Mastery Progress if authorized
     if (privacy.shareMasteryProgress) {
-      // Pull sample masteries or compute from attempts
-      const strong = [
-        { id: 'diff-calc-deriv', title: 'Calculus: Power & Product Rules', score: 94, subjectId: 'math' as any },
-        { id: 'cs-grad-desc', title: 'Loss Optimization & Convex Gradients', score: 88, subjectId: 'cs' as any },
-      ];
-      const weak = [
-        { id: 'chem-sn2-walden', title: 'Stereochemistry of SN2 Walden Inversion', score: 62, subjectId: 'chemistry' as any },
-        { id: 'calc-second-deriv', title: 'Stationary Inconclusiveness on Zero Curvature', score: 68, subjectId: 'math' as any },
-      ];
+      const correctCount = attempts.filter((a) => a.isCorrect).length;
+      const totalCount = attempts.length;
+      const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
       insights.masteryHighlights = {
-        strongConcepts: strong,
-        weakConcepts: weak,
-        averageRetention: 84,
+        strongConcepts: [],
+        weakConcepts: [],
+        averageRetention: accuracy,
       };
     }
 
     // Include Practice Activity if authorized
     if (privacy.sharePracticeActivity) {
       const correctCount = attempts.filter((a) => a.isCorrect).length;
-      const totalCount = Math.max(1, attempts.length);
+      const totalCount = attempts.length;
       insights.practiceActivity = {
         totalAttempted: totalCount,
-        accuracyPercentage: Math.round((correctCount / totalCount) * 100) || 78,
-        dailyStreak: gamification?.currentStreak || 4,
-        recentAccuracyTrend: [75, 80, 85, 78, 88, 90, 84],
+        accuracyPercentage: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
+        dailyStreak: gamification?.currentStreak || 0,
+        recentAccuracyTrend: [],
       };
     }
 

@@ -178,36 +178,9 @@ export class QuestionSelectionEngine {
       }
     }
 
-    // If user is new, provide initial calibrated signals
+    // If user is new (0 attempts), return empty array so no fake weak topics are shown
     if (Object.keys(topicStats).length === 0) {
-      return [
-        {
-          topicId: 'Applications of Derivatives',
-          topicTitle: 'Applications of Derivatives & Extrema',
-          subjectId: 'math',
-          conceptId: 'concept-deriv-inc-dec',
-          conceptTitle: 'Monotonicity & First Derivative Test',
-          totalAttempts: 4,
-          incorrectAttempts: 2,
-          accuracyRate: 50,
-          lastPracticedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          decayRisk: 'moderate',
-          recommendedAction: 'Take a 5-question calibrated drill to reinforce critical point testing.',
-        },
-        {
-          topicId: 'Stereochemistry of SN2 & Walden Inversion',
-          topicTitle: 'Nucleophilic Substitution & Stereochemistry',
-          subjectId: 'chemistry',
-          conceptId: 'concept-sn1-sn2',
-          conceptTitle: 'Stereochemistry of SN2 & Walden Inversion',
-          totalAttempts: 3,
-          incorrectAttempts: 2,
-          accuracyRate: 33,
-          lastPracticedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-          decayRisk: 'high',
-          recommendedAction: 'Review Walden inversion rules and solve 5 diagnostic chemistry questions.',
-        },
-      ];
+      return [];
     }
 
     const weakSignals: WeakTopicSignal[] = [];
