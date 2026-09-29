@@ -184,6 +184,8 @@ export class CreatorClient {
     message: string;
     addedCount: number;
     targetSubject: string;
+    questions?: any[];
+    resourceTitle?: string;
   }> {
     const res = await fetch(`/api/creator/resources/${id}/add-to-practice`, {
       method: 'POST',

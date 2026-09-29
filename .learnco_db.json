@@ -1,0 +1,1271 @@
+{
+  "users": {
+    "user-1788625702947-rafjf": {
+      "id": "user-1788625702947-rafjf",
+      "email": "yamsaniruhan@gmail.com",
+      "authProvider": "google",
+      "createdAt": "2026-09-05T16:28:22.947Z",
+      "updatedAt": "2026-09-05T16:28:22.947Z",
+      "lastLoginAt": "2026-09-05T16:28:22.947Z"
+    }
+  },
+  "usersByEmail": {
+    "yamsaniruhan@gmail.com": "user-1788625702947-rafjf"
+  },
+  "profiles": {
+    "user-1788625702947-rafjf": {
+      "id": "prof-user-1788625702947-rafjf",
+      "userId": "user-1788625702947-rafjf",
+      "email": "yamsaniruhan@gmail.com",
+      "fullName": "Ruhan",
+      "displayName": "Ruhan",
+      "avatarUrl": "https://api.dicebear.com/7.x/bottts/svg?seed=yamsaniruhan%40gmail.com",
+      "educationLevel": "",
+      "targetExam": "",
+      "targetScore": "",
+      "examDate": "",
+      "subjects": [
+        "math"
+      ],
+      "learningGoals": [],
+      "preferredStudyTimeMinutes": 30,
+      "studyTimeMinutesThisWeek": 0,
+      "role": "student",
+      "onboardingStatus": "NOT_STARTED",
+      "timezone": "UTC",
+      "joinedDate": "2026-09-05"
+    }
+  },
+  "gamification": {
+    "user-1788625702947-rafjf": {
+      "userId": "user-1788625702947-rafjf",
+      "xp": 0,
+      "level": 1,
+      "currentStreak": 0,
+      "longestStreak": 0,
+      "lastActiveDate": "",
+      "dailyQuestionsSolvedToday": 0,
+      "dailyAllowanceLimit": 25,
+      "dailyDoubtsAskedToday": 0,
+      "dailyDoubtsLimit": 5,
+      "dailyArtifactsCreatedToday": 0,
+      "dailyArtifactsLimit": 4,
+      "dailySourcesUploadedToday": 0,
+      "dailySourcesUploadLimit": 4
+    }
+  },
+  "settings": {
+    "user-1788625702947-rafjf": {
+      "userId": "user-1788625702947-rafjf",
+      "theme": "system",
+      "notifications": {
+        "studyReminders": true,
+        "streakAlerts": true,
+        "achievementAlerts": true,
+        "mentorAlerts": true,
+        "copilotAlerts": true
+      },
+      "privacy": {
+        "profileVisibility": "public",
+        "leaderboardVisibility": true,
+        "analyticsSharing": true
+      },
+      "learningPreferences": {
+        "socraticGuidanceLevel": "high",
+        "showDetailedDerivations": true,
+        "timerVisible": true,
+        "soundEffects": true
+      }
+    }
+  },
+  "xpTransactions": [],
+  "questionAttempts": [],
+  "attemptsById": {},
+  "mistakes": [],
+  "sessions": {
+    "f83286505da9434f2179b93f7b625b3ad5720f4447587ba6b7014dbf07629e36": {
+      "userId": "user-1788625702947-rafjf",
+      "createdAt": "2026-09-05T16:28:22.948Z",
+      "expiresAt": "2026-10-05T16:28:22.948Z"
+    }
+  },
+  "creatorSources": {},
+  "creatorResources": {},
+  "creatorResourceVersions": {},
+  "creatorJobs": {},
+  "copilotConversations": {},
+  "copilotMessages": {},
+  "mentorProfiles": {
+    "mentor-dr-turing-001": {
+      "id": "mentor-dr-turing-001",
+      "userId": "user-mentor-alan-01",
+      "name": "Dr. Alan Turing-Ward",
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+      "headline": "Theoretical Computer Scientist & Deep Learning Specialist",
+      "bio": "Former Olympiad coach and researcher at Cambridge. I mentor students through intuitive first-principles derivations in algorithm complexity, gradient dynamics, and discrete mathematics.",
+      "subjects": [
+        "cs",
+        "math"
+      ],
+      "areasOfExpertise": [
+        "Gradient Descent & Backprop Dynamics",
+        "Asymptotic Complexity & Dynamic Programming",
+        "Eigenvalues & Matrix Transformations",
+        "Neural Architecture Optimization"
+      ],
+      "teachingExperienceYears": 8,
+      "education": "PhD in Computer Science & Applied Math, Cambridge University",
+      "credentials": [
+        "International Olympiad in Informatics (IOI) Senior Coach",
+        "NeurIPS & ICML Published Author",
+        "ACM Senior Member"
+      ],
+      "supportedTracks": [
+        "JEE Advanced",
+        "Advanced STEM Mastery & JEE/AP",
+        "AP Computer Science A",
+        "GRE Computer Science",
+        "College STEM"
+      ],
+      "availability": {
+        "days": [
+          "Monday",
+          "Wednesday",
+          "Friday",
+          "Saturday"
+        ],
+        "timeSlots": [
+          "14:00 - 16:00 UTC",
+          "18:00 - 20:00 UTC"
+        ],
+        "timezone": "UTC",
+        "cadence": "weekly"
+      },
+      "mentoringStyle": "First-principles derivation with focus on mathematical invariants and counter-example exploration.",
+      "languages": [
+        "English",
+        "French"
+      ],
+      "isVerified": true,
+      "acceptingNewMentees": true,
+      "maxMentees": 8,
+      "activeMenteesCount": 4,
+      "rating": 4.96,
+      "reviewCount": 48,
+      "sessionsCompleted": 142,
+      "responseRatePercent": 98,
+      "format": [
+        "one_on_one",
+        "async_review",
+        "weekly_checkin"
+      ],
+      "pricingType": "free_community",
+      "createdAt": "2026-06-01T00:00:00.000Z",
+      "updatedAt": "2026-08-25T12:00:00.000Z"
+    },
+    "mentor-prof-miriam-002": {
+      "id": "mentor-prof-miriam-002",
+      "userId": "user-mentor-miriam-02",
+      "name": "Prof. Miriam Al-Hassan",
+      "avatarUrl": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
+      "headline": "Differential Calculus & Multivariable Analysis Chair",
+      "bio": "Dedicated to helping scholars develop rigorous mathematical intuition. We break down the Second Derivative Test, Lagrange Multipliers, and Divergence Theorem from geometric fundamentals.",
+      "subjects": [
+        "math",
+        "physics"
+      ],
+      "areasOfExpertise": [
+        "Differential Calculus & Optimization",
+        "Multivariable Limits & Monotonicity",
+        "Classical Mechanics & Conservation Laws",
+        "Differential Equations & Phase Planes"
+      ],
+      "teachingExperienceYears": 12,
+      "education": "DPhil in Pure & Applied Mathematics, Oxford University",
+      "credentials": [
+        "Author of \"Geometric Intuitions in Calculus\"",
+        "Putnam Competition Advisory Board Member",
+        "Distinguished Teaching Award 2024"
+      ],
+      "supportedTracks": [
+        "AP Calculus BC",
+        "Advanced STEM Mastery & JEE/AP",
+        "JEE Advanced",
+        "GRE Math Subject",
+        "College STEM"
+      ],
+      "availability": {
+        "days": [
+          "Tuesday",
+          "Thursday",
+          "Saturday",
+          "Sunday"
+        ],
+        "timeSlots": [
+          "15:00 - 17:00 UTC",
+          "19:00 - 21:00 UTC"
+        ],
+        "timezone": "America/New_York",
+        "cadence": "weekly"
+      },
+      "mentoringStyle": "Socratic questioning, visual geometric proofs, and rigorous epsilon-delta intuition.",
+      "languages": [
+        "English",
+        "Arabic"
+      ],
+      "isVerified": true,
+      "acceptingNewMentees": true,
+      "maxMentees": 6,
+      "activeMenteesCount": 3,
+      "rating": 4.98,
+      "reviewCount": 62,
+      "sessionsCompleted": 215,
+      "responseRatePercent": 100,
+      "format": [
+        "one_on_one",
+        "weekly_checkin"
+      ],
+      "pricingType": "free_community",
+      "createdAt": "2026-05-15T00:00:00.000Z",
+      "updatedAt": "2026-08-28T09:30:00.000Z"
+    },
+    "mentor-dr-chen-003": {
+      "id": "mentor-dr-chen-003",
+      "userId": "user-mentor-chen-03",
+      "name": "Dr. Wei Chen",
+      "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+      "headline": "Organic Reaction Mechanisms & Stereochemistry Specialist",
+      "bio": "Organic synthesis researcher and medical school pre-health mentor. Specializing in arrow-pushing mechanisms, SN1/SN2 Walden inversions, and thermodynamic vs kinetic control.",
+      "subjects": [
+        "chemistry",
+        "biology"
+      ],
+      "areasOfExpertise": [
+        "Stereochemistry of SN1 & SN2 Mechanisms",
+        "Walden Inversions & Enantiomeric Purity",
+        "Enzyme Kinetics & Michaelis-Menten",
+        "Spectroscopy & Molecular Orbital Theory"
+      ],
+      "teachingExperienceYears": 6,
+      "education": "PhD in Bio-Organic Chemistry, Johns Hopkins University",
+      "credentials": [
+        "National Chemistry Olympiad (USNCO) Mentor",
+        "ACS Organic Chemistry Division Member",
+        "MCAT Chemistry 100th Percentile Scorer"
+      ],
+      "supportedTracks": [
+        "AP Chemistry",
+        "Advanced STEM Mastery & JEE/AP",
+        "MCAT Chemical & Physical",
+        "JEE Advanced",
+        "College STEM"
+      ],
+      "availability": {
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Thursday",
+          "Friday"
+        ],
+        "timeSlots": [
+          "13:00 - 15:00 UTC",
+          "21:00 - 23:00 UTC"
+        ],
+        "timezone": "America/Los_Angeles",
+        "cadence": "biweekly"
+      },
+      "mentoringStyle": "Systematic mechanism tracing, misconception diagnosis, and active recall drills.",
+      "languages": [
+        "English",
+        "Mandarin"
+      ],
+      "isVerified": true,
+      "acceptingNewMentees": true,
+      "maxMentees": 10,
+      "activeMenteesCount": 7,
+      "rating": 4.92,
+      "reviewCount": 39,
+      "sessionsCompleted": 110,
+      "responseRatePercent": 95,
+      "format": [
+        "one_on_one",
+        "async_review"
+      ],
+      "pricingType": "free_community",
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-08-26T15:00:00.000Z"
+    },
+    "mentor-dr-siddiqui-004": {
+      "id": "mentor-dr-siddiqui-004",
+      "userId": "user-mentor-siddiqui-04",
+      "name": "Dr. Tariq Siddiqui",
+      "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
+      "headline": "Theoretical Physics & Wave Dynamics Instructor",
+      "bio": "Passionate physics educator with a decade of university and competitive coaching experience. Let us connect mathematical formalisms directly with physical reality.",
+      "subjects": [
+        "physics",
+        "math"
+      ],
+      "areasOfExpertise": [
+        "Rotational Dynamics & Torque Invariants",
+        "Electromagnetism & Maxwell Equations",
+        "Thermodynamic Cycles & Carnot Efficiency",
+        "Wave Interference & Fourier Optics"
+      ],
+      "teachingExperienceYears": 10,
+      "education": "PhD in Theoretical High-Energy Physics, MIT",
+      "credentials": [
+        "IPhO (International Physics Olympiad) Gold Medalist Mentor",
+        "American Physical Society Fellow",
+        "Author of \"Problems in General Physics Revisited\""
+      ],
+      "supportedTracks": [
+        "JEE Advanced",
+        "AP Physics C",
+        "College STEM",
+        "GRE Physics"
+      ],
+      "availability": {
+        "days": [
+          "Wednesday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "timeSlots": [
+          "10:00 - 12:00 UTC",
+          "16:00 - 18:00 UTC"
+        ],
+        "timezone": "Asia/Kolkata",
+        "cadence": "weekly"
+      },
+      "mentoringStyle": "First-principles Lagrangian mechanics and physical dimensional analysis.",
+      "languages": [
+        "English",
+        "Urdu",
+        "Hindi"
+      ],
+      "isVerified": true,
+      "acceptingNewMentees": true,
+      "maxMentees": 8,
+      "activeMenteesCount": 5,
+      "rating": 4.95,
+      "reviewCount": 54,
+      "sessionsCompleted": 180,
+      "responseRatePercent": 97,
+      "format": [
+        "one_on_one",
+        "weekly_checkin",
+        "async_review"
+      ],
+      "pricingType": "free_community",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "updatedAt": "2026-08-27T18:00:00.000Z"
+    },
+    "mentor-sophia-005": {
+      "id": "mentor-sophia-005",
+      "userId": "user-mentor-sophia-05",
+      "name": "Dr. Sophia Larsson",
+      "avatarUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80",
+      "headline": "Molecular Biology & Genetics Research Fellow",
+      "bio": "Postdoctoral fellow at Karolinska Institute. I coach students through cellular signaling cascades, CRISPR gene editing mechanisms, and evolutionary population genetics.",
+      "subjects": [
+        "biology",
+        "chemistry"
+      ],
+      "areasOfExpertise": [
+        "Cellular Respiration & Chemiosmosis",
+        "CRISPR-Cas9 & Recombinant DNA",
+        "Mendelian & Non-Mendelian Epistasis",
+        "Signal Transduction & G-Protein Receptors"
+      ],
+      "teachingExperienceYears": 5,
+      "education": "PhD in Molecular Biology & Genetics, Karolinska Institute",
+      "credentials": [
+        "EMBO Postdoctoral Research Fellow",
+        "Biology Olympiad National Examiner"
+      ],
+      "supportedTracks": [
+        "AP Biology",
+        "MCAT Biological Foundations",
+        "College STEM"
+      ],
+      "availability": {
+        "days": [
+          "Monday",
+          "Wednesday",
+          "Thursday"
+        ],
+        "timeSlots": [
+          "17:00 - 19:00 UTC",
+          "20:00 - 22:00 UTC"
+        ],
+        "timezone": "Europe/Stockholm",
+        "cadence": "biweekly"
+      },
+      "mentoringStyle": "Interactive pathway tracing and experimental hypothesis testing.",
+      "languages": [
+        "English",
+        "Swedish",
+        "German"
+      ],
+      "isVerified": true,
+      "acceptingNewMentees": true,
+      "maxMentees": 6,
+      "activeMenteesCount": 2,
+      "rating": 4.88,
+      "reviewCount": 27,
+      "sessionsCompleted": 65,
+      "responseRatePercent": 96,
+      "format": [
+        "one_on_one",
+        "async_review"
+      ],
+      "pricingType": "free_community",
+      "createdAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-08-24T11:00:00.000Z"
+    }
+  },
+  "mentorshipRequests": {
+    "req-alex-alan-001": {
+      "id": "req-alex-alan-001",
+      "learnerId": "user-alex-001",
+      "learnerName": "Alex Vance",
+      "learnerAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "learnerTargetExam": "Advanced STEM Mastery & JEE/AP",
+      "mentorId": "mentor-dr-turing-001",
+      "mentorName": "Dr. Alan Turing-Ward",
+      "mentorAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+      "subjectId": "cs",
+      "targetTrack": "Advanced STEM Mastery & JEE/AP",
+      "goalDescription": "Deepen understanding of Gradient Descent momentum proofs and matrix eigenvalue transformations.",
+      "initialMessage": "Hi Dr. Turing-Ward! I am currently preparing for advanced STEM examinations and studying neural loss manifolds. I would love your guidance on algorithmic proofs.",
+      "preferredCadence": "weekly",
+      "status": "ACCEPTED",
+      "mentorResponseNote": "Delighted to connect! Your focus on first-principles loss functions is fantastic. Let us schedule our introductory invariant review.",
+      "createdAt": "2026-08-15T09:00:00.000Z",
+      "updatedAt": "2026-08-16T11:00:00.000Z",
+      "respondedAt": "2026-08-16T11:00:00.000Z"
+    },
+    "req-alex-chen-002": {
+      "id": "req-alex-chen-002",
+      "learnerId": "user-alex-001",
+      "learnerName": "Alex Vance",
+      "learnerAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "learnerTargetExam": "Advanced STEM Mastery & JEE/AP",
+      "mentorId": "mentor-dr-chen-003",
+      "mentorName": "Dr. Wei Chen",
+      "mentorAvatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+      "subjectId": "chemistry",
+      "targetTrack": "Advanced STEM Mastery & JEE/AP",
+      "goalDescription": "Master organic stereochemistry mechanisms and resolve SN2 Walden inversion misconceptions.",
+      "initialMessage": "Hello Dr. Chen, I had a recent diagnostic mistake on backside nucleophilic attack stereochemistry. Looking for guidance on mastering organic reaction kinetics.",
+      "preferredCadence": "biweekly",
+      "status": "PENDING",
+      "createdAt": "2026-08-28T14:30:00.000Z",
+      "updatedAt": "2026-08-28T14:30:00.000Z"
+    }
+  },
+  "mentorshipRelationships": {
+    "rel-alex-miriam-001": {
+      "id": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "learnerName": "Alex Vance",
+      "learnerAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "learnerEmail": "learner@learn.co",
+      "mentorId": "mentor-prof-miriam-002",
+      "mentorName": "Prof. Miriam Al-Hassan",
+      "mentorAvatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
+      "mentorHeadline": "Differential Calculus & Multivariable Analysis Chair",
+      "status": "ACTIVE",
+      "subjectId": "math",
+      "targetTrack": "Advanced STEM Mastery & JEE/AP",
+      "startDate": "2026-08-10T10:00:00.000Z",
+      "lastInteractionDate": "2026-08-28T16:30:00.000Z",
+      "agreedCadence": "weekly",
+      "privacySettings": {
+        "shareMasteryProgress": true,
+        "sharePracticeActivity": true,
+        "shareMistakesAndMisconceptions": true,
+        "shareActiveGoals": true,
+        "shareCreatorStudioNotebooks": false,
+        "shareCopilotSessions": false
+      },
+      "notesCount": 4,
+      "sessionsCount": 3,
+      "goalsCount": 3,
+      "createdAt": "2026-08-10T10:00:00.000Z",
+      "updatedAt": "2026-08-28T16:30:00.000Z"
+    }
+  },
+  "mentorshipGoals": {
+    "goal-calc-001": {
+      "id": "goal-calc-001",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "subjectId": "math",
+      "title": "Master Monotonicity & Second Derivative Fallbacks",
+      "description": "Be able to construct complete sign charts and explain the Taylor expansion rationale when f''(c) = 0 with 100% accuracy.",
+      "targetDate": "2026-09-15",
+      "linkedTopicId": "Monotonicity & Inflexion Geometry",
+      "linkedConceptId": "concept-diff-calc-01",
+      "status": "IN_PROGRESS",
+      "progressPercent": 70,
+      "establishedBy": "mentor",
+      "createdAt": "2026-08-11T10:00:00.000Z",
+      "updatedAt": "2026-08-27T16:00:00.000Z"
+    },
+    "goal-calc-002": {
+      "id": "goal-calc-002",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "subjectId": "math",
+      "title": "Achieve 90%+ Accuracy on Multivariable Optimization Drills",
+      "description": "Solve 15 competitive problems on constrained extrema with Lagrange multipliers without diagnostic error.",
+      "targetDate": "2026-09-30",
+      "linkedTopicId": "Multivariable Extrema",
+      "status": "NOT_STARTED",
+      "progressPercent": 20,
+      "establishedBy": "learner",
+      "createdAt": "2026-08-18T14:00:00.000Z",
+      "updatedAt": "2026-08-26T10:00:00.000Z"
+    },
+    "goal-calc-003": {
+      "id": "goal-calc-003",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "subjectId": "math",
+      "title": "Formal Invariant Proof of Mean Value Theorem",
+      "description": "Complete written step-by-step Rolle theorem derivation and bounding inequalities.",
+      "targetDate": "2026-08-25",
+      "linkedTopicId": "Mean Value Theorem",
+      "status": "COMPLETED",
+      "progressPercent": 100,
+      "establishedBy": "copilot_suggested",
+      "createdAt": "2026-08-11T10:30:00.000Z",
+      "updatedAt": "2026-08-25T18:00:00.000Z"
+    }
+  },
+  "mentorshipTasks": {
+    "task-calc-101": {
+      "id": "task-calc-101",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "title": "Complete Monotonicity Active Recall & Sign Chart Drill",
+      "description": "Work through the 5 practice arena problems focusing on interval boundary conditions and stationary inflection points.",
+      "dueDate": "2026-09-02",
+      "status": "IN_PROGRESS",
+      "subjectId": "math",
+      "linkedTopicId": "Monotonicity & Inflexion Geometry",
+      "linkedResource": {
+        "type": "practice_drill",
+        "id": "math-calc-monotonicity",
+        "title": "Monotonicity & Extrema Practice Set"
+      },
+      "createdAt": "2026-08-26T11:00:00.000Z"
+    },
+    "task-calc-102": {
+      "id": "task-calc-102",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "title": "Review Creator Studio Note: \"Differential Calculus & Extrema Theorems\"",
+      "description": "Pay close attention to Section 3: The Zero-Curvature Case and higher-order Taylor derivative test.",
+      "dueDate": "2026-09-04",
+      "status": "TODO",
+      "subjectId": "math",
+      "linkedResource": {
+        "type": "creator_resource",
+        "id": "res-calc-note-001",
+        "title": "Differential Calculus & Extrema Theorems"
+      },
+      "createdAt": "2026-08-28T16:00:00.000Z"
+    }
+  },
+  "mentorshipSessions": {
+    "sess-alex-miriam-01": {
+      "id": "sess-alex-miriam-01",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "title": "Calculus Extrema Diagnostics & Inconclusive Second Derivatives",
+      "scheduledDate": "2026-09-03",
+      "startTime": "16:00",
+      "durationMinutes": 45,
+      "status": "SCHEDULED",
+      "topicsCovered": [
+        "Second Derivative Test Inconclusiveness",
+        "First Derivative Sign Charts",
+        "Stationary Points of $x^4$ vs $x^3$"
+      ],
+      "inPlatformMeetingId": "learnco-study-room-calc-991",
+      "sharedNotes": "### Agenda & Shared Study Plan\n1. Review Alex's latest practice attempts on stationary inflection points.\n2. Step-by-step Taylor polynomial expansion derivation when $f''(c) = 0$.\n3. Interactive problem review: Constructing continuous sign tables for piecewise rational functions.",
+      "privateMentorNotes": "Alex has strong geometric intuition but occasionally rushes the endpoint test on closed intervals $[a, b]$. Emphasize boundary evaluation.",
+      "actionItemsCount": 2,
+      "createdAt": "2026-08-26T10:00:00.000Z",
+      "updatedAt": "2026-08-28T16:00:00.000Z"
+    },
+    "sess-alex-miriam-00": {
+      "id": "sess-alex-miriam-00",
+      "mentorshipId": "rel-alex-miriam-001",
+      "learnerId": "user-alex-001",
+      "mentorId": "mentor-prof-miriam-002",
+      "title": "Kickoff: Diagnostic Analysis & Exam Target Roadmap",
+      "scheduledDate": "2026-08-17",
+      "startTime": "16:00",
+      "durationMinutes": 45,
+      "status": "COMPLETED",
+      "topicsCovered": [
+        "Diagnostic Assessment Review",
+        "Ebbinghaus Half-Life Targets",
+        "Weekly Goal Formulation"
+      ],
+      "inPlatformMeetingId": "learnco-study-room-calc-880",
+      "sharedNotes": "Completed baseline diagnostic review. Set target to achieve 95%+ retention stability before the October exam.",
+      "privateMentorNotes": "Great motivation and clear focus on conceptual first principles.",
+      "actionItemsCount": 1,
+      "createdAt": "2026-08-12T10:00:00.000Z",
+      "updatedAt": "2026-08-17T17:00:00.000Z"
+    }
+  },
+  "mentorshipMessages": {
+    "rel-alex-miriam-001": [
+      {
+        "id": "msg-m-001",
+        "mentorshipId": "rel-alex-miriam-001",
+        "senderId": "mentor-prof-miriam-002",
+        "senderRole": "mentor",
+        "senderName": "Prof. Miriam Al-Hassan",
+        "senderAvatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
+        "recipientId": "user-alex-001",
+        "content": "Hi Alex! Welcome to our Calculus mentorship workspace. I reviewed your diagnostic assessment — your score in fundamental derivatives is solid, and we will focus next on inflection geometry and multivariable extrema.",
+        "isRead": true,
+        "readAt": "2026-08-10T12:00:00.000Z",
+        "createdAt": "2026-08-10T11:00:00.000Z"
+      },
+      {
+        "id": "msg-m-002",
+        "mentorshipId": "rel-alex-miriam-001",
+        "senderId": "user-alex-001",
+        "senderRole": "learner",
+        "senderName": "Alex Vance",
+        "senderAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "recipientId": "mentor-prof-miriam-002",
+        "content": "Thank you Professor Miriam! I have been working through the practice arena and had a question regarding why $f''(c)=0$ does not automatically guarantee an inflection point. Looking forward to our next session!",
+        "isRead": true,
+        "readAt": "2026-08-10T14:30:00.000Z",
+        "createdAt": "2026-08-10T13:45:00.000Z"
+      },
+      {
+        "id": "msg-m-003",
+        "mentorshipId": "rel-alex-miriam-001",
+        "senderId": "mentor-prof-miriam-002",
+        "senderRole": "mentor",
+        "senderName": "Prof. Miriam Al-Hassan",
+        "senderAvatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
+        "recipientId": "user-alex-001",
+        "content": "That is one of the most common pitfalls! Think of $f(x) = x^4$: at $x=0$, $f''(0)=0$, yet $x=0$ is a strict global minimum because $f'(x)$ changes from negative to positive. I have linked the practice drill in our upcoming task list for you to explore.",
+        "attachedResource": {
+          "type": "creator_note",
+          "id": "res-calc-note-001",
+          "title": "Differential Calculus & Extrema Theorems",
+          "snippet": "When f''(c) = 0, the second derivative test fails. Inspect sign changes in f'(x)."
+        },
+        "isRead": true,
+        "readAt": "2026-08-28T10:00:00.000Z",
+        "createdAt": "2026-08-27T15:30:00.000Z"
+      },
+      {
+        "id": "msg-m-004",
+        "mentorshipId": "rel-alex-miriam-001",
+        "senderId": "user-alex-001",
+        "senderRole": "learner",
+        "senderName": "Alex Vance",
+        "senderAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "recipientId": "mentor-prof-miriam-002",
+        "content": "The $x^4$ counter-example makes it completely clear! I will complete the active recall task and prepare our discussion points for Wednesday at 16:00 UTC.",
+        "isRead": false,
+        "createdAt": "2026-08-28T16:30:00.000Z"
+      }
+    ]
+  },
+  "mentorshipFeedback": [
+    {
+      "id": "fb-001",
+      "mentorshipId": "rel-alex-miriam-001",
+      "sessionId": "sess-alex-miriam-00",
+      "giverId": "user-alex-001",
+      "giverName": "Alex Vance",
+      "giverRole": "learner",
+      "receiverId": "mentor-prof-miriam-002",
+      "overallRating": 5,
+      "pedagogicalClarityRating": 5,
+      "responsivenessRating": 5,
+      "domainMasteryRating": 5,
+      "feedbackText": "Prof. Miriam explains complex calculus concepts from first principles with unmatched clarity. The visual breakdown of Taylor expansions gave me complete confidence.",
+      "isAnonymous": false,
+      "isPublicOnProfile": true,
+      "createdAt": "2026-08-18T10:00:00.000Z"
+    }
+  ],
+  "mentorshipReports": [],
+  "studyPlans": {},
+  "studyGoals": {
+    "goal-001": {
+      "id": "goal-001",
+      "userId": "user-alex-001",
+      "title": "Differential Calculus & Optimization Mastery",
+      "description": "Master rate of change, monotonicity, second derivative test, and optimization problems for board exam.",
+      "targetExam": "Advanced STEM Board Exam",
+      "targetScore": "99th Percentile",
+      "startDate": "2026-08-20",
+      "deadline": "2026-09-30",
+      "subjects": [
+        "math"
+      ],
+      "topics": [
+        "Applications of Derivatives",
+        "Differential Calculus"
+      ],
+      "progressPercent": 78,
+      "status": "ACTIVE",
+      "createdAt": "2026-08-20T10:00:00Z",
+      "updatedAt": "2026-08-27T14:30:00Z"
+    },
+    "goal-002": {
+      "id": "goal-002",
+      "userId": "user-alex-001",
+      "title": "Machine Learning Mathematical Foundations",
+      "description": "Understand gradient descent convergence proofs, loss surface curvature, and backprop derivations.",
+      "targetExam": "CS AI Core Benchmark",
+      "targetScore": "Level 5 Expert",
+      "startDate": "2026-08-15",
+      "deadline": "2026-10-15",
+      "subjects": [
+        "cs"
+      ],
+      "topics": [
+        "Optimization Algorithms",
+        "Loss Surfaces"
+      ],
+      "progressPercent": 65,
+      "status": "ACTIVE",
+      "createdAt": "2026-08-15T09:00:00Z",
+      "updatedAt": "2026-08-26T18:00:00Z"
+    },
+    "goal-003": {
+      "id": "goal-003",
+      "userId": "user-alex-001",
+      "title": "Organic Reaction Mechanisms Remediation",
+      "description": "Targeted remediation of SN1/SN2 nucleophilic substitution stereochemistry and Walden inversion.",
+      "targetExam": "Chemistry Olympiad Qualifier",
+      "targetScore": "95+",
+      "startDate": "2026-08-22",
+      "deadline": "2026-09-15",
+      "subjects": [
+        "chemistry"
+      ],
+      "topics": [
+        "Nucleophilic Substitution",
+        "Stereochemistry"
+      ],
+      "progressPercent": 42,
+      "status": "ACTIVE",
+      "createdAt": "2026-08-22T11:00:00Z",
+      "updatedAt": "2026-08-27T16:00:00Z"
+    }
+  },
+  "studyTasks": {},
+  "studyScheduleSettings": {
+    "user-alex-001": {
+      "userId": "user-alex-001",
+      "availableDays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat"
+      ],
+      "dailyAvailableMinutes": 120,
+      "preferredStartTime": "17:30",
+      "preferredEndTime": "20:00",
+      "preferredSessionLength": 45,
+      "breakDurationMinutes": 10,
+      "unavailablePeriods": [],
+      "autoRescheduleMissed": true,
+      "reminderNotifications": true,
+      "reminderMinutesBefore": 15,
+      "targetExamTrack": "Advanced STEM Mastery & JEE/AP"
+    }
+  },
+  "studyPlanVersions": {
+    "plan-001": [
+      {
+        "id": "version-001",
+        "planId": "plan-001",
+        "userId": "user-alex-001",
+        "version": 1,
+        "title": "Initial AI Baseline Plan",
+        "changeSummary": "Generated initial 4-week balanced STEM schedule across Calculus, ML, Chemistry, and Physics.",
+        "snapshot": {
+          "plan": {
+            "id": "plan-001",
+            "userId": "user-alex-001",
+            "title": "Autumn 2026 STEM Sprint Plan",
+            "description": "Paced daily study program balancing Mathematics, CS AI Foundations, Chemistry remediation, and Physics conservation laws.",
+            "goalIds": [
+              "goal-001",
+              "goal-002",
+              "goal-003"
+            ],
+            "subjects": [
+              "math",
+              "cs",
+              "chemistry",
+              "physics"
+            ],
+            "startDate": "2026-08-24",
+            "targetEndDate": "2026-10-15",
+            "status": "ACTIVE",
+            "version": 1,
+            "totalTasksCount": 18,
+            "completedTasksCount": 6,
+            "totalEstimatedHours": 24,
+            "completedHours": 7.5,
+            "aiGenerated": true,
+            "generationPrompt": "Create a balanced 4-subject STEM sprint with emphasis on weak areas in Calculus and SN2 chemistry, respecting 25 daily questions practice limit.",
+            "createdAt": "2026-08-24T08:00:00Z",
+            "updatedAt": "2026-08-27T12:00:00Z"
+          },
+          "tasks": [
+            {
+              "id": "task-001",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-001",
+              "title": "Monotonicity & Extrema Concept Review",
+              "description": "Review First & Second Derivative tests and critical point conditions.",
+              "taskType": "LEARN_CONCEPT",
+              "subjectId": "math",
+              "conceptId": "concept-deriv-inc-dec",
+              "conceptTitle": "Monotonicity & First Derivative Test",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "17:30",
+              "scheduledEndTime": "18:15",
+              "estimatedDurationMinutes": 45,
+              "actualDurationMinutes": 45,
+              "priority": "HIGH",
+              "status": "COMPLETED",
+              "completedAt": "2026-08-27T18:15:00Z",
+              "manualProgress": 100,
+              "measuredProgress": 100,
+              "orderIndex": 1,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-27T18:15:00Z"
+            },
+            {
+              "id": "task-002",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-001",
+              "title": "Differential Calculus 5-Question Practice Drill",
+              "description": "Solve calibrated questions on local extrema, inflection points, and concavity.",
+              "taskType": "PRACTICE_QUESTIONS",
+              "subjectId": "math",
+              "conceptId": "concept-deriv-inc-dec",
+              "conceptTitle": "Monotonicity & First Derivative Test",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "18:25",
+              "scheduledEndTime": "18:55",
+              "estimatedDurationMinutes": 30,
+              "priority": "HIGH",
+              "status": "IN_PROGRESS",
+              "practiceQuestionCount": 5,
+              "manualProgress": 40,
+              "measuredProgress": 40,
+              "orderIndex": 2,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-27T18:25:00Z"
+            },
+            {
+              "id": "task-003",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-003",
+              "title": "Remediate SN2 Stereochemistry Mistakes",
+              "description": "Targeted review of recent mistake logs on Walden inversion and solvent effects.",
+              "taskType": "REVIEW_MISTAKES",
+              "subjectId": "chemistry",
+              "conceptId": "concept-sn1-sn2",
+              "conceptTitle": "Stereochemistry of SN2 & Walden Inversion",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "19:05",
+              "scheduledEndTime": "19:45",
+              "estimatedDurationMinutes": 40,
+              "priority": "CRITICAL",
+              "status": "NOT_STARTED",
+              "practiceQuestionCount": 4,
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 3,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-004",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-002",
+              "title": "Gradient Descent Notes & Derivation Flashcards",
+              "description": "Review saved Creator Studio flashcard deck on learning rate and Lipschitz continuity.",
+              "taskType": "FLASHCARDS",
+              "subjectId": "cs",
+              "creatorResourceId": "resource-001",
+              "creatorResourceTitle": "Gradient Descent & Convex Optimization Cards",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "19:50",
+              "scheduledEndTime": "20:10",
+              "estimatedDurationMinutes": 20,
+              "priority": "NORMAL",
+              "status": "NOT_STARTED",
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 4,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-005",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-002",
+              "title": "Gradient Descent & Loss Surface Curvature Derivation",
+              "description": "First-principles breakdown of Hessian condition numbers and oscillation dampers.",
+              "taskType": "LEARN_CONCEPT",
+              "subjectId": "cs",
+              "conceptId": "concept-grad-descent",
+              "conceptTitle": "Gradient Descent & Learning Rate Convergence",
+              "scheduledDate": "2026-08-28",
+              "scheduledStartTime": "17:30",
+              "scheduledEndTime": "18:15",
+              "estimatedDurationMinutes": 45,
+              "priority": "HIGH",
+              "status": "NOT_STARTED",
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 1,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            }
+          ],
+          "scheduleSettings": {
+            "userId": "user-alex-001",
+            "availableDays": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat"
+            ],
+            "dailyAvailableMinutes": 120,
+            "preferredStartTime": "17:30",
+            "preferredEndTime": "20:00",
+            "preferredSessionLength": 45,
+            "breakDurationMinutes": 10,
+            "unavailablePeriods": [],
+            "autoRescheduleMissed": true,
+            "reminderNotifications": true,
+            "reminderMinutesBefore": 15,
+            "targetExamTrack": "Advanced STEM Mastery & JEE/AP"
+          }
+        },
+        "createdAt": "2026-08-24T08:00:00Z",
+        "createdBy": "AI"
+      },
+      {
+        "id": "version-002",
+        "planId": "plan-001",
+        "userId": "user-alex-001",
+        "version": 2,
+        "title": "Targeted Remediation & Mentor Task Integration",
+        "changeSummary": "Prioritized Chemistry SN2 remediation, added mentor task from Dr. Elena, and shifted daily start time to 17:30.",
+        "snapshot": {
+          "plan": {
+            "id": "plan-001",
+            "userId": "user-alex-001",
+            "title": "Autumn 2026 STEM Sprint Plan",
+            "description": "Paced daily study program balancing Mathematics, CS AI Foundations, Chemistry remediation, and Physics conservation laws.",
+            "goalIds": [
+              "goal-001",
+              "goal-002",
+              "goal-003"
+            ],
+            "subjects": [
+              "math",
+              "cs",
+              "chemistry",
+              "physics"
+            ],
+            "startDate": "2026-08-24",
+            "targetEndDate": "2026-10-15",
+            "status": "ACTIVE",
+            "version": 2,
+            "totalTasksCount": 18,
+            "completedTasksCount": 6,
+            "totalEstimatedHours": 24,
+            "completedHours": 7.5,
+            "aiGenerated": true,
+            "generationPrompt": "Create a balanced 4-subject STEM sprint with emphasis on weak areas in Calculus and SN2 chemistry, respecting 25 daily questions practice limit.",
+            "createdAt": "2026-08-24T08:00:00Z",
+            "updatedAt": "2026-08-27T12:00:00Z"
+          },
+          "tasks": [
+            {
+              "id": "task-001",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-001",
+              "title": "Monotonicity & Extrema Concept Review",
+              "description": "Review First & Second Derivative tests and critical point conditions.",
+              "taskType": "LEARN_CONCEPT",
+              "subjectId": "math",
+              "conceptId": "concept-deriv-inc-dec",
+              "conceptTitle": "Monotonicity & First Derivative Test",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "17:30",
+              "scheduledEndTime": "18:15",
+              "estimatedDurationMinutes": 45,
+              "actualDurationMinutes": 45,
+              "priority": "HIGH",
+              "status": "COMPLETED",
+              "completedAt": "2026-08-27T18:15:00Z",
+              "manualProgress": 100,
+              "measuredProgress": 100,
+              "orderIndex": 1,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-27T18:15:00Z"
+            },
+            {
+              "id": "task-002",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-001",
+              "title": "Differential Calculus 5-Question Practice Drill",
+              "description": "Solve calibrated questions on local extrema, inflection points, and concavity.",
+              "taskType": "PRACTICE_QUESTIONS",
+              "subjectId": "math",
+              "conceptId": "concept-deriv-inc-dec",
+              "conceptTitle": "Monotonicity & First Derivative Test",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "18:25",
+              "scheduledEndTime": "18:55",
+              "estimatedDurationMinutes": 30,
+              "priority": "HIGH",
+              "status": "IN_PROGRESS",
+              "practiceQuestionCount": 5,
+              "manualProgress": 40,
+              "measuredProgress": 40,
+              "orderIndex": 2,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-27T18:25:00Z"
+            },
+            {
+              "id": "task-003",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-003",
+              "title": "Remediate SN2 Stereochemistry Mistakes",
+              "description": "Targeted review of recent mistake logs on Walden inversion and solvent effects.",
+              "taskType": "REVIEW_MISTAKES",
+              "subjectId": "chemistry",
+              "conceptId": "concept-sn1-sn2",
+              "conceptTitle": "Stereochemistry of SN2 & Walden Inversion",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "19:05",
+              "scheduledEndTime": "19:45",
+              "estimatedDurationMinutes": 40,
+              "priority": "CRITICAL",
+              "status": "NOT_STARTED",
+              "practiceQuestionCount": 4,
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 3,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-004",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-002",
+              "title": "Gradient Descent Notes & Derivation Flashcards",
+              "description": "Review saved Creator Studio flashcard deck on learning rate and Lipschitz continuity.",
+              "taskType": "FLASHCARDS",
+              "subjectId": "cs",
+              "creatorResourceId": "resource-001",
+              "creatorResourceTitle": "Gradient Descent & Convex Optimization Cards",
+              "scheduledDate": "2026-08-27",
+              "scheduledStartTime": "19:50",
+              "scheduledEndTime": "20:10",
+              "estimatedDurationMinutes": 20,
+              "priority": "NORMAL",
+              "status": "NOT_STARTED",
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 4,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-005",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-002",
+              "title": "Gradient Descent & Loss Surface Curvature Derivation",
+              "description": "First-principles breakdown of Hessian condition numbers and oscillation dampers.",
+              "taskType": "LEARN_CONCEPT",
+              "subjectId": "cs",
+              "conceptId": "concept-grad-descent",
+              "conceptTitle": "Gradient Descent & Learning Rate Convergence",
+              "scheduledDate": "2026-08-28",
+              "scheduledStartTime": "17:30",
+              "scheduledEndTime": "18:15",
+              "estimatedDurationMinutes": 45,
+              "priority": "HIGH",
+              "status": "NOT_STARTED",
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 1,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-006",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-002",
+              "title": "Optimization Algorithms Practice Arena",
+              "description": "Solve 6 calibrated ladder problems testing momentum parameters and learning decay.",
+              "taskType": "PRACTICE_QUESTIONS",
+              "subjectId": "cs",
+              "conceptId": "concept-grad-descent",
+              "conceptTitle": "Gradient Descent & Learning Rate Convergence",
+              "scheduledDate": "2026-08-28",
+              "scheduledStartTime": "18:25",
+              "scheduledEndTime": "19:00",
+              "estimatedDurationMinutes": 35,
+              "priority": "NORMAL",
+              "status": "NOT_STARTED",
+              "practiceQuestionCount": 6,
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 2,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-007",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-003",
+              "title": "Mentor Prescription: SN1 vs SN2 Comparison Matrix",
+              "description": "Assigned by Dr. Elena Rostova: Complete the reaction pathway analysis.",
+              "taskType": "MENTORSHIP_TASK",
+              "subjectId": "chemistry",
+              "mentorshipTaskId": "task-m-01",
+              "scheduledDate": "2026-08-28",
+              "scheduledStartTime": "19:10",
+              "scheduledEndTime": "19:45",
+              "estimatedDurationMinutes": 35,
+              "priority": "HIGH",
+              "status": "NOT_STARTED",
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 3,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-008",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "title": "Work-Energy Theorem in Conservative Systems",
+              "description": "Rigorous derivation of potential energy gradients and harmonic oscillators.",
+              "taskType": "LEARN_CONCEPT",
+              "subjectId": "physics",
+              "conceptId": "concept-energy-cons",
+              "conceptTitle": "Work-Energy Theorem in Conservative Systems",
+              "scheduledDate": "2026-08-29",
+              "scheduledStartTime": "10:00",
+              "scheduledEndTime": "10:50",
+              "estimatedDurationMinutes": 50,
+              "priority": "NORMAL",
+              "status": "NOT_STARTED",
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 1,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            },
+            {
+              "id": "task-009",
+              "planId": "plan-001",
+              "userId": "user-alex-001",
+              "goalId": "goal-001",
+              "title": "Calculus Spaced Repetition Drill (Cycle 2)",
+              "description": "Interval reinforcement for Monotonicity & Extrema rules.",
+              "taskType": "REVISION",
+              "subjectId": "math",
+              "conceptId": "concept-deriv-inc-dec",
+              "conceptTitle": "Monotonicity & First Derivative Test",
+              "scheduledDate": "2026-08-29",
+              "scheduledStartTime": "11:00",
+              "scheduledEndTime": "11:40",
+              "estimatedDurationMinutes": 40,
+              "isSpacedRevision": true,
+              "revisionCycle": 2,
+              "priority": "HIGH",
+              "status": "NOT_STARTED",
+              "practiceQuestionCount": 5,
+              "manualProgress": 0,
+              "measuredProgress": 0,
+              "orderIndex": 2,
+              "createdAt": "2026-08-24T08:00:00Z",
+              "updatedAt": "2026-08-24T08:00:00Z"
+            }
+          ],
+          "scheduleSettings": {
+            "userId": "user-alex-001",
+            "availableDays": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat"
+            ],
+            "dailyAvailableMinutes": 120,
+            "preferredStartTime": "17:30",
+            "preferredEndTime": "20:00",
+            "preferredSessionLength": 45,
+            "breakDurationMinutes": 10,
+            "unavailablePeriods": [],
+            "autoRescheduleMissed": true,
+            "reminderNotifications": true,
+            "reminderMinutesBefore": 15,
+            "targetExamTrack": "Advanced STEM Mastery & JEE/AP"
+          }
+        },
+        "createdAt": "2026-08-26T14:00:00Z",
+        "createdBy": "USER"
+      }
+    ]
+  },
+  "studyActiveSessions": {}
+}

@@ -1,6 +1,8 @@
 import { QuestionBankItem } from '../../src/types/curriculum';
+import { CURRICULUM_DATA } from '../../src/data/curriculumData';
+import { QuestionGeneratorEngine } from '../services/questionGeneratorEngine';
 
-export const MASTER_QUESTION_BANK: QuestionBankItem[] = [
+const CORE_QUESTION_BANK: QuestionBankItem[] = [
   // ==========================================
   // MATHEMATICS QUESTIONS
   // ==========================================
@@ -598,3 +600,27 @@ export const MASTER_QUESTION_BANK: QuestionBankItem[] = [
     version: 1,
   },
 ];
+
+// Dynamically generate 100 questions per topic for all subjects and chapters
+export const MASTER_QUESTION_BANK: QuestionBankItem[] = [...CORE_QUESTION_BANK];
+
+for (const subject of CURRICULUM_DATA) {
+  for (const chapter of subject.chapters) {
+    for (const topic of chapter.topics) {
+      const topicGenerated = QuestionGeneratorEngine.generateQuestionsForTopic(
+        topic.id,
+        subject.id as any,
+        chapter.id,
+        topic.title,
+        100
+      );
+
+      for (const q of topicGenerated) {
+        if (!MASTER_QUESTION_BANK.some((existing) => existing.id === q.id)) {
+          MASTER_QUESTION_BANK.push(q);
+        }
+      }
+    }
+  }
+}
+

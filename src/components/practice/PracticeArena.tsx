@@ -187,64 +187,97 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           currentQuestion.correctAnswer.toString().trim().toLowerCase();
       }
 
-      // Submit authoritatively to backend xpEngine
-      const submitRes = await fetch('/api/practice/submit-attempt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${AuthClient.getToken()}`,
-        },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          selectedAnswer: rawAnswer.toString(),
-          isCorrect,
-          timeSpentSeconds: timeSpentPerQuestion[questionId] || 15,
-          conceptId: currentQuestion.conceptId,
-          topicId: currentQuestion.topicId,
-          subjectId: currentQuestion.subjectId,
-          hintsUsedCount: hintsRevealed[questionId] || 0,
-        }),
-      });
+      const effectiveUserId = AuthClient.getCurrentUser()?.id || 'default_user';
 
-      const data = await submitRes.json();
-
-      // Record daily streak activity in gamification system
-      recordDailyActivity('default_user', {
-        questionsSolved: 1,
-        xpEarned: isCorrect ? (data.xpEarned || 5) : 0,
-        minutesStudied: Math.ceil((timeSpentPerQuestion[questionId] || 15) / 60),
-      });
-
-      setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
-      setSubmissionFeedback((prev) => ({
-        ...prev,
-        [questionId]: {
-          isCorrect,
-          xpEarned: data.xpEarned || (isCorrect ? 5 : 0),
-          dailyQuotaRemaining: data.dailyQuotaRemaining,
-          newStreak: data.currentStreak,
-        },
-      }));
-
-      if (isCorrect) {
-        sounds.playSuccess();
-        setTotalXpAwarded((prev) => prev + (data.xpEarned || 5));
-        confetti({
-          particleCount: 40,
-          spread: 60,
-          origin: { y: 0.7 },
+      try {
+        const submitRes = await fetch('/api/practice/submit-attempt', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${AuthClient.getToken()}`,
+          },
+          body: JSON.stringify({
+            questionId: currentQuestion.id,
+            selectedAnswer: rawAnswer.toString(),
+            isCorrect,
+            timeSpentSeconds: timeSpentPerQuestion[questionId] || 15,
+            conceptId: currentQuestion.conceptId,
+            topicId: currentQuestion.topicId,
+            subjectId: currentQuestion.subjectId,
+            hintsUsedCount: hintsRevealed[questionId] || 0,
+          }),
         });
-      } else {
-        sounds.playFailure();
+
+        const data = await submitRes.json();
+
+        // Record daily streak activity in gamification system (works online and offline)
+        const updatedStreak = recordDailyActivity(effectiveUserId, {
+          questionsSolved: 1,
+          xpEarned: isCorrect ? (data.xpEarned || 15) : 5,
+          minutesStudied: Math.ceil((timeSpentPerQuestion[questionId] || 15) / 60),
+        });
+
+        try {
+          window.dispatchEvent(new Event('learnco_streak_updated'));
+        } catch (_) {}
+
+        setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
+        setSubmissionFeedback((prev) => ({
+          ...prev,
+          [questionId]: {
+            isCorrect,
+            xpEarned: data.xpEarned || (isCorrect ? 15 : 5),
+            dailyQuotaRemaining: data.dailyQuotaRemaining,
+            newStreak: data.currentStreak || updatedStreak.currentStreak,
+          },
+        }));
+
+        if (isCorrect) {
+          sounds.playSuccess();
+          setTotalXpAwarded((prev) => prev + (data.xpEarned || 15));
+          confetti({
+            particleCount: 40,
+            spread: 60,
+            origin: { y: 0.7 },
+          });
+        } else {
+          sounds.playFailure();
+        }
+      } catch (err) {
+        // Fallback local submission (offline mode)
+        const updatedStreak = recordDailyActivity(effectiveUserId, {
+          questionsSolved: 1,
+          xpEarned: isCorrect ? 15 : 5,
+          minutesStudied: Math.ceil((timeSpentPerQuestion[questionId] || 15) / 60),
+        });
+
+        try {
+          window.dispatchEvent(new Event('learnco_streak_updated'));
+        } catch (_) {}
+
+        setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
+        setSubmissionFeedback((prev) => ({
+          ...prev,
+          [questionId]: {
+            isCorrect,
+            xpEarned: isCorrect ? 15 : 5,
+            dailyQuotaRemaining: 24,
+            newStreak: updatedStreak.currentStreak,
+          },
+        }));
+
+        if (isCorrect) {
+          sounds.playSuccess();
+          setTotalXpAwarded((prev) => prev + 15);
+          confetti({
+            particleCount: 30,
+            spread: 50,
+            origin: { y: 0.7 },
+          });
+        } else {
+          sounds.playFailure();
+        }
       }
-    } catch (err) {
-      sounds.playFailure();
-      // Fallback local submission
-      setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
-      setSubmissionFeedback((prev) => ({
-        ...prev,
-        [questionId]: { isCorrect: false, xpEarned: 0 },
-      }));
     } finally {
       setIsSubmitting(false);
     }

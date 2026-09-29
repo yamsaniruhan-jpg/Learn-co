@@ -9,10 +9,15 @@ import {
 } from '../types/analytics';
 import { SubjectId, ExamTrackId } from '../types/curriculum';
 import { MistakeRecord } from '../types/auth';
+import { AuthClient } from './authClient';
 
 export class AnalyticsClient {
   private static getHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token') || 'token-alex-001';
+    const token =
+      AuthClient.getToken() ||
+      localStorage.getItem('learnco_auth_token') ||
+      localStorage.getItem('auth_token') ||
+      'token-alex-001';
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
@@ -170,6 +175,83 @@ export class AnalyticsClient {
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to generate diagnostic summary');
+    return json.data;
+  }
+
+  /**
+   * Fetch system, attempt, and verification audit logs
+   */
+  static async getLogs(params?: { category?: string; search?: string; limit?: number }): Promise<any[]> {
+    const q = new URLSearchParams();
+    if (params?.category) q.append('category', params.category);
+    if (params?.search) q.append('search', params.search);
+    if (params?.limit) q.append('limit', String(params.limit));
+
+    const res = await fetch(`/api/analytics/logs?${q.toString()}`, {
+      headers: this.getHeaders(),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to fetch logs');
+    return json.logs || [];
+  }
+
+  /**
+   * Record a client-side audit or diagnostic log
+   */
+  static async logClientEvent(category: string, action: string, details: string, status: string = 'INFO', metadata?: Record<string, any>): Promise<any> {
+    const res = await fetch('/api/analytics/logs', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ category, action, details, status, metadata }),
+    });
+    const json = await res.json();
+    return json.log;
+  }
+
+  /**
+   * Fetch webhook alert configuration
+   */
+  static async getWebhookConfig(): Promise<any> {
+    const res = await fetch('/api/analytics/webhook-config', { headers: this.getHeaders() });
+    const json = await res.json();
+    return json.config;
+  }
+
+  /**
+   * Update webhook alert configuration
+   */
+  static async setWebhookConfig(config: any): Promise<any> {
+    const res = await fetch('/api/analytics/webhook-config', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(config),
+    });
+    const json = await res.json();
+    return json.config;
+  }
+
+  /**
+   * Dispatch a test alert to the configured webhook
+   */
+  static async testWebhook(): Promise<any> {
+    const res = await fetch('/api/analytics/test-webhook', {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+    const json = await res.json();
+    return json;
+  }
+
+  /**
+   * Trigger automated spaced repetition review generation from mistake records
+   */
+  static async triggerSpacedRepetition(): Promise<{ tasksCreated: number; notificationsCreated: number; remediatedTopics: string[] }> {
+    const res = await fetch('/api/analytics/trigger-spaced-repetition', {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to trigger spaced repetition');
     return json.data;
   }
 }

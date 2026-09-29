@@ -356,22 +356,47 @@ CRITICAL CONSTRAINTS:
 
       const contents = `Create a 14-day study plan based on: ${JSON.stringify(promptContext)}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.3,
-          responseMimeType: 'application/json',
-        },
-      });
+      const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      let rawJson = '';
 
-      const rawJson = response.text?.trim();
-      if (!rawJson) {
-        throw new Error('Empty AI response from Gemini');
+      for (const model of candidateModels) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const response = await ai.models.generateContent({
+              model,
+              contents,
+              config: {
+                systemInstruction,
+                temperature: 0.3,
+                responseMimeType: 'application/json',
+              },
+            });
+
+            const text = response.text?.trim();
+            if (text) {
+              rawJson = text;
+              break;
+            }
+          } catch (err: any) {
+            console.warn(
+              `AI plan generation model ${model} (attempt ${attempt}/2) error:`,
+              err?.message || err
+            );
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 600));
+            }
+          }
+        }
+        if (rawJson) break;
       }
 
-      const parsed = JSON.parse(rawJson);
+      if (!rawJson) {
+        throw new Error('All AI models failed or timed out during plan generation.');
+      }
+
+      // Strip potential markdown JSON code block markers
+      const cleanedJson = rawJson.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsed = JSON.parse(cleanedJson);
 
       // Validate and sanitize AI tasks
       const sanitizedTasks: Partial<StudyTask>[] = [];

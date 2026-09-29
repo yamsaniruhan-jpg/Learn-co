@@ -61,6 +61,17 @@ router.get('/plan', (req: Request, res: Response) => {
   }
 });
 
+// Alias: GET /api/planner/active
+router.get('/active', (req: Request, res: Response) => {
+  try {
+    const userId = resolveUserId(req);
+    const activeData = Database.getActivePlan(userId);
+    res.json(activeData);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch active plan.' });
+  }
+});
+
 // POST /api/planner/plan (Manual plan creation)
 router.post('/plan', async (req: Request, res: Response) => {
   try {
@@ -104,11 +115,17 @@ router.post('/generate-ai', async (req: Request, res: Response) => {
 router.post('/apply-generated', async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
-    const { plan, tasks, goal } = req.body;
+    const body = req.body.generatedPlan || req.body;
+    const { plan, tasks, goal } = body;
+
+    if (!plan) {
+      res.status(400).json({ error: 'Missing plan payload in request body.' });
+      return;
+    }
 
     const result = await withUserLock(userId, async () => {
       let createdGoal: StudyGoal | null = null;
-      if (goal) {
+      if (goal && Object.keys(goal).length > 0) {
         createdGoal = Database.createGoal(userId, goal);
       }
 
@@ -117,7 +134,7 @@ router.post('/apply-generated', async (req: Request, res: Response) => {
         goalIds: createdGoal ? [createdGoal.id] : plan.goalIds || [],
       };
 
-      return Database.createPlan(userId, planData, tasks);
+      return Database.createPlan(userId, planData, tasks || []);
     });
 
     res.status(201).json(result);
@@ -347,6 +364,22 @@ router.post('/tasks/:id/reschedule', async (req: Request, res: Response) => {
 
 // POST /api/planner/tasks/batch-reschedule-missed
 router.post('/tasks/batch-reschedule-missed', async (req: Request, res: Response) => {
+  try {
+    const userId = resolveUserId(req);
+    const { targetDate } = req.body;
+
+    const result = await withUserLock(userId, async () => {
+      return Database.batchRescheduleMissedTasks(userId, targetDate);
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to batch reschedule missed tasks.' });
+  }
+});
+
+// Alias: POST /api/planner/reschedule-missed
+router.post('/reschedule-missed', async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
     const { targetDate } = req.body;

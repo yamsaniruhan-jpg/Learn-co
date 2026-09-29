@@ -8,9 +8,11 @@ import { PracticeArena } from '../practice/PracticeArena';
 import { PracticeResultsView } from '../practice/PracticeResultsView';
 import { CognitiveWarmUpModal, UserMoodState } from './CognitiveWarmUpModal';
 import { QuestionBankItem } from '../../types/curriculum';
-import { BookOpen, Sparkles, Zap, Bot, ArrowLeft, Brain } from 'lucide-react';
+import { BookOpen, Sparkles, Zap, Bot, ArrowLeft, Brain, Library } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { sounds } from '../../utils/sound';
+import { DigitalArchiveHub } from './DigitalArchiveHub';
+import { XPIndicator } from '../ui/GamificationIndicators';
 
 interface LearnViewProps {
   initialSubjectId?: SubjectId;
@@ -29,6 +31,7 @@ export const LearnView: React.FC<LearnViewProps> = ({
   const [selectedSubject, setSelectedSubject] = useState<SubjectId>(initialSubjectId);
   const [selectedTrack, setSelectedTrack] = useState<ExamTrackId>('all');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [activeTabMode, setActiveTabMode] = useState<'curriculum' | 'archives'>('curriculum');
 
   // Concept View State
   const [activeConceptDetail, setActiveConceptDetail] = useState<ConceptDetail | null>(null);
@@ -186,6 +189,7 @@ export const LearnView: React.FC<LearnViewProps> = ({
                 <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
                   Data-Driven STEM Curriculum
                 </span>
+                <XPIndicator xp={gamification?.xp ?? 420} size="sm" />
                 <span className="text-xs text-slate-400 font-mono">5,000+ Question Architecture</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -230,8 +234,37 @@ export const LearnView: React.FC<LearnViewProps> = ({
             </div>
           </div>
 
-          {/* Curriculum Explorer */}
-          {isLoading ? (
+          {/* Mode Switcher Tabs */}
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-1">
+            <button
+              onClick={() => setActiveTabMode('curriculum')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
+                activeTabMode === 'curriculum'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Interactive Curriculum Hierarchy</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTabMode('archives')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
+                activeTabMode === 'archives'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Library className="w-4 h-4" />
+              <span>Digital Archive & Textbook Hub</span>
+            </button>
+          </div>
+
+          {/* View Content */}
+          {activeTabMode === 'archives' ? (
+            <DigitalArchiveHub selectedSubject={selectedSubject} />
+          ) : isLoading ? (
             <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
               Loading STEM curriculum hierarchy...
             </div>

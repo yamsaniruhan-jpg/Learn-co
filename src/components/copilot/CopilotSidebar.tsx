@@ -40,6 +40,8 @@ interface CopilotSidebarProps {
   onChangeMode: (mode: CopilotMode) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
@@ -56,6 +58,8 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
   onChangeMode,
   searchQuery,
   onSearchChange,
+  isMobileOpen = false,
+  onCloseMobile,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -96,8 +100,8 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
     { id: 'practice_generator', label: 'Practice Drill', icon: <Target className="w-3.5 h-3.5 text-cyan-500" /> },
   ];
 
-  return (
-    <aside className="w-80 flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 select-none">
+  const sidebarContent = (
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 select-none">
       {/* Top Header & New Conversation Button */}
       <div className="p-4 border-b border-slate-200/80 dark:border-slate-800/80 space-y-3">
         <div className="flex items-center justify-between">
@@ -111,13 +115,27 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
               </h2>
             </div>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-            {conversations.length} Active
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+              {conversations.length} Active
+            </span>
+            {onCloseMobile && (
+              <button
+                onClick={onCloseMobile}
+                className="md:hidden p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                aria-label="Close drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <button
-          onClick={onNewConversation}
+          onClick={() => {
+            onNewConversation();
+            if (onCloseMobile) onCloseMobile();
+          }}
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -301,6 +319,28 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
           </div>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-72 lg:w-80 flex-col h-full border-r border-slate-200 dark:border-slate-800 shrink-0 select-none">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer Overlay */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
+            onClick={onCloseMobile}
+          />
+          <div className="relative w-4/5 max-w-xs h-full z-10 animate-in slide-in-from-left duration-200 shadow-2xl">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

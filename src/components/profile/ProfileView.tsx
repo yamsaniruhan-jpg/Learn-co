@@ -38,6 +38,7 @@ import {
   calculateLevelFromXp,
 } from '../../types/auth';
 import { Card } from '../ui/Card';
+import { FormattedMathText } from '../common/FormattedMathText';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
@@ -970,23 +971,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
                     </Button>
                   </div>
 
-                  <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                    {mistake.questionText}
-                  </p>
+                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                    <FormattedMathText text={mistake.questionText} />
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300">
                       <strong className="block text-[10px] uppercase font-bold text-rose-500">
                         Your Submitted Answer
                       </strong>
-                      <span>{String(mistake.userAnswer)}</span>
+                      <FormattedMathText text={String(mistake.userAnswer)} inline />
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300">
                       <strong className="block text-[10px] uppercase font-bold text-emerald-500">
                         Authoritative Correct Answer
                       </strong>
-                      <span>{String(mistake.correctAnswer)}</span>
+                      <FormattedMathText text={String(mistake.correctAnswer)} inline />
                     </div>
                   </div>
 
@@ -994,7 +995,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
                     <strong className="block text-[10px] uppercase font-bold text-slate-400 mb-0.5">
                       Analytical Explanation:
                     </strong>
-                    {mistake.explanation}
+                    <FormattedMathText text={mistake.explanation} />
                   </div>
                 </Card>
               ))}

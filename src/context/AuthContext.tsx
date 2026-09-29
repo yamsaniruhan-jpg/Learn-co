@@ -8,6 +8,8 @@ import {
   DailyPracticeQuota,
   calculateLevelFromXp,
 } from '../types/auth';
+import { getCurrentXp } from '../utils/xpManager';
+import { loadUserStreak } from '../utils/streakManager';
 
 interface AuthContextType {
   user: any | null;
@@ -42,7 +44,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [gamification, setGamification] = useState<UserGamification | null>(null);
+  const [gamification, setGamification] = useState<UserGamification | null>(() => {
+    const initXp = getCurrentXp(420);
+    const lvl = calculateLevelFromXp(initXp);
+    const streakState = loadUserStreak('guest');
+    return {
+      userId: 'guest',
+      xp: initXp,
+      level: lvl.level,
+      currentStreak: streakState.currentStreak,
+      longestStreak: streakState.longestStreak,
+      lastActiveDate: streakState.lastActiveDate,
+      dailyQuestionsSolvedToday: 0,
+      dailyAllowanceLimit: 25,
+      dailyDoubtsAskedToday: 0,
+      dailyDoubtsLimit: 10,
+      dailyArtifactsCreatedToday: 0,
+      dailyArtifactsLimit: 5,
+      dailySourcesUploadedToday: 0,
+      dailySourcesUploadLimit: 5,
+    };
+  });
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -52,25 +74,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const token = AuthClient.getToken();
       if (!token) {
-        // No active session: Start in clean guest / unauthenticated state
+        // No active session: Start in clean guest / unauthenticated state with local gamification
         setUser(null);
         setProfile(null);
-        setGamification(null);
         setSettings(null);
+        const currentLocalXp = getCurrentXp(420);
+        const lvl = calculateLevelFromXp(currentLocalXp);
+        const streakState = loadUserStreak('guest');
+        setGamification((prev) => ({
+          userId: prev?.userId || 'guest',
+          xp: currentLocalXp,
+          level: lvl.level,
+          currentStreak: streakState.currentStreak,
+          longestStreak: streakState.longestStreak,
+          lastActiveDate: streakState.lastActiveDate,
+          dailyQuestionsSolvedToday: prev?.dailyQuestionsSolvedToday || 0,
+          dailyAllowanceLimit: prev?.dailyAllowanceLimit || 25,
+          dailyDoubtsAskedToday: prev?.dailyDoubtsAskedToday || 0,
+          dailyDoubtsLimit: prev?.dailyDoubtsLimit || 10,
+          dailyArtifactsCreatedToday: prev?.dailyArtifactsCreatedToday || 0,
+          dailyArtifactsLimit: prev?.dailyArtifactsLimit || 5,
+          dailySourcesUploadedToday: prev?.dailySourcesUploadedToday || 0,
+          dailySourcesUploadLimit: prev?.dailySourcesUploadLimit || 5,
+        }));
         return;
       }
 
       const res = await AuthClient.getMe();
       setUser(res.user);
       setProfile(res.profile);
-      setGamification(res.gamification);
+      const userStreak = loadUserStreak(res.user.id || 'default_user');
+      setGamification({
+        ...res.gamification,
+        currentStreak: userStreak.currentStreak,
+        longestStreak: userStreak.longestStreak,
+      });
       setSettings(res.settings);
     } catch (err: any) {
       console.warn('Session verification failed or expired:', err?.message || err);
       AuthClient.removeToken();
       setUser(null);
       setProfile(null);
-      setGamification(null);
       setSettings(null);
     } finally {
       setIsLoading(false);
@@ -80,6 +124,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     refreshUserData();
   }, [refreshUserData]);
+
+  // Listen to global XP awarded events
+  useEffect(() => {
+    const handleXpAwarded = (e: Event) => {
+      const customEvent = e as CustomEvent<{ totalXp: number; level: number }>;
+      if (customEvent.detail) {
+        setGamification((prev) => {
+          const currentXp = customEvent.detail.totalXp;
+          const lvl = calculateLevelFromXp(currentXp);
+          if (!prev) {
+            return {
+              userId: 'guest',
+              xp: currentXp,
+              level: lvl.level,
+              currentStreak: 3,
+              longestStreak: 7,
+              lastActiveDate: new Date().toISOString().split('T')[0],
+              dailyQuestionsSolvedToday: 4,
+              dailyAllowanceLimit: 25,
+              dailyDoubtsAskedToday: 1,
+              dailyDoubtsLimit: 10,
+              dailyArtifactsCreatedToday: 0,
+              dailyArtifactsLimit: 5,
+              dailySourcesUploadedToday: 0,
+              dailySourcesUploadLimit: 5,
+            };
+          }
+          return {
+            ...prev,
+            xp: currentXp,
+            level: lvl.level,
+          };
+        });
+      }
+    };
+
+    window.addEventListener('learnco_xp_awarded', handleXpAwarded);
+    return () => {
+      window.removeEventListener('learnco_xp_awarded', handleXpAwarded);
+    };
+  }, []);
 
   const signInWithEmail = async (email: string, password?: string) => {
     setAuthError(null);
@@ -143,11 +228,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await AuthClient.signOut();
     } finally {
-      // Re-sign in with demo user or reset state
       setUser(null);
       setProfile(null);
-      setGamification(null);
       setSettings(null);
+      const currentLocalXp = getCurrentXp(420);
+      const lvl = calculateLevelFromXp(currentLocalXp);
+      const streakState = loadUserStreak('guest');
+      setGamification({
+        userId: 'guest',
+        xp: currentLocalXp,
+        level: lvl.level,
+        currentStreak: streakState.currentStreak,
+        longestStreak: streakState.longestStreak,
+        lastActiveDate: streakState.lastActiveDate,
+        dailyQuestionsSolvedToday: 0,
+        dailyAllowanceLimit: 25,
+        dailyDoubtsAskedToday: 0,
+        dailyDoubtsLimit: 10,
+        dailyArtifactsCreatedToday: 0,
+        dailyArtifactsLimit: 5,
+        dailySourcesUploadedToday: 0,
+        dailySourcesUploadLimit: 5,
+      });
     }
   };
 
@@ -177,7 +279,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateGamificationState = (newGam: Partial<UserGamification>) => {
     setGamification((prev) => {
-      if (!prev) return null;
+      const streakState = loadUserStreak(prev?.userId || 'guest');
+      if (!prev) {
+        const initXp = newGam.xp ?? getCurrentXp(420);
+        const lvl = calculateLevelFromXp(initXp);
+        return {
+          userId: 'guest',
+          xp: initXp,
+          level: lvl.level,
+          currentStreak: streakState.currentStreak,
+          longestStreak: streakState.longestStreak,
+          lastActiveDate: streakState.lastActiveDate,
+          dailyQuestionsSolvedToday: 0,
+          dailyAllowanceLimit: 25,
+          dailyDoubtsAskedToday: 0,
+          dailyDoubtsLimit: 10,
+          dailyArtifactsCreatedToday: 0,
+          dailyArtifactsLimit: 5,
+          dailySourcesUploadedToday: 0,
+          dailySourcesUploadLimit: 5,
+          ...newGam,
+        };
+      }
       return { ...prev, ...newGam };
     });
   };

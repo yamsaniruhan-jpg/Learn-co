@@ -2,7 +2,13 @@
  * Streak Calculation & Persistence Utility for Gamification System
  * 
  * Handles calculating, updating, validating, and persisting daily learning streak data
- * across browser sessions, user activity events, and calendar day boundaries.
+ * across browser sessions, user sign-in events, and calendar day boundaries.
+ * 
+ * Core Streak Rules:
+ * 1. If a person signs in / uses the app today for the first time: streak starts at 1 today.
+ * 2. If the person signs in tomorrow again (difference = 1 day): streak continues (increments by 1).
+ * 3. If the person signs in multiple times on the same day (difference = 0): streak maintains current count.
+ * 4. If the difference between last active day and today is > 1 day: streak breaks and restarts at 1 today.
  */
 
 export interface StreakData {
@@ -35,7 +41,7 @@ const STORAGE_KEY_PREFIX = 'learnco_streak_data_';
 const DEFAULT_USER_ID = 'default_user';
 
 /**
- * Format a Date object to standard YYYY-MM-DD key format in the target or local timezone
+ * Format a Date object to standard YYYY-MM-DD key format in local timezone
  */
 export function formatDateToDateKey(dateInput: Date | string | number = new Date()): string {
   const d = new Date(dateInput);
@@ -71,62 +77,52 @@ export function getDaysDifference(dateStr1: string, dateStr2: string): number {
 /**
  * Get initial default streak state
  */
-export function getDefaultStreakData(initialStreak = 0, longestStreak = 0): StreakData {
+export function getDefaultStreakData(initialStreak = 1, longestStreak = 1): StreakData {
   const today = formatDateToDateKey();
-  const history: string[] = [];
-  
-  if (initialStreak > 0) {
-    // Seed past days if a positive initial streak was specified
-    for (let i = initialStreak - 1; i >= 0; i--) {
-      const pastDate = new Date();
-      pastDate.setDate(pastDate.getDate() - i);
-      history.push(formatDateToDateKey(pastDate));
-    }
-  }
+  const history: string[] = [today];
 
-  const dailyActivities: StreakData['dailyActivities'] = {};
-  history.forEach((dKey) => {
-    dailyActivities[dKey] = {
-      questionsSolved: 4,
-      xpEarned: 20,
-      minutesStudied: 25,
-      sessionsCompleted: 1,
-    };
-  });
+  const dailyActivities: StreakData['dailyActivities'] = {
+    [today]: {
+      questionsSolved: 0,
+      xpEarned: 0,
+      minutesStudied: 0,
+      sessionsCompleted: 0,
+    },
+  };
 
   return {
-    currentStreak: initialStreak,
-    longestStreak: Math.max(longestStreak, initialStreak),
-    lastActiveDate: initialStreak > 0 ? today : '',
+    currentStreak: Math.max(1, initialStreak),
+    longestStreak: Math.max(1, longestStreak, initialStreak),
+    lastActiveDate: today,
     streakHistory: history,
     dailyActivities,
     freezeDaysRemaining: 1,
-    isStreakActiveToday: initialStreak > 0,
-    streakStatus: initialStreak > 0 ? 'ACTIVE_TODAY' : 'BROKEN',
+    isStreakActiveToday: true,
+    streakStatus: 'ACTIVE_TODAY',
   };
 }
 
 /**
  * Load persisted streak data for a user with safety fallbacks
  */
-export function loadUserStreak(userId: string = DEFAULT_USER_ID, initialFallbackStreak = 0): StreakData {
+export function loadUserStreak(userId: string = DEFAULT_USER_ID): StreakData {
   if (typeof window === 'undefined') {
-    return getDefaultStreakData(initialFallbackStreak, initialFallbackStreak);
+    return getDefaultStreakData(1, 1);
   }
 
   try {
     const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}`);
     if (!raw) {
-      const initial = getDefaultStreakData(initialFallbackStreak, initialFallbackStreak);
+      const initial = getDefaultStreakData(1, 1);
       saveUserStreak(userId, initial);
       return initial;
     }
 
     const parsed: StreakData = JSON.parse(raw);
-    return computeCurrentStreakStatus(parsed);
+    return computeCurrentStreakStatus(parsed, userId);
   } catch (e) {
     console.warn('Failed to load streak from localStorage, using default', e);
-    return getDefaultStreakData(initialFallbackStreak);
+    return getDefaultStreakData(1, 1);
   }
 }
 
@@ -143,55 +139,81 @@ export function saveUserStreak(userId: string = DEFAULT_USER_ID, streakData: Str
 }
 
 /**
- * Re-evaluates streak status against the current date (e.g. checks if day passed without activity)
+ * Re-evaluates and synchronizes streak status on user session/sign-in against today's date:
+ * - If signed in today for the first time: streak starts today (1 day).
+ * - If signed in yesterday and opens today: streak continues (increments by 1).
+ * - If signed in today again: maintains current streak.
+ * - If missed more than 1 day (gap > 1 day): breaks streak and restarts at 1 today.
  */
-export function computeCurrentStreakStatus(streakData: StreakData): StreakData {
+export function computeCurrentStreakStatus(streakData: StreakData, userId: string = DEFAULT_USER_ID): StreakData {
   const today = formatDateToDateKey();
   const lastActive = streakData.lastActiveDate;
 
   if (!lastActive) {
-    return {
+    const freshData: StreakData = {
       ...streakData,
-      isStreakActiveToday: false,
-      streakStatus: 'AT_RISK',
+      currentStreak: 1,
+      longestStreak: Math.max(1, streakData.longestStreak || 1),
+      lastActiveDate: today,
+      isStreakActiveToday: true,
+      streakStatus: 'ACTIVE_TODAY',
+      streakHistory: [today],
     };
+    saveUserStreak(userId, freshData);
+    return freshData;
   }
 
   const daysDiff = getDaysDifference(lastActive, today);
 
   if (daysDiff === 0) {
-    // Activity happened today
-    return {
+    // Already active today
+    const updated: StreakData = {
       ...streakData,
+      currentStreak: Math.max(1, streakData.currentStreak || 1),
       isStreakActiveToday: true,
       streakStatus: 'ACTIVE_TODAY',
     };
+    return updated;
   } else if (daysDiff === 1) {
-    // Activity happened yesterday, today's practice has not occurred yet
-    return {
+    // User was active yesterday and signed in today -> Streak continues!
+    const newStreak = (streakData.currentStreak || 0) + 1;
+    const historySet = new Set(streakData.streakHistory || []);
+    historySet.add(today);
+    
+    const updated: StreakData = {
       ...streakData,
-      isStreakActiveToday: false,
-      streakStatus: 'AT_RISK',
+      currentStreak: newStreak,
+      longestStreak: Math.max(streakData.longestStreak || 0, newStreak),
+      lastActiveDate: today,
+      isStreakActiveToday: true,
+      streakStatus: 'EXTENDED',
+      streakHistory: Array.from(historySet).sort(),
     };
-  } else {
-    // Missed 2 or more days
-    return {
+    saveUserStreak(userId, updated);
+    return updated;
+  } else if (daysDiff > 1) {
+    // User missed one or more whole calendar days -> Break streak and start fresh today!
+    const historySet = new Set(streakData.streakHistory || []);
+    historySet.add(today);
+
+    const updated: StreakData = {
       ...streakData,
-      currentStreak: 0,
-      isStreakActiveToday: false,
-      streakStatus: 'BROKEN',
+      currentStreak: 1,
+      longestStreak: Math.max(streakData.longestStreak || 1, 1),
+      lastActiveDate: today,
+      isStreakActiveToday: true,
+      streakStatus: 'ACTIVE_TODAY',
+      streakHistory: Array.from(historySet).sort(),
     };
+    saveUserStreak(userId, updated);
+    return updated;
   }
+
+  return streakData;
 }
 
 /**
- * Record a new qualifying daily activity and recalculate the streak.
- * 
- * Rules:
- * - Activity today when already active today: aggregates activity stats, maintains streak.
- * - Activity today when last active yesterday (daysDiff === 1): increments streak (+1), updates longest streak if exceeded.
- * - Activity today when last active > 1 day ago: resets current streak to 1, begins new streak.
- * - First activity ever: sets streak to 1.
+ * Record a new qualifying daily activity (solving practice questions, completing lessons, etc.)
  */
 export function recordDailyActivity(
   userId: string = DEFAULT_USER_ID,
@@ -206,28 +228,25 @@ export function recordDailyActivity(
 
   if (!lastActive) {
     newCurrentStreak = 1;
-    status = 'EXTENDED';
+    status = 'ACTIVE_TODAY';
   } else {
     const daysDiff = getDaysDifference(lastActive, today);
 
     if (daysDiff === 0) {
-      // Already active today; keep current streak count
       newCurrentStreak = Math.max(1, currentData.currentStreak);
       status = 'ACTIVE_TODAY';
     } else if (daysDiff === 1) {
-      // Consecutive active day! Increment streak
-      newCurrentStreak = currentData.currentStreak + 1;
+      newCurrentStreak = (currentData.currentStreak || 0) + 1;
       status = 'EXTENDED';
     } else {
-      // Missed one or more days; start fresh streak of 1
       newCurrentStreak = 1;
-      status = 'EXTENDED';
+      status = 'ACTIVE_TODAY';
     }
   }
 
-  const newLongestStreak = Math.max(currentData.longestStreak, newCurrentStreak);
+  const newLongestStreak = Math.max(currentData.longestStreak || 1, newCurrentStreak);
 
-  // Update streak history list if not already present
+  // Update streak history list
   const historySet = new Set(currentData.streakHistory || []);
   historySet.add(today);
   const updatedHistory = Array.from(historySet).sort();

@@ -1055,12 +1055,27 @@ Produce a concise JSON response with:
 }
 Return STRICT JSON only.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      });
+      const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      let text = '';
 
-      const text = response.text || '';
+      for (const model of candidateModels) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const response = await ai.models.generateContent({
+              model,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            });
+            if (response.text) {
+              text = response.text;
+              break;
+            }
+          } catch (err) {
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
+          }
+        }
+        if (text) break;
+      }
+
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);

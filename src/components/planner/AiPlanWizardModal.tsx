@@ -23,6 +23,7 @@ import {
   StudyTask,
   StudyGoal,
 } from '../../types/planner';
+import { PlannerClient } from '../../services/plannerClient';
 
 interface AiPlanWizardModalProps {
   isOpen: boolean;
@@ -137,17 +138,7 @@ export const AiPlanWizardModal: React.FC<AiPlanWizardModalProps> = ({
     };
 
     try {
-      const res = await fetch('/api/planner/generate-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to generate AI plan.');
-      }
-
-      const data = await res.json();
+      const data = await PlannerClient.generateAiPlan(payload);
       setPreviewPlan(data.plan);
       setPreviewTasks(data.tasks || []);
       setPreviewGoal(data.goal);
@@ -164,22 +155,13 @@ export const AiPlanWizardModal: React.FC<AiPlanWizardModalProps> = ({
     setError(null);
 
     try {
-      const res = await fetch('/api/planner/apply-generated', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan: previewPlan,
-          tasks: previewTasks,
-          goal: previewGoal,
-        }),
+      const data = await PlannerClient.applyGeneratedPlan({
+        plan: previewPlan,
+        tasks: previewTasks,
+        goal: previewGoal,
+        summaryText: 'Generated AI Study Plan',
       });
-
-      if (!res.ok) {
-        throw new Error('Failed to apply generated plan.');
-      }
-
-      const data = await res.json();
-      onPlanGeneratedAndApplied(data.plan, data.tasks);
+      onPlanGeneratedAndApplied(data.plan, (previewTasks as StudyTask[]) || []);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error applying plan.');

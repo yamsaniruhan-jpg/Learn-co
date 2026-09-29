@@ -13,6 +13,7 @@ import {
   BookmarkPlus,
   RefreshCw,
 } from 'lucide-react';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface AttemptRecord {
   id: string;
@@ -228,7 +229,7 @@ export const PracticeHistoryView: React.FC = () => {
                 {/* Question Statement */}
                 {attempt.questionText && (
                   <div className="text-xs text-slate-700 dark:text-slate-300 font-serif line-clamp-2">
-                    {attempt.questionText}
+                    <FormattedMathText text={attempt.questionText} />
                   </div>
                 )}
 
@@ -238,23 +239,23 @@ export const PracticeHistoryView: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                         <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Your Response</span>
-                        <div className="font-medium text-slate-800 dark:text-slate-200">
-                          {attempt.selectedAnswer?.toString() || 'None'}
+                        <div className="font-medium text-slate-800 dark:text-slate-200 font-serif">
+                          <FormattedMathText text={attempt.selectedAnswer?.toString() || 'None'} inline />
                         </div>
                       </div>
 
                       <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                         <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Correct Answer</span>
-                        <div className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          {attempt.correctAnswer?.toString() || '—'}
+                        <div className="font-semibold text-emerald-600 dark:text-emerald-400 font-serif">
+                          <FormattedMathText text={attempt.correctAnswer?.toString() || '—'} inline />
                         </div>
                       </div>
                     </div>
 
                     {attempt.explanation && (
-                      <div className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/50 dark:border-indigo-900/40 text-slate-700 dark:text-slate-300">
+                      <div className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/50 dark:border-indigo-900/40 text-slate-700 dark:text-slate-300 space-y-1">
                         <span className="font-bold text-indigo-900 dark:text-indigo-300 block mb-1">Explanation:</span>
-                        <p>{attempt.explanation}</p>
+                        <FormattedMathText text={attempt.explanation} />
                       </div>
                     )}
                   </div>

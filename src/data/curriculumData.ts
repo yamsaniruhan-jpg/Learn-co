@@ -26,6 +26,30 @@ export const EXAM_TRACKS: ExamTrack[] = [
     subjects: ['math', 'physics', 'chemistry'],
   },
   {
+    id: 'nsejs',
+    name: 'National Standard Examination in Junior Science (NSEJS & IJSO)',
+    shortName: 'NSEJS Zone',
+    description: 'Junior science Olympiad stage 1 & 2 covering integrated physics, chemistry, biology, and math foundations.',
+    badgeColor: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
+    subjects: ['physics', 'chemistry', 'biology', 'math'],
+  },
+  {
+    id: 'iapt_exams',
+    name: 'IAPT National Exam Zone (NSEP / NSEC / NSEB / NSEA)',
+    shortName: 'IAPT Exam Zone',
+    description: 'Indian Association of Physics Teachers national Olympiad stages with experimental reasoning, calculus physics, and deep theory.',
+    badgeColor: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
+    subjects: ['physics', 'chemistry', 'biology', 'math'],
+  },
+  {
+    id: 'ict_hackathon',
+    name: 'International Computing Test (ICT) & Hackathon Engineering',
+    shortName: 'ICT & Hackathon',
+    description: 'Algorithms, data structures, competitive programming, distributed microservices, APIs, and hackathon project architecture.',
+    badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+    subjects: ['cs', 'math'],
+  },
+  {
     id: 'ai_ml_foundations',
     name: 'AI, Machine Learning & Computational STEM',
     shortName: 'AI & ML Track',
@@ -35,7 +59,7 @@ export const EXAM_TRACKS: ExamTrack[] = [
   },
   {
     id: 'stem_olympiad',
-    name: 'STEM Olympiad & Deep Theory',
+    name: 'STEM Olympiad & Deep Theory (INMO, INPhO, INChO, INBO)',
     shortName: 'Olympiad Track',
     description: 'Proof-based mathematics, invariant dynamics, reaction kinematics, and genetics.',
     badgeColor: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
@@ -43,11 +67,11 @@ export const EXAM_TRACKS: ExamTrack[] = [
   },
   {
     id: 'ap_stem',
-    name: 'Advanced Placement (AP Calculus / Physics / Chem)',
+    name: 'Advanced Placement (AP Calculus / Physics / Chem / CS)',
     shortName: 'AP STEM',
-    description: 'College-level foundational calculus, mechanics, organic reactions, and cellular biology.',
-    badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-    subjects: ['math', 'physics', 'chemistry', 'biology'],
+    description: 'College-level foundational calculus, mechanics, organic reactions, algorithms, and cellular biology.',
+    badgeColor: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300',
+    subjects: ['math', 'physics', 'chemistry', 'biology', 'cs'],
   },
 ];
 
@@ -474,11 +498,134 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
           },
         ],
       },
+      {
+        id: 'math-ch-conics-geo',
+        subjectId: 'math',
+        examTracks: ['all', 'jee_advanced', 'jee_main', 'iapt_exams', 'stem_olympiad'],
+        title: 'Coordinate Geometry & Conic Sections',
+        sequenceOrder: 7,
+        description: 'Locus equations, circles, confocal conics, eccentricities, tangents, normals, and focal properties.',
+        topics: [
+          {
+            id: 'math-topic-conics-foci',
+            chapterId: 'math-ch-conics-geo',
+            title: 'Conic Sections & Focal Reflection Properties',
+            description: 'Parabola, Ellipse, and Hyperbola invariants under focal directrix definitions.',
+            conceptCount: 1,
+            estimatedHours: 5,
+            subtopics: [
+              {
+                id: 'math-sub-focal-invariants',
+                title: 'Focal Conic Invariants',
+                description: 'Eccentricity e, directrix distances, and focal angle bisectors.',
+                concepts: [
+                  {
+                    id: 'concept-conics-focal-properties',
+                    subjectId: 'math',
+                    examTracks: ['all', 'jee_advanced', 'jee_main', 'iapt_exams'],
+                    chapterId: 'math-ch-conics-geo',
+                    topicId: 'math-topic-conics-foci',
+                    subtopicId: 'math-sub-focal-invariants',
+                    title: 'Focal Invariants & Eccentricity Relations',
+                    summary: 'For any point on a conic, the ratio of distance to focus over distance to directrix equals constant eccentricity e.',
+                    difficulty: 'medium_hard',
+                    estimatedMinutes: 15,
+                    xpReward: 35,
+                    formalDefinition: 'The locus of point P(x, y) satisfying SP/PM = e, where S is focus and PM is perpendicular distance to directrix.',
+                    intuitiveExplanation: 'Parabola has e=1, ellipse has e<1 (closed bounded loop), and hyperbola has e>1 (two open branches).',
+                    keyFormulas: [
+                      {
+                        label: 'Standard Ellipse & Hyperbola',
+                        latex: '\\frac{x^2}{a^2} \\pm \\frac{y^2}{b^2} = 1',
+                        explanation: 'b^2 = a^2(1 - e^2) for ellipse, b^2 = a^2(e^2 - 1) for hyperbola.',
+                      },
+                      {
+                        label: 'Tangent at (x1, y1)',
+                        latex: '\\frac{xx_1}{a^2} + \\frac{yy_1}{b^2} = 1',
+                        explanation: 'Standard tangent representation via replacement operator.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Reflection property: rays emitted from one focus of an ellipse reflect into the second focus.',
+                      'The director circle is the locus of intersection of perpendicular tangents.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'math-ch-number-theory',
+        subjectId: 'math',
+        examTracks: ['all', 'nsejs', 'stem_olympiad', 'ict_hackathon'],
+        title: 'Olympiad Number Theory & Modular Invariants',
+        sequenceOrder: 8,
+        description: 'Prime factorization, Euclidean algorithm, Bezout identity, Euler totient, modular arithmetic, and Diophantine equations.',
+        topics: [
+          {
+            id: 'math-topic-mod-arithmetic',
+            chapterId: 'math-ch-number-theory',
+            title: 'Modular Arithmetic & Fermat-Euler Theorems',
+            description: 'Congruences, inverses, CRT (Chinese Remainder Theorem), and primitive roots.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'math-sub-fermat-euler',
+                title: 'Fermat Little Theorem & Invariants',
+                description: 'Power congruences modulo primes and coprimality testing.',
+                concepts: [
+                  {
+                    id: 'concept-euler-totient-fermat',
+                    subjectId: 'math',
+                    examTracks: ['all', 'nsejs', 'stem_olympiad', 'ict_hackathon'],
+                    chapterId: 'math-ch-number-theory',
+                    topicId: 'math-topic-mod-arithmetic',
+                    subtopicId: 'math-sub-fermat-euler',
+                    title: 'Fermat\'s Little Theorem & Modular Inverses',
+                    summary: 'For prime p and gcd(a, p) = 1, a^(p-1) = 1 (mod p), facilitating fast inverse calculations.',
+                    difficulty: 'medium',
+                    estimatedMinutes: 14,
+                    xpReward: 30,
+                    formalDefinition: 'If p is prime and p does not divide a, then a^(p-1) = 1 (mod p). Consequently a^(-1) = a^(p-2) (mod p).',
+                    intuitiveExplanation: 'Multiplying the nonzero residue classes modulo p by a simply permutes the set.',
+                    keyFormulas: [
+                      {
+                        label: 'Fermat\'s Little Theorem',
+                        latex: 'a^{p-1} \\equiv 1 \\pmod p',
+                        explanation: 'Fundamental identity for prime modulus exponents.',
+                      },
+                      {
+                        label: 'Modular Inverse',
+                        latex: 'a^{-1} \\equiv a^{p-2} \\pmod p',
+                        explanation: 'Direct exponentiation formula for division modulo p.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Used extensively in RSA cryptography, competitive programming, and NSEJS combinatorics.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
 
   // ==========================================
-  // COMPUTER SCIENCE & AI (5 Chapters)
+  // COMPUTER SCIENCE & AI (7 Chapters)
   // ==========================================
   {
     id: 'cs',
@@ -763,11 +910,128 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
           },
         ],
       },
+      {
+        id: 'cs-ch-adv-algorithms',
+        subjectId: 'cs',
+        examTracks: ['all', 'ict_hackathon', 'stem_olympiad', 'ai_ml_foundations'],
+        title: 'Advanced Graph Algorithms & Competitive Dynamic Programming',
+        sequenceOrder: 6,
+        description: 'Dijkstra, Bellman-Ford, Floyd-Warshall, Segment Trees, Fenwick Trees, Tarjan strongly connected components, and state-space DP.',
+        topics: [
+          {
+            id: 'cs-topic-graph-shortest-path',
+            chapterId: 'cs-ch-adv-algorithms',
+            title: 'Shortest Path & Network Flow Invariants',
+            description: 'Optimal substructure in weighted graphs, negative cycle detection, and min-cut max-flow.',
+            conceptCount: 1,
+            estimatedHours: 5,
+            subtopics: [
+              {
+                id: 'cs-sub-dijkstra-bellman',
+                title: 'Dijkstra & Relaxation Invariants',
+                description: 'Greedy edge relaxation and priority queue state transitions.',
+                concepts: [
+                  {
+                    id: 'concept-dijkstra-relaxation',
+                    subjectId: 'cs',
+                    examTracks: ['all', 'ict_hackathon', 'stem_olympiad'],
+                    chapterId: 'cs-ch-adv-algorithms',
+                    topicId: 'cs-topic-graph-shortest-path',
+                    subtopicId: 'cs-sub-dijkstra-bellman',
+                    title: 'Dijkstra\'s Algorithm & Edge Relaxation',
+                    summary: 'Finds single-source shortest paths in non-negative weighted graphs with asymptotic complexity O((V + E) log V).',
+                    difficulty: 'medium_hard',
+                    estimatedMinutes: 15,
+                    xpReward: 35,
+                    formalDefinition: 'Greedy strategy maintaining a set of finalized vertices S. In each step, extract u in V\\S minimizing d[u], and for each neighbor v, relax: d[v] = min(d[v], d[u] + w(u, v)).',
+                    intuitiveExplanation: 'Wavefront expansion where the closest unvisited node is always guaranteed to have its absolute minimal distance finalized.',
+                    keyFormulas: [
+                      {
+                        label: 'Edge Relaxation Condition',
+                        latex: 'd[v] \\leftarrow \\min(d[v], d[u] + w(u, v))',
+                        explanation: 'Triangle inequality enforcement across directed edge (u, v).',
+                      },
+                      {
+                        label: 'Time Complexity',
+                        latex: 'O((|V| + |E|) \\log |V|)',
+                        explanation: 'Achieved via binary min-heap / priority queue.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Fails with negative edge weights; use Bellman-Ford in O(V E) if negative cycles or weights exist.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'cs-ch-hackathon-eng',
+        subjectId: 'cs',
+        examTracks: ['all', 'ict_hackathon', 'ai_ml_foundations'],
+        title: 'Full-Stack Architecture & Hackathon Engineering',
+        sequenceOrder: 7,
+        description: 'REST & GraphQL APIs, WebSocket duplex channels, OAuth 2.0 security, Redis caching, microservices, and rapid prototype scaffolding.',
+        topics: [
+          {
+            id: 'cs-topic-api-caching',
+            chapterId: 'cs-ch-hackathon-eng',
+            title: 'RESTful Protocols, WebSockets & In-Memory Caching',
+            description: 'Low-latency backend pipelines, pub/sub streams, and token authorization.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'cs-sub-caching-tokens',
+                title: 'JWT Authentication & Cache Invalidation',
+                description: 'Stateless session validation and TTL cache strategies.',
+                concepts: [
+                  {
+                    id: 'concept-jwt-cache-invalidation',
+                    subjectId: 'cs',
+                    examTracks: ['all', 'ict_hackathon'],
+                    chapterId: 'cs-ch-hackathon-eng',
+                    topicId: 'cs-topic-api-caching',
+                    subtopicId: 'cs-sub-caching-tokens',
+                    title: 'Stateless JWT Auth & Cache-Aside Strategy',
+                    summary: 'Architect scalable real-time hackathon apps using cryptographically signed JSON Web Tokens and Redis LRU caching.',
+                    difficulty: 'medium',
+                    estimatedMinutes: 14,
+                    xpReward: 30,
+                    formalDefinition: 'A JWT comprises Header.Payload.Signature verified via HMAC-SHA256 or RSA public keys, eliminating server-side session lookups.',
+                    intuitiveExplanation: 'The user carries a tamper-evident digital passport with their identity and expiration timestamp stamped inside.',
+                    keyFormulas: [
+                      {
+                        label: 'JWT Structure',
+                        latex: '\\text{Base64Url}(H) \\, . \\, \\text{Base64Url}(P) \\, . \\, \\text{HMAC}(H.P, K)',
+                        explanation: 'Cryptographic three-part authentication payload.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Always pair short-lived access tokens (15m) with rotating refresh tokens for defense in depth.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
 
   // ==========================================
-  // PHYSICS (5 Chapters)
+  // PHYSICS (7 Chapters)
   // ==========================================
   {
     id: 'physics',
@@ -1054,11 +1318,133 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
           },
         ],
       },
+      {
+        id: 'phys-ch-nsejs-foundations',
+        subjectId: 'physics',
+        examTracks: ['all', 'nsejs', 'iapt_exams', 'stem_olympiad'],
+        title: 'NSEJS Junior Physics Foundations & Hydrostatic Invariants',
+        sequenceOrder: 6,
+        description: 'Archimedes principle, Pascal law, buoyant forces, rectilinear kinematics, and Snell geometric optics for junior science Olympiads.',
+        topics: [
+          {
+            id: 'phys-topic-buoyancy-hydro',
+            chapterId: 'phys-ch-nsejs-foundations',
+            title: 'Buoyancy, Archimedes Invariants & Fluid Equilibrium',
+            description: 'Submerged volume equilibrium, apparent weight, and fluid pressure variations.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'phys-sub-archimedes',
+                title: 'Archimedes Principle & Floatation',
+                description: 'Hydrostatic upward thrust equal to the weight of displaced liquid.',
+                concepts: [
+                  {
+                    id: 'concept-buoyancy-archimedes',
+                    subjectId: 'physics',
+                    examTracks: ['all', 'nsejs', 'iapt_exams'],
+                    chapterId: 'phys-ch-nsejs-foundations',
+                    topicId: 'phys-topic-buoyancy-hydro',
+                    subtopicId: 'phys-sub-archimedes',
+                    title: 'Archimedes Principle & Center of Buoyancy',
+                    summary: 'An object partially or wholly immersed in fluid experiences an upward buoyant force equal to displaced fluid weight.',
+                    difficulty: 'medium',
+                    estimatedMinutes: 14,
+                    xpReward: 30,
+                    formalDefinition: 'The buoyant force is given by $F_B = \\rho_f V_{\\text{sub}} g$, acting vertically through the centroid of displaced volume.',
+                    intuitiveExplanation: 'Fluid pressure increases with depth; the bottom face of an object experiences greater upward pressure than the downward pressure on its top face.',
+                    keyFormulas: [
+                      {
+                        label: 'Buoyancy Force Formula',
+                        latex: 'F_B = \\rho_{\\text{fluid}} V_{\\text{submerged}} g',
+                        explanation: 'Upthrust proportional to fluid density and immersed volume.',
+                      },
+                      {
+                        label: 'Apparent Weight',
+                        latex: 'W_{\\text{app}} = W_{\\text{true}} - F_B = (\\rho_s - \\rho_f) V g',
+                        explanation: 'Effective net downward force in fluid medium.',
+                      },
+                    ],
+                    keyObservations: [
+                      'A floating object displaces a weight of fluid exactly equal to its own total weight.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'phys-ch-astrophysics',
+        subjectId: 'physics',
+        examTracks: ['all', 'iapt_exams', 'stem_olympiad', 'jee_advanced'],
+        title: 'Celestial Mechanics, Kepler Laws & Gravitational Fields',
+        sequenceOrder: 7,
+        description: 'Kepler orbital laws, vis-viva equation, gravitational potential energy, escape velocities, and black hole event horizons.',
+        topics: [
+          {
+            id: 'phys-topic-orbital-mechanics',
+            chapterId: 'phys-ch-astrophysics',
+            title: 'Kepler Laws & Orbital Energy Invariants',
+            description: 'Elliptic planetary orbits, areal velocity conservation, and gravitational orbital transfers.',
+            conceptCount: 1,
+            estimatedHours: 5,
+            subtopics: [
+              {
+                id: 'phys-sub-vis-viva',
+                title: 'Vis-Viva Equation & Angular Momentum Conservation',
+                description: 'Determining velocity at any orbital distance from primary mass.',
+                concepts: [
+                  {
+                    id: 'concept-orbital-vis-viva',
+                    subjectId: 'physics',
+                    examTracks: ['all', 'iapt_exams', 'stem_olympiad'],
+                    chapterId: 'phys-ch-astrophysics',
+                    topicId: 'phys-topic-orbital-mechanics',
+                    subtopicId: 'phys-sub-vis-viva',
+                    title: 'Vis-Viva Equation & Keplerian Orbital Invariants',
+                    summary: 'Connect orbital velocity $v$ at distance $r$ directly to semimajor axis $a$ via energy conservation.',
+                    difficulty: 'medium_hard',
+                    estimatedMinutes: 15,
+                    xpReward: 35,
+                    formalDefinition: 'Total mechanical energy of a two-body Keplerian system is $E = -\\frac{G M m}{2a}$. Equating kinetic and potential energies yields $v^2 = G M \\left(\\frac{2}{r} - \\frac{1}{a}\\right)$.',
+                    intuitiveExplanation: 'As a planet approaches perihelion (closest approach), potential energy drops and kinetic energy rises while total energy and angular momentum remain strictly constant.',
+                    keyFormulas: [
+                      {
+                        label: 'Vis-Viva Formula',
+                        latex: 'v^2 = GM \\left( \\frac{2}{r} - \\frac{1}{a} \\right)',
+                        explanation: 'Speed v as a function of radial distance r and semimajor axis a.',
+                      },
+                      {
+                        label: 'Kepler\'s Third Law',
+                        latex: 'T^2 = \\frac{4\\pi^2}{GM} a^3',
+                        explanation: 'Orbital period T squared is proportional to semimajor axis a cubed.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Areal velocity $\\frac{dA}{dt} = \\frac{L}{2m}$ is strictly constant due to zero net central torque.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
 
   // ==========================================
-  // CHEMISTRY (5 Chapters)
+  // CHEMISTRY (7 Chapters)
   // ==========================================
   {
     id: 'chemistry',
@@ -1341,11 +1727,128 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
           },
         ],
       },
+      {
+        id: 'chem-ch-nsejs-foundations',
+        subjectId: 'chemistry',
+        examTracks: ['all', 'nsejs', 'iapt_exams', 'stem_olympiad'],
+        title: 'NSEJS Junior Chemistry & Stoichiometric Invariants',
+        sequenceOrder: 6,
+        description: 'Mole concept, limiting reagent calculations, gas laws (PV=nRT), empirical formula determination, and periodic trends.',
+        topics: [
+          {
+            id: 'chem-topic-mole-stoich',
+            chapterId: 'chem-ch-nsejs-foundations',
+            title: 'Mole Concept & Limiting Reactant Analysis',
+            description: 'Mass-to-mole conversions, Avogadro invariant, and theoretical yield boundaries.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'chem-sub-limiting-reagent',
+                title: 'Limiting Reagent Stoichiometry',
+                description: 'Identifying reactant exhaustion in non-stoichiometric mixtures.',
+                concepts: [
+                  {
+                    id: 'concept-mole-limiting-reactant',
+                    subjectId: 'chemistry',
+                    examTracks: ['all', 'nsejs', 'iapt_exams'],
+                    chapterId: 'chem-ch-nsejs-foundations',
+                    topicId: 'chem-topic-mole-stoich',
+                    subtopicId: 'chem-sub-limiting-reagent',
+                    title: 'Limiting Reagent & Theoretical Yield Invariant',
+                    summary: 'Calculate the reactant that yields the least moles of product to govern reaction extent and excess remnants.',
+                    difficulty: 'medium',
+                    estimatedMinutes: 14,
+                    xpReward: 30,
+                    formalDefinition: 'For general reaction $aA + bB \\rightarrow cC$, reactant $A$ is limiting if $\\frac{n_A}{a} < \\frac{n_B}{b}$, bounding maximum product yield to $n_C = c \\cdot \\frac{n_A}{a}$.',
+                    intuitiveExplanation: 'If you have 10 slices of bread and 3 slices of cheese, cheese limits you to 3 sandwiches despite having leftover bread.',
+                    keyFormulas: [
+                      {
+                        label: 'Mole Ratio Comparison',
+                        latex: '\\text{Extent } \\xi = \\min\\left( \\frac{n_A}{a}, \\frac{n_B}{b} \\right)',
+                        explanation: 'The smaller normalized mole ratio determines reaction completion.',
+                      },
+                      {
+                        label: 'Ideal Gas Moles',
+                        latex: 'n = \\frac{PV}{RT} = \\frac{V_{\\text{STP}}}{22.4 \\text{ L}}',
+                        explanation: 'Molar volume relation at standard temperature and pressure.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Always normalize initial moles by balancing stoichiometric coefficients before comparing quantities.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chem-ch-metallurgy-polymers',
+        subjectId: 'chemistry',
+        examTracks: ['all', 'jee_advanced', 'jee_main', 'iapt_exams'],
+        title: 'Extractive Metallurgy, Ellingham Diagrams & Materials',
+        sequenceOrder: 7,
+        description: 'Thermodynamics of metal reduction, Ellingham $\\Delta G^\\circ - T$ graphs, roasting, calcination, and blast furnace reactions.',
+        topics: [
+          {
+            id: 'chem-topic-ellingham',
+            chapterId: 'chem-ch-metallurgy-polymers',
+            title: 'Ellingham Diagrams & Spontaneous Metal Reduction',
+            description: 'Free energy temperature curves governing metallurgical reducing agent selection.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'chem-sub-ellingham-invariants',
+                title: 'Ellingham Thermodynamic Invariants',
+                description: 'Relative position of oxide free energy lines for carbon vs CO reduction.',
+                concepts: [
+                  {
+                    id: 'concept-ellingham-reduction',
+                    subjectId: 'chemistry',
+                    examTracks: ['all', 'jee_advanced', 'iapt_exams'],
+                    chapterId: 'chem-ch-metallurgy-polymers',
+                    topicId: 'chem-topic-ellingham',
+                    subtopicId: 'chem-sub-ellingham-invariants',
+                    title: 'Ellingham Diagrams & Oxide Reduction Spontaneity',
+                    summary: 'Any metal higher on the Ellingham plot can have its oxide reduced by a metal or element lying lower on the diagram.',
+                    difficulty: 'medium_hard',
+                    estimatedMinutes: 15,
+                    xpReward: 35,
+                    formalDefinition: 'Based on $\\Delta G^\\circ = \\Delta H^\\circ - T\\Delta S^\\circ$. The slope represents $-\\Delta S^\\circ$. Since $2M(s) + O_2(g) \\rightarrow 2MO(s)$ consumes gas, $\\Delta S < 0$, giving a positive upward slope.',
+                    intuitiveExplanation: 'Carbon combustion to CO ($2C + O_2 \\rightarrow 2CO$) produces more gas molecules, so its slope is negative and drops downward, overtaking and reducing all metal oxides at high temperatures.',
+                    keyFormulas: [
+                      {
+                        label: 'Gibbs-Helmholtz Ellingham Slope',
+                        latex: '\\frac{d(\\Delta G^\\circ)}{dT} = -\\Delta S^\\circ',
+                        explanation: 'Slope changes abruptly at phase transition temperatures (melting/boiling).',
+                      },
+                    ],
+                    keyObservations: [
+                      'Below 983 K, CO is a stronger reducing agent than C; above 983 K, C is significantly more effective.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
 
   // ==========================================
-  // BIOLOGY (5 Chapters)
+  // BIOLOGY (6 Chapters)
   // ==========================================
   {
     id: 'biology',
@@ -1631,6 +2134,123 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
                     workedExamples: [],
                     commonPitfalls: [],
                     prerequisites: [{ id: 'concept-deriv-inc-dec', title: 'Calculus Rates of Change', subjectId: 'math' }],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'bio-ch-biotech-comp',
+        subjectId: 'biology',
+        examTracks: ['all', 'stem_olympiad', 'iapt_exams', 'ap_stem'],
+        title: 'Biotechnology, CRISPR-Cas9 & Genetic Engineering',
+        sequenceOrder: 6,
+        description: 'Restriction endonucleases, PCR thermal cycling, plasmid vectors, CRISPR sgRNA targeted cleavage, and DNA sequencing.',
+        topics: [
+          {
+            id: 'bio-topic-crispr-pcr',
+            chapterId: 'bio-ch-biotech-comp',
+            title: 'CRISPR Gene Editing & PCR Amplification Invariants',
+            description: 'Thermal DNA polymerase kinetics and RNA-guided endonuclease targeting.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'bio-sub-crispr-cas9',
+                title: 'CRISPR-Cas9 Mechanism',
+                description: 'Single-guide RNA (sgRNA) PAM recognition and double-strand break repair.',
+                concepts: [
+                  {
+                    id: 'concept-crispr-cas9-pcr',
+                    subjectId: 'biology',
+                    examTracks: ['all', 'stem_olympiad', 'iapt_exams'],
+                    chapterId: 'bio-ch-biotech-comp',
+                    topicId: 'bio-topic-crispr-pcr',
+                    subtopicId: 'bio-sub-crispr-cas9',
+                    title: 'CRISPR-Cas9 & PCR Geometric Amplification',
+                    summary: 'Understand molecular mechanism of Cas9 endonuclease and $N = N_0 \\cdot 2^n$ exponential amplification in PCR.',
+                    difficulty: 'medium_hard',
+                    estimatedMinutes: 14,
+                    xpReward: 30,
+                    formalDefinition: 'CRISPR-Cas9 requires a 20-nt guide sequence complementary to target DNA adjacent to a 5\'-NGG protospacer adjacent motif (PAM) to induce double-strand DNA breaks.',
+                    intuitiveExplanation: 'Cas9 is like molecular scissors with a GPS: the guide RNA guides Cas9 to the exact coordinate in 3 billion base pairs to make a precise cut.',
+                    keyFormulas: [
+                      {
+                        label: 'PCR Amplification Yield',
+                        latex: 'N_n = N_0 \\cdot (1 + E)^n \\approx N_0 \\cdot 2^n',
+                        explanation: 'n is the number of thermal cycles, E is primer efficiency.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Without the matching downstream PAM sequence (5\'-NGG), Cas9 cannot unwind or cleave the target DNA.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
+                    relatedConcepts: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'bio-ch-nsejs-foundations',
+        subjectId: 'biology',
+        examTracks: ['all', 'nsejs', 'iapt_exams', 'stem_olympiad'],
+        title: 'NSEJS Junior Biology & Cell Physiology Invariants',
+        sequenceOrder: 7,
+        description: 'Mitochondrial respiration, enzyme Michaelis-Menten kinetics, osmosis/water potential, and Mendelian dihybrid ratios.',
+        topics: [
+          {
+            id: 'bio-topic-enzyme-osmosis',
+            chapterId: 'bio-ch-nsejs-foundations',
+            title: 'Enzyme Catalysis & Osmotic Water Potential',
+            description: 'Activation energy depression, pH/temp denaturation, and water potential gradients.',
+            conceptCount: 1,
+            estimatedHours: 4,
+            subtopics: [
+              {
+                id: 'bio-sub-osmosis-water-potential',
+                title: 'Water Potential & Osmotic Equilibrium',
+                description: 'Net movement of water down chemical potential gradients $\\Psi = \\Psi_s + \\Psi_p$.',
+                concepts: [
+                  {
+                    id: 'concept-osmosis-water-potential',
+                    subjectId: 'biology',
+                    examTracks: ['all', 'nsejs', 'iapt_exams'],
+                    chapterId: 'bio-ch-nsejs-foundations',
+                    topicId: 'bio-topic-enzyme-osmosis',
+                    subtopicId: 'bio-sub-osmosis-water-potential',
+                    title: 'Water Potential & Osmotic Equilibrium',
+                    summary: 'Water moves spontaneously from regions of higher water potential (less negative) to lower water potential (more negative).',
+                    difficulty: 'medium',
+                    estimatedMinutes: 12,
+                    xpReward: 25,
+                    formalDefinition: 'Total water potential $\\Psi_w = \\Psi_s + \\Psi_p$, where solute potential $\\Psi_s = -iCRT$ is always negative for solutions.',
+                    intuitiveExplanation: 'Solutes trap water molecules; water flows naturally into saltier regions to equalize chemical potential.',
+                    keyFormulas: [
+                      {
+                        label: 'Total Water Potential',
+                        latex: '\\Psi_w = \\Psi_s + \\Psi_p',
+                        explanation: 'Solute potential plus turgor/pressure potential in plant and animal cells.',
+                      },
+                      {
+                        label: 'van \'t Hoff Solute Potential',
+                        latex: '\\Psi_s = -i C R T',
+                        explanation: 'Proportional to ionization factor i and molar concentration C.',
+                      },
+                    ],
+                    keyObservations: [
+                      'Pure water at standard temperature and pressure has $\\Psi_w = 0$ MPa by convention.',
+                    ],
+                    workedExamples: [],
+                    commonPitfalls: [],
+                    prerequisites: [],
                     relatedConcepts: [],
                   },
                 ],

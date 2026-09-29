@@ -7,8 +7,11 @@ import {
   Calendar,
   Layers,
   ChevronDown,
+  Award,
 } from 'lucide-react';
 import { StudyPlan } from '../../types/planner';
+import { useAuth } from '../../context/AuthContext';
+import { XPIndicator } from '../ui/GamificationIndicators';
 
 interface PlannerHeaderProps {
   plan: StudyPlan | null;
@@ -29,6 +32,9 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
   onOpenFocusSession,
   onOpenVersionHistory,
 }) => {
+  const { gamification } = useAuth();
+  const currentXp = gamification?.xp ?? 420;
+
   const tabs = [
     { id: 'today', label: "Today's Tasks", icon: '⚡' },
     { id: 'my-plan', label: 'My Study Plan', icon: '🗺️' },
@@ -45,8 +51,9 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
         <div>
           <div className="flex items-center gap-2.5 mb-1">
             <span className="px-2 py-0.5 text-xs font-semibold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              Volume 8 • Study Planner
+              Study Planner
             </span>
+            <XPIndicator xp={currentXp} size="sm" />
             {plan && (
               <span className="flex items-center gap-1 text-xs text-slate-400 font-mono">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />

@@ -12,6 +12,7 @@ import {
 import { NotificationItem } from '../../types';
 import { Button } from '../ui/Button';
 import { SEED_NOTIFICATIONS } from '../../data/seedData';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -141,15 +142,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           item.isRead ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-slate-100'
                         }`}
                       >
-                        {item.title}
+                        <FormattedMathText text={item.title} inline />
                       </h4>
                       {!item.isRead && (
                         <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
                       )}
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      {item.message}
-                    </p>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      <FormattedMathText text={item.message} />
+                    </div>
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 block font-medium">
                       {item.timestamp}
                     </span>

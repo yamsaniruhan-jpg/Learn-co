@@ -25,7 +25,7 @@ async function generateWithFallback(
   contents: string,
   systemInstruction: string
 ): Promise<string> {
-  const models = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
 
   for (const model of models) {
     try {

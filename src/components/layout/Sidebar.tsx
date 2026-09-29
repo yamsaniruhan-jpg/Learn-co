@@ -22,6 +22,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { calculateLevelFromXp } from '../../types/auth';
 
 interface SidebarProps {
   activeTab: string;
@@ -44,8 +45,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   dailyAllowanceRemaining,
 }) => {
-  const { isAuthenticated, user, profile, signOut } = useAuth();
+  const { isAuthenticated, user, profile, gamification, signOut } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const userXp = gamification?.xp ?? 420;
+  const levelInfo = calculateLevelFromXp(userXp);
 
   const coreNav: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -167,6 +171,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {renderNavGroup('Analytics & Studio', intelligenceNav)}
         {renderNavGroup('Account & Access', accountNav)}
       </div>
+
+      {/* Real-time Level & XP Progress Card */}
+      {!isCollapsed ? (
+        <div className="my-2 p-3 rounded-xl bg-gradient-to-br from-amber-500/10 via-indigo-500/5 to-purple-500/10 border border-amber-500/20 dark:border-amber-500/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Level {levelInfo.level}
+              </span>
+            </div>
+            <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">
+              {userXp.toLocaleString()} XP
+            </span>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1">
+            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-indigo-500 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(0, levelInfo.progressPercent))}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              <span>{levelInfo.progressPercent}%</span>
+              <span>{levelInfo.xpRemainingToNextLevel} XP to Lvl {levelInfo.level + 1}</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="my-2 flex flex-col items-center justify-center p-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold" title={`${userXp} XP (Level ${levelInfo.level})`}>
+          <Zap className="w-3 h-3 fill-amber-500" />
+          <span>L{levelInfo.level}</span>
+        </div>
+      )}
 
       {/* Collapse Toggle Footer */}
       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">

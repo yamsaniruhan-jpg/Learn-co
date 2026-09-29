@@ -7,6 +7,8 @@ import {
   CreatorResourceContent,
   GenerateResourceRequest,
 } from '../../src/types/creator';
+import { QuestionBankItem } from '../../src/types/curriculum';
+import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 
 const router = Router();
 
@@ -273,7 +275,7 @@ async function generateJsonWithAi(
   ai: GoogleGenAI,
   synthesisPrompt: string
 ): Promise<any> {
-  const models = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
 
   for (const model of models) {
@@ -1016,21 +1018,97 @@ router.post('/resources/:id/add-to-practice', requireAuth, (req: AuthenticatedRe
       return;
     }
 
-    let addedCount = 0;
+    const questions: QuestionBankItem[] = [];
 
-    if (resource.resourceType === 'quiz' && resource.content.quiz) {
-      addedCount = resource.content.quiz.length;
-    } else if (resource.resourceType === 'flashcards' && resource.content.flashcards) {
-      addedCount = resource.content.flashcards.length;
-    } else if (resource.resourceType === 'worksheet' && resource.content.worksheet) {
-      addedCount = resource.content.worksheet.problems.length;
+    if (resource.resourceType === 'quiz' && Array.isArray(resource.content.quiz)) {
+      resource.content.quiz.forEach((q: any, idx: number) => {
+        const item: QuestionBankItem = {
+          id: `creator-${resource.id}-${idx + 1}`,
+          subjectId: (resource.subjectId as any) || 'math',
+          examTracks: ['all'],
+          chapterId: `ch-${resource.subjectId}-creator`,
+          topicId: `topic-${resource.id}`,
+          subtopicId: `sub-${resource.id}`,
+          conceptId: `concept-${resource.id}`,
+          difficulty: (resource.difficulty as any) || 'medium',
+          questionType: 'single_choice',
+          questionText: q.question,
+          options: q.options && q.options.length > 0 ? q.options : [q.correctAnswer, 'Alternative option A', 'Alternative option B', 'Alternative option C'],
+          correctAnswer: q.correctAnswer || (q.options ? q.options[0] : ''),
+          explanation: q.explanation || 'Verified creator studio practice question.',
+          stepByStepSolution: [q.explanation || 'Refer to creator notes for step-by-step resolution.'],
+          hints: ['Think through the fundamental definitions in this module.'],
+          tags: ['creator-studio', resource.subjectId || 'math'],
+          source: `Creator Studio: ${resource.title}`,
+          verificationStatus: 'verified',
+          version: 1,
+        };
+        questions.push(item);
+        MASTER_QUESTION_BANK.push(item);
+      });
+    } else if (resource.resourceType === 'flashcards' && Array.isArray(resource.content.flashcards)) {
+      resource.content.flashcards.forEach((f: any, idx: number) => {
+        const item: QuestionBankItem = {
+          id: `creator-${resource.id}-${idx + 1}`,
+          subjectId: (resource.subjectId as any) || 'math',
+          examTracks: ['all'],
+          chapterId: `ch-${resource.subjectId}-creator`,
+          topicId: `topic-${resource.id}`,
+          subtopicId: `sub-${resource.id}`,
+          conceptId: `concept-${resource.id}`,
+          difficulty: (resource.difficulty as any) || 'medium',
+          questionType: 'single_choice',
+          questionText: f.front,
+          options: [f.back, 'Incorrect distractor A', 'Incorrect distractor B', 'Incorrect distractor C'],
+          correctAnswer: f.back,
+          explanation: f.mnemonic ? `Mnemonic / Key: ${f.mnemonic}. ${f.back}` : f.back,
+          stepByStepSolution: [f.back],
+          hints: [f.mnemonic || 'Recall the core flashcard concept.'],
+          tags: ['creator-studio', 'flashcards', resource.subjectId || 'math'],
+          source: `Creator Studio: ${resource.title}`,
+          verificationStatus: 'verified',
+          version: 1,
+        };
+        questions.push(item);
+        MASTER_QUESTION_BANK.push(item);
+      });
+    } else if (resource.resourceType === 'worksheet' && resource.content.worksheet?.problems) {
+      resource.content.worksheet.problems.forEach((p: any, idx: number) => {
+        const item: QuestionBankItem = {
+          id: `creator-${resource.id}-${idx + 1}`,
+          subjectId: (resource.subjectId as any) || 'math',
+          examTracks: ['all'],
+          chapterId: `ch-${resource.subjectId}-creator`,
+          topicId: `topic-${resource.id}`,
+          subtopicId: `sub-${resource.id}`,
+          conceptId: `concept-${resource.id}`,
+          difficulty: (resource.difficulty as any) || 'medium',
+          questionType: 'single_choice',
+          questionText: p.problemStatement,
+          options: [p.solution, 'Alternative approach 1', 'Alternative approach 2', 'Alternative approach 3'],
+          correctAnswer: p.solution,
+          explanation: p.solution,
+          stepByStepSolution: p.hints && p.hints.length > 0 ? p.hints : [p.solution],
+          hints: p.hints || ['Consider applying the relevant formula step by step.'],
+          tags: ['creator-studio', 'worksheet', resource.subjectId || 'math'],
+          source: `Creator Studio: ${resource.title}`,
+          verificationStatus: 'verified',
+          version: 1,
+        };
+        questions.push(item);
+        MASTER_QUESTION_BANK.push(item);
+      });
     }
+
+    const addedCount = questions.length;
 
     res.json({
       success: true,
       message: `Successfully integrated ${addedCount} items from "${resource.title}" into your Practice Arena!`,
       addedCount,
       targetSubject: resource.subjectId,
+      questions,
+      resourceTitle: resource.title,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to transfer resource to practice.' });

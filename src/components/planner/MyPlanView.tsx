@@ -17,6 +17,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { StudyPlan, StudyTask, StudyGoal } from '../../types/planner';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface MyPlanViewProps {
   plan: StudyPlan | null;
@@ -260,7 +261,7 @@ export const MyPlanView: React.FC<MyPlanViewProps> = ({
                               {t.subjectId}
                             </span>
                             <span className="font-semibold text-slate-200 truncate">
-                              {t.title}
+                              <FormattedMathText text={t.title} inline />
                             </span>
                           </div>
                           <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">

@@ -26,7 +26,13 @@ import {
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 
-export const CreatorStudioView: React.FC = () => {
+interface CreatorStudioViewProps {
+  onNavigateToPractice?: () => void;
+}
+
+export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
+  onNavigateToPractice,
+}) => {
   const [activeTab, setActiveTab] = useState<'synthesizer' | 'library' | 'sources'>('synthesizer');
 
   // Resources state
@@ -194,7 +200,24 @@ export const CreatorStudioView: React.FC = () => {
   const handleAddToPractice = async (res: CreatorResource) => {
     try {
       const result = await CreatorClient.addToPractice(res.id);
-      showToast(result.message);
+      if (result.questions && result.questions.length > 0) {
+        localStorage.setItem(
+          'learnco_creator_practice_session',
+          JSON.stringify({
+            resourceId: res.id,
+            resourceTitle: res.title,
+            subjectId: res.subjectId,
+            questions: result.questions,
+            timestamp: Date.now(),
+          })
+        );
+      }
+      showToast(result.message || 'Transferred to Practice Arena! Redirecting...');
+      if (onNavigateToPractice) {
+        setTimeout(() => {
+          onNavigateToPractice();
+        }, 500);
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to transfer to practice.', 'error');
     }
@@ -243,12 +266,12 @@ export const CreatorStudioView: React.FC = () => {
         </div>
 
         {/* Studio Sub-Navigation Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto shrink-0">
           <button
             onClick={() => {
               setActiveTab('synthesizer');
             }}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'synthesizer'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -260,7 +283,7 @@ export const CreatorStudioView: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('library')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'library'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -272,7 +295,7 @@ export const CreatorStudioView: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('sources')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'sources'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'

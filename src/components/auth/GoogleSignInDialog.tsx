@@ -323,7 +323,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
                         required
                         value={googleEmail}
                         onChange={(e) => setGoogleEmail(e.target.value)}
-                        placeholder="e.g. yamsaniruhan@gmail.com"
+                        placeholder="e.g. student@learn.co"
                         className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                       />
                     </div>

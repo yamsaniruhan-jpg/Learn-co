@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SubjectCurriculum, ExamTrack, ExamTrackId, SubjectId } from '../../types/curriculum';
+import { FormattedMathText } from '../common/FormattedMathText';
 import {
   Calculator,
   Terminal,
@@ -181,10 +182,10 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
                     </div>
                     <div>
                       <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                        {chapter.title}
+                        <FormattedMathText text={chapter.title} inline />
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {chapter.description}
+                        <FormattedMathText text={chapter.description} inline />
                       </div>
                     </div>
                   </div>
@@ -213,9 +214,11 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
                           <div>
                             <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                               <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
-                              {topic.title}
+                              <FormattedMathText text={topic.title} inline />
                             </h3>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{topic.description}</p>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                              <FormattedMathText text={topic.description} inline />
+                            </div>
                           </div>
 
                           <button
@@ -233,7 +236,7 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
                             <div key={subtopic.id} className="space-y-2">
                               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                 <Layers className="w-3 h-3" />
-                                {subtopic.title}
+                                <FormattedMathText text={subtopic.title} inline />
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -245,15 +248,15 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
                                     <div className="mb-2">
                                       <div className="flex items-center justify-between gap-1 mb-1">
                                         <span className="text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                          {concept.title}
+                                          <FormattedMathText text={concept.title} inline />
                                         </span>
                                         <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 capitalize">
                                           {concept.difficulty}
                                         </span>
                                       </div>
-                                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                                        {concept.summary}
-                                      </p>
+                                      <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                        <FormattedMathText text={concept.summary} inline />
+                                      </div>
                                     </div>
 
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-200/50 dark:border-slate-800/50 text-[11px]">

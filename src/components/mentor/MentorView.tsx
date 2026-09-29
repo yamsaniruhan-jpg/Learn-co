@@ -39,6 +39,7 @@ import { SessionRoomModal } from './SessionRoomModal';
 import { PrivacySettingsModal } from './PrivacySettingsModal';
 import { SafetyReportModal } from './SafetyReportModal';
 import { MentorPortal } from './MentorPortal';
+import { MentorAccessPanel } from './MentorAccessPanel';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -60,7 +61,68 @@ export const MentorView: React.FC<MentorViewProps> = ({
   onStartRevision,
   onNavigateToCopilot,
 }) => {
-  const [activeMainTab, setActiveMainTab] = useState<'my_mentorship' | 'discover' | 'sessions' | 'portal' | 'diagnostics'>('my_mentorship');
+  const [activeMainTab, setActiveMainTab] = useState<'my_mentorship' | 'discover' | 'sessions' | 'portal' | 'diagnostics' | 'mentor_access'>('my_mentorship');
+  const [isMentorRole, setIsMentorRole] = useState(user.role === 'educator');
+
+  const handleGrantMentorAccess = async (mentorProfileData?: any) => {
+    try {
+      const newProfile: MentorProfile = {
+        id: `mentor-${user.id || user.userId || 'self'}`,
+        userId: user.userId || user.id || 'self',
+        name: mentorProfileData?.name || user.fullName || user.displayName || 'Accredited STEM Mentor',
+        avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id || 'mentor'}`,
+        headline: 'Accredited STEM Mentor & Research Fellow',
+        education: mentorProfileData?.education || 'M.Sc in Applied Mathematics, Stanford / MIT',
+        subjects: mentorProfileData?.subjects || ['math'],
+        areasOfExpertise: ['Socratic Guidance', 'Exam Mastery', 'Proof Derivations'],
+        teachingExperienceYears: mentorProfileData?.teachingExperienceYears || 4,
+        credentials: ['Verified Mentor', 'Alum Fellow'],
+        supportedTracks: ['Foundation', 'Olympiad', 'Advanced'],
+        availability: {
+          days: ['Monday', 'Wednesday', 'Friday'],
+          timeSlots: ['14:00 - 18:00 UTC'],
+          timezone: 'UTC',
+          cadence: 'weekly',
+        },
+        mentoringStyle: 'First-principles derivations with socratic questioning.',
+        languages: ['English'],
+        isVerified: true,
+        acceptingNewMentees: true,
+        maxMentees: 5,
+        activeMenteesCount: 0,
+        rating: 5.0,
+        reviewCount: 1,
+        sessionsCompleted: 12,
+        responseRatePercent: 98,
+        format: ['one_on_one', 'weekly_checkin'],
+        pricingType: 'free_community',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        bio: mentorProfileData?.bio || 'Dedicated to socratic first-principles teaching.',
+      };
+
+      setPortalData((prev) => ({
+        ...prev,
+        mentorProfile: newProfile,
+      }));
+      setMentors((prev) => [newProfile, ...prev.filter((m) => m.id !== newProfile.id)]);
+      setIsMentorRole(true);
+      user.role = 'educator';
+    } catch (err) {
+      console.error('Failed to grant mentor access', err);
+    }
+  };
+
+  const handleRevokeMentorAccess = async () => {
+    setIsMentorRole(false);
+    user.role = 'student';
+    setPortalData((prev) => ({
+      ...prev,
+      mentorProfile: null,
+    }));
+    setMentors((prev) => prev.filter((m) => m.userId !== (user.userId || user.id)));
+    localStorage.removeItem(`learnco_mentor_app_${user.userId}`);
+  };
 
   // Core Data State
   const [mentors, setMentors] = useState<MentorProfile[]>([]);
@@ -412,6 +474,24 @@ export const MentorView: React.FC<MentorViewProps> = ({
           <Compass className="w-4 h-4" />
           <span>Cognitive Forecast</span>
         </button>
+
+        <button
+          id="main-tab-mentor-access"
+          onClick={() => setActiveMainTab('mentor_access')}
+          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+            activeMainTab === 'mentor_access'
+              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Lock className="w-4 h-4" />
+          <span>Mentor Access & Approvals</span>
+          {!isMentorRole && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+              Request
+            </span>
+          )}
+        </button>
       </div>
 
       {/* TAB 1: My Mentorship */}
@@ -759,6 +839,17 @@ export const MentorView: React.FC<MentorViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB 6: Mentor Access & Approvals */}
+      {activeMainTab === 'mentor_access' && (
+        <MentorAccessPanel
+          user={user}
+          isMentor={isMentorRole}
+          onGrantMentorAccess={handleGrantMentorAccess}
+          onRevokeMentorAccess={handleRevokeMentorAccess}
+          onOpenPortal={() => setActiveMainTab('portal')}
+        />
       )}
 
       {/* Modals */}

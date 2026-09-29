@@ -9,16 +9,14 @@ export interface ModelRouteDecision {
 
 export class ModelRouter {
   // Configurable model definitions from environment or smart defaults
-  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-2.5-flash';
-  static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-2.5-pro';
-  static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-2.5-flash';
-  static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-2.5-flash';
+  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-3.8-flash';
+  static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-3.8-flash';
+  static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-3.8-flash';
+  static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-3.8-flash';
 
   // Available fallback cascade models in order of preference
   static readonly FALLBACK_CASCADE = [
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-3.7-flash',
+    'gemini-3.8-flash',
     'gemini-flash-latest',
     'gemini-3.1-flash-lite',
   ];

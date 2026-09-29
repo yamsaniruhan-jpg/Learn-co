@@ -70,6 +70,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   // Interactive Context
   const [activeContextNote, setActiveContextNote] = useState<string>(initialContext);
   const [isContextDrawerOpen, setIsContextDrawerOpen] = useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Input & Streaming States
   const [inputPrompt, setInputPrompt] = useState<string>(initialPrompt);
@@ -351,7 +352,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   ];
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-6.5rem)] flex bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in duration-200">
+    <div className="max-w-7xl mx-auto h-[calc(100vh-7.5rem)] sm:h-[calc(100vh-6.5rem)] flex bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in duration-200">
       {/* 1. Left Session Sidebar */}
       <CopilotSidebar
         conversations={conversations}
@@ -380,14 +381,26 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
           setSearchQuery(q);
           CopilotClient.listConversations(q).then(setConversations);
         }}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* 2. Center Main Chat Canvas */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
         {/* Top Control Header */}
-        <div className="h-14 px-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
+        <div className="h-14 px-3 sm:px-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur flex items-center justify-between gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile Sessions Toggle Button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="md:hidden p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 shrink-0 cursor-pointer"
+              title="Open Chat Sessions & Modes"
+              aria-label="Open sessions"
+            >
+              <Layers className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </button>
+
+            <div className="flex items-center gap-1.5 min-w-0">
               <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                 {activeConversation?.title || 'Omni Socratic AI Copilot'}
               </h2>

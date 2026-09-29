@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 interface FormattedMathTextProps {
   text: string;
@@ -8,9 +9,187 @@ interface FormattedMathTextProps {
 }
 
 /**
+ * Converts raw LaTeX expressions and command sequences into human-readable normal text.
+ */
+export function cleanLatexToNormalText(input: string): string {
+  if (!input) return '';
+  let res = input;
+
+  // Remove delimiter markers
+  res = res.replace(/\$\$/g, '').replace(/\$/g, '');
+
+  // Fractions & roots (handles nested depth 1-2)
+  for (let iter = 0; iter < 3; iter++) {
+    res = res.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
+    res = res.replace(/\\sqrt\[([^\]]+)\]\{([^{}]+)\}/g, '$1√($2)');
+    res = res.replace(/\\sqrt\{([^{}]+)\}/g, '√($1)');
+  }
+
+  // Common Blackboard & Mathcal
+  res = res
+    .replace(/\\mathbb\{R\}/g, 'ℝ')
+    .replace(/\\mathbb\{Z\}/g, 'ℤ')
+    .replace(/\\mathbb\{N\}/g, 'ℕ')
+    .replace(/\\mathbb\{Q\}/g, 'ℚ')
+    .replace(/\\mathbb\{C\}/g, 'ℂ')
+    .replace(/\\mathcal\{L\}/g, 'ℒ')
+    .replace(/\\mathcal\{H\}/g, 'ℋ')
+    .replace(/\\mathcal\{O\}/g, '𝒪');
+
+  // Text formatting commands
+  res = res
+    .replace(/\\textbf\{([^}]+)\}/g, '$1')
+    .replace(/\\mathbf\{([^}]+)\}/g, '$1')
+    .replace(/\\mathrm\{([^}]+)\}/g, '$1')
+    .replace(/\\text\{([^}]+)\}/g, '$1')
+    .replace(/\\mathit\{([^}]+)\}/g, '$1')
+    .replace(/\\mathsf\{([^}]+)\}/g, '$1')
+    .replace(/\\underline\{([^}]+)\}/g, '$1');
+
+  // Delimiter sizing
+  res = res
+    .replace(/\\left\(/g, '(')
+    .replace(/\\right\)/g, ')')
+    .replace(/\\left\[/g, '[')
+    .replace(/\\right\]/g, ']')
+    .replace(/\\left\\{/g, '{')
+    .replace(/\\right\\}/g, '}')
+    .replace(/\\left|\\right/g, '');
+
+  // Binary operators & relations
+  res = res
+    .replace(/\\times/g, ' × ')
+    .replace(/\\cdot/g, ' · ')
+    .replace(/\\pm/g, '±')
+    .replace(/\\mp/g, '∓')
+    .replace(/\\neq/g, ' ≠ ')
+    .replace(/\\approx/g, ' ≈ ')
+    .replace(/\\equiv/g, ' ≡ ')
+    .replace(/\\le(q)?/g, ' ≤ ')
+    .replace(/\\ge(q)?/g, ' ≥ ')
+    .replace(/\\ll/g, ' ≪ ')
+    .replace(/\\gg/g, ' ≫ ')
+    .replace(/\\propto/g, ' ∝ ')
+    .replace(/\\infty/g, '∞')
+    .replace(/\\div/g, ' ÷ ')
+    .replace(/\\pm/g, '±');
+
+  // Arrows & Logic
+  res = res
+    .replace(/\\rightarrow|\\to/g, ' → ')
+    .replace(/\\leftarrow/g, ' ← ')
+    .replace(/\\implies|\\Longrightarrow/g, ' ⟹ ')
+    .replace(/\\iff|\\Longleftrightarrow/g, ' ⟺ ')
+    .replace(/\\forall/g, '∀')
+    .replace(/\\exists/g, '∃')
+    .replace(/\\in/g, ' ∈ ')
+    .replace(/\\notin/g, ' ∉ ')
+    .replace(/\\subset/g, ' ⊂ ')
+    .replace(/\\cup/g, ' ∪ ')
+    .replace(/\\cap/g, ' ∩ ')
+    .replace(/\\emptyset/g, '∅');
+
+  // Calculus & Vectors
+  res = res
+    .replace(/\\int_\{([^}]+)\}\^\{([^}]+)\}/g, '∫[$1..$2]')
+    .replace(/\\int_\{([^}]+)\}/g, '∫[$1]')
+    .replace(/\\int/g, '∫')
+    .replace(/\\iint/g, '∬')
+    .replace(/\\iiint/g, '∭')
+    .replace(/\\oint/g, '∮')
+    .replace(/\\sum_\{([^}]+)\}\^\{([^}]+)\}/g, '∑[$1..$2]')
+    .replace(/\\sum/g, '∑')
+    .replace(/\\prod/g, '∏')
+    .replace(/\\lim_\{([^}]+)\}/g, 'lim($1)')
+    .replace(/\\lim/g, 'lim')
+    .replace(/\\partial/g, '∂')
+    .replace(/\\nabla/g, '∇')
+    .replace(/\\vec\{([^}]+)\}/g, '$1→')
+    .replace(/\\hat\{([^}]+)\}/g, '$1^')
+    .replace(/\\bar\{([^}]+)\}/g, '$1̄')
+    .replace(/\\dot\{([^}]+)\}/g, '$1̇');
+
+  // Greek letters
+  res = res
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\gamma/g, 'γ')
+    .replace(/\\delta/g, 'δ')
+    .replace(/\\epsilon|\\varepsilon/g, 'ε')
+    .replace(/\\zeta/g, 'ζ')
+    .replace(/\\eta/g, 'η')
+    .replace(/\\theta|\\vartheta/g, 'θ')
+    .replace(/\\iota/g, 'ι')
+    .replace(/\\kappa/g, 'κ')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\mu/g, 'μ')
+    .replace(/\\nu/g, 'ν')
+    .replace(/\\xi/g, 'ξ')
+    .replace(/\\pi|\\varpi/g, 'π')
+    .replace(/\\rho|\\varrho/g, 'ρ')
+    .replace(/\\sigma/g, 'σ')
+    .replace(/\\tau/g, 'τ')
+    .replace(/\\upsilon/g, 'υ')
+    .replace(/\\phi|\\varphi/g, 'φ')
+    .replace(/\\chi/g, 'χ')
+    .replace(/\\psi/g, 'ψ')
+    .replace(/\\omega/g, 'ω')
+    .replace(/\\Gamma/g, 'Γ')
+    .replace(/\\Delta/g, 'Δ')
+    .replace(/\\Theta/g, 'Θ')
+    .replace(/\\Lambda/g, 'Λ')
+    .replace(/\\Xi/g, 'Ξ')
+    .replace(/\\Pi/g, 'Π')
+    .replace(/\\Sigma/g, 'Σ')
+    .replace(/\\Upsilon/g, 'Υ')
+    .replace(/\\Phi/g, 'Φ')
+    .replace(/\\Psi/g, 'Ψ')
+    .replace(/\\Omega/g, 'Ω');
+
+  // Subscripts & superscripts in braces
+  res = res.replace(/\^\{([^}]+)\}/g, '^($1)').replace(/_\{([^}]+)\}/g, '_($1)');
+
+  // Remove matrices / envs
+  res = res
+    .replace(/\\begin\{pmatrix\}|\\end\{pmatrix\}/g, '')
+    .replace(/\\begin\{matrix\}|\\end\{matrix\}/g, '')
+    .replace(/\\begin\{aligned\}|\\end\{aligned\}/g, '')
+    .replace(/\\\\/g, ', ')
+    .replace(/&/g, ' ');
+
+  // Clean trailing backslashes or unmatched tokens
+  res = res.replace(/\\([a-zA-Z]+)/g, '$1').replace(/\\/g, '');
+
+  return res.trim();
+}
+
+/**
+ * Preprocesses text to ensure raw LaTeX commands (e.g. \frac{d}{dx}, \int_0^1, \theta)
+ * that aren't explicitly wrapped in $...$ or $$...$$ get automatically wrapped
+ * in $...$ delimiters for KaTeX LaTeX rendering.
+ */
+function prepareLatexString(input: string): string {
+  if (!input) return '';
+
+  // If already contains $ or $$, keep existing math delimiters intact
+  if (input.includes('$')) {
+    return input;
+  }
+
+  // Common LaTeX math indicators
+  const hasLatexCommands = /\\[a-zA-Z]+|\{|\}|\^|_/g.test(input);
+  if (hasLatexCommands) {
+    // If the entire string is a math formula (e.g., \frac{d}{dx}[x^3] = 3x^2), wrap in $
+    return `$${input}$`;
+  }
+
+  return input;
+}
+
+/**
  * FormattedMathText converts standard math, superscript (^), subscript (_),
- * LaTeX delimiters ($...$ and $$...$$), chemical notations, and Unicode symbols
- * into crisp, mathematically accurate rendered typography.
+ * LaTeX delimiters ($...$ and $$...$$), chemical notations, and TeX commands
+ * into crisp, mathematically accurate rendered LaTeX typography.
  */
 export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
   text,
@@ -20,9 +199,11 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
   const renderedContent = useMemo(() => {
     if (!text) return null;
 
+    const processedText = prepareLatexString(text);
+
     // Pattern to match $$...$$ (display math) or $...$ (inline math)
     const mathRegex = /(\$\$[\s\S]*?\$\$|\$[^\$\n]+?\$)/g;
-    const parts = text.split(mathRegex);
+    const parts = processedText.split(mathRegex);
 
     return parts.map((part, index) => {
       if (!part) return null;
@@ -38,7 +219,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
           return (
             <span
               key={index}
-              className="inline-block my-1.5 max-w-full overflow-x-auto text-slate-900 dark:text-slate-100"
+              className="inline-block my-1.5 max-w-full overflow-x-auto text-slate-900 dark:text-slate-100 font-serif"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           );
@@ -62,7 +243,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
           return (
             <span
               key={index}
-              className="inline text-slate-900 dark:text-slate-100"
+              className="inline text-slate-900 dark:text-slate-100 font-serif"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           );
@@ -76,7 +257,6 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
       }
 
       // Check if the regular text contains simple superscript/subscript notation like x^2, H_2O, v_0, 10^-3
-      // We process plain text to make superscripts & subscripts look optical and legible
       return <FormatPlainSubSuperscripts key={index} content={part} />;
     });
   }, [text]);
@@ -93,7 +273,6 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
  * if LaTeX delimiters were omitted.
  */
 const FormatPlainSubSuperscripts: React.FC<{ content: string }> = ({ content }) => {
-  // Regex to catch ^(...) or ^{...} or ^\w+ as superscript and _(...) or _{...} or _\w+ as subscript
   const subSupRegex = /(\^\{[^}]+\}|\^[0-9a-zA-Z+-]+|_\{[^}]+\}|_[0-9a-zA-Z+-]+)/g;
   const tokens = content.split(subSupRegex);
 

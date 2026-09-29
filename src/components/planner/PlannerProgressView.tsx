@@ -25,6 +25,8 @@ import {
   StudyScheduleSettings,
   PlannerAdaptationRecommendation,
 } from '../../types/planner';
+import { useAuth } from '../../context/AuthContext';
+import { loadUserStreak } from '../../utils/streakManager';
 
 interface PlannerProgressViewProps {
   analytics: PlannerAnalytics;
@@ -45,6 +47,10 @@ export const PlannerProgressView: React.FC<PlannerProgressViewProps> = ({
     isOverloaded: d.isOverloaded,
     tasksCount: d.tasksCount,
   }));
+
+  const { user, gamification } = useAuth();
+  const streakData = loadUserStreak(user?.id || 'guest');
+  const streakDays = streakData.currentStreak || gamification?.currentStreak || analytics.consistencyStreakDays || 1;
 
   const subjectData = Object.entries(analytics.subjectBreakdown).map(([sub, data]) => ({
     subject: sub.toUpperCase(),
@@ -75,7 +81,7 @@ export const PlannerProgressView: React.FC<PlannerProgressViewProps> = ({
             <Flame className="w-4 h-4 text-amber-400 fill-current" />
           </div>
           <div className="text-2xl font-bold text-amber-400 mb-1">
-            {analytics.consistencyStreakDays} Days
+            {streakDays} {streakDays === 1 ? 'Day' : 'Days'}
           </div>
           <p className="text-[11px] text-slate-400">Active study consistency</p>
         </div>

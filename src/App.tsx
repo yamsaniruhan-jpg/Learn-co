@@ -22,12 +22,15 @@ import { ProfileView } from './components/profile/ProfileView';
 import { AuthView } from './components/auth/AuthView';
 import { Leaderboard } from './components/leaderboard/Leaderboard';
 import { ConceptLibraryView } from './components/concepts/ConceptLibraryView';
+import { DigitalArchiveHub } from './components/learn/DigitalArchiveHub';
+import { MobileAllTabsNav } from './components/layout/MobileAllTabsNav';
 
 import { useAuth } from './context/AuthContext';
 import { ConceptMastery, QuestionAttempt, SubjectId, UserProfile, NotificationItem } from './types';
 import { INITIAL_MASTERIES, SEED_NOTIFICATIONS } from './data/seedData';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import {
   LayoutDashboard,
   BookOpen,
@@ -254,6 +257,10 @@ export default function App() {
 
         {/* Dynamic Center Stage Canvas */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <ErrorBoundary
+            fallbackTitle="STEM Workspace View Error"
+            fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
+          >
           {activeTab === 'dashboard' && (
             <DashboardView
               user={effectiveLegacyUser}
@@ -284,7 +291,9 @@ export default function App() {
             <PracticeView onOpenCopilotWithContext={handleOpenCopilotWithContext} />
           )}
 
-          {activeTab === 'create' && <CreatorStudioView />}
+          {activeTab === 'create' && (
+            <CreatorStudioView onNavigateToPractice={() => setActiveTab('practice')} />
+          )}
 
           {activeTab === 'mentor' && (
             <MentorView
@@ -338,6 +347,12 @@ export default function App() {
 
           {activeTab === 'admin' && <AdminStudioView />}
 
+          {activeTab === 'digital-archive' && (
+            <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-200">
+              <DigitalArchiveHub selectedSubject="math" />
+            </div>
+          )}
+
           {activeTab === 'docs' && <DocsViewer />}
 
           {activeTab === 'profile' && (
@@ -359,6 +374,7 @@ export default function App() {
               onNavigateToTab={(tab) => setActiveTab(tab)}
             />
           )}
+          </ErrorBoundary>
         </main>
 
         {/* Right Collapsible Socratic Companion Panel */}
@@ -401,34 +417,15 @@ export default function App() {
       {/* Auth Modal (Sign In / Sign Up) */}
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
-      {/* Mobile Bottom Navigation Bar (Optimized 44px+ touch targets) */}
-      <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-2 py-1.5 flex justify-around sticky bottom-0 z-40">
-        {[
-          { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-          { id: 'learn', label: 'Learn', icon: BookOpen },
-          { id: 'practice', label: 'Practice', icon: Target },
-          { id: 'copilot', label: 'Copilot', icon: Bot },
-          { id: 'create', label: 'Create', icon: Sparkles },
-          { id: 'profile', label: 'Profile', icon: User },
-        ].map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition-colors min-h-[44px] cursor-pointer ${
-                isActive
-                  ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <Icon className="w-4 h-4 mb-0.5" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Mobile All-Tabs Navigation (Scrollable strip + Bottom Bar + All-Feature Drawer) */}
+      <MobileAllTabsNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        dailyAllowanceRemaining={Math.max(
+          0,
+          DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
+        )}
+      />
     </div>
   );
 }

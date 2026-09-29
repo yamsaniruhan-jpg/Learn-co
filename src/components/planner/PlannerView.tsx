@@ -8,6 +8,7 @@ import {
   ScheduleConflict,
   PlannerAdaptationRecommendation,
 } from '../../types/planner';
+import { PlannerClient } from '../../services/plannerClient';
 import { PlannerHeader } from './PlannerHeader';
 import { TodayTasksView } from './TodayTasksView';
 import { MyPlanView } from './MyPlanView';
@@ -19,6 +20,7 @@ import { AiPlanWizardModal } from './AiPlanWizardModal';
 import { TaskModal } from './TaskModal';
 import { VersionHistoryModal } from './VersionHistoryModal';
 import { FocusSessionModal } from './FocusSessionModal';
+import { awardXp } from '../../utils/xpManager';
 
 export const PlannerView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
@@ -49,7 +51,7 @@ export const PlannerView: React.FC = () => {
     plannedTasksCount: 0,
     completedTasksCount: 0,
     completionRatePercent: 0,
-    consistencyStreakDays: 4,
+    consistencyStreakDays: 0,
     overdueTasksCount: 0,
     weakAreaTasksCount: 0,
     spacedRevisionTasksCount: 0,
@@ -74,60 +76,18 @@ export const PlannerView: React.FC = () => {
   const [isFocusModalOpen, setIsFocusModalOpen] = useState(false);
   const [focusTask, setFocusTask] = useState<StudyTask | null>(null);
 
-  // Fetch all planner data from API
+  // Fetch all planner data from API via PlannerClient
   const fetchPlannerData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch current active plan
-      const planRes = await fetch('/api/planner/active');
-      let planData: StudyPlan | null = null;
-      if (planRes.ok) {
-        const d = await planRes.json();
-        planData = d.plan || null;
-        setActivePlan(planData);
-      }
-
-      // 2. Fetch tasks
-      const tasksRes = await fetch('/api/planner/tasks');
-      if (tasksRes.ok) {
-        const d = await tasksRes.json();
-        setTasks(d.tasks || []);
-      }
-
-      // 3. Fetch goals
-      const goalsRes = await fetch('/api/planner/goals');
-      if (goalsRes.ok) {
-        const d = await goalsRes.json();
-        setGoals(d.goals || []);
-      }
-
-      // 4. Fetch schedule settings
-      const settingsRes = await fetch('/api/planner/settings');
-      if (settingsRes.ok) {
-        const d = await settingsRes.json();
-        if (d.settings) setSettings(d.settings);
-      }
-
-      // 5. Fetch analytics
-      const analyticsRes = await fetch('/api/planner/analytics');
-      if (analyticsRes.ok) {
-        const d = await analyticsRes.json();
-        if (d.analytics) setAnalytics(d.analytics);
-      }
-
-      // 6. Fetch conflicts
-      const conflictsRes = await fetch('/api/planner/conflicts');
-      if (conflictsRes.ok) {
-        const d = await conflictsRes.json();
-        setConflicts(d.conflicts || []);
-      }
-
-      // 7. Fetch adaptive recommendations
-      const recsRes = await fetch('/api/planner/recommendations');
-      if (recsRes.ok) {
-        const d = await recsRes.json();
-        setRecommendations(d.recommendations || []);
-      }
+      const overview = await PlannerClient.getOverview();
+      if (overview.plan) setActivePlan(overview.plan);
+      if (overview.tasks) setTasks(overview.tasks);
+      if (overview.goals) setGoals(overview.goals);
+      if (overview.settings) setSettings(overview.settings);
+      if (overview.analytics) setAnalytics(overview.analytics);
+      if (overview.conflicts) setConflicts(overview.conflicts);
+      if (overview.recommendations) setRecommendations(overview.recommendations);
     } catch (err) {
       console.error('Error loading study planner data:', err);
     } finally {
@@ -156,24 +116,15 @@ export const PlannerView: React.FC = () => {
       )
     );
 
-    try {
-      const res = await fetch(`/api/planner/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: nextStatus,
-          completedAt: nextStatus === 'COMPLETED' ? new Date().toISOString() : undefined,
-        }),
-      });
+    if (nextStatus === 'COMPLETED') {
+      const taskObj = tasks.find((t) => t.id === taskId);
+      awardXp(50, `Completed study task: ${taskObj?.title || 'Study Session'}`);
+    }
 
-      if (res.ok) {
-        // Refresh analytics in background
-        const anRes = await fetch('/api/planner/analytics');
-        if (anRes.ok) {
-          const anData = await anRes.json();
-          if (anData.analytics) setAnalytics(anData.analytics);
-        }
-      }
+    try {
+      await PlannerClient.updateTaskStatus(taskId, nextStatus);
+      const overview = await PlannerClient.getOverview();
+      if (overview.analytics) setAnalytics(overview.analytics);
     } catch (err) {
       console.error('Failed to toggle task status:', err);
       fetchPlannerData();
@@ -184,30 +135,15 @@ export const PlannerView: React.FC = () => {
   const handleSaveTask = async (taskData: Partial<StudyTask>) => {
     try {
       if (editingTask) {
-        const res = await fetch(`/api/planner/tasks/${editingTask.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(taskData),
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updated.task : t)));
-        }
+        const updated = await PlannerClient.saveTask({ ...taskData, id: editingTask.id });
+        setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updated : t)));
       } else {
-        const res = await fetch('/api/planner/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...taskData,
-            planId: activePlan?.id || undefined,
-          }),
+        const created = await PlannerClient.saveTask({
+          ...taskData,
+          planId: activePlan?.id || undefined,
         });
-        if (res.ok) {
-          const created = await res.json();
-          setTasks((prev) => [created.task, ...prev]);
-        }
+        setTasks((prev) => [created, ...prev]);
       }
-      // Re-fetch analytics & conflicts
       fetchPlannerData();
     } catch (err) {
       console.error('Failed to save study task:', err);
@@ -218,7 +154,7 @@ export const PlannerView: React.FC = () => {
   const handleDeleteTask = async (taskId: string) => {
     try {
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      await fetch(`/api/planner/tasks/${taskId}`, { method: 'DELETE' });
+      await PlannerClient.deleteTask(taskId);
       fetchPlannerData();
     } catch (err) {
       console.error('Failed to delete task:', err);
@@ -228,14 +164,8 @@ export const PlannerView: React.FC = () => {
   // Reschedule single task
   const handleRescheduleTask = async (taskId: string, newDate: string) => {
     try {
-      const res = await fetch(`/api/planner/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledDate: newDate }),
-      });
-      if (res.ok) {
-        fetchPlannerData();
-      }
+      await PlannerClient.rescheduleTask(taskId, newDate);
+      fetchPlannerData();
     } catch (err) {
       console.error('Failed to reschedule task:', err);
     }
@@ -244,14 +174,8 @@ export const PlannerView: React.FC = () => {
   // Batch Reschedule Missed Tasks
   const handleBatchRescheduleMissed = async () => {
     try {
-      const res = await fetch('/api/planner/reschedule-missed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ strategy: 'NEXT_AVAILABLE_DAY' }),
-      });
-      if (res.ok) {
-        fetchPlannerData();
-      }
+      await PlannerClient.batchRescheduleMissed();
+      fetchPlannerData();
     } catch (err) {
       console.error('Failed to batch reschedule missed tasks:', err);
     }
@@ -260,27 +184,13 @@ export const PlannerView: React.FC = () => {
   // Save / Update Goal
   const handleSaveGoal = async (goalData: Partial<StudyGoal>) => {
     try {
+      const saved = await PlannerClient.saveGoal(goalData);
       if (goalData.id) {
-        const res = await fetch(`/api/planner/goals/${goalData.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(goalData),
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          setGoals((prev) => prev.map((g) => (g.id === goalData.id ? updated.goal : g)));
-        }
+        setGoals((prev) => prev.map((g) => (g.id === goalData.id ? saved : g)));
       } else {
-        const res = await fetch('/api/planner/goals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(goalData),
-        });
-        if (res.ok) {
-          const created = await res.json();
-          setGoals((prev) => [...prev, created.goal]);
-        }
+        setGoals((prev) => [...prev, saved]);
       }
+      fetchPlannerData();
     } catch (err) {
       console.error('Failed to save study goal:', err);
     }
@@ -290,7 +200,8 @@ export const PlannerView: React.FC = () => {
   const handleDeleteGoal = async (goalId: string) => {
     try {
       setGoals((prev) => prev.filter((g) => g.id !== goalId));
-      await fetch(`/api/planner/goals/${goalId}`, { method: 'DELETE' });
+      await PlannerClient.deleteGoal(goalId);
+      fetchPlannerData();
     } catch (err) {
       console.error('Failed to delete goal:', err);
     }
@@ -299,16 +210,9 @@ export const PlannerView: React.FC = () => {
   // Save Schedule Settings
   const handleSaveSettings = async (updates: Partial<StudyScheduleSettings>) => {
     try {
-      const res = await fetch('/api/planner/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        setSettings(d.settings);
-        fetchPlannerData();
-      }
+      const updated = await PlannerClient.saveSettings(updates);
+      setSettings(updated);
+      fetchPlannerData();
     } catch (err) {
       console.error('Failed to update schedule settings:', err);
     }
@@ -318,14 +222,8 @@ export const PlannerView: React.FC = () => {
   const handleRollbackVersion = async (versionId: string) => {
     if (!activePlan) return;
     try {
-      const res = await fetch(`/api/planner/rollback/${activePlan.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ versionId }),
-      });
-      if (res.ok) {
-        fetchPlannerData();
-      }
+      await PlannerClient.rollbackPlan(activePlan.id, versionId);
+      fetchPlannerData();
     } catch (err) {
       console.error('Failed to rollback plan:', err);
     }

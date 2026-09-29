@@ -34,9 +34,26 @@ export class AuthClient {
   static removeToken(): void {
     try {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem('learnco_user');
     } catch (e) {
       console.error('Failed to remove auth token', e);
     }
+  }
+
+  static getCurrentUser(): any | null {
+    try {
+      const userStr = localStorage.getItem('learnco_user') || localStorage.getItem('auth_user');
+      if (userStr) {
+        return JSON.parse(userStr);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static setCurrentUser(user: any): void {
+    try {
+      localStorage.setItem('learnco_user', JSON.stringify(user));
+    } catch (_) {}
   }
 
   private static getHeaders(): HeadersInit {
@@ -76,6 +93,9 @@ export class AuthClient {
     if (data.token) {
       this.setToken(data.token);
     }
+    if (data.user || data.profile) {
+      this.setCurrentUser(data.user || data.profile);
+    }
 
     return data;
   }
@@ -100,6 +120,9 @@ export class AuthClient {
 
     if (data.token) {
       this.setToken(data.token);
+    }
+    if (data.user || data.profile) {
+      this.setCurrentUser(data.user || data.profile);
     }
 
     return data;
@@ -136,6 +159,9 @@ export class AuthClient {
 
     if (data.token) {
       this.setToken(data.token);
+    }
+    if (data.user || data.profile) {
+      this.setCurrentUser(data.user || data.profile);
     }
 
     return data;

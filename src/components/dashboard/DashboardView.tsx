@@ -46,13 +46,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectSubject,
 }) => {
   const [streakData, setStreakData] = useState<StreakData>(() =>
-    loadUserStreak(user.id || 'default_user', user.currentStreak ?? 0)
+    loadUserStreak(user.id || 'default_user')
   );
 
   useEffect(() => {
-    const fresh = loadUserStreak(user.id || 'default_user', user.currentStreak ?? 0);
-    setStreakData(fresh);
-  }, [user.id, user.currentStreak]);
+    const handleUpdate = () => {
+      const fresh = loadUserStreak(user.id || 'default_user');
+      setStreakData(fresh);
+    };
+    handleUpdate();
+    window.addEventListener('learnco_streak_updated', handleUpdate);
+    return () => window.removeEventListener('learnco_streak_updated', handleUpdate);
+  }, [user.id]);
 
   const weeklyPills = getWeeklyStreakPills(streakData);
   const activeStreakCount = streakData.currentStreak ?? user.currentStreak ?? 0;
@@ -67,11 +72,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     (user.dailyQuestionsSolvedToday / user.dailyAllowanceLimit) * 100
   );
 
-  const averageMastery = Math.round(
-    masteries.reduce((acc, m) => acc + m.masteryScore, 0) / Math.max(1, masteries.length)
-  );
+  const hasStartedPractice = attempts.length > 0;
 
-  const weakConcepts = masteries.filter((m) => m.isWeakArea || m.masteryScore < 60);
+  const averageMastery = hasStartedPractice && masteries.length > 0
+    ? Math.round(
+        masteries.reduce((acc, m) => acc + m.masteryScore, 0) / Math.max(1, masteries.length)
+      )
+    : 0;
+
+  const weakConcepts = hasStartedPractice
+    ? masteries.filter((m) => m.isWeakArea || m.masteryScore < 60)
+    : [];
 
   const upcomingSessions = SEED_STUDY_SESSIONS.filter((s) => !s.isCompleted).slice(0, 3);
 
@@ -182,7 +193,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-xs text-indigo-200/70 block">Average Mastery</span>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-xl font-black text-emerald-400">{averageMastery}%</span>
-              <span className="text-xs text-indigo-200">empirically verified</span>
+              <span className="text-xs text-indigo-200">
+                {hasStartedPractice ? 'empirically verified' : 'not started yet'}
+              </span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
               <div
@@ -246,9 +259,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {SEED_SUBJECTS.map((subject) => {
+                const subjectAttempts = attempts.filter((a) => a.subjectId === subject.id);
                 const subjectMasteries = masteries.filter((m) => m.subjectId === subject.id);
                 const actualMastery =
-                  subjectMasteries.length > 0
+                  hasStartedPractice && subjectAttempts.length > 0 && subjectMasteries.length > 0
                     ? Math.round(
                         subjectMasteries.reduce((sum, m) => sum + m.masteryScore, 0) /
                           subjectMasteries.length
@@ -304,8 +318,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Weak Topics Triage Banner */}
-          {weakConcepts.length > 0 && (
+          {/* Weak Topics or Fresh Onboarding Status */}
+          {hasStartedPractice && weakConcepts.length > 0 ? (
             <Card
               variant="subtle"
               padding="md"
@@ -346,7 +360,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </Button>
               </div>
             </Card>
-          )}
+          ) : !hasStartedPractice ? (
+            <Card
+              variant="subtle"
+              padding="md"
+              className="border-l-4 border-l-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+                    <Target className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      Mastery Profile: Ready to Calibrate
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      You haven't attempted any questions yet. Start your first practice session to calculate baseline mastery and map knowledge retention.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => onNavigate('practice')}
+                  className="shrink-0"
+                >
+                  Start First Session
+                </Button>
+              </div>
+            </Card>
+          ) : null}
 
           {/* Quick First-Principles Inquiries for Copilot */}
           <div className="space-y-3">

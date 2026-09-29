@@ -240,7 +240,10 @@ export interface LeaderboardEntry {
   avatarUrl: string;
   xp: number;
   level: number;
-  streak: number;
+  streak?: number;
+  streakDays?: number;
+  tier?: string;
+  tierBadgeIcon?: string;
   isCurrentUser?: boolean;
 }
 

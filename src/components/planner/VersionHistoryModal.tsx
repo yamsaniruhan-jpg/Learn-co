@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { StudyPlanVersion } from '../../types/planner';
+import { PlannerClient } from '../../services/plannerClient';
 
 interface VersionHistoryModalProps {
   planId: string;
@@ -38,11 +39,10 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   const loadVersions = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/planner/versions/${planId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setVersions(data.versions || []);
-      }
+      const data = await PlannerClient.getVersions(planId);
+      setVersions(data as any || []);
+    } catch (err) {
+      console.error('Failed to load version history:', err);
     } finally {
       setIsLoading(false);
     }

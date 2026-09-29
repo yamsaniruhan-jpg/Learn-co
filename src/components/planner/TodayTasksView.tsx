@@ -19,6 +19,10 @@ import {
 } from 'lucide-react';
 import { StudyTask, StudyScheduleSettings } from '../../types/planner';
 import { SubjectId } from '../../types/curriculum';
+import { useAuth } from '../../context/AuthContext';
+import { loadUserStreak } from '../../utils/streakManager';
+import { StreakModal } from '../common/StreakModal';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface TodayTasksViewProps {
   tasks: StudyTask[];
@@ -55,6 +59,11 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
   const [subjectFilter, setSubjectFilter] = useState<string>('ALL');
+  const [showStreakModal, setShowStreakModal] = useState(false);
+
+  const { user, gamification } = useAuth();
+  const streakData = loadUserStreak(user?.id || 'guest');
+  const activeStreak = streakData.currentStreak || gamification?.currentStreak || 1;
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -165,24 +174,42 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => setShowStreakModal(true)}
+          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-500/40 transition-colors group"
+          title="Click to view daily streak breakdown"
+        >
           <div>
-            <span className="text-xs text-slate-400">Current Study Streak</span>
-            <div className="text-2xl font-bold text-amber-400 flex items-center gap-1.5 mt-1">
-              <Flame className="w-6 h-6 fill-current" />
-              <span>4 Days</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400">Current Study Streak</span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                ACTIVE
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Complete today's tasks to maintain</p>
+            <div className="text-2xl font-bold text-amber-400 flex items-center gap-1.5 mt-1">
+              <Flame className="w-6 h-6 fill-current animate-pulse group-hover:scale-110 transition-transform" />
+              <span>{activeStreak} {activeStreak === 1 ? 'Day' : 'Days'}</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {activeStreak === 1 ? 'Streak started today! Keep it going.' : 'Consecutive daily momentum'}
+            </p>
           </div>
           <button
             id="btn-quick-add-task"
-            onClick={onOpenNewTask}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenNewTask();
+            }}
             className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-all"
           >
             + Add Task
           </button>
         </div>
       </div>
+
+      {showStreakModal && (
+        <StreakModal isOpen={showStreakModal} onClose={() => setShowStreakModal(false)} />
+      )}
 
       {/* Filter and Tab Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
@@ -301,13 +328,13 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
                           isDone ? 'line-through text-slate-400' : ''
                         }`}
                       >
-                        {task.title}
+                        <FormattedMathText text={task.title} inline />
                       </h3>
 
                       {task.description && (
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                          {task.description}
-                        </p>
+                        <div className="text-xs text-slate-400 mt-1 line-clamp-2">
+                          <FormattedMathText text={task.description} />
+                        </div>
                       )}
 
                       {/* Time, Practice questions info */}

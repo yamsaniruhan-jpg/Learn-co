@@ -102,8 +102,12 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-white">{concept.title}</h1>
-        <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">{concept.summary}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-white">
+          <FormattedMathText text={concept.title} inline />
+        </h1>
+        <div className="text-slate-300 text-sm max-w-3xl leading-relaxed">
+          <FormattedMathText text={concept.summary} inline />
+        </div>
       </div>
 
       {/* Navigation Tabs */}
@@ -381,21 +385,21 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
                     <span className="font-bold uppercase tracking-wider block text-[10px] text-rose-600 dark:text-rose-400 mb-1">
                       Flawed Reasoning (The Trap)
                     </span>
-                    <p>{pit.flawedReasoning}</p>
+                    <FormattedMathText text={pit.flawedReasoning} inline />
                   </div>
 
                   <div className="p-3 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-900 dark:text-emerald-300">
                     <span className="font-bold uppercase tracking-wider block text-[10px] text-emerald-600 dark:text-emerald-400 mb-1">
                       Correct Invariant Understanding
                     </span>
-                    <p>{pit.correctConcept}</p>
+                    <FormattedMathText text={pit.correctConcept} inline />
                   </div>
                 </div>
 
                 {pit.counterExample && (
                   <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300">
                     <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">Counterexample:</span>
-                    {pit.counterExample}
+                    <FormattedMathText text={pit.counterExample} inline />
                   </div>
                 )}
               </div>

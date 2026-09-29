@@ -2,6 +2,7 @@ import {
   Database,
   withUserLock,
   getDateInTimezone,
+  getDaysBetweenDateKeys,
 } from './db';
 import {
   DAILY_PRACTICE_LIMIT,
@@ -203,25 +204,24 @@ export class XpEngine {
 
       // Authoritative Streak Calculation
       if (!gam.lastActiveDate) {
-        // First ever qualifying activity starts streak
+        // First ever qualifying activity starts streak at 1
         gam.currentStreak = 1;
         gam.longestStreak = Math.max(gam.longestStreak, 1);
       } else if (gam.lastActiveDate === todayDateStr) {
-        // Same calendar day: do not increment streak again
-        // Streak remains unchanged
+        // Same calendar day: maintain current streak (at least 1)
+        gam.currentStreak = Math.max(1, gam.currentStreak);
+        gam.longestStreak = Math.max(gam.longestStreak, gam.currentStreak);
       } else {
-        // Calculate difference in calendar days
-        const lastDate = new Date(gam.lastActiveDate);
-        const curDate = new Date(todayDateStr);
-        const diffDays = Math.round((curDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        const diffDays = getDaysBetweenDateKeys(gam.lastActiveDate, todayDateStr);
 
         if (diffDays === 1) {
-          // Consecutive calendar day -> Streak increments
-          gam.currentStreak += 1;
+          // Consecutive calendar day -> Streak continues and increments (+1)
+          gam.currentStreak = (gam.currentStreak || 0) + 1;
           gam.longestStreak = Math.max(gam.longestStreak, gam.currentStreak);
-        } else if (diffDays > 1) {
-          // Missed one or more days -> Streak resets to 1
+        } else {
+          // Missed one or more days -> Streak broke, starts fresh at 1 today
           gam.currentStreak = 1;
+          gam.longestStreak = Math.max(gam.longestStreak, 1);
         }
       }
 

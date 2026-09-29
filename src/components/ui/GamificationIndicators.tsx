@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Zap, Flame, ShieldCheck, Sparkles, Award } from 'lucide-react';
 import { DifficultyLevel } from '../../types';
+import { StreakModal } from '../common/StreakModal';
 
 export const XPIndicator: React.FC<{ xp: number; showIcon?: boolean; className?: string; size?: 'sm' | 'md' | 'lg' }> = ({
   xp,
@@ -24,24 +25,49 @@ export const XPIndicator: React.FC<{ xp: number; showIcon?: boolean; className?:
   );
 };
 
-export const StreakIndicator: React.FC<{ streak: number; className?: string; size?: 'sm' | 'md' | 'lg' }> = ({
+export const StreakIndicator: React.FC<{
+  streak: number;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+  interactive?: boolean;
+  onClick?: () => void;
+}> = ({
   streak,
   className = '',
   size = 'md',
+  interactive = true,
+  onClick,
 }) => {
+  const [showModal, setShowModal] = useState(false);
+
   const sizeStyles = {
     sm: 'text-xs px-2 py-0.5 gap-1',
     md: 'text-xs sm:text-sm px-2.5 py-1 gap-1.5',
     lg: 'text-base px-3.5 py-1.5 gap-2 font-bold',
   };
 
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    } else if (interactive) {
+      setShowModal(true);
+    }
+  };
+
   return (
-    <div
-      className={`inline-flex items-center rounded-xl bg-orange-500/10 dark:bg-orange-400/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 font-extrabold shadow-2xs select-none ${sizeStyles[size]} ${className}`}
-    >
-      <Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-500 shrink-0 animate-pulse" />
-      <span>{streak}d Streak</span>
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        title="Click to view daily streak details & rules"
+        className={`inline-flex items-center rounded-xl bg-orange-500/10 dark:bg-orange-400/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 font-extrabold shadow-2xs select-none transition-transform hover:scale-105 active:scale-95 cursor-pointer ${sizeStyles[size]} ${className}`}
+      >
+        <Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-500 shrink-0 animate-pulse" />
+        <span>{streak}d Streak</span>
+      </button>
+
+      {showModal && <StreakModal isOpen={showModal} onClose={() => setShowModal(false)} />}
+    </>
   );
 };
 

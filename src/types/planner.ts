@@ -185,6 +185,13 @@ export interface ScheduleConflict {
   suggestedResolution?: string;
 }
 
+export interface PlanGenerationResult {
+  plan: Partial<StudyPlan>;
+  tasks: Partial<StudyTask>[];
+  goal?: Partial<StudyGoal> | null;
+  summaryText?: string;
+}
+
 export interface PlanGenerationInput {
   goalTitle: string;
   targetExamTrack: string;

@@ -51,6 +51,35 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
   const [modalTopic, setModalTopic] = useState<string | undefined>(undefined);
   const [modalTitle, setModalTitle] = useState<string>('Calibrated 5-Question Ladder');
 
+  // Creator Studio transfer session state
+  const [creatorImportSession, setCreatorImportSession] = useState<{
+    resourceTitle: string;
+    questions: QuestionBankItem[];
+    resourceId?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const checkCreatorSession = () => {
+      try {
+        const stored = localStorage.getItem('learnco_creator_practice_session');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.questions && parsed.questions.length > 0) {
+            setCreatorImportSession({
+              resourceTitle: parsed.resourceTitle || 'Creator Studio Custom Resource',
+              questions: parsed.questions,
+              resourceId: parsed.resourceId,
+            });
+          }
+        }
+      } catch (_) {}
+    };
+
+    checkCreatorSession();
+    window.addEventListener('focus', checkCreatorSession);
+    return () => window.removeEventListener('focus', checkCreatorSession);
+  }, []);
+
   // Async data
   const [recommendations, setRecommendations] = useState<PracticeRecommendation[]>([]);
   const [weakTopics, setWeakTopics] = useState<WeakTopicSignal[]>([]);
@@ -210,6 +239,63 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
               <div className="text-[10px] text-slate-400 mt-1">Questions remaining today</div>
             </div>
           </div>
+
+          {/* Creator Studio Imported Resource Banner */}
+          {creatorImportSession && (
+            <div className="p-5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border-2 border-indigo-500/40 dark:border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-sm shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                      Creator Studio Import
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {creatorImportSession.resourceTitle}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                    {creatorImportSession.questions.length} problems transferred and ready to solve in Practice Arena.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('learnco_creator_practice_session');
+                    setCreatorImportSession(null);
+                  }}
+                  className="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePracticeSession({
+                      config: {
+                        subjectId: 'math',
+                        questionTypes: ['single_choice'],
+                        difficultyMode: 'easy',
+                        timed: false,
+                        questionCount: creatorImportSession.questions.length,
+                      },
+                      questions: creatorImportSession.questions,
+                    });
+                    localStorage.removeItem('learnco_creator_practice_session');
+                    setCreatorImportSession(null);
+                  }}
+                  className="flex-1 sm:flex-none px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Start Practice Now</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Sub Navigation Bar */}
           <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto pb-1">

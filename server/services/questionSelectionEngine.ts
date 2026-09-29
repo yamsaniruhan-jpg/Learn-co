@@ -12,8 +12,8 @@ import {
 export class QuestionSelectionEngine {
   /**
    * Select a set of questions tailored to user configuration and history.
-   * Default mode is the 5-Question Calibrated Ladder:
-   * [Easy, Easy/Medium, Medium, Medium/Hard, Hard]
+   * Enforces strict deduplication: guarantees no repeated questions across sessions
+   * by prioritizing unseen questions and randomizing matching candidate pools.
    */
   static selectPracticeSession(
     userId: string,
@@ -21,6 +21,7 @@ export class QuestionSelectionEngine {
   ): QuestionBankItem[] {
     const userAttempts = Database.getUserAttempts(userId);
     const userMistakes = Database.getMistakes(userId);
+    const allAttemptedIds = new Set(userAttempts.map((a) => a.questionId));
     const resolvedAttemptIds = new Set(userAttempts.filter((a) => a.isCorrect).map((a) => a.questionId));
 
     // Get all available questions (master bank + any creator imported questions from DB)
@@ -61,10 +62,13 @@ export class QuestionSelectionEngine {
         : [...MASTER_QUESTION_BANK];
     }
 
+    // Shuffle candidate pool to ensure non-deterministic, fresh variety
+    const shuffledPool = [...candidatePool].sort(() => Math.random() - 0.5);
+
     // If Mistake Remediation Mode
     if (config.mode === 'mistake_remediation') {
       const mistakeQuestionIds = new Set(userMistakes.filter((m) => !m.resolved).map((m) => m.questionId));
-      const mistakePool = candidatePool.filter((q) => mistakeQuestionIds.has(q.id));
+      const mistakePool = shuffledPool.filter((q) => mistakeQuestionIds.has(q.id));
       if (mistakePool.length >= config.questionCount) {
         return mistakePool.slice(0, config.questionCount);
       }
@@ -76,34 +80,45 @@ export class QuestionSelectionEngine {
     if (!config.difficultyMode || config.difficultyMode === 'calibrated_ladder') {
       const ladderDifficulties: DifficultyLevel[] = ['easy', 'easy_medium', 'medium', 'medium_hard', 'hard'];
       const selected: QuestionBankItem[] = [];
-      const usedIds = new Set<string>();
+      const usedInSessionIds = new Set<string>();
 
       for (let i = 0; i < count; i++) {
         const targetDiff = ladderDifficulties[i % ladderDifficulties.length];
         
-        // Find matching difficulty in candidates not yet used
-        let match = candidatePool.find(
-          (q) => q.difficulty === targetDiff && !usedIds.has(q.id) && !resolvedAttemptIds.has(q.id)
+        // Priority 1: Match target difficulty AND never attempted by user AND not used in this session
+        let match = shuffledPool.find(
+          (q) => q.difficulty === targetDiff && !allAttemptedIds.has(q.id) && !usedInSessionIds.has(q.id)
         );
 
-        // Fallback: match difficulty even if previously solved
+        // Priority 2: Match target difficulty AND not resolved/mastered AND not used in this session
         if (!match) {
-          match = candidatePool.find((q) => q.difficulty === targetDiff && !usedIds.has(q.id));
+          match = shuffledPool.find(
+            (q) => q.difficulty === targetDiff && !resolvedAttemptIds.has(q.id) && !usedInSessionIds.has(q.id)
+          );
         }
 
-        // Fallback: any unused candidate
+        // Priority 3: Match target difficulty AND not used in this session (spaced review)
         if (!match) {
-          match = candidatePool.find((q) => !usedIds.has(q.id));
+          match = shuffledPool.find(
+            (q) => q.difficulty === targetDiff && !usedInSessionIds.has(q.id)
+          );
         }
 
-        // Fallback: cycle candidatePool
-        if (!match && candidatePool.length > 0) {
-          match = candidatePool[i % candidatePool.length];
+        // Priority 4: Any unseen candidate not yet used in this session
+        if (!match) {
+          match = shuffledPool.find(
+            (q) => !allAttemptedIds.has(q.id) && !usedInSessionIds.has(q.id)
+          );
+        }
+
+        // Priority 5: Any unused candidate in this session
+        if (!match) {
+          match = shuffledPool.find((q) => !usedInSessionIds.has(q.id));
         }
 
         if (match) {
           selected.push(match);
-          usedIds.add(match.id);
+          usedInSessionIds.add(match.id);
         }
       }
 
@@ -112,14 +127,25 @@ export class QuestionSelectionEngine {
       }
     }
 
-    // Standard / custom difficulty mode
+    // Standard / custom difficulty mode with deduplication
     if (config.difficultyMode && config.difficultyMode !== 'calibrated_ladder') {
-      const filteredByDiff = candidatePool.filter((q) => q.difficulty === config.difficultyMode);
-      const pool = filteredByDiff.length >= count ? filteredByDiff : candidatePool;
+      const filteredByDiff = shuffledPool.filter((q) => q.difficulty === config.difficultyMode);
+      const pool = filteredByDiff.length >= count ? filteredByDiff : shuffledPool;
+      
+      const unattempted = pool.filter((q) => !allAttemptedIds.has(q.id));
+      if (unattempted.length >= count) {
+        return unattempted.slice(0, count);
+      }
       return pool.slice(0, count);
     }
 
-    return candidatePool.slice(0, count);
+    // General fallback: return unattempted candidates first
+    const unattempted = shuffledPool.filter((q) => !allAttemptedIds.has(q.id));
+    if (unattempted.length >= count) {
+      return unattempted.slice(0, count);
+    }
+
+    return shuffledPool.slice(0, count);
   }
 
   /**

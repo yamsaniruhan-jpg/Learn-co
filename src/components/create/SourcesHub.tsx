@@ -10,9 +10,13 @@ import {
   Search,
   Plus,
   File,
+  Bookmark,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { generateBibTeX, CitationItem } from '../../utils/citationUtils';
 
 interface SourcesHubProps {
   sources: CreatorSource[];
@@ -28,7 +32,7 @@ export const SourcesHub: React.FC<SourcesHubProps> = ({
   onCreateNewSource,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedSource, setSelectedSource] = useState<CreatorSource | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const filteredSources = sources.filter((s) => {
     if (!searchQuery.trim()) return true;
@@ -52,6 +56,22 @@ export const SourcesHub: React.FC<SourcesHubProps> = ({
     }
   };
 
+  const handleCopyBibtex = (source: CreatorSource) => {
+    const item: CitationItem = {
+      id: source.id,
+      itemType: source.sourceType === 'url' ? 'report' : 'bookSection',
+      title: source.title,
+      authors: ['LearnCo Academic Creator Archive'],
+      publicationYear: new Date(source.createdAt).getFullYear() || 2024,
+      abstractNote: source.extractedText.slice(0, 200),
+      tags: ['CreatorSource', source.sourceType],
+    };
+    const bib = generateBibTeX(item);
+    navigator.clipboard.writeText(bib);
+    setCopiedId(source.id);
+    setTimeout(() => setCopiedId(null), 2500);
+  };
+
   return (
     <div className="space-y-6">
       {/* Search and Action Bar */}
@@ -62,7 +82,7 @@ export const SourcesHub: React.FC<SourcesHubProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search ingested source documents or lecture notes..."
+            placeholder="Search ingested source documents, PDFs or lecture notes..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -86,7 +106,7 @@ export const SourcesHub: React.FC<SourcesHubProps> = ({
             No Ingested Sources Found
           </h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Upload PDFs, paste lecture notes, or scrape web articles into your source library.
+            Upload PDFs, paste lecture notes, or import references into your personal STEM knowledge hub.
           </p>
           <Button
             variant="primary"
@@ -130,7 +150,7 @@ export const SourcesHub: React.FC<SourcesHubProps> = ({
               </div>
 
               {/* Source Footer Actions */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 gap-2">
                 <Button
                   variant="primary"
                   size="sm"
@@ -141,13 +161,27 @@ export const SourcesHub: React.FC<SourcesHubProps> = ({
                   Synthesize
                 </Button>
 
-                <button
-                  onClick={() => onDeleteSource(source.id)}
-                  className="p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-400 hover:text-rose-500"
-                  title="Remove Source"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleCopyBibtex(source)}
+                    className="p-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-400 hover:text-indigo-600 transition-colors"
+                    title="Copy BibTeX Citation"
+                  >
+                    {copiedId === source.id ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <Bookmark className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => onDeleteSource(source.id)}
+                    className="p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-400 hover:text-rose-500 transition-colors"
+                    title="Remove Source"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
