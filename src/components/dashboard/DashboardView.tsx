@@ -157,15 +157,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {allowanceRemaining} Problems Left
               </p>
             </div>
-            <Button
-              onClick={onLaunchPractice}
-              variant="xp"
-              size="lg"
-              leftIcon={<Play className="w-4 h-4 fill-current" />}
-              className="w-full sm:w-auto shadow-lg shadow-amber-500/25"
-            >
-              Start Practice Arena
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
+                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
+                title="60-second Spaced Retention Flash Check (+15 XP)"
+              >
+                <Zap className="w-4 h-4 fill-current text-slate-950" />
+                <span>60s Flash Check</span>
+              </button>
+              <Button
+                onClick={onLaunchPractice}
+                variant="xp"
+                size="lg"
+                leftIcon={<Play className="w-4 h-4 fill-current" />}
+                className="w-full sm:w-auto shadow-lg shadow-amber-500/25"
+              >
+                Start Arena
+              </Button>
+            </div>
           </div>
         </div>
 

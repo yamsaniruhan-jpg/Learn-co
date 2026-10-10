@@ -7,6 +7,8 @@ import {
   Atom,
   FlaskConical,
   Dna,
+  BookMarked,
+  BrainCircuit,
   Search,
   ChevronDown,
   ChevronRight,
@@ -58,8 +60,15 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
       case 'FlaskConical':
         return <FlaskConical className="w-4 h-4" />;
       case 'Dna':
-      default:
         return <Dna className="w-4 h-4" />;
+      case 'BookMarked':
+      case 'BookOpen':
+        return <BookMarked className="w-4 h-4" />;
+      case 'BrainCircuit':
+      case 'Brain':
+        return <BrainCircuit className="w-4 h-4" />;
+      default:
+        return <BookOpen className="w-4 h-4" />;
     }
   };
 

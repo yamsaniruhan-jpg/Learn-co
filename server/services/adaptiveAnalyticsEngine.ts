@@ -471,6 +471,8 @@ export class AdaptiveAnalyticsEngine {
       physics: 0,
       chemistry: 0,
       biology: 0,
+      english: 0,
+      data_science: 0,
     };
 
     const difficultyDistribution: Record<DifficultyLevel, number> = {
@@ -1055,7 +1057,7 @@ Produce a concise JSON response with:
 }
 Return STRICT JSON only.`;
 
-      const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
       let text = '';
 
       for (const model of candidateModels) {
@@ -1064,6 +1066,10 @@ Return STRICT JSON only.`;
             const response = await ai.models.generateContent({
               model,
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: {
+                maxOutputTokens: 800,
+                temperature: 0.2,
+              },
             });
             if (response.text) {
               text = response.text;

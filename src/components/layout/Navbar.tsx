@@ -14,12 +14,17 @@ import {
   PanelRight,
   LogIn,
   ShieldCheck,
+  Maximize2,
+  Minimize2,
+  WifiOff,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { BrandLogo } from '../ui/BrandLogo';
 import { Avatar } from '../ui/Avatar';
 import { XPIndicator, StreakIndicator } from '../ui/GamificationIndicators';
 import { DAILY_PRACTICE_LIMIT } from '../../types/auth';
+import { useNetworkStatus } from '../../utils/offlineStorage';
 
 interface NavbarProps {
   activeTab: string;
@@ -32,6 +37,9 @@ interface NavbarProps {
   onToggleTheme: () => void;
   onOpenProfile: () => void;
   onOpenAuthModal: () => void;
+  onOpenFlashCheck?: () => void;
+  onToggleZenMode?: () => void;
+  isZenMode?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,8 +53,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   onOpenProfile,
   onOpenAuthModal,
+  onOpenFlashCheck,
+  onToggleZenMode,
+  isZenMode = false,
 }) => {
   const { user, profile, gamification, isAuthenticated, signOut } = useAuth();
+  const { isOnline } = useNetworkStatus();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   const solvedToday = gamification?.dailyQuestionsSolvedToday ?? 0;
@@ -89,6 +101,55 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Search className="w-4 h-4" />
           </button>
+
+          {/* Offline Mode Indicator if disconnected */}
+          {!isOnline && (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-[11px] font-bold"
+              title="Offline Mode: studying from local cached curriculum and offline attempts"
+            >
+              <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline">Offline Mode</span>
+            </div>
+          )}
+
+          {/* Flash Check Quick Trigger Button */}
+          {onOpenFlashCheck && (
+            <button
+              onClick={onOpenFlashCheck}
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Start 60-second Spaced Retention Flash Check (+15 XP)"
+            >
+              <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <span>Flash Check</span>
+            </button>
+          )}
+
+          {/* Quick Focus Timer Button */}
+          <button
+            onClick={() => setActiveTab('focus')}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'focus'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+            }`}
+            title="Open Gen Focus Timer Workspace"
+          >
+            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Focus</span>
+          </button>
+
+          {/* Zen Focus Canvas Toggle */}
+          {onToggleZenMode && (
+            <button
+              onClick={onToggleZenMode}
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={isZenMode ? "Exit Zen Mode" : "Enter Distraction-Free Zen Study Canvas (Esc to exit)"}
+              aria-label="Toggle Zen Focus Mode"
+            >
+              {isZenMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
 
           {/* Daily Allowance Quota Pill */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-700">

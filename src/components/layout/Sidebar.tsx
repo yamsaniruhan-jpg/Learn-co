@@ -20,6 +20,7 @@ import {
   LogOut,
   User,
   KeyRound,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateLevelFromXp } from '../../types/auth';
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'concepts', label: 'Concept Library', icon: Library, highlight: true },
     { id: 'learn', label: 'Learn & Explore', icon: BookOpen },
     { id: 'practice', label: 'Practice Arena', icon: Target, badge: `${dailyAllowanceRemaining} left` },
+    { id: 'focus', label: 'Gen Focus Timer', icon: Clock, highlight: true },
     { id: 'planner', label: 'Study Planner', icon: Calendar },
   ];
 

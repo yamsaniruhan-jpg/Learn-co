@@ -1,4 +1,11 @@
-export type SubjectId = 'math' | 'cs' | 'physics' | 'chemistry' | 'biology';
+export type SubjectId =
+  | 'math'
+  | 'cs'
+  | 'physics'
+  | 'chemistry'
+  | 'biology'
+  | 'english'
+  | 'data_science';
 export type DifficultyLevel = 'easy' | 'easy_medium' | 'medium' | 'medium_hard' | 'hard';
 
 export type ExamTrackId =

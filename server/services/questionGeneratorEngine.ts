@@ -1,4 +1,4 @@
-import { QuestionBankItem, DifficultyLevel, QuestionTypeId } from '../../src/types/curriculum';
+import { QuestionBankItem, DifficultyLevel, QuestionTypeId, SubjectId } from '../../src/types/curriculum';
 
 export class QuestionGeneratorEngine {
   /**
@@ -6,7 +6,7 @@ export class QuestionGeneratorEngine {
    */
   static generateQuestionsForTopic(
     topicId: string,
-    subjectId: 'math' | 'cs' | 'physics' | 'chemistry' | 'biology',
+    subjectId: SubjectId,
     chapterId: string,
     topicTitle: string,
     count: number = 100
@@ -40,7 +40,7 @@ export class QuestionGeneratorEngine {
   private static buildTopicQuestionInstance(
     id: string,
     index: number,
-    subjectId: 'math' | 'cs' | 'physics' | 'chemistry' | 'biology',
+    subjectId: SubjectId,
     chapterId: string,
     topicId: string,
     topicTitle: string,
@@ -261,7 +261,7 @@ export class QuestionGeneratorEngine {
           'Convert to base 10 log at $298\\text{ K}: \\frac{RT \\ln 10}{F} = 0.05916 \\approx 0.0592\\text{ V}$',
         ];
       }
-    } else {
+    } else if (subjectId === 'biology') {
       // Biology
       const p = 0.1 + (k % 8) * 0.1;
       const q = 1 - p;
@@ -293,9 +293,142 @@ export class QuestionGeneratorEngine {
         questionText = `[Variation #${k}] True or False: During the depolarization phase of a neuronal action potential, voltage-gated $Na^+$ channels open rapidly, allowing $Na^+$ ions to rush INTO the cell down their electrochemical gradient.`;
         options = ['True', 'False'];
         correctAnswer = 'True';
-        explanation = 'Depolarization occurs when voltage-gated $Na^+$ channels open at threshold (approx $-55\\text{ mV}$), causing rapid inward influx of sodium ions.',
+        explanation = 'Depolarization occurs when voltage-gated $Na^+$ channels open at threshold (approx $-55\\text{ mV}$), causing rapid inward influx of sodium ions.';
         stepByStepSolution = [
           'Review action potential phases: Resting ($-70\\text{mV}$), Threshold ($-55\\text{mV}$), Depolarization ($Na^+$ influx).',
+        ];
+      }
+    } else if (subjectId === 'english') {
+      // English & Linguistics
+      const roots = ['chron (time)', 'phil (love)', 'path (feeling/disease)', 'bene (good)', 'mal (bad)', 'poly (many)', 'omni (all)'];
+      const currentRoot = roots[k % roots.length];
+
+      if (questionType === 'single_choice') {
+        questionText = `[Variation #${k}] Read the excerpt regarding "${topicTitle}":\n"The speaker's deliberate juxtaposition of antiquated diction with rapid staccato phrasing underscores the irreconcilable tension between traditional pastoral values and the encroaching mechanization of the urban landscape."\n\nWhat is the primary rhetorical effect achieved by the speaker?`;
+        options = [
+          'To dramatize the psychological alienation caused by rapid industrialization through contrasting linguistic tempos.',
+          'To argue for complete abandonment of pastoral poetry in favor of scientific prose.',
+          'To demonstrate grammatical incompetence by intentionally confusing historical periods.',
+          'To establish an objective, dispassionate journalistic report devoid of figurative subtext.',
+        ];
+        correctAnswer = 'To dramatize the psychological alienation caused by rapid industrialization through contrasting linguistic tempos.';
+        explanation = 'Juxtaposition of archaic diction against modern staccato rhythm deliberately reinforces the substantive theme of technological displacement through form.';
+        stepByStepSolution = [
+          'Analyze rhetorical devices: juxtaposition of diction and tempo.',
+          'Connect formal linguistic choices to thematic tension (pastoral vs. urban mechanization).',
+          'Select the option synthesizing both form and semantic intention.',
+        ];
+      } else if (questionType === 'multiple_choice') {
+        questionText = `[Variation #${k}] Which of the following sentences contain a DANGLING or MISPLACED modifier? (Select all that apply)`;
+        options = [
+          'Having finished the manuscript after midnight, the printer ran out of ink before morning.',
+          'Running vigorously toward the departing train, Julian dropped his briefcase on the platform.',
+          'Covered in thick dust and cobwebs, Professor Albright discovered an annotated first edition in the attic.',
+          'Upon analyzing the statistical correlation, the hypothesis was deemed statistically significant by the panel.',
+        ];
+        correctAnswer = [
+          'Having finished the manuscript after midnight, the printer ran out of ink before morning.',
+          'Covered in thick dust and cobwebs, Professor Albright discovered an annotated first edition in the attic.',
+          'Upon analyzing the statistical correlation, the hypothesis was deemed statistically significant by the panel.',
+        ];
+        explanation = 'In (A), the participle clause "Having finished..." incorrectly modifies "the printer" instead of the author. In (C), "Covered in thick dust..." incorrectly describes Professor Albright rather than the book. In (D), the hypothesis did not analyze the correlation. Only (B) correctly attaches the introductory participle to the agent Julian.';
+        stepByStepSolution = [
+          'Identify introductory participial phrases in each sentence.',
+          'Locate the immediately adjacent grammatical subject.',
+          'Verify whether the adjacent subject can logically perform or undergo the action.',
+        ];
+      } else if (questionType === 'assertion_reason') {
+        questionText = `[Variation #${k}] Consider the following statements on rhetorical logic:\nAssertion (A): A deductive syllogism guarantees a true conclusion if both premises are factually valid and the argument structure is logically sound.\nReason (R): Deductive reasoning moves from universal invariants to specific instances with necessity, unlike inductive generalizations which establish only probabilistic validity.`;
+        options = [
+          'Both Assertion (A) and Reason (R) are TRUE, and Reason (R) is the CORRECT explanation of Assertion (A)',
+          'Both Assertion (A) and Reason (R) are TRUE, but Reason (R) is NOT the correct explanation of Assertion (A)',
+          'Assertion (A) is TRUE, but Reason (R) is FALSE',
+          'Assertion (A) is FALSE, but Reason (R) is TRUE',
+        ];
+        correctAnswer = 'Both Assertion (A) and Reason (R) are TRUE, and Reason (R) is the CORRECT explanation of Assertion (A)';
+        explanation = 'In classical logic, valid deductive structures guarantee necessity of truth from true premises, which directly explains why valid sound syllogisms preserve truth.';
+        stepByStepSolution = [
+          'Recall definitions of deductive validity vs. soundness.',
+          'Assess whether Reason R provides the formal epistemological mechanism for Assertion A.',
+        ];
+      } else if (questionType === 'numerical') {
+        const syllableCounts = [10, 14, 12, 10, 10];
+        const count = syllableCounts[k % syllableCounts.length];
+        questionText = `[Variation #${k}] In classical English prosody, how many metric syllables are present in a standard line of unrhymed Iambic Pentameter?`;
+        correctAnswer = '10';
+        explanation = 'Iambic Pentameter consists of five (penta) iambic feet (da-DUM), totaling exactly $5 \\times 2 = 10$ syllables per regular line.';
+        stepByStepSolution = [
+          'Recall foot structure: 1 iamb = 1 unstressed + 1 stressed syllable (2 syllables).',
+          'Multiply by meter length: pentameter = 5 feet.',
+          'Total = 5 feet * 2 syllables/foot = 10 syllables.',
+        ];
+      } else {
+        questionText = `[Variation #${k}] True or False: In formal English academic prose, an independent clause may be joined to another independent clause using ONLY a coordinating conjunction (for, and, nor, but, or, yet, so) with a preceding comma, or by a semicolon without conjunction.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'Joining two independent clauses without punctuation creates a run-on sentence, while joining them with only a comma produces a comma splice. A comma + FANBOYS conjunction or a semicolon is required.';
+        stepByStepSolution = [
+          'Identify the rule of coordination in independent clauses.',
+          'Verify that comma splice prevention requires coordinating conjunction + comma or semicolon.',
+        ];
+      }
+    } else {
+      // Data Science & Applied AI
+      const nSamples = (k % 10 + 1) * 100;
+      const features = (k % 5) + 3;
+
+      if (questionType === 'numerical') {
+        const tp = 80 + (k % 15);
+        const fp = 10 + (k % 8);
+        const precision = (tp / (tp + fp)).toFixed(3);
+        questionText = `[Variation #${k}] In a binary classification evaluation on "${topicTitle}", a model produces $TP = ${tp}$ true positives, $FP = ${fp}$ false positives, and $FN = 15$ false negatives. Calculate the Precision metric to 3 decimal places.`;
+        correctAnswer = `${precision}`;
+        explanation = `Precision is defined as $\\text{Precision} = \\frac{TP}{TP + FP} = \\frac{${tp}}{${tp} + ${fp}} = \\frac{${tp}}{${tp + fp}} = ${precision}$.`;
+        stepByStepSolution = [
+          `State Precision formula: $\\text{Precision} = \\frac{TP}{TP + FP}$`,
+          `Substitute $TP = ${tp}$ and $FP = ${fp}$`,
+          `Calculate $\\frac{${tp}}{${tp + fp}} = ${precision}$`,
+        ];
+      } else if (questionType === 'single_choice' || questionType === 'code_output') {
+        questionText = `[Variation #${k}] Which of the following regularizations imposes $L_1$ penalty on parameter weights, thereby promoting sparse feature selection by driving non-informative coefficients strictly to zero?`;
+        options = [
+          'Lasso Regularization ($L_1$ norm)',
+          'Ridge Regularization ($L_2$ norm)',
+          'Batch Normalization',
+          'Dropout with probability $p = 0.5$',
+        ];
+        correctAnswer = 'Lasso Regularization ($L_1$ norm)';
+        explanation = 'Lasso adds $\\lambda \\sum |w_i|$ penalty. The diamond contour of $L_1$ geometry produces corner intersections on parameter axes, forcing coefficients to exactly 0 (sparsity).';
+        stepByStepSolution = [
+          'Review $L_1$ vs $L_2$ geometric contour intersections.',
+          'Recognize that $L_1$ norm encourages exact zeros, yielding feature sparsity.',
+        ];
+      } else if (questionType === 'multiple_choice') {
+        questionText = `[Variation #${k}] Which of the following techniques mitigate the OVERFITTING problem in machine learning and deep neural networks? (Select all that apply)`;
+        options = [
+          'Early stopping based on validation loss plateaus',
+          'Data augmentation (rotations, cropping, synthetic jitter)',
+          'Adding $L_2$ weight decay regularization penalty',
+          'Increasing model parameters without adding training data',
+        ];
+        correctAnswer = [
+          'Early stopping based on validation loss plateaus',
+          'Data augmentation (rotations, cropping, synthetic jitter)',
+          'Adding $L_2$ weight decay regularization penalty',
+        ];
+        explanation = 'Early stopping, data augmentation, and weight decay reduce overfitting by restricting model complexity or enriching data. Increasing parameter count without more data worsens overfitting.';
+        stepByStepSolution = [
+          'Evaluate each technique against bias-variance trade-off.',
+          'Confirm early stopping, data augmentation, and regularization control generalization variance.',
+        ];
+      } else {
+        questionText = `[Variation #${k}] True or False: According to the Central Limit Theorem, the distribution of the sample mean approaches a Normal (Gaussian) distribution as sample size $n \\to \\infty$, regardless of the shape of the underlying population distribution, provided variance is finite.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'The Central Limit Theorem guarantees asymptotic normality of sample means for independent identically distributed variables with finite mean and variance.';
+        stepByStepSolution = [
+          'State Central Limit Theorem invariant conditions: i.i.d. random variables with finite variance $\\sigma^2 < \\infty$.',
+          'Verify that asymptotic distribution of $\\bar{X}_n$ converges to $\\mathcal{N}(\\mu, \\sigma^2/n)$.',
         ];
       }
     }

@@ -217,7 +217,7 @@ export const MistakeNotebookView: React.FC<MistakeNotebookViewProps> = ({
 
           {/* Subject Filter */}
           <div className="flex gap-1 overflow-x-auto">
-            {['all', 'math', 'cs', 'physics', 'chemistry', 'biology'].map((sub) => (
+            {['all', 'math', 'cs', 'physics', 'chemistry', 'biology', 'english', 'data_science'].map((sub) => (
               <button
                 key={sub}
                 onClick={() => setSelectedSubject(sub)}

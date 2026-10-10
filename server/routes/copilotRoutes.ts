@@ -4,6 +4,7 @@ import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware'
 import { CopilotGateway } from '../services/copilotGateway';
 import { CopilotToolRegistry } from '../services/copilotTools';
 import { RagEngine } from '../services/ragEngine';
+import { CopilotCacheEngine } from '../services/copilotCacheEngine';
 import { XpEngine } from '../xpEngine';
 import {
   CopilotMode,
@@ -36,6 +37,26 @@ router.get('/quota', (req: AuthenticatedRequest, res: Response) => {
     res.json({ success: true, quota: quotas.doubts });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch doubt quota.' });
+  }
+});
+
+// GET /api/copilot/cache-stats - Telemetry on AI cost savings & token efficiency
+router.get('/cache-stats', (req: Request, res: Response) => {
+  try {
+    const stats = CopilotCacheEngine.getStats();
+    res.json({ success: true, stats });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch cache stats.' });
+  }
+});
+
+// POST /api/copilot/cache-clear - Reset cache
+router.post('/cache-clear', (req: Request, res: Response) => {
+  try {
+    CopilotCacheEngine.clear();
+    res.json({ success: true, message: 'Copilot AI response cache purged.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to clear cache.' });
   }
 });
 

@@ -61,6 +61,26 @@ export const SEED_SUBJECTS: Subject[] = [
     conceptCount: 35,
     masteryPercentage: 0,
   },
+  {
+    id: 'english',
+    name: 'English & Linguistics',
+    iconName: 'BookMarked',
+    description: 'Rhetorical synthesis, analytical reading comprehension, syntactic grammar, etymology, and argumentative discourse.',
+    color: '#8b5cf6',
+    courseCount: 5,
+    conceptCount: 50,
+    masteryPercentage: 0,
+  },
+  {
+    id: 'data_science',
+    name: 'Data Science & Applied AI',
+    iconName: 'BrainCircuit',
+    description: 'Statistical inference, exploratory data analysis, machine learning algorithms, deep neural representations, and predictive analytics.',
+    color: '#06b6d4',
+    courseCount: 5,
+    conceptCount: 48,
+    masteryPercentage: 0,
+  },
 ];
 
 export const SEED_COURSES: Course[] = [
@@ -123,6 +143,26 @@ export const SEED_COURSES: Course[] = [
     chaptersCount: 5,
     estimatedHours: 15,
     iconName: 'Dna',
+  },
+  {
+    id: 'eng-rhetoric-composition',
+    subjectId: 'english',
+    title: 'Critical Rhetoric, Syntax & Analytical Composition',
+    description: 'Master deductive argument analysis, syntactic parallelism, diction nuance, and thesis construction.',
+    level: 'Advanced',
+    chaptersCount: 5,
+    estimatedHours: 16,
+    iconName: 'BookMarked',
+  },
+  {
+    id: 'ds-ml-stats',
+    subjectId: 'data_science',
+    title: 'Statistical Inference & Machine Learning Systems',
+    description: 'Bayesian modeling, loss functions, regularization, decision trees, and neural representations.',
+    level: 'Advanced',
+    chaptersCount: 5,
+    estimatedHours: 20,
+    iconName: 'BrainCircuit',
   },
 ];
 

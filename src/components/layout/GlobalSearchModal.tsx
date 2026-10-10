@@ -13,6 +13,9 @@ import {
   Atom,
   FlaskConical,
   Dna,
+  BookMarked,
+  BrainCircuit,
+  Clock,
 } from 'lucide-react';
 
 interface GlobalSearchModalProps {
@@ -77,6 +80,32 @@ const SEARCH_ITEMS: SearchItem[] = [
     context: { subjectId: 'biology' },
     icon: <Dna className="w-4 h-4 text-rose-500" />,
     detail: 'Cellular Respiration, CRISPR Gene Editing, Signal Pathways',
+  },
+  {
+    id: 'english',
+    title: 'English & Linguistics Track',
+    category: 'Subject',
+    tabId: 'learn',
+    context: { subjectId: 'english' },
+    icon: <BookMarked className="w-4 h-4 text-purple-500" />,
+    detail: 'Rhetoric, Syntactic Parallelism, Literary Tropes, Etymology',
+  },
+  {
+    id: 'data_science',
+    title: 'Data Science & Applied AI Track',
+    category: 'Subject',
+    tabId: 'learn',
+    context: { subjectId: 'data_science' },
+    icon: <BrainCircuit className="w-4 h-4 text-cyan-500" />,
+    detail: 'Statistical Inference, L1/L2 Regularization, ROC-AUC, ML Pipelines',
+  },
+  {
+    id: 'focus-timer',
+    title: 'Gen Focus Timer & Ambient Synthesizer',
+    category: 'Tool',
+    tabId: 'focus',
+    icon: <Clock className="w-4 h-4 text-indigo-500" />,
+    detail: 'Calibrated Pomodoro sprints, binaural 40Hz audio & scratchpad',
   },
   {
     id: 'practice-adaptive',

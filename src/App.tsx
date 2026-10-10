@@ -31,6 +31,10 @@ import { INITIAL_MASTERIES, SEED_NOTIFICATIONS } from './data/seedData';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
+import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
+import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
+import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import {
   LayoutDashboard,
   BookOpen,
@@ -59,6 +63,9 @@ export default function App() {
   const [isContextPanelOpen, setIsContextPanelOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>('math');
+  const [isFlashCheckOpen, setIsFlashCheckOpen] = useState<boolean>(false);
+  const [isZenMode, setIsZenMode] = useState<boolean>(false);
+  const [inspectedFormula, setInspectedFormula] = useState<FormulaInspectionData | null>(null);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('learnco_theme');
@@ -142,6 +149,28 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Global listener for interactive formula inspection, flash check, and zen mode
+  useEffect(() => {
+    const handleInspect = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.latex) {
+        setInspectedFormula({ latex: detail.latex });
+      }
+    };
+    const handleFlashCheck = () => setIsFlashCheckOpen(true);
+    const handleZenToggle = () => setIsZenMode((prev) => !prev);
+
+    window.addEventListener('learnco-inspect-formula', handleInspect);
+    window.addEventListener('learnco-open-flash-check', handleFlashCheck);
+    window.addEventListener('learnco-toggle-zen-mode', handleZenToggle);
+
+    return () => {
+      window.removeEventListener('learnco-inspect-formula', handleInspect);
+      window.removeEventListener('learnco-open-flash-check', handleFlashCheck);
+      window.removeEventListener('learnco-toggle-zen-mode', handleZenToggle);
+    };
   }, []);
 
   const handleOpenCopilotWithContext = (context: string) => {
@@ -241,6 +270,9 @@ export default function App() {
         onToggleTheme={toggleTheme}
         onOpenProfile={() => setActiveTab('profile')}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenFlashCheck={() => setIsFlashCheckOpen(true)}
+        onToggleZenMode={() => setIsZenMode((prev) => !prev)}
+        isZenMode={isZenMode}
       />
 
       {/* Main Body Workspace */}
@@ -255,20 +287,21 @@ export default function App() {
           )}
         />
 
-        {/* Dynamic Center Stage Canvas */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <ErrorBoundary
-            fallbackTitle="STEM Workspace View Error"
-            fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
-          >
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              user={effectiveLegacyUser}
-              masteries={masteries}
-              onNavigate={(tab) => setActiveTab(tab)}
-              onSelectSubject={handleSelectSubject}
-            />
-          )}
+        {/* Dynamic Center Stage Canvas with Zen Focus Canvas */}
+        <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <ErrorBoundary
+              fallbackTitle="STEM Workspace View Error"
+              fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
+            >
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                user={effectiveLegacyUser}
+                masteries={masteries}
+                onNavigate={(tab) => setActiveTab(tab)}
+                onSelectSubject={handleSelectSubject}
+              />
+            )}
 
           {activeTab === 'concepts' && (
             <ConceptLibraryView
@@ -289,6 +322,16 @@ export default function App() {
 
           {activeTab === 'practice' && (
             <PracticeView onOpenCopilotWithContext={handleOpenCopilotWithContext} />
+          )}
+
+          {activeTab === 'focus' && (
+            <GenFocusTimerView
+              onNavigateToTab={(tab, ctx) => {
+                if (ctx?.subjectId) setSelectedSubjectId(ctx.subjectId);
+                setActiveTab(tab);
+              }}
+              onToggleZenMode={() => setIsZenMode((prev) => !prev)}
+            />
           )}
 
           {activeTab === 'create' && (
@@ -376,6 +419,7 @@ export default function App() {
           )}
           </ErrorBoundary>
         </main>
+        </ZenFocusCanvas>
 
         {/* Right Collapsible Socratic Companion Panel */}
         <RightContextPanel
@@ -425,6 +469,31 @@ export default function App() {
           0,
           DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
         )}
+      />
+
+      {/* Spaced-Repetition Micro-Quiz Modal (60s Flash Check) */}
+      <FlashCheckModal
+        isOpen={isFlashCheckOpen}
+        onClose={() => setIsFlashCheckOpen(false)}
+        onComplete={(xpEarned) => {
+          // Can refresh gamification or show streak toast
+        }}
+        onAskCopilot={(prompt) => {
+          setCopilotContext(prompt);
+          setActiveTab('copilot');
+          setIsFlashCheckOpen(false);
+        }}
+      />
+
+      {/* Interactive Formula Inspector Tooltip & Invariant Modal */}
+      <FormulaInspectorModal
+        formulaData={inspectedFormula}
+        onClose={() => setInspectedFormula(null)}
+        onAskCopilot={(prompt) => {
+          setCopilotContext(prompt);
+          setActiveTab('copilot');
+          setInspectedFormula(null);
+        }}
       />
     </div>
   );

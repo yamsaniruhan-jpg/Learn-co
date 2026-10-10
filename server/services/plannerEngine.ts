@@ -356,7 +356,7 @@ CRITICAL CONSTRAINTS:
 
       const contents = `Create a 14-day study plan based on: ${JSON.stringify(promptContext)}`;
 
-      const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
       let rawJson = '';
 
       for (const model of candidateModels) {
@@ -368,6 +368,7 @@ CRITICAL CONSTRAINTS:
               config: {
                 systemInstruction,
                 temperature: 0.3,
+                maxOutputTokens: 1000,
                 responseMimeType: 'application/json',
               },
             });
@@ -400,7 +401,7 @@ CRITICAL CONSTRAINTS:
 
       // Validate and sanitize AI tasks
       const sanitizedTasks: Partial<StudyTask>[] = [];
-      const validSubjects: Set<string> = new Set(['math', 'cs', 'physics', 'chemistry', 'biology']);
+      const validSubjects: Set<string> = new Set(['math', 'cs', 'physics', 'chemistry', 'biology', 'english', 'data_science']);
       const validTypes: Set<string> = new Set([
         'LEARN_CONCEPT',
         'READ_NOTES',

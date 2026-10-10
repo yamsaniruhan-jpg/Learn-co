@@ -494,6 +494,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
                 { name: 'Physics', key: 'physics', color: 'purple', icon: '⚡' },
                 { name: 'Chemistry', key: 'chemistry', color: 'emerald', icon: '🧪' },
                 { name: 'Biology', key: 'biology', color: 'rose', icon: '🧬' },
+                { name: 'English', key: 'english', color: 'violet', icon: '📚' },
+                { name: 'Data Science', key: 'data_science', color: 'teal', icon: '🤖' },
               ].map((sub) => {
                 const subStats = stats?.subjectBreakdown?.[sub.key as SubjectId] || {
                   attempted: 1,
@@ -916,7 +918,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
 
             {/* Subject Filter Pills */}
             <div className="flex flex-wrap gap-1.5">
-              {(['all', 'math', 'cs', 'physics', 'chemistry', 'biology'] as const).map((sub) => (
+              {(['all', 'math', 'cs', 'physics', 'chemistry', 'biology', 'english', 'data_science'] as const).map((sub) => (
                 <button
                   key={sub}
                   onClick={() => setMistakeFilter(sub)}

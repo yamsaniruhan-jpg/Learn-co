@@ -6,6 +6,8 @@ interface FormattedMathTextProps {
   text: string;
   className?: string;
   inline?: boolean;
+  interactiveInspect?: boolean;
+  onInspectFormula?: (latex: string) => void;
 }
 
 /**
@@ -195,7 +197,20 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
   text,
   className = '',
   inline = false,
+  interactiveInspect = true,
+  onInspectFormula,
 }) => {
+  const handleFormulaClick = (latex: string) => {
+    if (!interactiveInspect) return;
+    if (onInspectFormula) {
+      onInspectFormula(latex);
+    } else {
+      window.dispatchEvent(
+        new CustomEvent('learnco-inspect-formula', { detail: { latex } })
+      );
+    }
+  };
+
   const renderedContent = useMemo(() => {
     if (!text) return null;
 
@@ -219,7 +234,11 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
           return (
             <span
               key={index}
-              className="inline-block my-1.5 max-w-full overflow-x-auto text-slate-900 dark:text-slate-100 font-serif"
+              onClick={() => handleFormulaClick(formula)}
+              title={interactiveInspect ? "Click to inspect formula invariants & dimensional units" : undefined}
+              className={`inline-block my-1.5 max-w-full overflow-x-auto text-slate-900 dark:text-slate-100 font-serif ${
+                interactiveInspect ? 'hover:opacity-85 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 p-1 rounded-lg transition-colors cursor-pointer' : ''
+              }`}
               dangerouslySetInnerHTML={{ __html: html }}
             />
           );
@@ -243,7 +262,11 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
           return (
             <span
               key={index}
-              className="inline text-slate-900 dark:text-slate-100 font-serif"
+              onClick={() => handleFormulaClick(formula)}
+              title={interactiveInspect ? "Click to inspect formula invariants & dimensional units" : undefined}
+              className={`inline text-slate-900 dark:text-slate-100 font-serif ${
+                interactiveInspect ? 'hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors' : ''
+              }`}
               dangerouslySetInnerHTML={{ __html: html }}
             />
           );

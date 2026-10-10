@@ -14,12 +14,13 @@ import {
   XPTransaction,
   calculateLevelFromXp,
   DailyPracticeQuota,
+  SubjectId,
 } from '../src/types/auth';
 
 export interface SubmitAttemptRequest {
   attemptId: string;
   questionId: string;
-  subjectId: 'math' | 'cs' | 'physics' | 'chemistry' | 'biology';
+  subjectId: SubjectId;
   topicId: string;
   subtopicId?: string;
   conceptId?: string;

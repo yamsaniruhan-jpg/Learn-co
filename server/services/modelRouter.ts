@@ -4,25 +4,27 @@ export interface ModelRouteDecision {
   modelName: string;
   reason: string;
   temperature: number;
-  thinkingBudget?: number;
+  maxOutputTokens: number;
+  isEcoSaver?: boolean;
 }
 
 export class ModelRouter {
-  // Configurable model definitions from environment or smart defaults
-  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-3.8-flash';
+  // Ultra-low cost default for high throughput and tight budgets
+  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-3.1-flash-lite';
+  // High-performance models for complex mathematical proofs & derivations
   static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-3.8-flash';
   static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-3.8-flash';
   static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-3.8-flash';
 
-  // Available fallback cascade models in order of preference
+  // Cost-optimized fallback cascade: flash-lite first, then flash 3.8
   static readonly FALLBACK_CASCADE = [
+    'gemini-3.1-flash-lite',
     'gemini-3.8-flash',
     'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
   ];
 
   /**
-   * Determine the optimal model and temperature based on query characteristics, mode, and context size
+   * Determine the optimal model, max tokens, and temperature based on query characteristics, mode, and cost profile
    */
   static selectModel(
     prompt: string,
@@ -30,11 +32,17 @@ export class ModelRouter {
     contextLength: number = 0,
     requestedModel?: string
   ): ModelRouteDecision {
-    if (requestedModel && requestedModel.trim()) {
+    const isExplicitEco = requestedModel === 'gemini-3.1-flash-lite' || requestedModel === 'auto_eco';
+
+    if (requestedModel && requestedModel.trim() && !requestedModel.startsWith('auto')) {
+      const model = requestedModel.trim();
+      const isLite = model.includes('lite');
       return {
-        modelName: requestedModel.trim(),
+        modelName: model,
         reason: 'User explicitly selected model',
         temperature: 0.3,
+        maxOutputTokens: isLite ? 800 : 1200,
+        isEcoSaver: isLite,
       };
     }
 
@@ -46,6 +54,8 @@ export class ModelRouter {
         modelName: this.LONG_CONTEXT_MODEL,
         reason: 'Large document/RAG reference context routing',
         temperature: 0.2,
+        maxOutputTokens: 1500,
+        isEcoSaver: false,
       };
     }
 
@@ -70,6 +80,8 @@ export class ModelRouter {
         modelName: this.CODE_MODEL,
         reason: 'STEM coding & algorithmic analysis routing',
         temperature: 0.2,
+        maxOutputTokens: 1400,
+        isEcoSaver: false,
       };
     }
 
@@ -81,26 +93,42 @@ export class ModelRouter {
       lower.includes('derive') ||
       lower.includes('why is') ||
       lower.includes('theorem') ||
-      lower.includes('integral') ||
       lower.includes('schrodinger') ||
       lower.includes('hamiltonian') ||
-      lower.includes('inconclusive') ||
       lower.includes('stereochemistry');
 
-    if (isReasoningTask) {
+    if (isReasoningTask && !isExplicitEco) {
       return {
         modelName: this.REASONING_MODEL,
         reason: 'Deep multi-step STEM derivation & invariant reasoning',
         temperature: 0.3,
+        maxOutputTokens: 1200,
+        isEcoSaver: false,
       };
     }
 
-    // 4. Default: Socratic Hint / First-Principles Explainer / Fast Q&A -> Standard Copilot Model
+    // 4. Default: Socratic Hint / First-Principles Explainer / Fast Q&A -> Ultra-Low Cost Flash-Lite
     return {
       modelName: this.DEFAULT_MODEL,
-      reason: 'General Socratic teaching & diagnostic hint routing',
+      reason: 'Cost-friendly Socratic teaching & high-efficiency flash-lite routing',
       temperature: 0.4,
+      maxOutputTokens: 750,
+      isEcoSaver: true,
     };
+  }
+
+  /**
+   * Compact prompt version for Eco mode: saves 50%+ prompt tokens
+   */
+  static buildCompactSystemPrompt(
+    mode: CopilotMode = 'socratic_hint',
+    learnerLevel: LearnerLevel = 'intermediate'
+  ): string {
+    return `You are Learn.co Omni Copilot (Socratic STEM Tutor). Learner: ${learnerLevel.toUpperCase()}.
+Rule 1: If mode is socratic_hint, do NOT reveal the final answer. Ask 1-2 invariant/boundary guiding questions.
+Rule 2: Ground in first principles and conservation laws.
+Rule 3: Wrap inline math in $...$ and block math in $$...$$.
+Rule 4: Code in \`\`\`python ... \`\`\`. Be concise, direct, and pedagogical.`;
   }
 
   /**

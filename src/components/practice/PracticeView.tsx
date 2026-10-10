@@ -226,6 +226,25 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
                 Test STEM comprehension across Mathematics, CS & AI, Physics, Chemistry, and Biology. Earn +5 XP per correct question while reinforcing knowledge decay limits.
               </p>
+
+              {/* Quick Actions */}
+              <div className="pt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
+                  className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-current text-slate-950" />
+                  <span>60s Flash Check (+15 XP)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('learnco-toggle-zen-mode'))}
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span>Zen Study Mode</span>
+                </button>
+              </div>
             </div>
 
             {/* Daily Practice Limit Live Quota */}
@@ -337,13 +356,15 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
                   <span className="text-xs text-slate-400">Easy → Medium → Hard progression</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
                   {[
                     { id: 'math', name: 'Mathematics', desc: 'Calculus, Linear Algebra, Series', color: 'from-blue-600 to-indigo-600' },
                     { id: 'cs', name: 'CS & AI', desc: 'Algorithms, Gradient Descent, PyTorch', color: 'from-emerald-600 to-teal-600' },
                     { id: 'physics', name: 'Physics', desc: 'Mechanics, Energy, Electromagnetism', color: 'from-purple-600 to-indigo-600' },
                     { id: 'chemistry', name: 'Chemistry', desc: 'Organic Mechanisms, Thermodynamics', color: 'from-amber-600 to-orange-600' },
-                    { id: 'biology', name: 'Biology', desc: 'Genetics, Transcription, Cellular Respiration', color: 'from-rose-600 to-pink-600' },
+                    { id: 'biology', name: 'Biology', desc: 'Genetics, Transcription, Respiration', color: 'from-rose-600 to-pink-600' },
+                    { id: 'english', name: 'English', desc: 'Rhetoric, Syntactic Parallelism, Tropes', color: 'from-violet-600 to-purple-600' },
+                    { id: 'data_science', name: 'Data Science', desc: 'Inference, Lasso/Ridge, ROC-AUC', color: 'from-cyan-600 to-teal-600' },
                   ].map((subj) => (
                     <button
                       key={subj.id}

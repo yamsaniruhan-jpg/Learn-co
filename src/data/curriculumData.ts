@@ -1,4 +1,7 @@
 import { SubjectCurriculum, ExamTrack, ExamTrackId } from '../types/curriculum';
+import { ENGLISH_CURRICULUM } from './curricula/englishCurriculum';
+import { DATA_SCIENCE_CURRICULUM } from './curricula/dataScienceCurriculum';
+import { AMPLIFIED_CONCEPTS } from './curricula/amplifiedConcepts';
 
 export const EXAM_TRACKS: ExamTrack[] = [
   {
@@ -7,7 +10,7 @@ export const EXAM_TRACKS: ExamTrack[] = [
     shortName: 'All Tracks',
     description: 'Comprehensive universal STEM curriculum covering all concepts and levels.',
     badgeColor: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200',
-    subjects: ['math', 'cs', 'physics', 'chemistry', 'biology'],
+    subjects: ['math', 'cs', 'physics', 'chemistry', 'biology', 'english', 'data_science'],
   },
   {
     id: 'jee_advanced',
@@ -47,7 +50,7 @@ export const EXAM_TRACKS: ExamTrack[] = [
     shortName: 'ICT & Hackathon',
     description: 'Algorithms, data structures, competitive programming, distributed microservices, APIs, and hackathon project architecture.',
     badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-    subjects: ['cs', 'math'],
+    subjects: ['cs', 'math', 'data_science'],
   },
   {
     id: 'ai_ml_foundations',
@@ -55,7 +58,7 @@ export const EXAM_TRACKS: ExamTrack[] = [
     shortName: 'AI & ML Track',
     description: 'Matrix calculus, gradient optimization, neural architectures, and algorithmic complexity.',
     badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300',
-    subjects: ['cs', 'math'],
+    subjects: ['cs', 'math', 'data_science'],
   },
   {
     id: 'stem_olympiad',
@@ -75,7 +78,7 @@ export const EXAM_TRACKS: ExamTrack[] = [
   },
 ];
 
-export const CURRICULUM_DATA: SubjectCurriculum[] = [
+const BASE_CURRICULUM_DATA: SubjectCurriculum[] = [
   // ==========================================
   // MATHEMATICS (6 Chapters)
   // ==========================================
@@ -2262,3 +2265,27 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
     ],
   },
 ];
+
+// Dynamically inject amplified high-density concepts into core subjects
+for (const subject of BASE_CURRICULUM_DATA) {
+  for (const chapter of subject.chapters) {
+    for (const topic of chapter.topics) {
+      const extra = AMPLIFIED_CONCEPTS[topic.id];
+      if (extra && extra.length > 0 && topic.subtopics.length > 0) {
+        for (const c of extra) {
+          if (!topic.subtopics[0].concepts.some((ex) => ex.id === c.id)) {
+            topic.subtopics[0].concepts.push(c);
+          }
+        }
+        topic.conceptCount = topic.subtopics.reduce((acc, sub) => acc + sub.concepts.length, 0);
+      }
+    }
+  }
+}
+
+export const CURRICULUM_DATA: SubjectCurriculum[] = [
+  ...BASE_CURRICULUM_DATA,
+  ENGLISH_CURRICULUM,
+  DATA_SCIENCE_CURRICULUM,
+];
+

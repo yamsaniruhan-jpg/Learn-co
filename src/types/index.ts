@@ -6,7 +6,14 @@ export * from './mentorship';
 export * from './planner';
 export * from './analytics';
 
-export type SubjectId = 'math' | 'cs' | 'physics' | 'chemistry' | 'biology';
+export type SubjectId =
+  | 'math'
+  | 'cs'
+  | 'physics'
+  | 'chemistry'
+  | 'biology'
+  | 'english'
+  | 'data_science';
 
 export type DifficultyLevel = 'easy' | 'easy_medium' | 'medium' | 'medium_hard' | 'hard';
 

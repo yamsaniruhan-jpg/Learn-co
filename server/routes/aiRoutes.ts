@@ -19,13 +19,13 @@ function getGeminiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Resilient Gemini generateContent with model fallbacks and retry
+// Resilient Gemini generateContent with cost-optimized model fallbacks and token capping
 async function generateWithFallback(
   ai: GoogleGenAI,
   contents: string,
   systemInstruction: string
 ): Promise<string> {
-  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
   for (const model of models) {
     try {
@@ -35,6 +35,7 @@ async function generateWithFallback(
         config: {
           systemInstruction,
           temperature: 0.4,
+          maxOutputTokens: 800,
         },
       });
 

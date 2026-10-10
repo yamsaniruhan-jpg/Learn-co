@@ -74,6 +74,8 @@ export const TopicAnalyticsTree: React.FC<TopicAnalyticsTreeProps> = ({
     { id: 'physics', label: 'Physics' },
     { id: 'chemistry', label: 'Chemistry' },
     { id: 'biology', label: 'Biology' },
+    { id: 'english', label: 'English' },
+    { id: 'data_science', label: 'Data Science' },
   ];
 
   return (

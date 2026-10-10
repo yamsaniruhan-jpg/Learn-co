@@ -732,12 +732,14 @@ export class Database {
     const accuracy = completed.length > 0 ? Math.round((correct / completed.length) * 100) : 0;
     const totalTimeSeconds = attempts.reduce((sum, a) => sum + (a.solvingTimeSeconds || 0), 0);
 
-    const subjects: ('math' | 'cs' | 'physics' | 'chemistry' | 'biology')[] = [
+    const subjects: ('math' | 'cs' | 'physics' | 'chemistry' | 'biology' | 'english' | 'data_science')[] = [
       'math',
       'cs',
       'physics',
       'chemistry',
       'biology',
+      'english',
+      'data_science',
     ];
 
     const subjectBreakdown: Record<string, any> = {};

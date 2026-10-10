@@ -61,6 +61,8 @@ export const PlannerView: React.FC = () => {
       physics: { plannedMinutes: 0, completedMinutes: 0, tasksCount: 0 },
       chemistry: { plannedMinutes: 0, completedMinutes: 0, tasksCount: 0 },
       biology: { plannedMinutes: 0, completedMinutes: 0, tasksCount: 0 },
+      english: { plannedMinutes: 0, completedMinutes: 0, tasksCount: 0 },
+      data_science: { plannedMinutes: 0, completedMinutes: 0, tasksCount: 0 },
     },
     dailyWorkloadForecast: [],
   });

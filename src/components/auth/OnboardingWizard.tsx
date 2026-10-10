@@ -23,6 +23,8 @@ const ALL_SUBJECTS: Array<{ id: SubjectId; name: string; icon: string; desc: str
   { id: 'physics', name: 'Physics', icon: '⚡', desc: 'Classical Mechanics, Electromagnetism, Quantum' },
   { id: 'chemistry', name: 'Chemistry', icon: '🧪', desc: 'Organic Synthesis, Thermodynamics, Kinetics' },
   { id: 'biology', name: 'Biology', icon: '🧬', desc: 'Molecular Genetics, Cellular Systems' },
+  { id: 'english', name: 'English & Linguistics', icon: '📚', desc: 'Rhetoric, Syntactic Grammar, Etymology' },
+  { id: 'data_science', name: 'Data Science & AI', icon: '🤖', desc: 'Inference, Supervised ML, Regularization' },
 ];
 
 const EDUCATION_LEVELS = [

@@ -65,7 +65,46 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   // Mode, Model & Learner Configuration
   const [activeMode, setActiveMode] = useState<CopilotMode>('socratic_hint');
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>('intermediate');
-  const [selectedModel, setSelectedModel] = useState<string>(''); // empty = auto-router
+  const [selectedModel, setSelectedModel] = useState<string>('auto_eco'); // auto_eco = cost-optimized router
+
+  // AI Token Economy & Cost Stats
+  const [cacheStats, setCacheStats] = useState<{
+    totalRequests: number;
+    cacheHits: number;
+    hitRatePercent: number;
+    totalTokensSaved: number;
+    totalEstimatedSavingsDollars: number;
+    cachedEntriesCount: number;
+  }>({
+    totalRequests: 0,
+    cacheHits: 0,
+    hitRatePercent: 0,
+    totalTokensSaved: 0,
+    totalEstimatedSavingsDollars: 0,
+    cachedEntriesCount: 0,
+  });
+
+  const loadCacheStats = async () => {
+    try {
+      const res = await fetch('/api/copilot/cache-stats', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('learnco_auth_token') || ''}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stats) {
+          setCacheStats(data.stats);
+        }
+      }
+    } catch {
+      // silently ignore telemetry fetch error
+    }
+  };
+
+  useEffect(() => {
+    loadCacheStats();
+  }, []);
 
   // Interactive Context
   const [activeContextNote, setActiveContextNote] = useState<string>(initialContext);
@@ -301,7 +340,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
               role: 'assistant',
               content: accumulatedContent,
               mode: activeMode,
-              modelUsed: doneData.modelUsed || 'gemini-2.5-flash',
+              modelUsed: doneData.modelUsed || 'gemini-3.1-flash-lite',
               citations: accumulatedCitations,
               artifact: accumulatedArtifact,
               timestamp: new Date().toISOString(),
@@ -313,8 +352,9 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             setStreamingCitations([]);
             setStreamingArtifact(undefined);
 
-            // Refresh conversation title & snippet in list
+            // Refresh conversation title & snippet in list and reload cost economy telemetry
             loadConversations();
+            loadCacheStats();
           },
           onError: (errMsg) => {
             console.error('Streaming error received:', errMsg);
@@ -418,7 +458,9 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Model Selector Dropdown */}
+
+
+            {/* Cost-Friendly Model Selector Dropdown */}
             <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
               <Cpu className="w-3.5 h-3.5 text-slate-400 ml-1" />
               <select
@@ -426,10 +468,10 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="bg-transparent text-[11px] font-semibold text-slate-700 dark:text-slate-200 outline-hidden pr-2 cursor-pointer"
               >
-                <option value="" className="dark:bg-slate-800">Auto Router (Smart)</option>
-                <option value="gemini-2.5-flash" className="dark:bg-slate-800">Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-pro" className="dark:bg-slate-800">Gemini 2.5 Pro (Deep Reasoning)</option>
-                <option value="gemini-3.7-flash" className="dark:bg-slate-800">Gemini 3.7 Flash</option>
+                <option value="auto_eco" className="dark:bg-slate-800">⚡ Auto Cost-Saver (Smart)</option>
+                <option value="gemini-3.1-flash-lite" className="dark:bg-slate-800">🟢 3.1 Flash-Lite (Lowest Cost & Fast)</option>
+                <option value="gemini-3.8-flash" className="dark:bg-slate-800">🔷 3.8 Flash (High Performance)</option>
+                <option value="gemini-flash-latest" className="dark:bg-slate-800">⚡ Flash Latest</option>
               </select>
             </div>
 
@@ -536,20 +578,44 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggested Quick Prompts if conversation is fresh */}
-        {messages.length <= 2 && (
-          <div className="px-4 pb-2 flex gap-2 overflow-x-auto shrink-0 scrollbar-none">
-            {suggestedPrompts.map((p, idx) => (
-              <button
-                key={idx}
-                onClick={() => setInputPrompt(p)}
-                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 text-slate-600 dark:text-slate-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Always-Available Quick Prompt Action Chips */}
+        <div className="px-4 pb-1.5 flex gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setInputPrompt('Can you provide a Socratic hint without revealing the final answer?')}
+            className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 dark:hover:bg-purple-900 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+          >
+            <span>💡 Socratic Hint</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputPrompt('What is the first-principles intuition and physical/mathematical invariant here?')}
+            className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+          >
+            <span>🔍 First Principles</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputPrompt('Can you check boundary limits (as x -> 0 or infinity) and symmetry invariants?')}
+            className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+          >
+            <span>📐 Boundary Check</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputPrompt('Generate 1 challenging diagnostic multiple-choice question on this topic.')}
+            className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+          >
+            <span>📝 Practice Problem</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputPrompt('Diagnose the common trap or misconception students fall into for this topic.')}
+            className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+          >
+            <span>🩺 Diagnose Mistake</span>
+          </button>
+        </div>
 
         {/* Bottom Input Prompt Bar */}
         <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800/80 shrink-0 space-y-2">
@@ -669,6 +735,56 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 <ChevronRight className="w-3 h-3" />
               </button>
             </div>
+          </div>
+
+          {/* AI Token Economy & Cost Optimizer Card */}
+          <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-900 dark:text-emerald-200 text-[11px]">
+                <Cpu className="w-3.5 h-3.5 text-emerald-600" />
+                <span>AI Cost & Token Economy</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+                Eco Active
+              </span>
+            </div>
+
+            <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+              <div className="flex justify-between">
+                <span>Model Priority:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-100">Gemini 3.1 Flash-Lite</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cost Reduction:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">~85% vs standard</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Zero-Cost Cached Hits:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-100">{cacheStats.cacheHits} ({cacheStats.hitRatePercent}%)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Tokens Saved:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-100">{cacheStats.totalTokensSaved.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Est. Dollar Savings:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">${cacheStats.totalEstimatedSavingsDollars.toFixed(4)}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await fetch('/api/copilot/cache-clear', {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${localStorage.getItem('learnco_auth_token') || ''}` },
+                });
+                loadCacheStats();
+              }}
+              className="w-full py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
+            >
+              Purge Response Cache
+            </button>
           </div>
         </aside>
       )}

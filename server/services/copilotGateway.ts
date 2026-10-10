@@ -3,6 +3,7 @@ import { Database } from '../db';
 import { RagEngine } from './ragEngine';
 import { ModelRouter } from './modelRouter';
 import { CopilotToolRegistry } from './copilotTools';
+import { CopilotCacheEngine } from './copilotCacheEngine';
 import {
   CopilotMode,
   LearnerLevel,
@@ -47,6 +48,7 @@ export interface CopilotGenerationResult {
   citations: CopilotCitation[];
   toolCalls: CopilotToolCall[];
   artifact?: CopilotArtifact;
+  fromCache?: boolean;
 }
 
 export class CopilotGateway {
@@ -72,11 +74,25 @@ export class CopilotGateway {
       selectedModel,
     } = params;
 
-    // 1. Retrieve RAG Context (Creator Studio notes, Curriculum concepts, User mistakes)
+    // 1. Check AI Response Cache for Zero-Token / Zero-Cost Instant Response
+    const cacheKey = CopilotCacheEngine.generateKey(prompt, mode, learnerLevel, selectedModel);
+    const cached = CopilotCacheEngine.get(cacheKey);
+    if (cached) {
+      return {
+        reply: cached.reply,
+        modelUsed: `${cached.modelUsed} (⚡ Zero-Cost Cache)`,
+        citations: cached.citations || [],
+        toolCalls: cached.toolCalls || [],
+        artifact: cached.artifact,
+        fromCache: true,
+      };
+    }
+
+    // 2. Retrieve RAG Context (Creator Studio notes, Curriculum concepts, User mistakes)
     const { chunks, citations } = RagEngine.retrieveContext(userId, prompt, context, 4);
     const ragContextFormatted = RagEngine.formatChunksForPrompt(chunks);
 
-    // 2. Select Optimal Model
+    // 3. Select Optimal Model & Token Cost Profile
     const routeDecision = ModelRouter.selectModel(
       prompt,
       mode,
@@ -84,14 +100,16 @@ export class CopilotGateway {
       selectedModel
     );
 
-    // 3. Build System Prompt
-    const systemInstruction = ModelRouter.buildSystemPrompt(
-      mode,
-      learnerLevel,
-      context?.socraticGuidanceLevel || 'high'
-    );
+    // 4. Build System Prompt (Use compact mode for Eco Saver to cut prompt tokens by 80%)
+    const systemInstruction = routeDecision.isEcoSaver
+      ? ModelRouter.buildCompactSystemPrompt(mode, learnerLevel)
+      : ModelRouter.buildSystemPrompt(
+          mode,
+          learnerLevel,
+          context?.socraticGuidanceLevel || 'high'
+        );
 
-    // 4. Assemble Structured User Message with Boundaries
+    // 5. Assemble Structured User Message with Boundaries
     let fullPrompt = '';
     if (context?.activeQuestion) {
       fullPrompt += `[ACTIVE PRACTICE QUESTION CONTEXT]:
@@ -109,13 +127,13 @@ Explanation: "${context.activeQuestion.explanation || ''}"\n\n`;
       fullPrompt += `${ragContextFormatted}\n\n`;
     }
 
-    fullPrompt += `[USER QUERY]:\n${prompt}`;
+    fullPrompt += `[USER QUERY]:\n${prompt.trim()}`;
 
     const ai = getGeminiClient();
     const toolCalls: CopilotToolCall[] = [];
     let artifact: CopilotArtifact | undefined;
 
-    // 5. Try Real Gemini API if Available
+    // 6. Try Real Gemini API if Available
     if (ai) {
       const candidateModels = [
         routeDecision.modelName,
@@ -131,6 +149,7 @@ Explanation: "${context.activeQuestion.explanation || ''}"\n\n`;
               config: {
                 systemInstruction,
                 temperature: routeDecision.temperature,
+                maxOutputTokens: routeDecision.maxOutputTokens,
               },
             }),
             6500,
@@ -148,12 +167,23 @@ Explanation: "${context.activeQuestion.explanation || ''}"\n\n`;
               mode
             );
 
+            // Save to Cache for subsequent identical/similar requests
+            CopilotCacheEngine.set(cacheKey, {
+              reply: postProcessed.reply,
+              modelUsed: model,
+              mode,
+              citations,
+              toolCalls: postProcessed.toolCalls,
+              artifact: postProcessed.artifact,
+            });
+
             return {
               reply: postProcessed.reply,
               modelUsed: model,
               citations,
               toolCalls: postProcessed.toolCalls,
               artifact: postProcessed.artifact,
+              fromCache: false,
             };
           }
         } catch (err: any) {

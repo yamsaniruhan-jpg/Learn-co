@@ -275,7 +275,7 @@ async function generateJsonWithAi(
   ai: GoogleGenAI,
   synthesisPrompt: string
 ): Promise<any> {
-  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
   let lastError: any = null;
 
   for (const model of models) {
@@ -291,6 +291,7 @@ Always return STRICT valid JSON without markdown wrapping or code blocks.
 Use LaTeX formatting for formulas with $ inline and $$ display math.`,
             responseMimeType: 'application/json',
             temperature: 0.3,
+            maxOutputTokens: 1200,
           },
         });
 
