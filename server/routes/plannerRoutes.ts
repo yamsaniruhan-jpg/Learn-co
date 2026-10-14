@@ -278,6 +278,7 @@ router.get('/tasks', (req: Request, res: Response) => {
 
 // POST /api/planner/tasks
 router.post('/tasks', async (req: Request, res: Response) => {
+  console.log('[PlannerRoutes] POST /tasks received');
   try {
     const userId = resolveUserId(req);
     const taskData = req.body;
@@ -288,6 +289,7 @@ router.post('/tasks', async (req: Request, res: Response) => {
 
     res.status(201).json({ task });
   } catch (err: any) {
+    console.error('[PlannerRoutes] POST /tasks error:', err);
     res.status(500).json({ error: err.message || 'Failed to create task.' });
   }
 });

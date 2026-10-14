@@ -80,12 +80,12 @@ export class PlannerEngine {
     }> = [];
 
     selectedSubjects.forEach((subId) => {
-      const subData = CURRICULUM_DATA[subId];
-      if (subData && subData.courses) {
-        subData.courses.forEach((course) => {
-          course.chapters.forEach((chap) => {
-            chap.topics.forEach((topic) => {
-              topic.concepts.forEach((concept) => {
+      const subData = CURRICULUM_DATA.find(s => s.id === subId);
+      if (subData && subData.chapters) {
+        subData.chapters.forEach((chap) => {
+          chap.topics?.forEach((topic) => {
+            topic.subtopics?.forEach((subtopic) => {
+              subtopic.concepts?.forEach((concept) => {
                 subjectConcepts.push({
                   subjectId: subId,
                   topicId: topic.id,
@@ -98,7 +98,6 @@ export class PlannerEngine {
         });
       }
     });
-
     // 3. Collect recent user mistakes for remediation
     const mistakes = Database.getMistakes(userId);
     const weakMistakes = mistakes.filter(
@@ -207,8 +206,11 @@ export class PlannerEngine {
           dayQuestionsUsed += questionCount;
           slotMinutes += practiceDur + 10;
         } else {
-          const prevConcept =
-            generatedTasks[generatedTasks.length - 1] || subjectConcepts[0];
+          const prevConcept = generatedTasks[generatedTasks.length - 1] || subjectConcepts[0] || {
+            conceptTitle: 'STEM',
+            subjectId: 'math',
+            conceptId: 'generic-concept'
+          };
           const questionCount = Math.min(5, DAILY_PRACTICE_LIMIT - dayQuestionsUsed);
 
           generatedTasks.push({
@@ -485,8 +487,13 @@ CRITICAL CONSTRAINTS:
 
       return { plan, tasks: sanitizedTasks, goal };
     } catch (err: any) {
-      console.warn('AI plan generation failed or timed out. Falling back to deterministic engine:', err?.message || err);
-      return this.generateDeterministicPlan(userId, input);
+      console.error('AI plan generation failed or timed out, error:', err?.message || err);
+      try {
+        return this.generateDeterministicPlan(userId, input);
+      } catch (detErr) {
+        console.error('Deterministic plan generation also failed:', detErr);
+        throw detErr;
+      }
     }
   }
 }

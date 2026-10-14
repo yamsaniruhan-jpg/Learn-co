@@ -302,8 +302,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         }
       } catch (_) {}
     }
-    // Default to at least 3 days if user has practice momentum
-    return Math.max(streakVal, 3);
+    return Math.max(0, streakVal);
   }, [gamification?.currentStreak, user?.id]);
 
   const handleTimeframeChange = (tf: TimeframeFilter) => {
@@ -584,7 +583,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
               <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Active Streak</div>
               <div className="text-sm font-black text-orange-400 flex items-center justify-center gap-1 mt-0.5">
                 <Flame className="w-4 h-4 fill-orange-500 text-orange-500 animate-pulse" />
-                <span>{effectiveUserStreak} Days</span>
+                <span>{currentUserEntry?.streakDays ?? effectiveUserStreak} Days</span>
               </div>
             </div>
 
@@ -840,7 +839,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             {filteredEntries.map((scholar: any) => {
               const isUser = scholar.isCurrentUser;
               const relativeScorePercent = Math.min(100, Math.round((scholar.xp / topXpScore) * 100));
-              const scholarStreak = scholar.streak ?? scholar.streakDays ?? (isUser ? effectiveUserStreak : 1);
+              const scholarStreak = scholar.streak ?? scholar.streakDays ?? (isUser ? (currentUserEntry?.streakDays ?? effectiveUserStreak) : 1);
               const stageInfo = calculateStageFromXp(scholar.xp);
               const promoInfo = getPromotionZoneInfo(scholar.rank, rawEntries.length, stageInfo.stage.id);
 
@@ -877,13 +876,23 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                             You
                           </Badge>
                         )}
+                        {/* Stage Badge */}
+                        <span 
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${stageInfo.substage.colorScheme.badgeBg} ${stageInfo.substage.colorScheme.badgeText} ${stageInfo.substage.colorScheme.border}`}
+                          title={stageInfo.substage.substageName}
+                        >
+                          {stageInfo.stage.badgeEmoji}
+                          {stageInfo.substage.substageName}
+                        </span>
                       </div>
 
                       {/* Division Pill */}
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400">
-                          {stageInfo.stage.badgeEmoji} {stageInfo.substage.substageName}
-                        </span>
+                        {promoInfo.zone !== 'safe' && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${promoInfo.badgeBg} ${promoInfo.badgeText} ${promoInfo.border}`}>
+                            {promoInfo.label}
+                          </span>
+                        )}
                         <span className="sm:hidden text-slate-300">•</span>
                         <span className="sm:hidden text-[10px] text-orange-500 font-bold flex items-center gap-0.5">
                           <Flame className="w-2.5 h-2.5 fill-orange-500" />
