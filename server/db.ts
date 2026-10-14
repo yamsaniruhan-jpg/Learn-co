@@ -15,6 +15,7 @@ import {
   DAILY_DOUBTS_LIMIT,
   DAILY_ARTIFACTS_LIMIT,
   DAILY_SOURCES_UPLOAD_LIMIT,
+  DAILY_URLS_LIMIT,
   MAX_SOURCES_PER_ARTIFACT,
   UserDailyQuotas,
   XP_PER_CORRECT_QUESTION,
@@ -365,8 +366,26 @@ export class Database {
 
   static getGamification(userId: string): UserGamification | null {
     const profile = memoryDb.profiles[userId];
-    const gam = memoryDb.gamification[userId];
-    if (!gam) return null;
+    let gam = memoryDb.gamification[userId];
+    if (!gam) {
+      gam = {
+        userId,
+        xp: 420,
+        level: 3,
+        currentStreak: 1,
+        longestStreak: 3,
+        lastActiveDate: new Date().toISOString().split('T')[0],
+        dailyQuestionsSolvedToday: 0,
+        dailyAllowanceLimit: 25,
+        dailyDoubtsAskedToday: 0,
+        dailyDoubtsLimit: 10,
+        dailyArtifactsCreatedToday: 0,
+        dailyArtifactsLimit: 5,
+        dailySourcesUploadedToday: 0,
+        dailySourcesUploadLimit: 5,
+      };
+      memoryDb.gamification[userId] = gam;
+    }
 
     // Check if daily counts need to be reset for a new day in user timezone
     const userTimezone = profile?.timezone || 'UTC';
@@ -399,9 +418,11 @@ export class Database {
     gam.dailyDoubtsLimit = gam.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT;
     gam.dailyArtifactsLimit = gam.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
     gam.dailySourcesUploadLimit = gam.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
+    gam.dailyUrlsLimit = gam.dailyUrlsLimit || DAILY_URLS_LIMIT;
     gam.dailyDoubtsAskedToday = gam.dailyDoubtsAskedToday || 0;
     gam.dailyArtifactsCreatedToday = gam.dailyArtifactsCreatedToday || 0;
     gam.dailySourcesUploadedToday = gam.dailySourcesUploadedToday || 0;
+    gam.dailyUrlsProcessedToday = gam.dailyUrlsProcessedToday || 0;
 
     return gam;
   }
@@ -416,6 +437,8 @@ export class Database {
     const artifactsLimit = gam?.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
     const sourcesUsed = gam?.dailySourcesUploadedToday || 0;
     const sourcesLimit = gam?.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
+    const urlsUsed = gam?.dailyUrlsProcessedToday || 0;
+    const urlsLimit = gam?.dailyUrlsLimit || DAILY_URLS_LIMIT;
 
     return {
       questions: {
@@ -443,8 +466,31 @@ export class Database {
         isLimitReached: sourcesUsed >= sourcesLimit,
         maxPerArtifact: MAX_SOURCES_PER_ARTIFACT,
       },
+      urls: {
+        used: urlsUsed,
+        limit: urlsLimit,
+        remaining: Math.max(0, urlsLimit - urlsUsed),
+        isLimitReached: urlsUsed >= urlsLimit,
+      },
       resetsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       timezone: 'UTC',
+    };
+  }
+
+  static checkAndIncrementUrlQuota(userId: string): { remaining: number; used: number } {
+    const gam = this.getGamification(userId);
+    if (!gam) {
+      throw new Error('User gamification record not found.');
+    }
+    const current = gam.dailyUrlsProcessedToday || 0;
+    const limit = gam.dailyUrlsLimit || DAILY_URLS_LIMIT;
+    if (current >= limit) {
+      throw new Error('Your limit is reached on the free plan.');
+    }
+    gam.dailyUrlsProcessedToday = current + 1;
+    return {
+      used: gam.dailyUrlsProcessedToday,
+      remaining: Math.max(0, limit - gam.dailyUrlsProcessedToday),
     };
   }
 
@@ -456,7 +502,7 @@ export class Database {
     const current = gam.dailyDoubtsAskedToday || 0;
     const limit = gam.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT;
     if (current >= limit) {
-      throw new Error(`Daily doubt limit reached (${limit}/${limit}). Your quota will refresh at midnight in your timezone.`);
+      throw new Error('Your limit is reached on the free plan.');
     }
     gam.dailyDoubtsAskedToday = current + 1;
     return {
@@ -473,7 +519,7 @@ export class Database {
     const current = gam.dailySourcesUploadedToday || 0;
     const limit = gam.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
     if (current >= limit) {
-      throw new Error(`Daily source upload limit reached (${limit}/${limit}). You can upload up to 4 sources per day (refreshes at midnight).`);
+      throw new Error('Your limit is reached on the free plan.');
     }
     gam.dailySourcesUploadedToday = current + 1;
     return {
@@ -496,7 +542,7 @@ export class Database {
     const current = gam.dailyArtifactsCreatedToday || 0;
     const limit = gam.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
     if (current >= limit) {
-      throw new Error(`Daily artifact creation limit reached (${limit}/${limit}). You can synthesize up to 4 artifacts per day (refreshes at midnight).`);
+      throw new Error('Your limit is reached on the free plan.');
     }
     gam.dailyArtifactsCreatedToday = current + 1;
     return {
@@ -904,6 +950,7 @@ export class Database {
       xp: item.xp,
       level: item.level,
       streak: item.streak,
+      streakDays: item.streak,
       isCurrentUser: item.userId === currentUserId,
     }));
   }
@@ -1383,6 +1430,35 @@ export class Database {
     conv.lastMessageSnippet = undefined;
     conv.updatedAt = new Date().toISOString();
     return true;
+  }
+
+  static deleteAllCopilotConversations(userId: string): number {
+    let count = 0;
+    for (const [convId, conv] of Object.entries(memoryDb.copilotConversations)) {
+      if (conv.userId === userId) {
+        delete memoryDb.copilotConversations[convId];
+        delete memoryDb.copilotMessages[convId];
+        count++;
+      }
+    }
+    return count;
+  }
+
+  static exportAllCopilotHistory(userId: string): any {
+    const conversations = this.listCopilotConversations(userId);
+    const fullHistory = conversations.map((conv) => {
+      const res = this.getCopilotConversation(userId, conv.id);
+      return {
+        conversation: conv,
+        messages: res ? res.messages : [],
+      };
+    });
+    return {
+      userId,
+      exportedAt: new Date().toISOString(),
+      totalConversations: fullHistory.length,
+      history: fullHistory,
+    };
   }
 
   // ==================== MENTORSHIP DOMAIN METHODS ====================

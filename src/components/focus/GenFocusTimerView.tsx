@@ -22,6 +22,7 @@ import {
   Compass,
   Radio,
   Layers,
+  Zap,
 } from 'lucide-react';
 import { SubjectId } from '../../types';
 import { CURRICULUM_DATA } from '../../data/curriculumData';
@@ -354,6 +355,24 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
   const circleCircumference = 2 * Math.PI * circleRadius;
   const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
 
+  const [pulseToast, setPulseToast] = useState<string | null>(null);
+
+  const handleLogFocusPulse = () => {
+    const xp = 25;
+    awardXp(xp, 'Logged Focus Pulse');
+    if (onAwardXp) {
+      onAwardXp(xp, 'Logged Focus Pulse');
+    }
+    const newSessions = completedSessionsToday + 1;
+    const newMinutes = totalMinutesFocusedToday + 15;
+    setCompletedSessionsToday(newSessions);
+    setTotalMinutesFocusedToday(newMinutes);
+    localStorage.setItem('learnco_focus_sessions_today', String(newSessions));
+    localStorage.setItem('learnco_focus_minutes_today', String(newMinutes));
+    setPulseToast('+25 XP awarded for Focus Pulse!');
+    setTimeout(() => setPulseToast(null), 3000);
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Top Header & Breadcrumb */}
@@ -364,14 +383,14 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
               <Clock className="w-5 h-5" />
             </span>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white font-display tracking-tight">
-              Gen Focus Timer
+              Zen Focus Timer
             </h1>
             <Badge variant="primary" size="sm">
               Deep Work Engine
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Calibrated Pomodoro cycles, binaural soundscapes, and distraction-free cognitive flow.
+            Calibrated Pomodoro cycles, binaural soundscapes, distraction-free flow, and focus XP pulses.
           </p>
         </div>
 
@@ -515,8 +534,27 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
               </Button>
             </div>
 
+            {/* Focus Pulse Quick Action & XP Feedback */}
+            <div className="mt-4 flex flex-col items-center justify-center gap-2">
+              <button
+                onClick={handleLogFocusPulse}
+                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-bold shadow-lg shadow-amber-500/25 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
+                title="Log a 15-minute quick Focus Pulse (+25 XP)"
+              >
+                <Zap className="w-4 h-4 fill-white" />
+                <span>Log Focus Pulse (+25 XP)</span>
+              </button>
+
+              {pulseToast && (
+                <div className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-in fade-in flex items-center gap-1.5 shadow-xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{pulseToast}</span>
+                </div>
+              )}
+            </div>
+
             {/* Mode Presets Buttons */}
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
               <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5">
                 Calibrated Focus Presets
               </div>

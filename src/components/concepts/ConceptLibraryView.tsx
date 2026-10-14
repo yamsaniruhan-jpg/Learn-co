@@ -883,10 +883,10 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
                 {selectedAIDoc.title}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed bg-indigo-50/50 dark:bg-indigo-950/30 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/60">
+              <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed bg-indigo-50/50 dark:bg-indigo-950/30 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/60">
                 <span className="font-bold text-indigo-900 dark:text-indigo-200">Abstract: </span>
                 {selectedAIDoc.abstract}
-              </p>
+              </div>
             </div>
 
             {/* Intuition Section */}
@@ -895,9 +895,9 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
                 <Lightbulb className="w-4 h-4 text-amber-500" />
                 <span>Conceptual Intuition & Mental Model</span>
               </h2>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-amber-50/40 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/40">
+              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-amber-50/40 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/40">
                 {selectedAIDoc.intuition}
-              </p>
+              </div>
             </div>
 
             {/* Rigor & Mathematical Formulas */}

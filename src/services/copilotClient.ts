@@ -159,6 +159,43 @@ export class CopilotClient {
   }
 
   /**
+   * Delete all conversations
+   */
+  static async deleteAllConversations(): Promise<boolean> {
+    try {
+      const response = await fetch('/api/copilot/conversations', {
+        method: 'DELETE',
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      return response.ok;
+    } catch (err) {
+      console.error('CopilotClient: failed to delete all conversations', err);
+      return false;
+    }
+  }
+
+  /**
+   * Export all history
+   */
+  static async exportHistory(): Promise<any> {
+    try {
+      const response = await fetch('/api/copilot/history/export', {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.data;
+    } catch (err) {
+      console.error('CopilotClient: failed to export history', err);
+      return null;
+    }
+  }
+
+  /**
    * Send standard chat message
    */
   static async sendMessage(options: CopilotPromptOptions): Promise<{

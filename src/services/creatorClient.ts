@@ -220,4 +220,16 @@ export class CreatorClient {
     }
     return data;
   }
+
+  static async getQuota(): Promise<{ sources: any, artifacts: any, urls: any }> {
+    const res = await fetch('/api/creator/quota', {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch quota: ${res.statusText}`);
+    }
+    const data = await res.json();
+    return data.quotas;
+  }
 }

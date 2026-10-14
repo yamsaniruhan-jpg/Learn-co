@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { latexToPlainText } from '../../utils/textSanitizer';
 
 interface WorksheetViewerProps {
   worksheet: WorksheetContent;
@@ -79,7 +80,7 @@ export const WorksheetViewer: React.FC<WorksheetViewerProps> = ({ worksheet, tit
 
               {/* Problem statement */}
               <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 leading-relaxed">
-                {problem.problemStatement}
+                {latexToPlainText(problem.problemStatement)}
               </div>
 
               {/* Action Buttons */}
@@ -113,7 +114,7 @@ export const WorksheetViewer: React.FC<WorksheetViewerProps> = ({ worksheet, tit
                   <strong>Socratic Hint:</strong>
                   <ul className="list-disc list-inside space-y-1 pl-1">
                     {problem.hints.map((h, hIdx) => (
-                      <li key={hIdx}>{h}</li>
+                      <li key={hIdx}>{latexToPlainText(h)}</li>
                     ))}
                   </ul>
                 </div>
@@ -130,13 +131,13 @@ export const WorksheetViewer: React.FC<WorksheetViewerProps> = ({ worksheet, tit
                   <ol className="list-decimal list-inside space-y-1.5 text-slate-600 dark:text-slate-300">
                     {problem.solutionSteps.map((step, sIdx) => (
                       <li key={sIdx} className="leading-relaxed pl-1">
-                        {step}
+                        {latexToPlainText(step)}
                       </li>
                     ))}
                   </ol>
 
                   <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 dark:text-emerald-200 font-bold">
-                    <strong>Final Answer:</strong> {problem.finalAnswer}
+                    <strong>Final Answer:</strong> {latexToPlainText(problem.finalAnswer)}
                   </div>
                 </div>
               )}

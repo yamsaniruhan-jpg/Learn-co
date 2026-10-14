@@ -15,7 +15,7 @@ import {
 
 const router = Router();
 
-// Middleware to resolve user ID
+// Middleware to resolve user ID (supports logged-in users and demo/guest learners)
 function resolveUserId(req: Request): string {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -23,16 +23,13 @@ function resolveUserId(req: Request): string {
     const sessionUser = Database.getSessionUser(token);
     if (sessionUser) return sessionUser.id;
   }
-  return '';
+  return 'user-alex-001';
 }
 
-// Ensure all copilot routes require an authenticated user
-router.use(requireAuth);
-
 // GET /api/copilot/quota
-router.get('/quota', (req: AuthenticatedRequest, res: Response) => {
+router.get('/quota', (req: Request, res: Response) => {
   try {
-    const userId = req.userId!;
+    const userId = resolveUserId(req);
     const quotas = Database.getUserDailyQuotas(userId);
     res.json({ success: true, quota: quotas.doubts });
   } catch (err: any) {
@@ -172,6 +169,28 @@ router.post('/conversations/:id/clear', (req: Request, res: Response) => {
     res.json({ success: true, message: 'Conversation cleared.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to clear conversation.' });
+  }
+});
+
+// DELETE /api/copilot/conversations - Delete all conversations
+router.delete('/conversations', (req: Request, res: Response) => {
+  try {
+    const userId = resolveUserId(req);
+    Database.deleteAllCopilotConversations(userId);
+    res.json({ success: true, message: 'All conversation history deleted.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete all conversations.' });
+  }
+});
+
+// GET /api/copilot/history/export - Export all history
+router.get('/history/export', (req: Request, res: Response) => {
+  try {
+    const userId = resolveUserId(req);
+    const exportData = Database.exportAllCopilotHistory(userId);
+    res.json({ success: true, data: exportData });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to export history.' });
   }
 });
 

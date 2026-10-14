@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { latexToPlainText } from '../../utils/textSanitizer';
 
 interface FlashcardDeckViewerProps {
   flashcards: FlashcardItem[];
@@ -186,19 +187,20 @@ export const FlashcardDeckViewer: React.FC<FlashcardDeckViewerProps> = ({
             {/* Main Question / Answer Body */}
             <div className="py-6 my-auto text-center space-y-4">
               <p className="text-base sm:text-lg font-bold leading-relaxed max-w-xl mx-auto">
-                {isFlipped ? currentCard.back : currentCard.front}
+                {latexToPlainText(isFlipped ? currentCard.back : currentCard.front)}
               </p>
 
-              {/* LaTeX formula callout */}
+              {/* Clean readable formula callout */}
               {currentCard.formula && (
                 <div
-                  className={`p-3 rounded-xl max-w-md mx-auto text-xs font-mono font-bold border ${
+                  className={`p-3 rounded-xl max-w-md mx-auto text-xs font-semibold border ${
                     isFlipped
                       ? 'bg-indigo-950/60 border-indigo-500/40 text-indigo-200'
                       : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400'
                   }`}
                 >
-                  $${currentCard.formula}$$
+                  <span className="font-bold mr-1.5 opacity-70">Formula:</span>
+                  <span>{latexToPlainText(currentCard.formula)}</span>
                 </div>
               )}
 

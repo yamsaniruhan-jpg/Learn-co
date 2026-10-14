@@ -1018,9 +1018,9 @@ export const AdminStudioView: React.FC = () => {
 
             <div>
               <span className="font-bold text-slate-400 block mb-1">Details & Message</span>
-              <p className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl leading-relaxed font-serif">
+              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl leading-relaxed font-serif">
                 {selectedLogEntry.details}
-              </p>
+              </div>
             </div>
 
             {selectedLogEntry.metadata && (
@@ -1204,9 +1204,9 @@ export const AdminStudioView: React.FC = () => {
                 Step-by-Step Derivation & Solution
               </span>
               <div className="p-3 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl border border-indigo-100 dark:border-indigo-900 space-y-2">
-                <p className="font-serif">
+                <div className="font-serif">
                   <FormattedMathText text={inspectQuestion.explanation} />
-                </p>
+                </div>
                 {inspectQuestion.stepByStepSolution && (
                   <div className="space-y-1 pt-2 border-t border-indigo-100/60 dark:border-indigo-900/60">
                     {inspectQuestion.stepByStepSolution.map((step, sIdx) => (

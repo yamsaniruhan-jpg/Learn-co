@@ -288,7 +288,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
     return <span className={`inline-math-container ${className}`}>{renderedContent}</span>;
   }
 
-  return <div className={`formatted-math-text ${className}`}>{renderedContent}</div>;
+  return <span className={`formatted-math-text block ${className}`}>{renderedContent}</span>;
 };
 
 /**

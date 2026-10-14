@@ -1057,7 +1057,7 @@ Produce a concise JSON response with:
 }
 Return STRICT JSON only.`;
 
-      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+      const candidateModels = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite'];
       let text = '';
 
       for (const model of candidateModels) {

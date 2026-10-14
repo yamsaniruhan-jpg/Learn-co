@@ -33,8 +33,11 @@ import { BrandLogo } from './components/ui/BrandLogo';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
 import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
+import { UserGuideView } from './components/guide/UserGuideView';
+import { SimulationsHubView } from './components/simulations/SimulationsHubView';
 import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { FlashCheckModal } from './components/practice/FlashCheckModal';
+import { awardXp } from './utils/xpManager';
 import {
   LayoutDashboard,
   BookOpen,
@@ -331,6 +334,7 @@ export default function App() {
                 setActiveTab(tab);
               }}
               onToggleZenMode={() => setIsZenMode((prev) => !prev)}
+              onAwardXp={(xp, reason) => awardXp(xp, reason)}
             />
           )}
 
@@ -357,6 +361,10 @@ export default function App() {
               initialContext={copilotContext}
               onNavigateToTab={(tab) => setActiveTab(tab)}
             />
+          )}
+
+          {activeTab === 'simulations' && (
+            <SimulationsHubView onNavigateToTab={(tab) => setActiveTab(tab)} />
           )}
 
           {activeTab === 'planner' && <PlannerView />}
@@ -397,6 +405,15 @@ export default function App() {
           )}
 
           {activeTab === 'docs' && <DocsViewer />}
+
+          {(activeTab === 'user-guide' || activeTab === 'guide') && (
+            <UserGuideView
+              onNavigateToTab={(tab, ctx) => {
+                if (ctx?.subjectId) setSelectedSubjectId(ctx.subjectId);
+                setActiveTab(tab);
+              }}
+            />
+          )}
 
           {activeTab === 'profile' && (
             <ProfileView onOpenCopilotWithContext={handleOpenCopilotWithContext} />

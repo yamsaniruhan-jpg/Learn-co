@@ -5,11 +5,14 @@ import {
   Download,
   Copy,
   CheckCircle2,
-  FileCode,
   FileText,
   Printer,
+  Sparkles,
+  Bookmark,
+  Share2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { resourceToPlainText } from '../../utils/textSanitizer';
 
 interface ExportModalProps {
   resource: CreatorResource;
@@ -22,27 +25,44 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [format, setFormat] = useState<'markdown' | 'json'>('markdown');
+  const [format, setFormat] = useState<'normal' | 'markdown' | 'json'>('normal');
   const [copied, setCopied] = useState<boolean>(false);
+  const [savedLocally, setSavedLocally] = useState<boolean>(false);
 
   if (!isOpen) return null;
+
+  const normalText = resourceToPlainText(resource);
 
   const generateMarkdown = (): string => {
     let md = `# ${resource.title}\n\n`;
     md += `**Subject**: ${resource.subjectId.toUpperCase()} | **Difficulty**: ${resource.difficulty} | **Version**: v${resource.version}\n\n---\n\n`;
 
-    if (resource.resourceType === 'flashcards' && resource.content.flashcards) {
+    if (resource.resourceType === 'slides' && resource.content.slides) {
+      resource.content.slides.forEach((s: any, idx: number) => {
+        md += `## Slide ${idx + 1}: ${s.title}\n\n`;
+        if (s.subtitle) md += `*${s.subtitle}*\n\n`;
+        if (s.bullets) {
+          s.bullets.forEach((b: string) => {
+            md += `* ${b}\n`;
+          });
+          md += `\n`;
+        }
+        if (s.calloutFormula) md += `> Formula: ${s.calloutFormula}\n\n`;
+        if (s.speakerNotes) md += `**Speaker Notes**: ${s.speakerNotes}\n\n`;
+        md += `---\n\n`;
+      });
+    } else if (resource.resourceType === 'flashcards' && resource.content.flashcards) {
       md += `## Flashcard Deck (${resource.content.flashcards.length} Cards)\n\n`;
-      resource.content.flashcards.forEach((fc, idx) => {
+      resource.content.flashcards.forEach((fc: any, idx: number) => {
         md += `### Card ${idx + 1}: ${fc.front}\n\n`;
         md += `**Answer**: ${fc.back}\n\n`;
-        if (fc.formula) md += `$$${fc.formula}$$\n\n`;
+        if (fc.formula) md += `Formula: ${fc.formula}\n\n`;
       });
     } else if (resource.resourceType === 'quiz' && resource.content.quiz) {
       md += `## Diagnostic Quiz\n\n`;
-      resource.content.quiz.forEach((q, idx) => {
+      resource.content.quiz.forEach((q: any, idx: number) => {
         md += `### Question ${idx + 1}: ${q.question}\n\n`;
-        q.options.forEach((opt, oIdx) => {
+        q.options.forEach((opt: string, oIdx: number) => {
           md += `* [${oIdx === q.correctIndex ? 'x' : ' '}] ${String.fromCharCode(65 + oIdx)}. ${opt}\n`;
         });
         md += `\n**Explanation**: ${q.explanation}\n\n`;
@@ -50,27 +70,36 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     } else if (resource.resourceType === 'summary' && resource.content.summary) {
       md += `## Executive Summary\n\n${resource.content.summary.executiveSummary}\n\n`;
     } else {
-      md += `\`\`\`json\n${JSON.stringify(resource.content, null, 2)}\n\`\`\`\n`;
+      md += normalText;
     }
 
     return md;
   };
 
   const exportText =
-    format === 'markdown' ? generateMarkdown() : JSON.stringify(resource, null, 2);
+    format === 'normal'
+      ? normalText
+      : format === 'markdown'
+      ? generateMarkdown()
+      : JSON.stringify(resource, null, 2);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(exportText);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2200);
   };
 
   const handleDownload = () => {
-    const ext = format === 'markdown' ? 'md' : 'json';
+    const ext = format === 'normal' ? 'txt' : format === 'markdown' ? 'md' : 'json';
     const filename = `${resource.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.${ext}`;
-    const blob = new Blob([exportText], {
-      type: format === 'markdown' ? 'text/markdown' : 'application/json',
-    });
+    const mimeType =
+      format === 'normal'
+        ? 'text/plain;charset=utf-8'
+        : format === 'markdown'
+        ? 'text/markdown;charset=utf-8'
+        : 'application/json';
+
+    const blob = new Blob([exportText], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -81,61 +110,105 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleSaveNormally = () => {
+    try {
+      const savedKey = `learnco_saved_resource_${resource.id}`;
+      localStorage.setItem(
+        savedKey,
+        JSON.stringify({
+          id: resource.id,
+          title: resource.title,
+          resourceType: resource.resourceType,
+          savedAt: new Date().toISOString(),
+          textContent: normalText,
+        })
+      );
+      setSavedLocally(true);
+      setTimeout(() => setSavedLocally(false), 2500);
+    } catch (_) {}
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl max-h-[85vh] bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="w-full max-w-2xl max-h-[88vh] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              Export Artifact
+            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              Save & Copy Artifact
             </span>
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
               {resource.title}
             </h2>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Format Selector */}
-        <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                onClick={() => setFormat('markdown')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
-                  format === 'markdown'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Markdown (.md)</span>
-              </button>
+        {/* Format Selector Pills (Default: Normal Text) */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800">
+            <button
+              onClick={() => setFormat('normal')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                format === 'normal'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              Normal Text (Clean)
+            </button>
+            <button
+              onClick={() => setFormat('markdown')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                format === 'markdown'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              Markdown (.md)
+            </button>
+            <button
+              onClick={() => setFormat('json')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                format === 'json'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              JSON Data
+            </button>
+          </div>
 
-              <button
-                onClick={() => setFormat('json')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
-                  format === 'json'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <FileCode className="w-3.5 h-3.5" />
-                <span>JSON Schema (.json)</span>
-              </button>
-            </div>
+          {/* Quick In-App Save Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveNormally}
+            leftIcon={savedLocally ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Bookmark className="w-3.5 h-3.5 text-amber-500" />}
+            className="text-xs"
+          >
+            {savedLocally ? 'Saved to My Notes!' : 'Save Normally to App'}
+          </Button>
+        </div>
 
+        {/* Text Preview Canvas */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950/60 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text">
+          {exportText}
+        </div>
+
+        {/* Action Footer */}
+        <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -143,42 +216,31 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               leftIcon={<Printer className="w-3.5 h-3.5" />}
               className="text-xs"
             >
-              Print Sheet
+              Print / PDF
             </Button>
           </div>
 
-          {/* Preview Box */}
-          <div className="relative">
-            <textarea
-              readOnly
-              rows={12}
-              value={exportText}
-              className="w-full p-4 font-mono text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none select-all"
-            />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleCopy}
+              leftIcon={copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              className="text-xs font-bold"
+            >
+              {copied ? 'Copied Normally!' : 'Copy Normally'}
+            </Button>
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleDownload}
+              leftIcon={<Download className="w-3.5 h-3.5" />}
+              className="text-xs font-bold"
+            >
+              {format === 'normal' ? 'Save as Normal Text (.txt)' : `Download .${format === 'markdown' ? 'md' : 'json'}`}
+            </Button>
           </div>
-        </div>
-
-        {/* Footer actions */}
-        <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            leftIcon={copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-            className="text-xs"
-          >
-            {copied ? 'Copied to Clipboard' : 'Copy Text'}
-          </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleDownload}
-            leftIcon={<Download className="w-3.5 h-3.5" />}
-            className="text-xs"
-          >
-            Download {format === 'markdown' ? '.MD File' : '.JSON File'}
-          </Button>
         </div>
       </div>
     </div>

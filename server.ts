@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -16,7 +17,7 @@ import { analyticsRouter } from "./server/routes/analyticsRoutes";
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
 
   // JSON payload parser with generous limit for base64 image avatar uploads
   app.use(express.json({ limit: "10mb" }));
@@ -52,7 +53,10 @@ async function startServer() {
   // Vite middleware for development vs static build for production
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -64,9 +68,26 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Learn.co Server running on http://localhost:${PORT}`);
   });
+
+  server.on("error", (err: any) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`[Server] Port ${PORT} already in use. A process is already listening.`);
+    } else {
+      console.error("[Server] Error:", err);
+    }
+  });
+
+  const shutdown = () => {
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 startServer();

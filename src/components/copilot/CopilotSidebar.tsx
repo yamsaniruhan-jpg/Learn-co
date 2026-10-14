@@ -19,6 +19,7 @@ import {
   Code2,
   Stethoscope,
   Target,
+  FileText,
 } from 'lucide-react';
 import {
   CopilotConversation,
@@ -42,6 +43,8 @@ interface CopilotSidebarProps {
   onSearchChange: (q: string) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onDeleteAllHistory?: () => void;
+  onExportHistory?: () => void;
 }
 
 export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
@@ -60,6 +63,8 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
   onSearchChange,
   isMobileOpen = false,
   onCloseMobile,
+  onDeleteAllHistory,
+  onExportHistory,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -317,6 +322,26 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Save & Delete All History Actions */}
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <button
+            onClick={onExportHistory}
+            className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+            title="Save & Export All History"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Save History</span>
+          </button>
+          <button
+            onClick={onDeleteAllHistory}
+            className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-700 dark:text-rose-300 text-[10px] font-bold border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+            title="Delete All History"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete All</span>
+          </button>
         </div>
       </div>
     </div>

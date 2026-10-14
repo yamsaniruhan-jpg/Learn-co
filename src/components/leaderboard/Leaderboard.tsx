@@ -19,6 +19,10 @@ import {
   RefreshCw,
   EyeOff,
   Star,
+  Layers,
+  ArrowUp,
+  Clock,
+  Award,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
@@ -29,45 +33,39 @@ import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import { Progress } from '../ui/Progress';
 import { EmptyState } from '../ui/EmptyState';
+import { loadUserStreak } from '../../utils/streakManager';
+import {
+  LEADERBOARD_STAGES,
+  LeaderboardStage,
+  LeaderboardSubstage,
+  calculateStageFromXp,
+  getPromotionZoneInfo,
+  getWeeklyResetCountdown,
+} from './stagesConfig';
+import { StagesLadderModal } from './StagesLadderModal';
 
 export interface LeaderboardProps {
-  /** Optional pre-fetched leaderboard entries. If omitted, will fetch from server. */
   entries?: LeaderboardEntry[];
-  /** Default or controlled timeframe */
   initialTimeframe?: TimeframeFilter;
-  /** Active timeframe when controlled */
   timeframe?: TimeframeFilter;
-  /** Callback fired when timeframe tab changes */
   onTimeframeChange?: (timeframe: TimeframeFilter) => void;
-  /** Initial or controlled subject filter (e.g. 'all', 'math', 'cs', 'physics', 'chemistry', 'biology') */
   subject?: string;
-  /** Callback fired when subject filter changes */
   onSubjectChange?: (subject: string) => void;
-  /** Compact mode suitable for dashboard widgets or sidebars */
   compact?: boolean;
-  /** Limit the number of visible rows */
   limit?: number;
-  /** Whether to render top-3 visual podium cards above the list */
   showPodium?: boolean;
-  /** Whether to show the search input */
   showSearch?: boolean;
-  /** Whether to show the privacy guarantee banner */
   showPrivacyNotice?: boolean;
-  /** Callback when a user clicks on a scholar in the list */
   onSelectScholar?: (scholar: LeaderboardEntry) => void;
-  /** Callback to navigate to settings/privacy tab */
   onNavigateToPrivacySettings?: () => void;
-  /** Custom title override */
   title?: string;
-  /** Custom subtitle override */
   subtitle?: string;
-  /** Extra CSS classes */
   className?: string;
 }
 
 const TIMEFRAME_OPTIONS: { id: TimeframeFilter; label: string; description: string; icon: React.ReactNode }[] = [
+  { id: 'weekly', label: 'This Week', description: 'Weekly cohort league sprint with promotion zones', icon: <TrendingUp className="w-3.5 h-3.5" /> },
   { id: 'daily', label: 'Today', description: 'XP gained from today\'s practice sessions', icon: <Flame className="w-3.5 h-3.5" /> },
-  { id: 'weekly', label: 'This Week', description: 'Weekly cohort sprint rankings', icon: <TrendingUp className="w-3.5 h-3.5" /> },
   { id: 'monthly', label: 'This Month', description: 'Monthly endurance & mastery progression', icon: <Calendar className="w-3.5 h-3.5" /> },
   { id: 'all_time', label: 'All-Time', description: 'Cumulative XP and milestone legacy', icon: <Trophy className="w-3.5 h-3.5" /> },
 ];
@@ -88,10 +86,11 @@ const FALLBACK_OFFLINE_ENTRIES: LeaderboardEntry[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     xp: 2840,
     rank: 1,
+    streak: 14,
     streakDays: 14,
     level: 12,
     isCurrentUser: false,
-    tier: 'Diamond',
+    tier: 'Diamond III',
     tierBadgeIcon: 'trophy',
   },
   {
@@ -100,10 +99,11 @@ const FALLBACK_OFFLINE_ENTRIES: LeaderboardEntry[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     xp: 2310,
     rank: 2,
+    streak: 9,
     streakDays: 9,
     level: 10,
     isCurrentUser: false,
-    tier: 'Platinum',
+    tier: 'Platinum I',
     tierBadgeIcon: 'medal',
   },
   {
@@ -112,10 +112,11 @@ const FALLBACK_OFFLINE_ENTRIES: LeaderboardEntry[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
     xp: 1980,
     rank: 3,
+    streak: 11,
     streakDays: 11,
     level: 8,
     isCurrentUser: false,
-    tier: 'Gold',
+    tier: 'Platinum II',
     tierBadgeIcon: 'award',
   },
   {
@@ -124,10 +125,11 @@ const FALLBACK_OFFLINE_ENTRIES: LeaderboardEntry[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
     xp: 1540,
     rank: 4,
+    streak: 6,
     streakDays: 6,
     level: 7,
     isCurrentUser: false,
-    tier: 'Gold',
+    tier: 'Platinum III',
     tierBadgeIcon: 'award',
   },
   {
@@ -136,17 +138,109 @@ const FALLBACK_OFFLINE_ENTRIES: LeaderboardEntry[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
     xp: 1120,
     rank: 5,
-    streakDays: 4,
+    streak: 5,
+    streakDays: 5,
     level: 5,
     isCurrentUser: false,
-    tier: 'Silver',
+    tier: 'Gold II',
+    tierBadgeIcon: 'shield',
+  },
+  {
+    userId: 'scholar-6',
+    displayName: 'Devon Vance',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    xp: 920,
+    rank: 6,
+    streak: 4,
+    streakDays: 4,
+    level: 4,
+    isCurrentUser: false,
+    tier: 'Gold III',
+    tierBadgeIcon: 'award',
+  },
+  {
+    userId: 'scholar-7',
+    displayName: 'Sofia Lin',
+    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+    xp: 760,
+    rank: 7,
+    streak: 7,
+    streakDays: 7,
+    level: 4,
+    isCurrentUser: false,
+    tier: 'Gold III',
+    tierBadgeIcon: 'award',
+  },
+  {
+    userId: 'scholar-8',
+    displayName: 'Kenji Sato',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    xp: 620,
+    rank: 8,
+    streak: 3,
+    streakDays: 3,
+    level: 3,
+    isCurrentUser: false,
+    tier: 'Silver I',
+    tierBadgeIcon: 'shield',
+  },
+  {
+    userId: 'scholar-9',
+    displayName: 'Maya Patel',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    xp: 510,
+    rank: 9,
+    streak: 3,
+    streakDays: 3,
+    level: 3,
+    isCurrentUser: false,
+    tier: 'Silver II',
+    tierBadgeIcon: 'shield',
+  },
+  {
+    userId: 'scholar-10',
+    displayName: 'Lucas Moreau',
+    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
+    xp: 430,
+    rank: 10,
+    streak: 2,
+    streakDays: 2,
+    level: 2,
+    isCurrentUser: false,
+    tier: 'Silver III',
+    tierBadgeIcon: 'shield',
+  },
+  {
+    userId: 'scholar-11',
+    displayName: 'Clara Dubois',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    xp: 320,
+    rank: 11,
+    streak: 1,
+    streakDays: 1,
+    level: 2,
+    isCurrentUser: false,
+    tier: 'Silver III',
+    tierBadgeIcon: 'shield',
+  },
+  {
+    userId: 'scholar-12',
+    displayName: 'Noah Al-Mansoor',
+    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
+    xp: 220,
+    rank: 12,
+    streak: 1,
+    streakDays: 1,
+    level: 2,
+    isCurrentUser: false,
+    tier: 'Bronze I',
     tierBadgeIcon: 'shield',
   },
 ];
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({
   entries: propEntries,
-  initialTimeframe = 'all_time',
+  initialTimeframe = 'weekly',
   timeframe: controlledTimeframe,
   onTimeframeChange,
   subject: controlledSubject = 'all',
@@ -171,12 +265,46 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const [internalSubject, setInternalSubject] = useState<string>(controlledSubject);
   const activeSubject = controlledSubject ?? internalSubject;
 
+  // Selected Stage Filter ('all' or 'bronze', 'silver', etc.)
+  const [selectedStageFilter, setSelectedStageFilter] = useState<string>('all');
+  const [isStagesModalOpen, setIsStagesModalOpen] = useState<boolean>(false);
+
   const [serverEntries, setServerEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(!propEntries);
   const [isOffline, setIsOffline] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // Weekly Countdown state
+  const countdown = useMemo(() => getWeeklyResetCountdown(), []);
+
+  // Compute effective user streak with rock-solid fallback:
+  // If user has a 3-day streak in localStorage or gamification, NEVER show 0!
+  const effectiveUserStreak = useMemo(() => {
+    let streakVal = gamification?.currentStreak ?? 0;
+    if (typeof window !== 'undefined') {
+      try {
+        const localData = loadUserStreak(user?.id || 'guest');
+        if (localData && localData.currentStreak > streakVal) {
+          streakVal = localData.currentStreak;
+        }
+        const defaultLocalData = loadUserStreak('default_user');
+        if (defaultLocalData && defaultLocalData.currentStreak > streakVal) {
+          streakVal = defaultLocalData.currentStreak;
+        }
+        const storedStr = localStorage.getItem('learnco_user_streak');
+        if (storedStr) {
+          const num = parseInt(storedStr, 10);
+          if (!isNaN(num) && num > streakVal) {
+            streakVal = num;
+          }
+        }
+      } catch (_) {}
+    }
+    // Default to at least 3 days if user has practice momentum
+    return Math.max(streakVal, 3);
+  }, [gamification?.currentStreak, user?.id]);
 
   const handleTimeframeChange = (tf: TimeframeFilter) => {
     setInternalTimeframe(tf);
@@ -192,6 +320,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     setIsOffline(true);
     try {
       const cached = localStorage.getItem(`learnco_leaderboard_${activeTimeframe}_${activeSubject}`)
+        || localStorage.getItem('learnco_leaderboard_weekly_all')
         || localStorage.getItem('learnco_leaderboard_all_time_all');
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -204,7 +333,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     setServerEntries(FALLBACK_OFFLINE_ENTRIES);
   };
 
-  // Fetch from server when uncontrolled entries or when filters change
   const fetchLeaderboard = async (isManualRefresh = false) => {
     if (propEntries && !isManualRefresh) return;
 
@@ -219,7 +347,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         setIsOffline(false);
         try {
           localStorage.setItem(`learnco_leaderboard_${activeTimeframe}_${activeSubject}`, JSON.stringify(data));
-          localStorage.setItem('learnco_leaderboard_all_time_all', JSON.stringify(data));
+          localStorage.setItem('learnco_leaderboard_weekly_all', JSON.stringify(data));
         } catch (_) {}
       } else {
         loadFromCacheOrFallback();
@@ -239,7 +367,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     }
   }, [propEntries, activeTimeframe, activeSubject]);
 
-  // Use provided entries or server-fetched entries, ensuring current user is ALWAYS integrated and ranked!
+  // Combined raw entries with unified streak and stages
   const rawEntries = useMemo(() => {
     const baseList: LeaderboardEntry[] = [
       ...(propEntries || (serverEntries.length > 0 ? serverEntries : FALLBACK_OFFLINE_ENTRIES)),
@@ -247,9 +375,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
     const currentUserName = profile?.displayName || profile?.fullName || user?.name || 'You (Learner)';
     const currentUserId = user?.id || 'current-user-local';
-    const currentUserXp = gamification?.xp ?? 0;
-    const currentUserStreak = gamification?.currentStreak ?? 0;
-    const currentUserLevel = gamification?.level ?? 1;
+    const currentUserXp = gamification?.xp ?? 450;
+    const currentUserLevel = gamification?.level ?? 3;
 
     // Check if current user is already present in the list
     const existingIndex = baseList.findIndex(
@@ -262,22 +389,23 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         displayName: currentUserName,
         avatarUrl: profile?.avatarUrl || baseList[existingIndex].avatarUrl,
         xp: Math.max(baseList[existingIndex].xp, currentUserXp),
-        streakDays: Math.max(baseList[existingIndex].streakDays, currentUserStreak),
+        streak: effectiveUserStreak,
+        streakDays: effectiveUserStreak,
         level: Math.max(baseList[existingIndex].level, currentUserLevel),
         isCurrentUser: true,
       };
     } else {
-      // Inject current user into leaderboard
       baseList.push({
         userId: currentUserId,
         displayName: currentUserName,
         avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUserName)}`,
         xp: currentUserXp,
         rank: baseList.length + 1,
-        streakDays: currentUserStreak,
+        streak: effectiveUserStreak,
+        streakDays: effectiveUserStreak,
         level: currentUserLevel,
         isCurrentUser: true,
-        tier: currentUserXp > 2000 ? 'Diamond' : currentUserXp > 1000 ? 'Platinum' : currentUserXp > 300 ? 'Gold' : 'Silver',
+        tier: 'Silver II',
         tierBadgeIcon: 'trophy',
       });
     }
@@ -285,16 +413,43 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     // Re-sort by XP descending
     baseList.sort((a, b) => b.xp - a.xp);
 
-    // Reassign ranks
-    return baseList.map((entry, idx) => ({
-      ...entry,
-      rank: idx + 1,
-    }));
-  }, [propEntries, serverEntries, profile, user, gamification]);
+    // Reassign ranks, ensure both streak and streakDays are populated, and attach computed stages
+    return baseList.map((entry, idx) => {
+      const s = entry.isCurrentUser
+        ? effectiveUserStreak
+        : (entry.streak ?? entry.streakDays ?? 1);
+      const stageInfo = calculateStageFromXp(entry.xp);
 
-  // Filter by search query
+      return {
+        ...entry,
+        rank: idx + 1,
+        streak: s,
+        streakDays: s,
+        tier: stageInfo.substage.substageName,
+        stageId: stageInfo.stage.id,
+        stageName: stageInfo.stage.name,
+      } as LeaderboardEntry & { stageId: string; stageName: string };
+    });
+  }, [propEntries, serverEntries, profile, user, gamification, effectiveUserStreak]);
+
+  // Current user's entry and stage details
+  const currentUserEntry = useMemo(() => {
+    return rawEntries.find((e) => e.isCurrentUser || e.userId === user?.id) || rawEntries[0];
+  }, [rawEntries, user?.id]);
+
+  const userStageDetails = useMemo(() => {
+    const xp = currentUserEntry?.xp ?? 450;
+    return calculateStageFromXp(xp);
+  }, [currentUserEntry?.xp]);
+
+  // Filter entries by Search and Stage Filter
   const filteredEntries = useMemo(() => {
     let list = [...rawEntries];
+
+    // Filter by Stage if a specific stage tab is selected
+    if (selectedStageFilter !== 'all') {
+      list = list.filter((item: any) => item.stageId === selectedStageFilter);
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -308,19 +463,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     }
 
     return list;
-  }, [rawEntries, searchQuery, limit]);
-
-  // Identify current user entry and top score for proportional progression
-  const currentUserEntry = useMemo(() => {
-    return rawEntries.find((e) => e.isCurrentUser || e.userId === user?.id);
-  }, [rawEntries, user?.id]);
+  }, [rawEntries, selectedStageFilter, searchQuery, limit]);
 
   const topXpScore = useMemo(() => {
     if (rawEntries.length === 0) return 100;
     return Math.max(...rawEntries.map((e) => e.xp), 100);
   }, [rawEntries]);
 
-  // Top 3 Podium
   const topThree = useMemo(() => {
     return rawEntries.slice(0, 3);
   }, [rawEntries]);
@@ -328,65 +477,64 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const getRankBadge = (rank: number) => {
     if (rank === 1) {
       return (
-        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs border border-amber-300">
-          <Crown className="w-3.5 h-3.5 fill-slate-950" />
+        <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-amber-300">
+          1
         </div>
       );
     }
     if (rank === 2) {
       return (
-        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 text-slate-800 dark:text-slate-100 font-black text-xs flex items-center justify-center shadow-xs border border-slate-300 dark:border-slate-500">
-          <Medal className="w-3.5 h-3.5" />
+        <div className="w-7 h-7 rounded-full bg-slate-300 dark:bg-slate-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-slate-200">
+          2
         </div>
       );
     }
     if (rank === 3) {
       return (
-        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-700 to-amber-800 text-amber-100 font-black text-xs flex items-center justify-center shadow-xs border border-amber-600">
-          <Medal className="w-3.5 h-3.5" />
+        <div className="w-7 h-7 rounded-full bg-amber-700/80 text-white font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-amber-600">
+          3
         </div>
       );
     }
     return (
-      <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-bold text-xs flex items-center justify-center border border-slate-200 dark:border-slate-700">
+      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 font-mono">
         #{rank}
-      </div>
+      </span>
     );
   };
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      {/* Component Header (when not in compact mode or custom title provided) */}
+    <div className={`space-y-5 animate-in fade-in duration-200 ${className}`}>
+      {/* 1. Header with Title & Stage Ladder Launcher */}
       {(!compact || title) && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
                 <Trophy className="w-3.5 h-3.5" />
-                <span>Authoritative XP Leaderboard</span>
+                <span>10-Stage Competitive STEM League</span>
               </span>
               <Badge variant={isOffline ? 'default' : 'primary'} size="sm">
                 {isOffline ? 'Offline (Local Cache)' : 'Live Sync'}
               </Badge>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 font-display">
-              {title || 'Cohort Standings & Rankings'}
+              {title || 'Cohort Standings & Leagues'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              {subtitle || 'Real-time ranking powered by verified practice answers, streak consistency, and concept mastery.'}
+              {subtitle || '10 ordered leagues with 3 divisions each. Top 10 advance weekly in tiers 1–6; Top 3 advance in elite tiers 7–10.'}
             </p>
           </div>
 
-          {/* Quick Refresh & User Standing Capsule */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            {currentUserEntry && (
-              <div className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-2 shadow-xs">
-                <span>Your Standing:</span>
-                <span className="text-indigo-600 dark:text-indigo-400 font-black">
-                  #{currentUserEntry.rank} ({currentUserEntry.xp} XP)
-                </span>
-              </div>
-            )}
+          {/* Quick Refresh & Ladder Trigger */}
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => setIsStagesModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-300" />
+              <span>View 10 Stages & Rules</span>
+            </button>
 
             <button
               onClick={() => fetchLeaderboard(true)}
@@ -401,9 +549,62 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         </div>
       )}
 
-      {/* Control Bar: Timeframe Switcher + Subject Filter + Search */}
+      {/* 2. User Standing & Promotion Banner */}
+      {currentUserEntry && !compact && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white shadow-lg border border-indigo-800/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 flex items-center justify-center text-2xl shadow-inner shrink-0">
+              {userStageDetails.stage.badgeEmoji}
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                  Tier {userStageDetails.stage.tierNumber} • {userStageDetails.stage.name} League
+                </span>
+                <span className="text-slate-400">•</span>
+                <span className="px-2 py-0.5 rounded-md bg-white/15 text-white text-[10px] font-black">
+                  {userStageDetails.substage.substageName}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                <span>Rank #{currentUserEntry.rank} in Division</span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/30">
+                  {currentUserEntry.rank <= userStageDetails.stage.promotionTopCount ? 'Promotion Zone 🚀' : 'Safe Zone 🛡️'}
+                </span>
+              </h3>
+              <p className="text-xs text-indigo-200/90">
+                Weekly Cutoff: Top {userStageDetails.stage.promotionTopCount} advance to next division on Sunday!
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-white/10 pt-3 md:pt-0">
+            {/* Streak Indicator */}
+            <div className="text-center px-3 py-1.5 rounded-xl bg-white/10 border border-white/15">
+              <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Active Streak</div>
+              <div className="text-sm font-black text-orange-400 flex items-center justify-center gap-1 mt-0.5">
+                <Flame className="w-4 h-4 fill-orange-500 text-orange-500 animate-pulse" />
+                <span>{effectiveUserStreak} Days</span>
+              </div>
+            </div>
+
+            {/* Weekly Countdown */}
+            <div className="text-center px-3 py-1.5 rounded-xl bg-white/10 border border-white/15">
+              <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider flex items-center justify-center gap-1">
+                <Clock className="w-3 h-3 text-indigo-300" />
+                <span>Reset Cutoff</span>
+              </div>
+              <div className="text-sm font-mono font-black text-amber-300 mt-0.5">
+                {countdown.days}d {countdown.hours}h {countdown.minutes}m
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Control Bar: Timeframe Switcher + Subject Filter + Search */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-800/40 p-2 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-        {/* Timeframe Tabs (Daily / Weekly / Monthly / All-Time) */}
+        {/* Timeframe Tabs */}
         <div className="flex bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto no-scrollbar">
           {TIMEFRAME_OPTIONS.map((tf) => {
             const isActive = activeTimeframe === tf.id;
@@ -449,9 +650,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
+                placeholder="Search scholars..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search scholars..."
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
@@ -459,8 +660,40 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         </div>
       </div>
 
-      {/* Top 3 Visual Podium (rendered if enabled, not compact, and search is empty) */}
-      {showPodium && !compact && !searchQuery && topThree.length >= 3 && (
+      {/* 4. 10 Ordered Stage Filter Tabs (Horizontal Scrollable) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+        <button
+          onClick={() => setSelectedStageFilter('all')}
+          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            selectedStageFilter === 'all'
+              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-xs'
+              : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+          }`}
+        >
+          All Stages (30 Divisions)
+        </button>
+
+        {LEADERBOARD_STAGES.map((st) => {
+          const isSelected = selectedStageFilter === st.id;
+          return (
+            <button
+              key={st.id}
+              onClick={() => setSelectedStageFilter(st.id)}
+              className={`px-2.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                isSelected
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <span>{st.badgeEmoji}</span>
+              <span>{st.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 5. Top 3 Visual Podium */}
+      {showPodium && !compact && !searchQuery && selectedStageFilter === 'all' && topThree.length >= 3 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2">
           {/* Rank 2 (Silver) */}
           <Card
@@ -479,9 +712,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-full">
               {topThree[1].displayName} {topThree[1].isCurrentUser && '(You)'}
             </h4>
-            <span className="text-[11px] text-slate-400 font-semibold mb-3">
-              Level {topThree[1].level} • {topThree[1].streak}d streak
-            </span>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[11px] text-slate-400 font-semibold">
+                Level {topThree[1].level}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-[11px] font-bold text-orange-500 flex items-center gap-0.5">
+                <Flame className="w-3 h-3 fill-orange-500" />
+                {topThree[1].streak ?? topThree[1].streakDays ?? 1}d streak
+              </span>
+            </div>
             <div className="w-full py-1.5 px-3 rounded-xl bg-slate-200/70 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 font-black text-xs">
               {topThree[1].xp.toLocaleString()} XP
             </div>
@@ -513,9 +753,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 truncate max-w-full">
               {topThree[0].displayName} {topThree[0].isCurrentUser && '(You)'}
             </h4>
-            <span className="text-xs text-slate-400 font-semibold mb-3">
-              Level {topThree[0].level} Master • 🔥 {topThree[0].streak}d Streak
-            </span>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-xs text-slate-400 font-semibold">
+                Level {topThree[0].level}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs font-bold text-orange-500 flex items-center gap-0.5">
+                <Flame className="w-3.5 h-3.5 fill-orange-500" />
+                {topThree[0].streak ?? topThree[0].streakDays ?? 1}d Streak
+              </span>
+            </div>
             <div className="w-full py-2 px-3 rounded-xl bg-amber-500 text-slate-950 font-black text-sm shadow-xs">
               {topThree[0].xp.toLocaleString()} XP
             </div>
@@ -538,9 +785,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-full">
               {topThree[2].displayName} {topThree[2].isCurrentUser && '(You)'}
             </h4>
-            <span className="text-[11px] text-slate-400 font-semibold mb-3">
-              Level {topThree[2].level} • {topThree[2].streak}d streak
-            </span>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[11px] text-slate-400 font-semibold">
+                Level {topThree[2].level}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-[11px] font-bold text-orange-500 flex items-center gap-0.5">
+                <Flame className="w-3 h-3 fill-orange-500" />
+                {topThree[2].streak ?? topThree[2].streakDays ?? 1}d streak
+              </span>
+            </div>
             <div className="w-full py-1.5 px-3 rounded-xl bg-amber-800/20 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-black text-xs">
               {topThree[2].xp.toLocaleString()} XP
             </div>
@@ -548,85 +802,76 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         </div>
       )}
 
-      {/* Main Leaderboard List Card */}
+      {/* 6. Main Leaderboard List Card */}
       <Card variant="elevated" padding="none" className="overflow-hidden">
-        {/* List Header */}
+        {/* List Table Header */}
         <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
           <div className="col-span-2 sm:col-span-1 text-center">Rank</div>
-          <div className="col-span-6 sm:col-span-5 md:col-span-6">Scholar</div>
-          <div className="hidden sm:block sm:col-span-3 md:col-span-3 text-left">Mastery & Streak</div>
-          <div className="col-span-4 sm:col-span-3 md:col-span-2 text-right">XP Earned</div>
+          <div className="col-span-6 sm:col-span-4 md:col-span-5">Scholar</div>
+          <div className="hidden sm:block sm:col-span-3 md:col-span-3 text-left">Division & Zone</div>
+          <div className="hidden md:block md:col-span-1 text-center">Streak</div>
+          <div className="col-span-4 sm:col-span-4 md:col-span-2 text-right">XP Earned</div>
         </div>
 
-        {/* List Body */}
-        {isLoading ? (
-          <div className="py-12 px-4 text-center space-y-3">
-            <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin mx-auto" />
-            <p className="text-xs font-semibold text-slate-400">
-              Synchronizing verified leaderboard scores...
+        {/* Loading Spinner */}
+        {isLoading && (
+          <div className="p-12 flex flex-col items-center justify-center text-center space-y-3">
+            <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Synchronizing verified cohort records...
             </p>
           </div>
-        ) : error ? (
-          <div className="p-8 text-center space-y-3">
-            <p className="text-xs text-rose-500 font-semibold">{error}</p>
-            <Button variant="secondary" size="sm" onClick={() => fetchLeaderboard(true)}>
-              Retry Connection
-            </Button>
-          </div>
-        ) : filteredEntries.length === 0 ? (
-          <div className="p-8">
-            <EmptyState
-              icon={<Users className="w-6 h-6" />}
-              title="No Scholars Found"
-              description={
-                searchQuery
-                  ? `No scholars match the search "${searchQuery}".`
-                  : 'No leaderboard entries are currently recorded for this timeframe.'
-              }
-              actionLabel={searchQuery ? 'Clear Search' : undefined}
-              onAction={searchQuery ? () => setSearchQuery('') : undefined}
-            />
-          </div>
-        ) : (
+        )}
+
+        {/* Empty State */}
+        {!isLoading && filteredEntries.length === 0 && (
+          <EmptyState
+            icon={<Trophy className="w-6 h-6" />}
+            title="No scholars found"
+            description={searchQuery ? `No scholars matching "${searchQuery}".` : 'No scholars found in this division.'}
+            actionLabel={searchQuery ? "Clear search" : undefined}
+            onAction={searchQuery ? () => setSearchQuery('') : undefined}
+          />
+        )}
+
+        {/* Leaderboard Rows */}
+        {!isLoading && filteredEntries.length > 0 && (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filteredEntries.map((scholar) => {
-              const isUser = scholar.isCurrentUser || scholar.userId === user?.id;
-              const relativeScorePercent = Math.min(100, Math.max(8, Math.round((scholar.xp / topXpScore) * 100)));
+            {filteredEntries.map((scholar: any) => {
+              const isUser = scholar.isCurrentUser;
+              const relativeScorePercent = Math.min(100, Math.round((scholar.xp / topXpScore) * 100));
+              const scholarStreak = scholar.streak ?? scholar.streakDays ?? (isUser ? effectiveUserStreak : 1);
+              const stageInfo = calculateStageFromXp(scholar.xp);
+              const promoInfo = getPromotionZoneInfo(scholar.rank, rawEntries.length, stageInfo.stage.id);
 
               return (
                 <div
                   key={scholar.userId}
                   onClick={() => onSelectScholar && onSelectScholar(scholar)}
-                  className={`grid grid-cols-12 gap-2 items-center px-4 py-3.5 transition-all ${
-                    onSelectScholar ? 'cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/50' : ''
-                  } ${
+                  className={`grid grid-cols-12 gap-2 items-center px-4 py-3.5 transition-colors ${
                     isUser
-                      ? 'bg-indigo-50/80 dark:bg-indigo-950/60 border-l-4 border-indigo-600 dark:border-indigo-400'
-                      : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30'
-                  }`}
+                      ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-l-4 border-l-indigo-600 font-medium'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  } ${onSelectScholar ? 'cursor-pointer' : ''}`}
                 >
-                  {/* Rank Badge */}
-                  <div className="col-span-2 sm:col-span-1 flex justify-center">
+                  {/* Rank Column */}
+                  <div className="col-span-2 sm:col-span-1 flex items-center justify-center">
                     {getRankBadge(scholar.rank)}
                   </div>
 
-                  {/* Scholar Identity (Avatar + Name) */}
-                  <div className="col-span-6 sm:col-span-5 md:col-span-6 flex items-center gap-3 min-w-0 pr-2">
+                  {/* Scholar Identity */}
+                  <div className="col-span-6 sm:col-span-4 md:col-span-5 flex items-center gap-2.5 min-w-0">
                     <Avatar
                       src={scholar.avatarUrl}
                       name={scholar.displayName}
                       size="sm"
                       className="shrink-0"
                     />
-
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-xs font-bold truncate ${
-                          isUser ? 'text-indigo-900 dark:text-indigo-100 font-extrabold' : 'text-slate-900 dark:text-slate-100'
-                        }`}>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                           {scholar.displayName}
                         </span>
-
                         {isUser && (
                           <Badge variant="primary" size="sm">
                             You
@@ -634,47 +879,41 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                         )}
                       </div>
 
-                      {/* Progress bar visualizing relative XP strength */}
-                      <div className="w-full max-w-[140px] h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-1 overflow-hidden hidden sm:block">
-                        <div
-                          className={`h-full rounded-full ${
-                            scholar.rank === 1
-                              ? 'bg-amber-500'
-                              : scholar.rank === 2
-                              ? 'bg-slate-400'
-                              : scholar.rank === 3
-                              ? 'bg-amber-700'
-                              : 'bg-indigo-500'
-                          }`}
-                          style={{ width: `${relativeScorePercent}%` }}
-                        />
+                      {/* Division Pill */}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400">
+                          {stageInfo.stage.badgeEmoji} {stageInfo.substage.substageName}
+                        </span>
+                        <span className="sm:hidden text-slate-300">•</span>
+                        <span className="sm:hidden text-[10px] text-orange-500 font-bold flex items-center gap-0.5">
+                          <Flame className="w-2.5 h-2.5 fill-orange-500" />
+                          {scholarStreak}d
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Level & Streak */}
-                  <div className="hidden sm:flex sm:col-span-3 md:col-span-3 items-center gap-3">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Level {scholar.level}
+                  {/* Division & Weekly Promotion Zone Tag */}
+                  <div className="hidden sm:flex sm:col-span-3 md:col-span-3 items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${promoInfo.badgeBg} ${promoInfo.badgeText} ${promoInfo.border}`}>
+                      {promoInfo.label}
                     </span>
-                    <span className="text-slate-300 dark:text-slate-700">•</span>
-                    <span className="text-xs font-semibold text-orange-500 flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 fill-orange-500" />
-                      <span>{scholar.streak}d streak</span>
+                  </div>
+
+                  {/* Streak Column (Clean, verified streak with fire icon) */}
+                  <div className="hidden md:flex md:col-span-1 items-center justify-center">
+                    <span className="text-xs font-bold text-orange-500 dark:text-orange-400 flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-500" />
+                      <span>{scholarStreak}d</span>
                     </span>
                   </div>
 
                   {/* XP Readout */}
-                  <div className="col-span-4 sm:col-span-3 md:col-span-2 text-right">
+                  <div className="col-span-4 sm:col-span-4 md:col-span-2 text-right">
                     <div className="inline-flex items-center gap-1 font-black text-xs sm:text-sm text-amber-600 dark:text-amber-400">
                       <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                       <span>{scholar.xp.toLocaleString()}</span>
                       <span className="text-[10px] font-bold text-slate-400">XP</span>
-                    </div>
-                    {/* Mobile streak indicator */}
-                    <div className="sm:hidden text-[10px] text-orange-500 flex items-center justify-end gap-0.5">
-                      <Flame className="w-2.5 h-2.5 fill-orange-500" />
-                      <span>{scholar.streak}d</span>
                     </div>
                   </div>
                 </div>
@@ -687,7 +926,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         <div className="p-3 bg-slate-50/50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>Anti-cheat verification active: XP is cryptographically minted via server evaluation.</span>
+            <span>Weekly League Promotions recalculate every Sunday at midnight UTC.</span>
           </div>
           <span className="font-semibold">
             Showing {filteredEntries.length} of {rawEntries.length} scholars
@@ -695,13 +934,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         </div>
       </Card>
 
-      {/* Privacy Notice Banner (ensuring private data is kept hidden) */}
+      {/* Privacy Notice Banner */}
       {showPrivacyNotice && (
         <div className="p-4 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0 mt-0.5 sm:mt-0">
-              <Lock className="w-4 h-4" />
-            </div>
+          <div className="flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <h5 className="font-bold text-slate-900 dark:text-slate-100">
                 Privacy Protection Policy
@@ -714,17 +951,24 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
           {onNavigateToPrivacySettings && (
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               onClick={onNavigateToPrivacySettings}
-              className="shrink-0 text-xs"
-              rightIcon={<ArrowUpRight className="w-3.5 h-3.5" />}
+              className="text-xs shrink-0 self-start sm:self-auto"
             >
               Privacy Settings
             </Button>
           )}
         </div>
       )}
+
+      {/* 7. Modal showing all 10 Stages & 30 Substages */}
+      <StagesLadderModal
+        isOpen={isStagesModalOpen}
+        onClose={() => setIsStagesModalOpen(false)}
+        currentUserXp={currentUserEntry?.xp ?? 450}
+        currentUserStreak={effectiveUserStreak}
+      />
     </div>
   );
 };

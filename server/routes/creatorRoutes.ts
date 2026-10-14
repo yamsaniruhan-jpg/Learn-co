@@ -42,6 +42,7 @@ router.get('/quota', requireAuth, (req: AuthenticatedRequest, res: Response) => 
       quotas: {
         sources: quotas.sources,
         artifacts: quotas.artifacts,
+        urls: quotas.urls,
       },
     });
   } catch (err: any) {
@@ -72,15 +73,18 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
       return;
     }
 
-    // Enforce daily source upload quota (4 sources per day)
-    let quotaResult;
+    // Enforce daily quotas based on sourceType
     try {
-      quotaResult = Database.checkAndIncrementSourceQuota(userId);
+      if (sourceType === 'url') {
+        Database.checkAndIncrementUrlQuota(userId);
+      } else {
+        Database.checkAndIncrementSourceQuota(userId);
+      }
     } catch (quotaErr: any) {
       res.status(429).json({
-        error: quotaErr.message || 'Daily source upload limit reached (4/4).',
+        error: quotaErr.message || 'Daily limit reached.',
         isLimitReached: true,
-        limit: 4,
+        limit: 5,
         remaining: 0,
       });
       return;
@@ -275,7 +279,7 @@ async function generateJsonWithAi(
   ai: GoogleGenAI,
   synthesisPrompt: string
 ): Promise<any> {
-  const models = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  const models = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite'];
   let lastError: any = null;
 
   for (const model of models) {

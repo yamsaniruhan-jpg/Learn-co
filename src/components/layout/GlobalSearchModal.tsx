@@ -101,11 +101,19 @@ const SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: 'focus-timer',
-    title: 'Gen Focus Timer & Ambient Synthesizer',
+    title: 'Zen Focus Timer & Focus Pulse (+XP)',
     category: 'Tool',
     tabId: 'focus',
     icon: <Clock className="w-4 h-4 text-indigo-500" />,
-    detail: 'Calibrated Pomodoro sprints, binaural 40Hz audio & scratchpad',
+    detail: 'Calibrated Pomodoro sprints, binaural 40Hz audio, focus pulse XP & scratchpad',
+  },
+  {
+    id: 'user-guide-item',
+    title: 'Platform User Guide & Scholar Manual',
+    category: 'Tool',
+    tabId: 'user-guide',
+    icon: <BookOpen className="w-4 h-4 text-purple-500" />,
+    detail: 'Complete user guide, daily routines, feature walkthroughs, and action roadmaps',
   },
   {
     id: 'practice-adaptive',

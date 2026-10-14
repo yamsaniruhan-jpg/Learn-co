@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with display name, bio, and avatar",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "email": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "displayName"]
+    },
+    "UserGamification": {
+      "title": "UserGamification",
+      "description": "User XP, level, streak, and tier status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "currentStreak": { "type": "number" },
+        "longestStreak": { "type": "number" },
+        "tier": { "type": "string" },
+        "lastActiveDate": { "type": "string" }
+      },
+      "required": ["userId", "xp", "level", "currentStreak"]
+    },
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Public cohort standing entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "streak": { "type": "number" },
+        "tier": { "type": "string" },
+        "rank": { "type": "number" }
+      },
+      "required": ["userId", "displayName", "xp", "rank"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private user profile and settings"
+    },
+    "/users/{userId}/gamification/status": {
+      "schema": "UserGamification",
+      "description": "Private gamification status document"
+    },
+    "/public_profiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Public scholar profile details"
+    },
+    "/leaderboard/{entryId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Public weekly and all-time leaderboard standings"
+    }
+  }
+}

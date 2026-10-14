@@ -98,8 +98,8 @@ export class CopilotCacheEngine {
       artifact?: any;
     }
   ): void {
-    // Avoid caching very short or error replies
-    if (!data.reply || data.reply.length < 20) return;
+    // Avoid caching very short, error, or fallback replies
+    if (!data.reply || data.reply.length < 20 || data.modelUsed.includes('engine') || data.modelUsed.includes('fallback')) return;
 
     // Enforce LRU eviction if cache reaches capacity
     if (this.cache.size >= this.MAX_ENTRIES) {

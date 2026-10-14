@@ -125,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Quick Focus Timer Button */}
+          {/* Quick Zen Focus Timer Button */}
           <button
             onClick={() => setActiveTab('focus')}
             className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -133,10 +133,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
             }`}
-            title="Open Gen Focus Timer Workspace"
+            title="Open Zen Focus Timer Workspace"
           >
             <Clock className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Focus</span>
+            <span>Zen Focus</span>
+          </button>
+
+          {/* Quick User Guide Button */}
+          <button
+            onClick={() => setActiveTab('user-guide')}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'user-guide' || activeTab === 'guide'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+            }`}
+            title="Open Platform User Guide & Manual"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
+            <span>User Guide</span>
           </button>
 
           {/* Zen Focus Canvas Toggle */}

@@ -52,6 +52,8 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isGenerationLimitReached, setIsGenerationLimitReached] = useState<boolean>(false);
+  const [quota, setQuota] = useState<{ sources: any, artifacts: any, urls: any } | null>(null);
 
   // Modals state
   const [editingResource, setEditingResource] = useState<CreatorResource | null>(null);
@@ -72,12 +74,15 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const loadData = async () => {
     setIsLoadingResources(true);
     try {
-      const [resList, srcList] = await Promise.all([
+      const [resList, srcList, q] = await Promise.all([
         CreatorClient.getResources(),
         CreatorClient.getSources(),
+        CreatorClient.getQuota(),
       ]);
       setResources(resList);
       setSources(srcList);
+      setQuota(q);
+      setIsGenerationLimitReached(q.artifacts.isLimitReached);
 
       // Default active resource if none
       if (!activeResource && resList.length > 0) {
@@ -130,7 +135,12 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       // Refresh sources in background
       CreatorClient.getSources().then(setSources).catch(() => {});
     } catch (err: any) {
-      showToast(err.message || 'Generation failed.', 'error');
+      if (err.message.includes('429') || err.message.includes('limit reached')) {
+        setIsGenerationLimitReached(true);
+        showToast('Daily generation limit reached. Please try again tomorrow.', 'error');
+      } else {
+        showToast(err.message || 'Generation failed.', 'error');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -356,6 +366,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             <SourceIntakePanel
               onGenerate={handleGenerate}
               isGenerating={isGenerating}
+              isGenerationLimitReached={isGenerationLimitReached}
               prefillSource={prefillSource}
             />
           )}

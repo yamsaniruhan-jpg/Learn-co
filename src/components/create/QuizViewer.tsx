@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { latexToPlainText } from '../../utils/textSanitizer';
 
 interface QuizViewerProps {
   quiz: QuizQuestionItem[];
@@ -200,7 +201,7 @@ export const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, title, onComplete 
 
               {/* Question Text */}
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 mb-4 leading-relaxed">
-                {q.question}
+                {latexToPlainText(q.question)}
               </h3>
 
               {/* Options Grid */}
@@ -242,7 +243,7 @@ export const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, title, onComplete 
                       >
                         {String.fromCharCode(65 + optIdx)}
                       </span>
-                      <span className="flex-1 pt-0.5">{opt}</span>
+                      <span className="flex-1 pt-0.5">{latexToPlainText(opt)}</span>
                       {hasAnswered && isThisCorrect && (
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                       )}
@@ -267,7 +268,7 @@ export const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, title, onComplete 
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>First-Principles Rationale:</span>
                   </div>
-                  <p className="leading-relaxed">{q.explanation}</p>
+                  <p className="leading-relaxed">{latexToPlainText(q.explanation)}</p>
                 </div>
               )}
             </div>

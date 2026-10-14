@@ -203,15 +203,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     setAuthError(null);
     try {
-      if (!email || !email.includes('@')) {
-        throw new Error('Please select or provide a valid Google Account email.');
+      // 1. Use Firebase Auth if not already provided via idToken
+      let firebaseToken = idToken;
+      if (!firebaseToken) {
+        const { signInWithPopup } = await import('../services/firebaseClient');
+        const { googleProvider, auth } = await import('../services/firebaseClient');
+        const result = await signInWithPopup(auth, googleProvider);
+        firebaseToken = await result.user.getIdToken();
       }
+
+      // 2. Pass the Firebase ID token to the backend
       const res = await AuthClient.signInWithGoogle({
-        email: email.trim().toLowerCase(),
-        name: name || email.split('@')[0],
+        email: email || '',
+        name: name || '',
         avatarUrl,
         intent,
-        idToken,
+        idToken: firebaseToken,
       });
       setUser(res.user);
       setProfile(res.profile);

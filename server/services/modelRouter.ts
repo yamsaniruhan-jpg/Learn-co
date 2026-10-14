@@ -9,18 +9,19 @@ export interface ModelRouteDecision {
 }
 
 export class ModelRouter {
-  // Ultra-low cost default for high throughput and tight budgets
-  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-3.1-flash-lite';
+  // Primary high-speed, available Gemini models
+  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-3.5-flash';
   // High-performance models for complex mathematical proofs & derivations
-  static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-3.8-flash';
-  static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-3.8-flash';
-  static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-3.8-flash';
+  static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-3.5-flash';
+  static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-3.5-flash';
+  static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-3.5-flash';
 
-  // Cost-optimized fallback cascade: flash-lite first, then flash 3.8
+  // Cost-optimized, highly reliable fallback cascade
   static readonly FALLBACK_CASCADE = [
-    'gemini-3.1-flash-lite',
-    'gemini-3.8-flash',
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
     'gemini-flash-latest',
+    'gemini-3.8-flash',
   ];
 
   /**
@@ -32,17 +33,14 @@ export class ModelRouter {
     contextLength: number = 0,
     requestedModel?: string
   ): ModelRouteDecision {
-    const isExplicitEco = requestedModel === 'gemini-3.1-flash-lite' || requestedModel === 'auto_eco';
-
     if (requestedModel && requestedModel.trim() && !requestedModel.startsWith('auto')) {
       const model = requestedModel.trim();
-      const isLite = model.includes('lite');
       return {
         modelName: model,
         reason: 'User explicitly selected model',
         temperature: 0.3,
-        maxOutputTokens: isLite ? 800 : 1200,
-        isEcoSaver: isLite,
+        maxOutputTokens: 1200,
+        isEcoSaver: false,
       };
     }
 
@@ -97,23 +95,23 @@ export class ModelRouter {
       lower.includes('hamiltonian') ||
       lower.includes('stereochemistry');
 
-    if (isReasoningTask && !isExplicitEco) {
+    if (isReasoningTask) {
       return {
         modelName: this.REASONING_MODEL,
         reason: 'Deep multi-step STEM derivation & invariant reasoning',
         temperature: 0.3,
-        maxOutputTokens: 1200,
+        maxOutputTokens: 1400,
         isEcoSaver: false,
       };
     }
 
-    // 4. Default: Socratic Hint / First-Principles Explainer / Fast Q&A -> Ultra-Low Cost Flash-Lite
+    // 4. Default: Socratic Hint / First-Principles Explainer / Fast Q&A -> Fast, High-Fidelity Flash
     return {
       modelName: this.DEFAULT_MODEL,
-      reason: 'Cost-friendly Socratic teaching & high-efficiency flash-lite routing',
+      reason: 'First-principles Socratic teaching & high-efficiency flash routing',
       temperature: 0.4,
-      maxOutputTokens: 750,
-      isEcoSaver: true,
+      maxOutputTokens: 1200,
+      isEcoSaver: false,
     };
   }
 

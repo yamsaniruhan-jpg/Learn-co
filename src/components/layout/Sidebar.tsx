@@ -21,6 +21,8 @@ import {
   User,
   KeyRound,
   Clock,
+  HelpCircle,
+  FlaskConical,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateLevelFromXp } from '../../types/auth';
@@ -57,7 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'concepts', label: 'Concept Library', icon: Library, highlight: true },
     { id: 'learn', label: 'Learn & Explore', icon: BookOpen },
     { id: 'practice', label: 'Practice Arena', icon: Target, badge: `${dailyAllowanceRemaining} left` },
-    { id: 'focus', label: 'Gen Focus Timer', icon: Clock, highlight: true },
+    { id: 'focus', label: 'Zen Focus Timer', icon: Clock, highlight: true },
+    { id: 'user-guide', label: 'User Guide', icon: HelpCircle, highlight: true },
+    { id: 'simulations', label: 'Virtual Simulations', icon: FlaskConical, highlight: true },
     { id: 'planner', label: 'Study Planner', icon: Calendar },
   ];
 

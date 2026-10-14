@@ -17,6 +17,9 @@ import {
   X,
   ChevronRight,
   BookMarked,
+  Clock,
+  HelpCircle,
+  FlaskConical,
 } from 'lucide-react';
 
 interface MobileAllTabsNavProps {
@@ -44,6 +47,33 @@ export const ALL_APP_FEATURES: NavFeature[] = [
     category: 'Core',
     icon: LayoutDashboard,
     description: 'Overview, streaks, daily goals and quick access',
+  },
+  {
+    id: 'focus',
+    label: 'Zen Focus Timer',
+    shortLabel: 'Zen Focus',
+    category: 'Core',
+    icon: Clock,
+    description: 'Deep work timer with ambient binaural soundscapes & XP pulses',
+    highlight: true,
+  },
+  {
+    id: 'simulations',
+    label: 'Virtual Simulations Hub',
+    shortLabel: 'Simulations',
+    category: 'Core',
+    icon: FlaskConical,
+    description: 'Interactive STEM lab models, sign charts, and gradient descent optimizers',
+    highlight: true,
+  },
+  {
+    id: 'user-guide',
+    label: 'User Guide & Manual',
+    shortLabel: 'Guide',
+    category: 'Core',
+    icon: HelpCircle,
+    description: 'Complete platform guide, feature walkthroughs & daily routines',
+    highlight: true,
   },
   {
     id: 'learn',

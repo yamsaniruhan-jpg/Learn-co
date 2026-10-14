@@ -29,6 +29,7 @@ import { Badge } from '../ui/Badge';
 interface SourceIntakePanelProps {
   onGenerate: (params: GenerateResourceRequest) => Promise<void>;
   isGenerating: boolean;
+  isGenerationLimitReached: boolean;
   prefillSource?: {
     sourceId?: string;
     title?: string;
@@ -40,6 +41,7 @@ interface SourceIntakePanelProps {
 export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   onGenerate,
   isGenerating,
+  isGenerationLimitReached,
   prefillSource,
 }) => {
   const [sourceType, setSourceType] = useState<SourceType>(
@@ -531,11 +533,11 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
           type="submit"
           variant="primary"
           size="lg"
-          disabled={isGenerating || (sourceType === 'text' && !textContent.trim()) || (sourceType === 'url' && !urlInput.trim())}
-          leftIcon={isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          className="bg-white text-indigo-950 hover:bg-indigo-50 font-bold px-6 shadow-sm"
+          disabled={isGenerating || isGenerationLimitReached || (sourceType === 'text' && !textContent.trim()) || (sourceType === 'url' && !urlInput.trim())}
+          leftIcon={isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : isGenerationLimitReached ? <X className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+          className={isGenerationLimitReached ? "bg-red-500 text-white cursor-not-allowed" : "bg-white text-indigo-950 hover:bg-indigo-50 font-bold px-6 shadow-sm"}
         >
-          {isGenerating ? 'Synthesizing...' : 'Synthesize Resource'}
+          {isGenerating ? 'Synthesizing...' : isGenerationLimitReached ? 'Daily Limit Reached' : 'Synthesize Resource'}
         </Button>
       </div>
     </form>

@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User private data
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      match /{subcollection}/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Public scholar profiles & leaderboards
+    match /public_profiles/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+    }
+
+    match /leaderboard/{entryId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Creator resources
+    match /resources/{resourceId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.creatorId == request.auth.uid ||
+        resource.data.userId == request.auth.uid
+      );
+    }
+
+    // Default deny for unmapped documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
