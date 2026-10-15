@@ -35,6 +35,10 @@ import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
 import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
 import { UserGuideView } from './components/guide/UserGuideView';
 import { SimulationsHubView } from './components/simulations/SimulationsHubView';
+import { StudyRoomsView } from './components/common/StudyRoomsView';
+import { VoiceExamView } from './components/common/VoiceExamView';
+import { ExamForecasterView } from './components/common/ExamForecasterView';
+import { OfflineSyncView } from './components/common/OfflineSyncView';
 import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import { awardXp } from './utils/xpManager';
@@ -127,6 +131,9 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('learnco_notifications', JSON.stringify(notifications));
   }, [notifications]);
+
+  const [profileInitialTab, setProfileInitialTab] = useState<'analytics' | 'settings' | 'mistakes' | 'xp_trail'>('analytics');
+  const [profileInitialSection, setProfileInitialSection] = useState<'account' | 'appearance' | 'learning' | 'notifications' | 'privacy'>('account');
 
   const handleSelectNotification = (item: NotificationItem) => {
     setNotifications((prev) =>
@@ -372,7 +379,11 @@ export default function App() {
           {activeTab === 'leaderboard' && (
             <div className="max-w-5xl mx-auto animate-in fade-in duration-200">
               <Leaderboard
-                onNavigateToPrivacySettings={() => setActiveTab('profile')}
+                onNavigateToPrivacySettings={() => {
+                  setProfileInitialTab('settings');
+                  setProfileInitialSection('privacy');
+                  setActiveTab('profile');
+                }}
               />
             </div>
           )}
@@ -406,6 +417,11 @@ export default function App() {
 
           {activeTab === 'docs' && <DocsViewer />}
 
+          {activeTab === 'study-rooms' && <StudyRoomsView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'voice-exam' && <VoiceExamView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'forecaster' && <ExamForecasterView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'offline-sync' && <OfflineSyncView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+
           {(activeTab === 'user-guide' || activeTab === 'guide') && (
             <UserGuideView
               onNavigateToTab={(tab, ctx) => {
@@ -416,7 +432,11 @@ export default function App() {
           )}
 
           {activeTab === 'profile' && (
-            <ProfileView onOpenCopilotWithContext={handleOpenCopilotWithContext} />
+            <ProfileView
+              onOpenCopilotWithContext={handleOpenCopilotWithContext}
+              initialTab={profileInitialTab}
+              initialSettingsSection={profileInitialSection}
+            />
           )}
 
           {(activeTab === 'auth' ||

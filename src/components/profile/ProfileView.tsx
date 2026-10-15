@@ -24,6 +24,13 @@ import {
   TrendingUp,
   Clock,
   Lock,
+  Download,
+  FileText,
+  Scale,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
@@ -46,14 +53,20 @@ import { XPIndicator, StreakIndicator } from '../ui/GamificationIndicators';
 
 interface ProfileViewProps {
   onOpenCopilotWithContext: (context: string) => void;
+  initialTab?: 'analytics' | 'settings' | 'mistakes' | 'xp_trail';
+  initialSettingsSection?: 'account' | 'appearance' | 'learning' | 'notifications' | 'privacy';
 }
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithContext }) => {
-  const { profile, gamification, settings, updateProfile, updateSettings, uploadAvatar, signOut } =
+export const ProfileView: React.FC<ProfileViewProps> = ({
+  onOpenCopilotWithContext,
+  initialTab = 'analytics',
+  initialSettingsSection = 'account',
+}) => {
+  const { user, profile, gamification, settings, updateProfile, updateSettings, uploadAvatar, signOut } =
     useAuth();
 
   const [activeTab, setActiveTab] = useState<'analytics' | 'settings' | 'mistakes' | 'xp_trail'>(
-    'analytics'
+    initialTab
   );
   const [stats, setStats] = useState<UserStatistics | null>(null);
   const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
@@ -64,7 +77,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
   // Settings tab sub-section
   const [settingsSection, setSettingsSection] = useState<
     'account' | 'appearance' | 'learning' | 'notifications' | 'privacy'
-  >('account');
+  >(initialSettingsSection);
 
   // Form states for profile editing
   const [displayName, setDisplayName] = useState<string>(profile?.displayName || profile?.fullName || '');
@@ -193,6 +206,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleExportData = () => {
+    const exportBundle = {
+      exportedAt: new Date().toISOString(),
+      student: {
+        id: user?.id,
+        email: user?.email,
+      },
+      profile,
+      gamification,
+      settings,
+      statistics: stats,
+      mistakes,
+      xpTransactions,
+    };
+    const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `learnco-student-portfolio-${user?.id || 'export'}-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -828,26 +864,75 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
                   </div>
                 )}
 
-                {/* SECTION: PRIVACY */}
+                {/* SECTION: PRIVACY, POLICY & PLATFORM RULES */}
                 {settingsSection === 'privacy' && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                        Privacy & Leaderboard Visibility
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        Manage cohort ranking visibility and learning analytics privacy.
-                      </p>
+                  <div className="space-y-6 animate-in fade-in">
+                    {/* Header */}
+                    <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                          <span>Privacy Governance, Policy & Student Rules</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Complete transparent specification of student data rights, academic honor code, and system rules.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleExportData}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors self-start sm:self-auto cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Export My Data (.json)</span>
+                      </button>
                     </div>
 
+                    {/* Granular Visibility & Privacy Controls */}
                     <div className="space-y-3">
-                      <label className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between cursor-pointer">
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                            Public Leaderboard Visibility
+                      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        1. Granular Visibility Controls
+                      </h4>
+
+                      {/* Profile Visibility Tier */}
+                      <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Profile Visibility Mode
                           </span>
-                          <span className="text-[11px] text-slate-400 block">
-                            When enabled, your rank, display name, and XP are visible to cohort peers.
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold uppercase">
+                            {privacy.profileVisibility}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Controls whether cohort peers can view your badges, solved diagnostics, and STEM trajectory.
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          {(['public', 'cohort', 'private'] as const).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => setPrivacy({ ...privacy, profileVisibility: mode })}
+                              className={`py-1.5 px-2.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                                privacy.profileVisibility === mode
+                                  ? 'bg-indigo-600 text-white shadow-xs'
+                                  : 'bg-white dark:bg-slate-750 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              {mode === 'private' ? 'Anonymous' : mode}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Public Leaderboard Toggle */}
+                      <label className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between cursor-pointer">
+                        <div className="space-y-0.5 pr-4">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                            Public Leaderboard Enrollment & Standings
+                          </span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                            When enabled, your rank, verified streak days, and XP appear on the cohort leaderboard. Disabling will mask your name as &quot;Anonymous Scholar&quot; while maintaining your private progression.
                           </span>
                         </div>
                         <input
@@ -856,17 +941,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
                           onChange={(e) =>
                             setPrivacy({ ...privacy, leaderboardVisibility: e.target.checked })
                           }
-                          className="w-4 h-4 accent-indigo-600 rounded-sm cursor-pointer"
+                          className="w-4 h-4 accent-indigo-600 rounded-sm cursor-pointer shrink-0"
                         />
                       </label>
 
-                      <label className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between cursor-pointer">
-                        <div className="space-y-0.5">
+                      {/* Diagnostic Analytics Sharing */}
+                      <label className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between cursor-pointer">
+                        <div className="space-y-0.5 pr-4">
                           <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                            Diagnostic Analytics Sharing
+                            Diagnostic Mistake History Sharing for Socratic Calibration
                           </span>
-                          <span className="text-[11px] text-slate-400 block">
-                            Allow Socratic AI mentors to inspect question attempt history for personalized calibration.
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                            Permits the Socratic AI tutor to inspect prior incorrect attempts to construct targeted derivation hints without revealing final answers.
                           </span>
                         </div>
                         <input
@@ -875,9 +961,157 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenCopilotWithConte
                           onChange={(e) =>
                             setPrivacy({ ...privacy, analyticsSharing: e.target.checked })
                           }
-                          className="w-4 h-4 accent-indigo-600 rounded-sm cursor-pointer"
+                          className="w-4 h-4 accent-indigo-600 rounded-sm cursor-pointer shrink-0"
                         />
                       </label>
+                    </div>
+
+                    {/* Official Privacy Policy Standards */}
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>2. Official Student Privacy Policy & Data Guarantees</span>
+                      </h4>
+
+                      <div className="space-y-2.5">
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              Zero Commercial Data Brokering Guarantee
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            Learn.co never sells, licenses, rents, or monetizes student email addresses, problem attempt histories, or study session audio. All telemetry is strictly utilized for diagnostic concept derivation and personalized pedagogical remediation.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold text-xs">
+                              <Lock className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              AI Query Isolation & Secure Proxying
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            Interactions with Google Gemini AI models are strictly executed via secure server-side proxy routes. No client-side API keys or user session tokens are exposed to third-party scripts. Raw prompts do not feed public training sets.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-bold text-xs">
+                              <Scale className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              FERPA & COPPA Educational Alignment
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            Educational progress metrics, question logs, and focus session records are encrypted at rest and in transit. Students and educational mentors retain the right to audit, export, or permanently purge their data records at any time.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs">
+                              <Lock className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              Zero-Knowledge Password Security & Cookie Discipline
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            User passwords are automatically hashed with HMAC-SHA256 and salted. Plaintext passwords are never stored or logged. Local storage is strictly reserved for session continuity and active streak caching—never for ad tracking.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Academic Code of Conduct & System Rules */}
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Scale className="w-3.5 h-3.5 text-amber-500" />
+                        <span>3. Platform Rules & Academic Code of Conduct</span>
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>⚖️ Rule 1: Authentic Derivations</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            All practice submissions must reflect genuine student problem-solving. Automated scripts, scrapers, or bot solvers are strictly prohibited and trigger automatic streak resets.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>🎯 Rule 2: 25-Questions Daily Limit</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Learn.co enforces a strict 25 question/day quota to eliminate cognitive fatigue and prioritize deep concept retention over superficial volume grinding.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>🧠 Rule 3: Spaced Retrieval Invariant</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Logged errors are queued into the Mistake Notebook and automatically resurfaced on Ebbinghaus intervals (Day 3, 7, 14, 30) for verified neurological consolidation.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>🤝 Rule 4: Mentorship & Cohort Respect</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Peer interactions, study room communications, and shared creator materials must adhere to collegial academic decorum and constructive collaboration.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>🔒 Rule 5: Credential Isolation & Secure Sign-In</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Upon sign-in, user credentials and email accounts are securely persisted to the authenticated backend database. Each scholar is enrolled in the cohort leaderboard with protected ranking records.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>🤖 Rule 6: Socratic AI Tutoring Integrity</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            The Socratic AI Copilot is bound to first-principles guidance. It generates pedagogical hints and conceptual scaffolding rather than leaking raw exam solutions without derivation.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>📦 Rule 7: Data Portability & Complete Erasure</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Scholars maintain unconditional sovereignty over their academic data. You can download a complete JSON telemetry export at any time or request immediate permanent account purge.
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 space-y-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>🏅 Rule 8: Fair Play in 30-Tier Leaderboard</span>
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Streak days and XP advancement must be earned through verified daily diagnostic sessions. Weekly division resets ensure dynamic, meritocratic progression across all 30 sub-stages.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

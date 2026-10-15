@@ -69,12 +69,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'create', label: 'Creator Studio', icon: Sparkles, highlight: true },
     { id: 'copilot', label: 'Omni Copilot', icon: Bot },
     { id: 'mentor', label: 'Personal Mentor', icon: Compass },
+    { id: 'voice-exam', label: 'Voice Oral Exam', icon: Sparkles, highlight: true },
   ];
 
   const intelligenceNav: NavItem[] = [
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, highlight: true },
     { id: 'intelligence', label: 'Mastery Matrix', icon: BarChart3 },
+    { id: 'forecaster', label: 'Exam Forecaster', icon: BarChart3, highlight: true },
     { id: 'gamification', label: 'XP & Badges', icon: Award },
+    { id: 'study-rooms', label: 'Peer Study Rooms', icon: User, highlight: true },
+    { id: 'offline-sync', label: 'PWA Offline Sync', icon: ShieldCheck },
     { id: 'admin', label: 'Admin Studio', icon: ShieldCheck },
     { id: 'docs', label: 'Specs & Docs', icon: FileCode2 },
   ];

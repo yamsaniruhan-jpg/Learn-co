@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/canvas-confetti": "^1.9.0",
     "@types/katex": "^0.16.8",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.0.4",
     "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
@@ -29,6 +30,7 @@
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
+    "three": "^0.186.1",
     "vite": "^6.2.3"
   },
   "devDependencies": {

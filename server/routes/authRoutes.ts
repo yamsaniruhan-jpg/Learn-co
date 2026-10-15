@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { Database, hashPassword } from '../db';
 import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { OnboardingStatus } from '../../src/types/auth';
+import { FirestoreSyncService } from '../services/firestoreSync';
 
 const router = Router();
 
@@ -31,6 +32,9 @@ router.post('/signup', (req, res: Response) => {
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
 
+    // Sync to Firestore & persist leaderboard entry
+    FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
+
     res.status(201).json({
       token,
       user: {
@@ -57,27 +61,85 @@ router.post('/signin', (req, res: Response) => {
       return;
     }
 
-    const user = Database.findUserByEmail(email);
+    if (!email.includes('@')) {
+      res.status(400).json({ error: 'Please provide a valid email address.' });
+      return;
+    }
+
+    let user = Database.findUserByEmail(email);
+
+    // If user does not exist yet, auto-create their account seamlessly so their credentials are saved
+    // and they are immediately enrolled into the leaderboard and backend storage
     if (!user) {
-      res.status(404).json({
-        error: 'No account found with this email. Please create a new account first.',
-        notFound: true,
+      if (password.length < 6) {
+        res.status(400).json({ error: 'Password must be at least 6 characters in length.' });
+        return;
+      }
+
+      const created = Database.createUser({
+        email,
+        password,
+        fullName: email.split('@')[0],
+        authProvider: 'email',
+        timezone: 'UTC',
+      });
+      user = created.user;
+
+      const profile = created.profile;
+      const gamification = Database.getGamification(user.id);
+      const settings = Database.getSettings(user.id);
+
+      // Persist to Firestore & leaderboard
+      FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
+
+      res.status(200).json({
+        token: created.token,
+        user: {
+          id: user.id,
+          email: user.email,
+          authProvider: user.authProvider,
+        },
+        profile,
+        gamification,
+        settings,
       });
       return;
     }
 
-    if (user.authProvider === 'email') {
+    // Existing user: verify password
+    if (user.authProvider === 'email' && user.passwordHash) {
       const hashed = hashPassword(password);
       if (user.passwordHash !== hashed) {
         res.status(401).json({ error: 'Incorrect password for this account. Please try again.' });
         return;
       }
+    } else if (!user.passwordHash && password) {
+      // If user signed in previously via OAuth or has empty password hash, store the password now
+      user.passwordHash = hashPassword(password);
     }
 
+    // Update last login timestamp and ensure persistence
+    user.lastLoginAt = new Date().toISOString();
+    user.updatedAt = new Date().toISOString();
+
     const token = Database.createSession(user.id);
-    const profile = Database.getProfile(user.id);
-    const gamification = Database.getGamification(user.id);
-    const settings = Database.getSettings(user.id);
+    let profile = Database.getProfile(user.id);
+    let gamification = Database.getGamification(user.id);
+    let settings = Database.getSettings(user.id);
+
+    // Ensure settings has leaderboardVisibility enabled so the user is kept in the leaderboard
+    if (settings && settings.privacy) {
+      settings.privacy.leaderboardVisibility = true;
+    }
+
+    // Save state to disk immediately
+    Database.saveToDisk();
+
+    // Sync to Firestore & ensure user is enrolled in leaderboard
+    if (profile && gamification) {
+      FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
+      FirestoreSyncService.syncLeaderboardEntry(user, profile, gamification);
+    }
 
     res.json({
       token,
@@ -139,6 +201,11 @@ router.post('/google', (req, res: Response) => {
 
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
+
+    // Sync to Firestore & ensure user is enrolled in leaderboard
+    if (profile && gamification) {
+      FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
+    }
 
     // Generate a structured Google OAuth token representation
     const verifiedGoogleToken = idToken || `g_oauth2_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;

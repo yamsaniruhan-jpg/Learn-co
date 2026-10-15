@@ -350,10 +350,22 @@ export class Database {
     return memoryDb;
   }
 
+  static saveToDisk(): void {
+    saveDbToDisk();
+  }
+
   static findUserByEmail(email: string): UserAccount | null {
-    const userId = memoryDb.usersByEmail[email.toLowerCase().trim()];
-    if (!userId) return null;
-    return memoryDb.users[userId] || null;
+    const norm = email.toLowerCase().trim();
+    const userId = memoryDb.usersByEmail[norm];
+    if (userId && memoryDb.users[userId]) {
+      return memoryDb.users[userId];
+    }
+    const found = Object.values(memoryDb.users).find((u) => u.email.toLowerCase().trim() === norm);
+    if (found) {
+      memoryDb.usersByEmail[norm] = found.id;
+      return found;
+    }
+    return null;
   }
 
   static findUserById(userId: string): UserAccount | null {
@@ -857,6 +869,38 @@ export class Database {
     const todayStr = now.toISOString().split('T')[0];
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Ensure all registered users are enrolled and initialized in the leaderboard
+    for (const userId of Object.keys(memoryDb.users)) {
+      if (!memoryDb.gamification[userId]) {
+        this.getGamification(userId);
+      }
+      if (!memoryDb.profiles[userId]) {
+        const u = memoryDb.users[userId];
+        if (u) {
+          memoryDb.profiles[userId] = {
+            id: `prof-${userId}`,
+            userId,
+            email: u.email,
+            fullName: u.email.split('@')[0],
+            displayName: u.email.split('@')[0],
+            avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.email)}`,
+            educationLevel: '',
+            targetExam: '',
+            targetScore: '',
+            examDate: '',
+            subjects: ['math'],
+            learningGoals: [],
+            preferredStudyTimeMinutes: 30,
+            studyTimeMinutesThisWeek: 0,
+            role: 'student',
+            onboardingStatus: 'NOT_STARTED',
+            timezone: 'UTC',
+            joinedDate: new Date().toISOString().split('T')[0],
+          };
+        }
+      }
+    }
 
     for (const [userId, gam] of Object.entries(memoryDb.gamification)) {
       const profile = memoryDb.profiles[userId];
