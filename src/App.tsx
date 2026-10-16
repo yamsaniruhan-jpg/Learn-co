@@ -58,6 +58,7 @@ import {
   Loader2,
   Sun,
   Moon,
+  X,
 } from 'lucide-react';
 
 export default function App() {
@@ -131,6 +132,80 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('learnco_notifications', JSON.stringify(notifications));
   }, [notifications]);
+
+  // Smart Study Reminder upon arrival (Deterministic, Zero AI cost)
+  const [arrivalReminder, setArrivalReminder] = useState<{
+    id: string;
+    title: string;
+    message: string;
+    actionUrl: string;
+    actionLabel: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const alreadyRemindedSession = sessionStorage.getItem('learnco_arrival_reminded');
+    if (!alreadyRemindedSession) {
+      sessionStorage.setItem('learnco_arrival_reminded', 'true');
+      const hour = new Date().getHours();
+      const currentStreak = gamification?.currentStreak ?? 0;
+      const solvedToday = gamification?.dailyQuestionsSolvedToday ?? 0;
+      const missedCount = attempts.filter((a) => !a.isCorrect).length;
+
+      let title = 'Smart Study Reminder';
+      let message = 'Welcome back! Ready to advance your STEM concept mastery today?';
+      let actionUrl = 'practice';
+      let actionLabel = 'Start Practice';
+
+      if (solvedToday === 0 && currentStreak > 0) {
+        title = `🔥 Protect Your ${currentStreak}-Day Streak!`;
+        message = `You haven't practiced yet today. Solve 1 quick question to safeguard your streak and earn +10 XP.`;
+        actionUrl = 'practice';
+        actionLabel = 'Solve 1 Problem';
+      } else if (missedCount > 0) {
+        title = '📓 Mistake Notebook: Spaced Review Ready';
+        message = `You have ${missedCount} concept problem${missedCount > 1 ? 's' : ''} queued for Ebbinghaus retention review.`;
+        actionUrl = 'intelligence';
+        actionLabel = 'Review Mistakes';
+      } else if (hour < 12) {
+        title = '🌅 Morning High-Yield Focus Block';
+        message = 'Working memory is at peak capacity. Tackle 3 diagnostic derivation questions.';
+        actionUrl = 'practice';
+        actionLabel = 'Practice Arena';
+      } else if (hour >= 18) {
+        title = '🎙️ Evening Oral Defense Examination';
+        message = 'Test your verbal STEM articulation with 1 of 100 free pre-generated oral exam questions.';
+        actionUrl = 'voice-exam';
+        actionLabel = 'Oral Defense Exam';
+      } else {
+        title = '🔬 3D STEM Virtual Simulations';
+        message = 'Experiment with interactive 3D multivariable calculus surfaces or oscillator phase plots.';
+        actionUrl = 'simulations';
+        actionLabel = 'Explore 3D Labs';
+      }
+
+      setArrivalReminder({
+        id: `arrival-remind-${Date.now()}`,
+        title,
+        message,
+        actionUrl,
+        actionLabel,
+      });
+
+      // Also prepend to Notification Center so the user has persistent access
+      setNotifications((prev) => [
+        {
+          id: `notif-arrival-${Date.now()}`,
+          type: 'reminder',
+          title,
+          message,
+          timestamp: 'Just now',
+          isRead: false,
+          actionUrl,
+        },
+        ...prev,
+      ]);
+    }
+  }, [attempts, gamification?.currentStreak, gamification?.dailyQuestionsSolvedToday]);
 
   const [profileInitialTab, setProfileInitialTab] = useState<'analytics' | 'settings' | 'mistakes' | 'xp_trail'>('analytics');
   const [profileInitialSection, setProfileInitialSection] = useState<'account' | 'appearance' | 'learning' | 'notifications' | 'privacy'>('account');
@@ -304,6 +379,48 @@ export default function App() {
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
             >
+            {arrivalReminder && (
+              <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-200/80 dark:border-indigo-800/80 text-slate-900 dark:text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-600 text-white shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm text-indigo-950 dark:text-indigo-200">
+                        {arrivalReminder.title}
+                      </h4>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                        0 AI Tokens • Free
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                      {arrivalReminder.message}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    onClick={() => {
+                      setActiveTab(arrivalReminder.actionUrl);
+                      setArrivalReminder(null);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    {arrivalReminder.actionLabel}
+                  </button>
+                  <button
+                    onClick={() => setArrivalReminder(null)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    aria-label="Dismiss smart reminder"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'dashboard' && (
               <DashboardView
                 user={effectiveLegacyUser}

@@ -19,13 +19,25 @@ function getGeminiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+// In-memory zero-token response cache to reduce AI costs
+const aiCostReductionCache = new Map<string, { reply: string; timestamp: number }>();
+const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+
 // Resilient Gemini generateContent with cost-optimized model fallbacks and token capping
 async function generateWithFallback(
   ai: GoogleGenAI,
   contents: string,
-  systemInstruction: string
+  systemInstruction: string,
+  maxOutputTokens: number = 350
 ): Promise<string> {
-  const models = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite'];
+  const cacheKey = `${contents}:::${systemInstruction}:::${maxOutputTokens}`;
+  const cached = aiCostReductionCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.reply;
+  }
+
+  // Cost-optimized model hierarchy: start with ultra-efficient flash-latest and 3.1-flash-lite
+  const models = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
 
   for (const model of models) {
     try {
@@ -34,13 +46,15 @@ async function generateWithFallback(
         contents,
         config: {
           systemInstruction,
-          temperature: 0.4,
-          maxOutputTokens: 800,
+          temperature: 0.3,
+          maxOutputTokens,
         },
       });
 
       if (response.text && response.text.trim()) {
-        return response.text.trim();
+        const text = response.text.trim();
+        aiCostReductionCache.set(cacheKey, { reply: text, timestamp: Date.now() });
+        return text;
       }
     } catch (err: any) {
       const isTransient =
@@ -52,7 +66,6 @@ async function generateWithFallback(
         err?.message?.includes?.('UNAVAILABLE');
 
       console.warn(`Gemini generation with ${model} encountered ${isTransient ? 'transient error (retrying/falling back)' : 'error'}:`, err?.message || err);
-      // If there are more models in the list, continue to the next model
       continue;
     }
   }
@@ -139,6 +152,71 @@ router.post('/generate-resource', async (req: Request, res: Response) => {
     res.json({ resource });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Resource generation failed.' });
+  }
+});
+
+// POST /api/ai/voice-exam-eval
+// Low-token, cost-optimized oral exam evaluation (max 180 tokens)
+router.post('/voice-exam-eval', async (req: Request, res: Response) => {
+  try {
+    const { question, rubric, thesis = '', derivation = '', constraints = '', subject = 'STEM' } = req.body;
+
+    const studentDefense = `[Thesis/Definition]: ${thesis}\n[Step-by-Step Derivation]: ${derivation}\n[Boundary & Invariants]: ${constraints}`.trim();
+
+    if (!thesis.trim() && !derivation.trim()) {
+      res.status(400).json({ error: 'Please provide at least a thesis or derivation for evaluation.' });
+      return;
+    }
+
+    const ai = getGeminiClient();
+    if (ai) {
+      try {
+        const systemPrompt = 'You are a strict, objective STEM oral examination examiner. Evaluate the student defense against the reference rubric. Output JSON strictly with keys: score (number 0-100), strength (1 short sentence), missing (1 short sentence), verdict (string "PASS" if score >= 70 else "REVISE"). Keep text minimal (under 50 words).';
+        const prompt = `[Question]: ${question}\n[Subject]: ${subject}\n[Key Rubric Invariant]: ${rubric}\n\n[Student Defense]:\n${studentDefense}`;
+
+        const rawReply = await generateWithFallback(ai, prompt, systemPrompt, 140);
+        const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          res.json({
+            score: typeof parsed.score === 'number' ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 75,
+            strength: parsed.strength || 'Good conceptual articulation.',
+            missing: parsed.missing || 'Could expand on formal edge cases.',
+            verdict: parsed.verdict || (parsed.score >= 70 ? 'PASS' : 'REVISE'),
+            mode: 'ai_low_token',
+          });
+          return;
+        }
+      } catch (aiErr) {
+        console.warn('Voice exam AI evaluation fallback to deterministic rubric:', aiErr);
+      }
+    }
+
+    // Deterministic fallback evaluation (zero tokens, accurate keyword & structure heuristics)
+    const combinedText = `${thesis} ${derivation} ${constraints}`.toLowerCase();
+    const rubricWords = (rubric || '').toLowerCase().split(/[\s,.;]+/).filter((w: string) => w.length > 3);
+    const matchedWords = rubricWords.filter((w: string) => combinedText.includes(w));
+    const coverage = rubricWords.length > 0 ? matchedWords.length / rubricWords.length : 0.5;
+
+    let score = Math.round(coverage * 60);
+    if (thesis.trim().length > 20) score += 15;
+    if (derivation.trim().length > 40) score += 15;
+    if (constraints.trim().length > 15) score += 10;
+    score = Math.max(25, Math.min(98, score));
+
+    res.json({
+      score,
+      strength: matchedWords.length > 0
+        ? `Accurately identified key concept anchors: ${matchedWords.slice(0, 3).join(', ')}.`
+        : 'Good effort in structuring the oral response.',
+      missing: coverage < 0.6
+        ? `Incorporate formal aspects from the ground-truth rubric: "${rubric}".`
+        : 'Deepen the step-by-step mathematical reasoning.',
+      verdict: score >= 70 ? 'PASS' : 'REVISE',
+      mode: 'deterministic_offline',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Evaluation failed.' });
   }
 });
 

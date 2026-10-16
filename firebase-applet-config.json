@@ -1,9 +1,9 @@
 {
   "projectId": "robust-virtue-62t1j",
   "appId": "1:645462810395:web:ae491364913d7a04157dbe",
-
+  "apiKey": "AIzaSyC11Oz94k47B30dIST6MC4ATwtuGuoxr5w",
   "authDomain": "robust-virtue-62t1j.firebaseapp.com",
-  "firestoreDatabaseId":"ai-studio-learnco-ea5511bf-17f5-45c1-a004-aa58035900a8",
+  "firestoreDatabaseId": "ai-studio-learnco-ea5511bf-17f5-45c1-a004-aa58035900a8",
   "storageBucket": "robust-virtue-62t1j.firebasestorage.app",
   "messagingSenderId": "645462810395",
   "measurementId": "",

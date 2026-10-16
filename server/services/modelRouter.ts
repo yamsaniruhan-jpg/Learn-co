@@ -10,17 +10,16 @@ export interface ModelRouteDecision {
 
 export class ModelRouter {
   // Primary high-speed, available Gemini models
-  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-3.5-flash';
+  static readonly DEFAULT_MODEL = process.env.COPILOT_MODEL || 'gemini-flash-latest';
   // High-performance models for complex mathematical proofs & derivations
-  static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-3.5-flash';
-  static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-3.5-flash';
-  static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-3.5-flash';
+  static readonly REASONING_MODEL = process.env.COPILOT_REASONING_MODEL || 'gemini-3.8-flash';
+  static readonly LONG_CONTEXT_MODEL = process.env.COPILOT_LONG_CONTEXT_MODEL || 'gemini-3.8-flash';
+  static readonly CODE_MODEL = process.env.COPILOT_CODE_MODEL || 'gemini-flash-latest';
 
   // Cost-optimized, highly reliable fallback cascade
   static readonly FALLBACK_CASCADE = [
-    'gemini-3.5-flash',
-    'gemini-3.6-flash',
     'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
     'gemini-3.8-flash',
   ];
 

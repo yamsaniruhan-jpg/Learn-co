@@ -358,7 +358,7 @@ CRITICAL CONSTRAINTS:
 
       const contents = `Create a 14-day study plan based on: ${JSON.stringify(promptContext)}`;
 
-      const candidateModels = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite'];
+      const candidateModels = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
       let rawJson = '';
 
       for (const model of candidateModels) {
