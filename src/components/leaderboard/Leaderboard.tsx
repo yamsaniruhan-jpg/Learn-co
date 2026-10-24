@@ -368,32 +368,66 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
   // Combined raw entries with unified streak and stages
   const rawEntries = useMemo(() => {
-    const baseList: LeaderboardEntry[] = [
-      ...(propEntries || (serverEntries.length > 0 ? serverEntries : FALLBACK_OFFLINE_ENTRIES)),
-    ];
+    // 1. Build initial cohort registry
+    const cohortMap = new Map<string, LeaderboardEntry>();
+    for (const c of FALLBACK_OFFLINE_ENTRIES) {
+      cohortMap.set(c.userId, { ...c });
+    }
 
-    const currentUserName = profile?.displayName || profile?.fullName || user?.name || 'You (Learner)';
+    // 2. Overlay server or prop entries so registered scholars are placed with their authentic names
+    const sourceList = propEntries || (serverEntries.length > 0 ? serverEntries : []);
+    for (const s of sourceList) {
+      const existingCohort = cohortMap.get(s.userId);
+      cohortMap.set(s.userId, {
+        ...s,
+        displayName:
+          s.displayName && s.displayName !== 'Anonymous Scholar' && !s.displayName.includes('You (Learner)')
+            ? s.displayName
+            : existingCohort?.displayName || s.displayName || 'Scholar',
+      });
+    }
+
+    const baseList: LeaderboardEntry[] = Array.from(cohortMap.values());
+
     const currentUserId = user?.id || 'current-user-local';
-    const currentUserXp = gamification?.xp ?? 450;
-    const currentUserLevel = gamification?.level ?? 3;
+    const currentUserXp = gamification?.xp ?? (user ? 0 : 450);
+    const currentUserLevel = gamification?.level ?? 1;
+
+    // Authentic display name: Never default to 'You (Learner)'
+    const currentUserName =
+      profile?.displayName ||
+      profile?.fullName ||
+      user?.name ||
+      (user?.email ? user.email.split('@')[0] : '');
 
     // Check if current user is already present in the list
     const existingIndex = baseList.findIndex(
-      (e) => e.isCurrentUser || e.userId === currentUserId || e.displayName.toLowerCase() === currentUserName.toLowerCase()
+      (e) =>
+        e.isCurrentUser ||
+        e.userId === currentUserId ||
+        (currentUserName && e.displayName.toLowerCase() === currentUserName.toLowerCase())
     );
 
     if (existingIndex >= 0) {
+      const existing = baseList[existingIndex];
+      const preservedName =
+        (currentUserName && !currentUserName.includes('You (Learner)') ? currentUserName : '') ||
+        (existing.displayName && !existing.displayName.includes('You (Learner)') ? existing.displayName : '') ||
+        profile?.displayName ||
+        profile?.fullName ||
+        (user?.email ? user.email.split('@')[0] : 'Scholar');
+
       baseList[existingIndex] = {
-        ...baseList[existingIndex],
-        displayName: currentUserName,
-        avatarUrl: profile?.avatarUrl || baseList[existingIndex].avatarUrl,
-        xp: Math.max(baseList[existingIndex].xp, currentUserXp),
+        ...existing,
+        displayName: preservedName,
+        avatarUrl: profile?.avatarUrl || existing.avatarUrl,
+        xp: Math.max(existing.xp, currentUserXp),
         streak: effectiveUserStreak,
         streakDays: effectiveUserStreak,
-        level: Math.max(baseList[existingIndex].level, currentUserLevel),
+        level: Math.max(existing.level, currentUserLevel),
         isCurrentUser: true,
       };
-    } else {
+    } else if (currentUserName) {
       baseList.push({
         userId: currentUserId,
         displayName: currentUserName,

@@ -10,14 +10,14 @@
   "theme_color": "#4f46e5",
   "icons": [
     {
-      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=learnco-icon-192",
+      "src": "/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/jpeg"
     },
     {
-      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=learnco-icon-512",
+      "src": "/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/jpeg"
     }
   ]
 }

@@ -370,7 +370,7 @@ CRITICAL CONSTRAINTS:
               config: {
                 systemInstruction,
                 temperature: 0.3,
-                maxOutputTokens: 1000,
+                maxOutputTokens: 2500,
                 responseMimeType: 'application/json',
               },
             });

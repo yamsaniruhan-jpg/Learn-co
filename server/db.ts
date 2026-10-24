@@ -282,6 +282,94 @@ function seedDatabase() {
   for (const [userId, settings] of Object.entries(SEED_SCHEDULE_SETTINGS)) {
     memoryDb.studyScheduleSettings[userId] = { ...settings };
   }
+
+  // Seed competitive cohort scholars for leaderboard league
+  const SEED_COHORT = [
+    { id: 'scholar-1', name: 'Priya Sharma', email: 'priya.sharma@stanford.edu', xp: 2840, level: 12, streak: 14, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-2', name: 'Aarav Mehta', email: 'aarav.mehta@mit.edu', xp: 2310, level: 10, streak: 9, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-3', name: 'Elena Rostova', email: 'elena.rostova@oxford.ac.uk', xp: 1980, level: 8, streak: 11, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-4', name: 'David Kim', email: 'david.kim@berkeley.edu', xp: 1720, level: 7, streak: 6, avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-5', name: 'Sophia Chen', email: 'sophia.chen@cambridge.ac.uk', xp: 1510, level: 6, streak: 8, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-6', name: 'Marcus Vance', email: 'marcus.vance@caltech.edu', xp: 1340, level: 5, streak: 5, avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-7', name: 'Amara Okafor', email: 'amara.okafor@harvard.edu', xp: 1180, level: 5, streak: 4, avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-8', name: "Liam O'Connor", email: 'liam.oconnor@imperial.ac.uk', xp: 990, level: 4, streak: 3, avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-9', name: 'Ananya Sen', email: 'ananya.sen@iitb.ac.in', xp: 850, level: 4, streak: 7, avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-10', name: 'Kenji Sato', email: 'kenji.sato@u-tokyo.ac.jp', xp: 710, level: 3, streak: 2, avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-11', name: 'Chloe Dubois', email: 'chloe.dubois@ens.fr', xp: 560, level: 3, streak: 4, avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80' },
+    { id: 'scholar-12', name: 'Rohan Verma', email: 'rohan.verma@iitd.ac.in', xp: 420, level: 2, streak: 1, avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80' },
+  ];
+
+  for (const c of SEED_COHORT) {
+    if (!memoryDb.users[c.id]) {
+      memoryDb.users[c.id] = {
+        id: c.id,
+        email: c.email,
+        authProvider: 'email',
+        createdAt: now,
+        updatedAt: now,
+        lastLoginAt: now,
+      };
+      memoryDb.usersByEmail[c.email.toLowerCase()] = c.id;
+      memoryDb.profiles[c.id] = {
+        id: `prof-${c.id}`,
+        userId: c.id,
+        email: c.email,
+        fullName: c.name,
+        displayName: c.name,
+        avatarUrl: c.avatar,
+        educationLevel: 'Undergraduate STEM',
+        targetExam: 'Advanced STEM Mastery',
+        targetScore: 'Top 1%',
+        examDate: '',
+        subjects: ['math', 'cs', 'physics'],
+        learningGoals: ['First-principles STEM mastery'],
+        preferredStudyTimeMinutes: 45,
+        studyTimeMinutesThisWeek: 180,
+        role: 'student',
+        onboardingStatus: 'COMPLETED',
+        timezone: 'UTC',
+        joinedDate: '2026-08-15',
+      };
+      memoryDb.gamification[c.id] = {
+        userId: c.id,
+        xp: c.xp,
+        level: c.level,
+        currentStreak: c.streak,
+        longestStreak: c.streak + 3,
+        lastActiveDate: now.split('T')[0],
+        dailyQuestionsSolvedToday: 8,
+        dailyAllowanceLimit: 25,
+        dailyDoubtsAskedToday: 2,
+        dailyDoubtsLimit: 10,
+        dailyArtifactsCreatedToday: 1,
+        dailyArtifactsLimit: 5,
+        dailySourcesUploadedToday: 1,
+        dailySourcesUploadLimit: 5,
+      };
+      memoryDb.settings[c.id] = {
+        userId: c.id,
+        theme: 'system',
+        notifications: {
+          studyReminders: true,
+          streakAlerts: true,
+          achievementAlerts: true,
+          mentorAlerts: true,
+          copilotAlerts: true,
+        },
+        privacy: {
+          profileVisibility: 'public',
+          leaderboardVisibility: true,
+          analyticsSharing: true,
+        },
+        learningPreferences: {
+          socraticGuidanceLevel: 'high',
+          showDetailedDerivations: true,
+          timerVisible: true,
+          soundEffects: true,
+        },
+      };
+    }
+  }
 }
 
 export function loadDbFromDisk() {
@@ -290,28 +378,27 @@ export function loadDbFromDisk() {
       const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        if (parsed.users) memoryDb.users = parsed.users;
-        if (parsed.usersByEmail) memoryDb.usersByEmail = parsed.usersByEmail;
-        if (parsed.profiles) memoryDb.profiles = parsed.profiles;
-        if (parsed.gamification) memoryDb.gamification = parsed.gamification;
-        if (parsed.settings) memoryDb.settings = parsed.settings;
-        if (parsed.sessions) memoryDb.sessions = parsed.sessions;
+        if (parsed.users) memoryDb.users = { ...memoryDb.users, ...parsed.users };
+        if (parsed.usersByEmail) memoryDb.usersByEmail = { ...memoryDb.usersByEmail, ...parsed.usersByEmail };
+        if (parsed.profiles) memoryDb.profiles = { ...memoryDb.profiles, ...parsed.profiles };
+        if (parsed.gamification) memoryDb.gamification = { ...memoryDb.gamification, ...parsed.gamification };
+        if (parsed.settings) memoryDb.settings = { ...memoryDb.settings, ...parsed.settings };
+        if (parsed.sessions) memoryDb.sessions = { ...memoryDb.sessions, ...parsed.sessions };
         if (parsed.studyPlans) {
           delete parsed.studyPlans['study-plan-001'];
-          memoryDb.studyPlans = parsed.studyPlans;
+          memoryDb.studyPlans = { ...memoryDb.studyPlans, ...parsed.studyPlans };
         }
-        if (parsed.studyGoals) memoryDb.studyGoals = parsed.studyGoals;
+        if (parsed.studyGoals) memoryDb.studyGoals = { ...memoryDb.studyGoals, ...parsed.studyGoals };
         if (parsed.studyTasks) {
-          // Remove seeded tasks
           delete parsed.studyTasks['task-001'];
           delete parsed.studyTasks['task-002'];
           delete parsed.studyTasks['task-003'];
           delete parsed.studyTasks['task-004'];
           delete parsed.studyTasks['task-005'];
-          memoryDb.studyTasks = parsed.studyTasks;
+          memoryDb.studyTasks = { ...memoryDb.studyTasks, ...parsed.studyTasks };
         }
-        if (parsed.creatorResources) memoryDb.creatorResources = parsed.creatorResources;
-        if (parsed.creatorSources) memoryDb.creatorSources = parsed.creatorSources;
+        if (parsed.creatorResources) memoryDb.creatorResources = { ...memoryDb.creatorResources, ...parsed.creatorResources };
+        if (parsed.creatorSources) memoryDb.creatorSources = { ...memoryDb.creatorSources, ...parsed.creatorSources };
       }
     }
   } catch (err) {
@@ -497,7 +584,7 @@ export class Database {
     const current = gam.dailyUrlsProcessedToday || 0;
     const limit = gam.dailyUrlsLimit || DAILY_URLS_LIMIT;
     if (current >= limit) {
-      throw new Error('Your limit is reached on the free plan.');
+      throw new Error('Your daily limit has been reached for today.');
     }
     gam.dailyUrlsProcessedToday = current + 1;
     return {
@@ -514,7 +601,7 @@ export class Database {
     const current = gam.dailyDoubtsAskedToday || 0;
     const limit = gam.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT;
     if (current >= limit) {
-      throw new Error('Your limit is reached on the free plan.');
+      throw new Error('Your daily limit has been reached for today.');
     }
     gam.dailyDoubtsAskedToday = current + 1;
     return {
@@ -531,7 +618,7 @@ export class Database {
     const current = gam.dailySourcesUploadedToday || 0;
     const limit = gam.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
     if (current >= limit) {
-      throw new Error('Your limit is reached on the free plan.');
+      throw new Error('Your daily limit has been reached for today.');
     }
     gam.dailySourcesUploadedToday = current + 1;
     return {
@@ -554,7 +641,7 @@ export class Database {
     const current = gam.dailyArtifactsCreatedToday || 0;
     const limit = gam.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
     if (current >= limit) {
-      throw new Error('Your limit is reached on the free plan.');
+      throw new Error('Your daily limit has been reached for today.');
     }
     gam.dailyArtifactsCreatedToday = current + 1;
     return {
@@ -585,19 +672,15 @@ export class Database {
     }
     const session = memoryDb.sessions[cleanToken];
     if (!session) {
-      // Fallback to default active user if available
-      const defaultUser = memoryDb.users['user-alex-001'] || Object.values(memoryDb.users)[0];
-      if (defaultUser) return defaultUser;
       return null;
     }
 
     if (new Date(session.expiresAt) < new Date()) {
       delete memoryDb.sessions[cleanToken];
-      // Fallback
-      return memoryDb.users['user-alex-001'] || Object.values(memoryDb.users)[0] || null;
+      return null;
     }
 
-    return memoryDb.users[session.userId] || memoryDb.users['user-alex-001'] || null;
+    return memoryDb.users[session.userId] || null;
   }
 
   static revokeSession(token: string): boolean {
@@ -968,11 +1051,9 @@ export class Database {
         }
       }
 
-      // Respect profile visibility: if 'private', mask display name for other users
-      let safeDisplayName = profile.displayName || profile.fullName || 'Scholar';
-      if (settings?.privacy?.profileVisibility === 'private' && userId !== currentUserId) {
-        safeDisplayName = 'Anonymous Scholar';
-      }
+      // Always preserve the scholar's registered name / display name / email name
+      const userAcc = memoryDb.users[userId];
+      const safeDisplayName = profile.displayName || profile.fullName || (userAcc?.email ? userAcc.email.split('@')[0] : 'Scholar');
 
       list.push({
         userId,
@@ -2906,6 +2987,8 @@ export class Database {
       `Created ${newPlan.title} with ${createdTasks.length} scheduled tasks.`,
       planData.aiGenerated ? 'AI' : 'USER'
     );
+
+    saveDbToDisk();
 
     return {
       plan: { ...memoryDb.studyPlans[planId] },

@@ -72,6 +72,7 @@ export class AuthClient {
     password?: string;
     fullName?: string;
     timezone?: string;
+    idToken?: string;
   }): Promise<{
     token: string;
     user: any;
@@ -100,7 +101,7 @@ export class AuthClient {
     return data;
   }
 
-  static async signIn(email: string, password?: string): Promise<{
+  static async signIn(email: string, password?: string, idToken?: string): Promise<{
     token: string;
     user: any;
     profile: UserProfile;
@@ -110,7 +111,7 @@ export class AuthClient {
     const res = await fetch('/api/auth/signin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, idToken }),
     });
 
     const data = await res.json();

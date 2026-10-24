@@ -147,10 +147,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-3">
+        <div className="flex justify-center">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-950 border border-indigo-500/40 shadow-lg shadow-indigo-500/25 p-0.5">
+            <img
+              src="/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg"
+              alt="LearnCo Logo"
+              className="w-full h-full object-cover scale-110"
+            />
+          </div>
+        </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
           <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span>Learn.co Session & Identity Management</span>
+          <span>LearnCo Session & Identity Management</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
           Authentication Portal

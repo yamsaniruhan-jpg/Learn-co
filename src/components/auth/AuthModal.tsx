@@ -95,8 +95,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Modal Header */}
           <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white flex items-center justify-center shadow-xs">
-                <GraduationCap className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-950 border border-indigo-500/40 shadow-xs shrink-0">
+                <img
+                  src="/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg"
+                  alt="LearnCo Logo"
+                  className="w-full h-full object-cover scale-110"
+                />
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-display">

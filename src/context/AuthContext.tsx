@@ -10,6 +10,7 @@ import {
 } from '../types/auth';
 import { getCurrentXp } from '../utils/xpManager';
 import { loadUserStreak } from '../utils/streakManager';
+import { syncClientToFirestore } from '../services/clientFirestoreSync';
 
 interface AuthContextType {
   user: any | null;
@@ -169,11 +170,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithEmail = async (email: string, password?: string) => {
     setAuthError(null);
     try {
-      const res = await AuthClient.signIn(email, password);
+      let firebaseIdToken: string | undefined;
+
+      // Authenticate with Firebase Authentication first if password is provided
+      if (password) {
+        try {
+          const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import(
+            '../services/firebaseClient'
+          );
+          if (auth && auth.app) {
+            try {
+              const cred = await signInWithEmailAndPassword(auth, email, password);
+              firebaseIdToken = await cred.user.getIdToken();
+            } catch (fbErr: any) {
+              // If user does not exist yet in Firebase, auto-register in Firebase Auth
+              if (
+                fbErr.code === 'auth/user-not-found' ||
+                fbErr.code === 'auth/invalid-credential'
+              ) {
+                try {
+                  const newCred = await createUserWithEmailAndPassword(auth, email, password);
+                  firebaseIdToken = await newCred.user.getIdToken();
+                } catch {
+                  // Fall back to backend auth
+                }
+              }
+            }
+          }
+        } catch (fbInitErr) {
+          console.warn('Firebase client sign-in fallback to backend auth', fbInitErr);
+        }
+      }
+
+      // Complete backend flow with Firebase ID Token
+      const res = await AuthClient.signIn(email, password, firebaseIdToken);
       setUser(res.user);
       setProfile(res.profile);
       setGamification(res.gamification);
       setSettings(res.settings);
+      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       setAuthError(err.message || 'Sign in failed.');
       throw err;
@@ -183,11 +218,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUpWithEmail = async (email: string, password?: string, fullName?: string) => {
     setAuthError(null);
     try {
-      const res = await AuthClient.signUp({ email, password, fullName });
+      let firebaseIdToken: string | undefined;
+
+      // Register with Firebase Authentication
+      if (password) {
+        try {
+          const { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import(
+            '../services/firebaseClient'
+          );
+          if (auth && auth.app) {
+            try {
+              const cred = await createUserWithEmailAndPassword(auth, email, password);
+              firebaseIdToken = await cred.user.getIdToken();
+            } catch (fbErr: any) {
+              if (fbErr.code === 'auth/email-already-in-use') {
+                const cred = await signInWithEmailAndPassword(auth, email, password);
+                firebaseIdToken = await cred.user.getIdToken();
+              }
+            }
+          }
+        } catch (fbInitErr) {
+          console.warn('Firebase client sign-up fallback to backend auth', fbInitErr);
+        }
+      }
+
+      // Complete backend flow with Firebase ID Token
+      const res = await AuthClient.signUp({ email, password, fullName, idToken: firebaseIdToken });
       setUser(res.user);
       setProfile(res.profile);
       setGamification(res.gamification);
       setSettings(res.settings);
+      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       setAuthError(err.message || 'Sign up failed.');
       throw err;
@@ -224,6 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(res.profile);
       setGamification(res.gamification);
       setSettings(res.settings);
+      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       setAuthError(err.message || 'Google sign in failed.');
       throw err;
@@ -233,6 +295,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setAuthError(null);
     try {
+      try {
+        const { auth, signOut: fbSignOut } = await import('../services/firebaseClient');
+        if (auth && auth.app) {
+          await fbSignOut(auth);
+        }
+      } catch (fbErr) {
+        console.warn('Firebase sign-out warning:', fbErr);
+      }
       await AuthClient.signOut();
     } finally {
       setUser(null);

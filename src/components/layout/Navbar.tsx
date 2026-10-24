@@ -18,6 +18,7 @@ import {
   Minimize2,
   WifiOff,
   Clock,
+  Crown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { BrandLogo } from '../ui/BrandLogo';

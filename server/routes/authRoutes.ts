@@ -9,7 +9,7 @@ const router = Router();
 // POST /api/auth/signup
 router.post('/signup', (req, res: Response) => {
   try {
-    const { email, password, fullName, timezone } = req.body;
+    const { email, password, fullName, timezone, idToken } = req.body;
 
     if (!email || !email.includes('@')) {
       res.status(400).json({ error: 'Please provide a valid email address.' });
@@ -37,6 +37,7 @@ router.post('/signup', (req, res: Response) => {
 
     res.status(201).json({
       token,
+      firebaseToken: idToken || null,
       user: {
         id: user.id,
         email: user.email,
@@ -54,7 +55,7 @@ router.post('/signup', (req, res: Response) => {
 // POST /api/auth/signin
 router.post('/signin', (req, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, idToken } = req.body;
 
     if (!email || !password) {
       res.status(400).json({ error: 'Email and password are required.' });
@@ -143,6 +144,7 @@ router.post('/signin', (req, res: Response) => {
 
     res.json({
       token,
+      firebaseToken: idToken || null,
       user: {
         id: user.id,
         email: user.email,

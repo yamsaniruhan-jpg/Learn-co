@@ -1,6 +1,8 @@
 import { adminDb } from './firebaseAdmin';
 import { UserAccount, UserProfile, UserGamification, LeaderboardEntry } from '../../src/types/auth';
 
+let isAdminDbAvailable = true;
+
 /**
  * Service to sync local auth, profile, and leaderboard records to Firestore
  */
@@ -9,8 +11,8 @@ export class FirestoreSyncService {
    * Persist user account and credentials to Firestore
    */
   static async syncUserAccount(user: UserAccount): Promise<void> {
+    if (!isAdminDbAvailable || !adminDb) return;
     try {
-      if (!adminDb) return;
       await adminDb.collection('users').doc(user.id).set(
         {
           id: user.id,
@@ -19,13 +21,19 @@ export class FirestoreSyncService {
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           lastLoginAt: user.lastLoginAt,
-          // Store hashed password securely if email provider
           ...(user.passwordHash ? { passwordHash: user.passwordHash } : {}),
         },
         { merge: true }
       );
     } catch (err: any) {
-      console.warn('[FirestoreSync] Failed to sync user account:', err?.message || err);
+      const msg = err?.message || String(err);
+      if (msg.includes('PERMISSION_DENIED') || err?.code === 7) {
+        // Backend runtime environment does not have direct IAM service account permissions to cross-project Firestore.
+        // Disable adminDb sync gracefully so local disk/in-memory DB handles state, and client SDK handles web sync.
+        isAdminDbAvailable = false;
+        return;
+      }
+      console.warn('[FirestoreSync] Failed to sync user account:', msg);
     }
   }
 
@@ -33,8 +41,8 @@ export class FirestoreSyncService {
    * Persist public profile to Firestore
    */
   static async syncUserProfile(profile: UserProfile): Promise<void> {
+    if (!isAdminDbAvailable || !adminDb) return;
     try {
-      if (!adminDb) return;
       await adminDb.collection('public_profiles').doc(profile.userId).set(
         {
           ...profile,
@@ -43,7 +51,12 @@ export class FirestoreSyncService {
         { merge: true }
       );
     } catch (err: any) {
-      console.warn('[FirestoreSync] Failed to sync user profile:', err?.message || err);
+      const msg = err?.message || String(err);
+      if (msg.includes('PERMISSION_DENIED') || err?.code === 7) {
+        isAdminDbAvailable = false;
+        return;
+      }
+      console.warn('[FirestoreSync] Failed to sync user profile:', msg);
     }
   }
 
@@ -55,8 +68,8 @@ export class FirestoreSyncService {
     profile: UserProfile,
     gamification: UserGamification
   ): Promise<void> {
+    if (!isAdminDbAvailable || !adminDb) return;
     try {
-      if (!adminDb) return;
       const displayName = profile.displayName || profile.fullName || user.email.split('@')[0];
       const entry: Partial<LeaderboardEntry> = {
         userId: user.id,
@@ -77,7 +90,12 @@ export class FirestoreSyncService {
         { merge: true }
       );
     } catch (err: any) {
-      console.warn('[FirestoreSync] Failed to sync leaderboard entry:', err?.message || err);
+      const msg = err?.message || String(err);
+      if (msg.includes('PERMISSION_DENIED') || err?.code === 7) {
+        isAdminDbAvailable = false;
+        return;
+      }
+      console.warn('[FirestoreSync] Failed to sync leaderboard entry:', msg);
     }
   }
 
@@ -89,11 +107,13 @@ export class FirestoreSyncService {
     profile: UserProfile,
     gamification: UserGamification
   ): Promise<void> {
-    // Run in background without blocking response
+    if (!isAdminDbAvailable || !adminDb) return;
     Promise.allSettled([
       this.syncUserAccount(user),
       this.syncUserProfile(profile),
       this.syncLeaderboardEntry(user, profile, gamification),
-    ]).catch((e) => console.warn('[FirestoreSync] Bundle sync warning:', e));
+    ]).catch(() => {
+      // Background sync handled gracefully
+    });
   }
 }
