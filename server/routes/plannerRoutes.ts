@@ -105,12 +105,14 @@ router.post('/plan', async (req: Request, res: Response) => {
 router.post('/generate-ai', async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
+    Database.checkAndIncrementAiPlanQuota(userId);
+
     const input: PlanGenerationInput = req.body;
 
     const preview = await PlannerEngine.generateAiPlan(userId, input);
     res.json(preview);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to generate AI plan.' });
+    res.status(400).json({ error: err.message || 'Failed to generate AI plan.' });
   }
 });
 

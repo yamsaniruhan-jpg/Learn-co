@@ -16,6 +16,7 @@ import {
   DAILY_ARTIFACTS_LIMIT,
   DAILY_SOURCES_UPLOAD_LIMIT,
   DAILY_URLS_LIMIT,
+  DAILY_AI_PLANS_LIMIT,
   MAX_SOURCES_PER_ARTIFACT,
   UserDailyQuotas,
   XP_PER_CORRECT_QUESTION,
@@ -282,94 +283,6 @@ function seedDatabase() {
   for (const [userId, settings] of Object.entries(SEED_SCHEDULE_SETTINGS)) {
     memoryDb.studyScheduleSettings[userId] = { ...settings };
   }
-
-  // Seed competitive cohort scholars for leaderboard league
-  const SEED_COHORT = [
-    { id: 'scholar-1', name: 'Priya Sharma', email: 'priya.sharma@stanford.edu', xp: 2840, level: 12, streak: 14, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-2', name: 'Aarav Mehta', email: 'aarav.mehta@mit.edu', xp: 2310, level: 10, streak: 9, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-3', name: 'Elena Rostova', email: 'elena.rostova@oxford.ac.uk', xp: 1980, level: 8, streak: 11, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-4', name: 'David Kim', email: 'david.kim@berkeley.edu', xp: 1720, level: 7, streak: 6, avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-5', name: 'Sophia Chen', email: 'sophia.chen@cambridge.ac.uk', xp: 1510, level: 6, streak: 8, avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-6', name: 'Marcus Vance', email: 'marcus.vance@caltech.edu', xp: 1340, level: 5, streak: 5, avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-7', name: 'Amara Okafor', email: 'amara.okafor@harvard.edu', xp: 1180, level: 5, streak: 4, avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-8', name: "Liam O'Connor", email: 'liam.oconnor@imperial.ac.uk', xp: 990, level: 4, streak: 3, avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-9', name: 'Ananya Sen', email: 'ananya.sen@iitb.ac.in', xp: 850, level: 4, streak: 7, avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-10', name: 'Kenji Sato', email: 'kenji.sato@u-tokyo.ac.jp', xp: 710, level: 3, streak: 2, avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-11', name: 'Chloe Dubois', email: 'chloe.dubois@ens.fr', xp: 560, level: 3, streak: 4, avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80' },
-    { id: 'scholar-12', name: 'Rohan Verma', email: 'rohan.verma@iitd.ac.in', xp: 420, level: 2, streak: 1, avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80' },
-  ];
-
-  for (const c of SEED_COHORT) {
-    if (!memoryDb.users[c.id]) {
-      memoryDb.users[c.id] = {
-        id: c.id,
-        email: c.email,
-        authProvider: 'email',
-        createdAt: now,
-        updatedAt: now,
-        lastLoginAt: now,
-      };
-      memoryDb.usersByEmail[c.email.toLowerCase()] = c.id;
-      memoryDb.profiles[c.id] = {
-        id: `prof-${c.id}`,
-        userId: c.id,
-        email: c.email,
-        fullName: c.name,
-        displayName: c.name,
-        avatarUrl: c.avatar,
-        educationLevel: 'Undergraduate STEM',
-        targetExam: 'Advanced STEM Mastery',
-        targetScore: 'Top 1%',
-        examDate: '',
-        subjects: ['math', 'cs', 'physics'],
-        learningGoals: ['First-principles STEM mastery'],
-        preferredStudyTimeMinutes: 45,
-        studyTimeMinutesThisWeek: 180,
-        role: 'student',
-        onboardingStatus: 'COMPLETED',
-        timezone: 'UTC',
-        joinedDate: '2026-08-15',
-      };
-      memoryDb.gamification[c.id] = {
-        userId: c.id,
-        xp: c.xp,
-        level: c.level,
-        currentStreak: c.streak,
-        longestStreak: c.streak + 3,
-        lastActiveDate: now.split('T')[0],
-        dailyQuestionsSolvedToday: 8,
-        dailyAllowanceLimit: 25,
-        dailyDoubtsAskedToday: 2,
-        dailyDoubtsLimit: 10,
-        dailyArtifactsCreatedToday: 1,
-        dailyArtifactsLimit: 5,
-        dailySourcesUploadedToday: 1,
-        dailySourcesUploadLimit: 5,
-      };
-      memoryDb.settings[c.id] = {
-        userId: c.id,
-        theme: 'system',
-        notifications: {
-          studyReminders: true,
-          streakAlerts: true,
-          achievementAlerts: true,
-          mentorAlerts: true,
-          copilotAlerts: true,
-        },
-        privacy: {
-          profileVisibility: 'public',
-          leaderboardVisibility: true,
-          analyticsSharing: true,
-        },
-        learningPreferences: {
-          socraticGuidanceLevel: 'high',
-          showDetailedDerivations: true,
-          timerVisible: true,
-          soundEffects: true,
-        },
-      };
-    }
-  }
 }
 
 export function loadDbFromDisk() {
@@ -477,11 +390,13 @@ export class Database {
         dailyQuestionsSolvedToday: 0,
         dailyAllowanceLimit: 25,
         dailyDoubtsAskedToday: 0,
-        dailyDoubtsLimit: 10,
+        dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
         dailyArtifactsCreatedToday: 0,
-        dailyArtifactsLimit: 5,
+        dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
         dailySourcesUploadedToday: 0,
         dailySourcesUploadLimit: 5,
+        dailyAiPlansGeneratedToday: 0,
+        dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
       };
       memoryDb.gamification[userId] = gam;
     }
@@ -497,6 +412,7 @@ export class Database {
       gam.dailyDoubtsAskedToday = 0;
       gam.dailyArtifactsCreatedToday = 0;
       gam.dailySourcesUploadedToday = 0;
+      gam.dailyAiPlansGeneratedToday = 0;
       (gam as any).lastQuotaResetDate = today;
     }
 
@@ -518,10 +434,12 @@ export class Database {
     gam.dailyArtifactsLimit = gam.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT;
     gam.dailySourcesUploadLimit = gam.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
     gam.dailyUrlsLimit = gam.dailyUrlsLimit || DAILY_URLS_LIMIT;
+    gam.dailyAiPlansLimit = gam.dailyAiPlansLimit || DAILY_AI_PLANS_LIMIT;
     gam.dailyDoubtsAskedToday = gam.dailyDoubtsAskedToday || 0;
     gam.dailyArtifactsCreatedToday = gam.dailyArtifactsCreatedToday || 0;
     gam.dailySourcesUploadedToday = gam.dailySourcesUploadedToday || 0;
     gam.dailyUrlsProcessedToday = gam.dailyUrlsProcessedToday || 0;
+    gam.dailyAiPlansGeneratedToday = gam.dailyAiPlansGeneratedToday || 0;
 
     return gam;
   }
@@ -538,6 +456,8 @@ export class Database {
     const sourcesLimit = gam?.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT;
     const urlsUsed = gam?.dailyUrlsProcessedToday || 0;
     const urlsLimit = gam?.dailyUrlsLimit || DAILY_URLS_LIMIT;
+    const aiPlansUsed = gam?.dailyAiPlansGeneratedToday || 0;
+    const aiPlansLimit = gam?.dailyAiPlansLimit || DAILY_AI_PLANS_LIMIT;
 
     return {
       questions: {
@@ -570,6 +490,12 @@ export class Database {
         limit: urlsLimit,
         remaining: Math.max(0, urlsLimit - urlsUsed),
         isLimitReached: urlsUsed >= urlsLimit,
+      },
+      aiPlans: {
+        used: aiPlansUsed,
+        limit: aiPlansLimit,
+        remaining: Math.max(0, aiPlansLimit - aiPlansUsed),
+        isLimitReached: aiPlansUsed >= aiPlansLimit,
       },
       resetsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       timezone: 'UTC',
@@ -647,6 +573,24 @@ export class Database {
     return {
       used: gam.dailyArtifactsCreatedToday,
       remaining: Math.max(0, limit - gam.dailyArtifactsCreatedToday),
+    };
+  }
+
+  static checkAndIncrementAiPlanQuota(userId: string): { remaining: number; used: number } {
+    const gam = this.getGamification(userId);
+    if (!gam) {
+      throw new Error('User gamification record not found.');
+    }
+    const current = gam.dailyAiPlansGeneratedToday || 0;
+    const limit = gam.dailyAiPlansLimit || DAILY_AI_PLANS_LIMIT;
+    if (current >= limit) {
+      throw new Error('Daily limit exceeded: You can only generate 2 AI study plans per day.');
+    }
+    gam.dailyAiPlansGeneratedToday = current + 1;
+    this.saveToDisk();
+    return {
+      used: gam.dailyAiPlansGeneratedToday,
+      remaining: Math.max(0, limit - gam.dailyAiPlansGeneratedToday),
     };
   }
 
@@ -953,35 +897,51 @@ export class Database {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Ensure all registered users are enrolled and initialized in the leaderboard
-    for (const userId of Object.keys(memoryDb.users)) {
+    // Ensure all registered users across users, profiles, and gamification are enrolled and initialized
+    const allUserIds = new Set([
+      ...Object.keys(memoryDb.users),
+      ...Object.keys(memoryDb.profiles),
+      ...Object.keys(memoryDb.gamification),
+    ]);
+
+    for (const userId of allUserIds) {
       if (!memoryDb.gamification[userId]) {
         this.getGamification(userId);
       }
       if (!memoryDb.profiles[userId]) {
         const u = memoryDb.users[userId];
-        if (u) {
-          memoryDb.profiles[userId] = {
-            id: `prof-${userId}`,
-            userId,
-            email: u.email,
-            fullName: u.email.split('@')[0],
-            displayName: u.email.split('@')[0],
-            avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.email)}`,
-            educationLevel: '',
-            targetExam: '',
-            targetScore: '',
-            examDate: '',
-            subjects: ['math'],
-            learningGoals: [],
-            preferredStudyTimeMinutes: 30,
-            studyTimeMinutesThisWeek: 0,
-            role: 'student',
-            onboardingStatus: 'NOT_STARTED',
-            timezone: 'UTC',
-            joinedDate: new Date().toISOString().split('T')[0],
-          };
-        }
+        const email = u?.email || `${userId}@learn.co`;
+        memoryDb.profiles[userId] = {
+          id: `prof-${userId}`,
+          userId,
+          email,
+          fullName: email.split('@')[0],
+          displayName: email.split('@')[0],
+          avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
+          educationLevel: '',
+          targetExam: '',
+          targetScore: '',
+          examDate: '',
+          subjects: ['math'],
+          learningGoals: [],
+          preferredStudyTimeMinutes: 30,
+          studyTimeMinutesThisWeek: 0,
+          role: 'student',
+          onboardingStatus: 'COMPLETED',
+          timezone: 'UTC',
+          joinedDate: new Date().toISOString().split('T')[0],
+        };
+      }
+      if (!memoryDb.users[userId]) {
+        const p = memoryDb.profiles[userId];
+        memoryDb.users[userId] = {
+          id: userId,
+          email: p?.email || `${userId}@learn.co`,
+          authProvider: 'email',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
       }
     }
 
@@ -1007,14 +967,7 @@ export class Database {
           (t) => t.userId === userId && t.timestamp.startsWith(todayStr)
         );
         const txXp = todayTxs.reduce((sum, t) => sum + t.amount, 0);
-        // Fallback or combination with questions solved today
         calculatedXp = Math.max(txXp, (gam.dailyQuestionsSolvedToday || 0) * 5);
-        
-        // For cohort demo accounts without fresh transactions today, provide balanced daily practice activity
-        if (calculatedXp === 0 && userId.startsWith('user-alex-001')) {
-          const pseudoDaily = (gam.xp % 35) + 15;
-          calculatedXp = pseudoDaily;
-        }
       } else if (timeframe === 'weekly') {
         // Calculate weekly XP (last 7 days)
         const weeklyTxs = memoryDb.xpTransactions.filter(
@@ -1066,6 +1019,23 @@ export class Database {
     }
 
     list.sort((a, b) => b.xp - a.xp);
+
+    // Weekly Promotion Logic: If a scholar is in the promotion zone (rank <= 10) and 7 days have passed since last promotion, promote to next level
+    const nowMs = now.getTime();
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    list.forEach((item, index) => {
+      const rank = index + 1;
+      const gam = memoryDb.gamification[item.userId];
+      if (gam) {
+        const lastPromo = (gam as any).lastPromotionDate ? new Date((gam as any).lastPromotionDate).getTime() : 0;
+        if (rank <= 10 && (nowMs - lastPromo > oneWeekMs || !(gam as any).lastPromotionDate)) {
+          gam.level = (gam.level || 1) + 1;
+          (gam as any).lastPromotionDate = todayStr;
+          item.level = gam.level;
+          saveDbToDisk();
+        }
+      }
+    });
 
     return list.map((item, index) => ({
       rank: index + 1,

@@ -79,164 +79,10 @@ const SUBJECT_OPTIONS = [
   { id: 'biology', label: 'Biology' },
 ];
 
-const FALLBACK_OFFLINE_ENTRIES: LeaderboardEntry[] = [
-  {
-    userId: 'scholar-1',
-    displayName: 'Priya Sharma',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    xp: 2840,
-    rank: 1,
-    streak: 14,
-    streakDays: 14,
-    level: 12,
-    isCurrentUser: false,
-    tier: 'Diamond III',
-    tierBadgeIcon: 'trophy',
-  },
-  {
-    userId: 'scholar-2',
-    displayName: 'Aarav Mehta',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    xp: 2310,
-    rank: 2,
-    streak: 9,
-    streakDays: 9,
-    level: 10,
-    isCurrentUser: false,
-    tier: 'Platinum I',
-    tierBadgeIcon: 'medal',
-  },
-  {
-    userId: 'scholar-3',
-    displayName: 'Elena Rostova',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    xp: 1980,
-    rank: 3,
-    streak: 11,
-    streakDays: 11,
-    level: 8,
-    isCurrentUser: false,
-    tier: 'Platinum II',
-    tierBadgeIcon: 'award',
-  },
-  {
-    userId: 'scholar-4',
-    displayName: 'Marcus Chen',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    xp: 1540,
-    rank: 4,
-    streak: 6,
-    streakDays: 6,
-    level: 7,
-    isCurrentUser: false,
-    tier: 'Platinum III',
-    tierBadgeIcon: 'award',
-  },
-  {
-    userId: 'scholar-5',
-    displayName: 'Ananya Iyer',
-    avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
-    xp: 1120,
-    rank: 5,
-    streak: 5,
-    streakDays: 5,
-    level: 5,
-    isCurrentUser: false,
-    tier: 'Gold II',
-    tierBadgeIcon: 'shield',
-  },
-  {
-    userId: 'scholar-6',
-    displayName: 'Devon Vance',
-    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-    xp: 920,
-    rank: 6,
-    streak: 4,
-    streakDays: 4,
-    level: 4,
-    isCurrentUser: false,
-    tier: 'Gold III',
-    tierBadgeIcon: 'award',
-  },
-  {
-    userId: 'scholar-7',
-    displayName: 'Sofia Lin',
-    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-    xp: 760,
-    rank: 7,
-    streak: 7,
-    streakDays: 7,
-    level: 4,
-    isCurrentUser: false,
-    tier: 'Gold III',
-    tierBadgeIcon: 'award',
-  },
-  {
-    userId: 'scholar-8',
-    displayName: 'Kenji Sato',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    xp: 620,
-    rank: 8,
-    streak: 3,
-    streakDays: 3,
-    level: 3,
-    isCurrentUser: false,
-    tier: 'Silver I',
-    tierBadgeIcon: 'shield',
-  },
-  {
-    userId: 'scholar-9',
-    displayName: 'Maya Patel',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    xp: 510,
-    rank: 9,
-    streak: 3,
-    streakDays: 3,
-    level: 3,
-    isCurrentUser: false,
-    tier: 'Silver II',
-    tierBadgeIcon: 'shield',
-  },
-  {
-    userId: 'scholar-10',
-    displayName: 'Lucas Moreau',
-    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
-    xp: 430,
-    rank: 10,
-    streak: 2,
-    streakDays: 2,
-    level: 2,
-    isCurrentUser: false,
-    tier: 'Silver III',
-    tierBadgeIcon: 'shield',
-  },
-  {
-    userId: 'scholar-11',
-    displayName: 'Clara Dubois',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    xp: 320,
-    rank: 11,
-    streak: 1,
-    streakDays: 1,
-    level: 2,
-    isCurrentUser: false,
-    tier: 'Silver III',
-    tierBadgeIcon: 'shield',
-  },
-  {
-    userId: 'scholar-12',
-    displayName: 'Noah Al-Mansoor',
-    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
-    xp: 220,
-    rank: 12,
-    streak: 1,
-    streakDays: 1,
-    level: 2,
-    isCurrentUser: false,
-    tier: 'Bronze I',
-    tierBadgeIcon: 'shield',
-  },
-];
+
+
+ 
+    
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({
   entries: propEntries,
@@ -329,7 +175,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         }
       }
     } catch (_) {}
-    setServerEntries(FALLBACK_OFFLINE_ENTRIES);
+    setServerEntries([]);
   };
 
   const fetchLeaderboard = async (isManualRefresh = false) => {
@@ -368,26 +214,20 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
   // Combined raw entries with unified streak and stages
   const rawEntries = useMemo(() => {
-    // 1. Build initial cohort registry
-    const cohortMap = new Map<string, LeaderboardEntry>();
-    for (const c of FALLBACK_OFFLINE_ENTRIES) {
-      cohortMap.set(c.userId, { ...c });
-    }
-
-    // 2. Overlay server or prop entries so registered scholars are placed with their authentic names
     const sourceList = propEntries || (serverEntries.length > 0 ? serverEntries : []);
+    const scholarMap = new Map<string, LeaderboardEntry>();
+
     for (const s of sourceList) {
-      const existingCohort = cohortMap.get(s.userId);
-      cohortMap.set(s.userId, {
+      scholarMap.set(s.userId, {
         ...s,
         displayName:
           s.displayName && s.displayName !== 'Anonymous Scholar' && !s.displayName.includes('You (Learner)')
             ? s.displayName
-            : existingCohort?.displayName || s.displayName || 'Scholar',
+            : s.displayName || 'Scholar',
       });
     }
 
-    const baseList: LeaderboardEntry[] = Array.from(cohortMap.values());
+    const baseList: LeaderboardEntry[] = Array.from(scholarMap.values());
 
     const currentUserId = user?.id || 'current-user-local';
     const currentUserXp = gamification?.xp ?? (user ? 0 : 450);

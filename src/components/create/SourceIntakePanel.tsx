@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { uploadUserFile, auth } from '../../services/firebaseClient';
 
 interface SourceIntakePanelProps {
   onGenerate: (params: GenerateResourceRequest) => Promise<void>;
@@ -138,21 +139,41 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     },
   ];
 
-  const handleFileChange = (file: File) => {
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  const handleFileChange = async (file: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
+    setIsUploading(true);
+    try {
+      const userId = auth.currentUser?.uid || 'user-alex-001';
+      const downloadUrl = await uploadUserFile(userId, file);
       setUploadedFile({
         name: file.name,
         size: file.size,
-        base64Data: base64,
+        base64Data: downloadUrl,
       });
+      setUrlInput(downloadUrl);
       if (!title) {
         setTitle(file.name.replace(/\.[^/.]+$/, ''));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Firebase Storage upload failed, falling back to local reader:', err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setUploadedFile({
+          name: file.name,
+          size: file.size,
+          base64Data: base64,
+        });
+        if (!title) {
+          setTitle(file.name.replace(/\.[^/.]+$/, ''));
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {

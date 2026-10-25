@@ -3,10 +3,11 @@ export const XP_PER_INCORRECT_QUESTION = 0;
 export const XP_PER_ABANDONED_QUESTION = 0;
 
 export const DAILY_PRACTICE_LIMIT = 25;
-export const DAILY_DOUBTS_LIMIT = 30;
-export const DAILY_ARTIFACTS_LIMIT = 5;
+export const DAILY_DOUBTS_LIMIT = 25;
+export const DAILY_ARTIFACTS_LIMIT = 3;
 export const DAILY_SOURCES_UPLOAD_LIMIT = 5;
 export const DAILY_URLS_LIMIT = 5;
+export const DAILY_AI_PLANS_LIMIT = 2;
 export const MAX_SOURCES_PER_ARTIFACT = 5;
 
 export type OnboardingStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
@@ -82,6 +83,8 @@ export interface UserGamification {
   dailySourcesUploadLimit?: number;
   dailyUrlsProcessedToday?: number;
   dailyUrlsLimit?: number;
+  dailyAiPlansGeneratedToday?: number;
+  dailyAiPlansLimit?: number;
 }
 
 export interface UserDailyQuotas {
@@ -111,6 +114,12 @@ export interface UserDailyQuotas {
     maxPerArtifact: number;
   };
   urls: {
+    used: number;
+    limit: number;
+    remaining: number;
+    isLimitReached: boolean;
+  };
+  aiPlans: {
     used: number;
     limit: number;
     remaining: number;

@@ -75,7 +75,7 @@
     "user-1788625702947-rafjf": {
       "userId": "user-1788625702947-rafjf",
       "xp": 10,
-      "level": 1,
+      "level": 2,
       "currentStreak": 1,
       "longestStreak": 1,
       "lastActiveDate": "2026-10-10",
@@ -87,12 +87,13 @@
       "dailyArtifactsLimit": 4,
       "dailySourcesUploadedToday": 0,
       "dailySourcesUploadLimit": 4,
-      "lastQuotaResetDate": "2026-10-10"
+      "lastQuotaResetDate": "2026-10-10",
+      "lastPromotionDate": "2026-10-25"
     },
     "user-1791611225252-uwfhk": {
       "userId": "user-1791611225252-uwfhk",
       "xp": 0,
-      "level": 1,
+      "level": 2,
       "currentStreak": 0,
       "longestStreak": 0,
       "lastActiveDate": "",
@@ -103,7 +104,8 @@
       "dailyArtifactsCreatedToday": 0,
       "dailyArtifactsLimit": 4,
       "dailySourcesUploadedToday": 0,
-      "dailySourcesUploadLimit": 4
+      "dailySourcesUploadLimit": 4,
+      "lastPromotionDate": "2026-10-25"
     }
   },
   "settings": {
@@ -152,328 +154,10 @@
       }
     }
   },
-  "xpTransactions": [
-    {
-      "id": "tx-1791611010401-opy3l",
-      "userId": "user-1788625702947-rafjf",
-      "amount": 5,
-      "reason": "QUESTION_CORRECT",
-      "relatedAttemptId": "att-1791611010401-a0aeq",
-      "metadata": {
-        "questionId": "q-gen-cs-topic-concurrency-24",
-        "subjectId": "cs"
-      },
-      "timestamp": "2026-10-10T05:43:30.401Z"
-    },
-    {
-      "id": "tx-1791611005956-bomo5",
-      "userId": "user-1788625702947-rafjf",
-      "amount": 5,
-      "reason": "QUESTION_CORRECT",
-      "relatedAttemptId": "att-1791611005955-f56ht",
-      "metadata": {
-        "questionId": "q-gen-cs-topic-concurrency-23",
-        "subjectId": "cs"
-      },
-      "timestamp": "2026-10-10T05:43:25.956Z"
-    }
-  ],
-  "questionAttempts": [
-    {
-      "id": "att-1791611015907-c65p7",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-grad-opt-15",
-      "subjectId": "cs",
-      "topicId": "cs-topic-grad-opt",
-      "conceptId": "concept-cs-topic-grad-opt-gen-15",
-      "difficulty": "hard",
-      "selectedAnswer": "2",
-      "correctAnswer": "11",
-      "isCorrect": false,
-      "solvingTimeSeconds": 3,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:32.908Z",
-      "submittedAt": "2026-10-10T05:43:35.908Z",
-      "status": "INCORRECT",
-      "xpAwarded": 0,
-      "questionText": "[Variation #15] In a binary search tree containing 2047 perfectly balanced nodes, what is the maximum number of comparisons required to search for any element?",
-      "explanation": "A perfectly balanced binary tree with $N = 2^h - 1$ nodes has height $h = \\log_2(N + 1)$. Here $N = 2047$, so $h = 11$.",
-      "stepByStepSolution": [
-        "Formula for max comparisons in balanced BST = height $h = \\log_2(N + 1)$",
-        "$N = 2^{11} - 1 \\implies h = 11$"
-      ]
-    },
-    {
-      "id": "att-1791611010401-a0aeq",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-concurrency-24",
-      "subjectId": "cs",
-      "topicId": "cs-topic-concurrency",
-      "conceptId": "concept-cs-topic-concurrency-gen-24",
-      "difficulty": "medium_hard",
-      "selectedAnswer": "$O(\\log n)$",
-      "correctAnswer": "$O(\\log n)$",
-      "isCorrect": true,
-      "solvingTimeSeconds": 2,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:28.401Z",
-      "submittedAt": "2026-10-10T05:43:30.401Z",
-      "status": "CORRECT",
-      "xpAwarded": 5,
-      "questionText": "[Variation #24] What is the tightest asymptotic time complexity $O(g(n))$ for the following Python algorithm snippet?\n```python\ndef compute_grid(n):\n    total = 0\n    for i in range(25):\n        j = 1\n        while j < n:\n            total += i * j\n            j *= 2\n    return total\n```",
-      "explanation": "The outer loop runs a constant number of times $(25)$ which is $O(1)$. The inner loop doubles $j$ each iteration ($j *= 2$), running $\\approx \\log_2(n)$ times. Thus the total complexity is $O(\\log n)$.",
-      "stepByStepSolution": [
-        "Analyze outer loop: fixed constant bounds $0 \\dots 24$, running $O(1)$ times.",
-        "Analyze inner loop: variable $j$ doubles each step, making iterations logarithmic $O(\\log n)$.",
-        "Multiply bounds: $O(1) \\times O(\\log n) = O(\\log n)$."
-      ]
-    },
-    {
-      "id": "att-1791611005955-f56ht",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-concurrency-23",
-      "subjectId": "cs",
-      "topicId": "cs-topic-concurrency",
-      "conceptId": "concept-cs-topic-concurrency-gen-23",
-      "difficulty": "medium",
-      "selectedAnswer": "False",
-      "correctAnswer": "False",
-      "isCorrect": true,
-      "solvingTimeSeconds": 1,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:24.956Z",
-      "submittedAt": "2026-10-10T05:43:25.956Z",
-      "status": "CORRECT",
-      "xpAwarded": 5,
-      "questionText": "[Variation #23] True or False: In distributed system theory (CAP Theorem), a system can simultaneously guarantee Consistency, Availability, and Partition Tolerance during a network partition.",
-      "explanation": "According to Gilbert and Lynch's formal proof of the CAP Theorem, when a network partition occurs, a distributed system must choose between Consistency (CP) and Availability (AP).",
-      "stepByStepSolution": [
-        "Recall CAP Theorem principles during network partitions.",
-        "Partition tolerance is mandatory in real networks, forcing a tradeoff between C and A."
-      ]
-    },
-    {
-      "id": "att-1791611002551-nvixj",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-complexity-22",
-      "subjectId": "cs",
-      "topicId": "cs-topic-complexity",
-      "conceptId": "concept-cs-topic-complexity-gen-22",
-      "difficulty": "easy_medium",
-      "selectedAnswer": "True",
-      "correctAnswer": "False",
-      "isCorrect": false,
-      "solvingTimeSeconds": 3,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:19.551Z",
-      "submittedAt": "2026-10-10T05:43:22.551Z",
-      "status": "INCORRECT",
-      "xpAwarded": 0,
-      "questionText": "[Variation #22] True or False: In distributed system theory (CAP Theorem), a system can simultaneously guarantee Consistency, Availability, and Partition Tolerance during a network partition.",
-      "explanation": "According to Gilbert and Lynch's formal proof of the CAP Theorem, when a network partition occurs, a distributed system must choose between Consistency (CP) and Availability (AP).",
-      "stepByStepSolution": [
-        "Recall CAP Theorem principles during network partitions.",
-        "Partition tolerance is mandatory in real networks, forcing a tradeoff between C and A."
-      ]
-    },
-    {
-      "id": "att-1791610995153-mv975",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-attention-21",
-      "subjectId": "cs",
-      "topicId": "cs-topic-attention",
-      "conceptId": "concept-cs-topic-attention-gen-21",
-      "difficulty": "easy",
-      "selectedAnswer": "5",
-      "correctAnswer": "9",
-      "isCorrect": false,
-      "solvingTimeSeconds": 436,
-      "hintsRevealedCount": 1,
-      "startedAt": "2026-10-10T05:35:59.155Z",
-      "submittedAt": "2026-10-10T05:43:15.155Z",
-      "status": "INCORRECT",
-      "xpAwarded": 0,
-      "questionText": "[Variation #21] In a binary search tree containing 511 perfectly balanced nodes, what is the maximum number of comparisons required to search for any element?",
-      "explanation": "A perfectly balanced binary tree with $N = 2^h - 1$ nodes has height $h = \\log_2(N + 1)$. Here $N = 511$, so $h = 9$.",
-      "stepByStepSolution": [
-        "Formula for max comparisons in balanced BST = height $h = \\log_2(N + 1)$",
-        "$N = 2^{9} - 1 \\implies h = 9$"
-      ]
-    }
-  ],
-  "attemptsById": {
-    "att-1791610995153-mv975": {
-      "id": "att-1791610995153-mv975",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-attention-21",
-      "subjectId": "cs",
-      "topicId": "cs-topic-attention",
-      "conceptId": "concept-cs-topic-attention-gen-21",
-      "difficulty": "easy",
-      "selectedAnswer": "5",
-      "correctAnswer": "9",
-      "isCorrect": false,
-      "solvingTimeSeconds": 436,
-      "hintsRevealedCount": 1,
-      "startedAt": "2026-10-10T05:35:59.155Z",
-      "submittedAt": "2026-10-10T05:43:15.155Z",
-      "status": "INCORRECT",
-      "xpAwarded": 0,
-      "questionText": "[Variation #21] In a binary search tree containing 511 perfectly balanced nodes, what is the maximum number of comparisons required to search for any element?",
-      "explanation": "A perfectly balanced binary tree with $N = 2^h - 1$ nodes has height $h = \\log_2(N + 1)$. Here $N = 511$, so $h = 9$.",
-      "stepByStepSolution": [
-        "Formula for max comparisons in balanced BST = height $h = \\log_2(N + 1)$",
-        "$N = 2^{9} - 1 \\implies h = 9$"
-      ]
-    },
-    "att-1791611002551-nvixj": {
-      "id": "att-1791611002551-nvixj",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-complexity-22",
-      "subjectId": "cs",
-      "topicId": "cs-topic-complexity",
-      "conceptId": "concept-cs-topic-complexity-gen-22",
-      "difficulty": "easy_medium",
-      "selectedAnswer": "True",
-      "correctAnswer": "False",
-      "isCorrect": false,
-      "solvingTimeSeconds": 3,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:19.551Z",
-      "submittedAt": "2026-10-10T05:43:22.551Z",
-      "status": "INCORRECT",
-      "xpAwarded": 0,
-      "questionText": "[Variation #22] True or False: In distributed system theory (CAP Theorem), a system can simultaneously guarantee Consistency, Availability, and Partition Tolerance during a network partition.",
-      "explanation": "According to Gilbert and Lynch's formal proof of the CAP Theorem, when a network partition occurs, a distributed system must choose between Consistency (CP) and Availability (AP).",
-      "stepByStepSolution": [
-        "Recall CAP Theorem principles during network partitions.",
-        "Partition tolerance is mandatory in real networks, forcing a tradeoff between C and A."
-      ]
-    },
-    "att-1791611005955-f56ht": {
-      "id": "att-1791611005955-f56ht",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-concurrency-23",
-      "subjectId": "cs",
-      "topicId": "cs-topic-concurrency",
-      "conceptId": "concept-cs-topic-concurrency-gen-23",
-      "difficulty": "medium",
-      "selectedAnswer": "False",
-      "correctAnswer": "False",
-      "isCorrect": true,
-      "solvingTimeSeconds": 1,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:24.956Z",
-      "submittedAt": "2026-10-10T05:43:25.956Z",
-      "status": "CORRECT",
-      "xpAwarded": 5,
-      "questionText": "[Variation #23] True or False: In distributed system theory (CAP Theorem), a system can simultaneously guarantee Consistency, Availability, and Partition Tolerance during a network partition.",
-      "explanation": "According to Gilbert and Lynch's formal proof of the CAP Theorem, when a network partition occurs, a distributed system must choose between Consistency (CP) and Availability (AP).",
-      "stepByStepSolution": [
-        "Recall CAP Theorem principles during network partitions.",
-        "Partition tolerance is mandatory in real networks, forcing a tradeoff between C and A."
-      ]
-    },
-    "att-1791611010401-a0aeq": {
-      "id": "att-1791611010401-a0aeq",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-concurrency-24",
-      "subjectId": "cs",
-      "topicId": "cs-topic-concurrency",
-      "conceptId": "concept-cs-topic-concurrency-gen-24",
-      "difficulty": "medium_hard",
-      "selectedAnswer": "$O(\\log n)$",
-      "correctAnswer": "$O(\\log n)$",
-      "isCorrect": true,
-      "solvingTimeSeconds": 2,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:28.401Z",
-      "submittedAt": "2026-10-10T05:43:30.401Z",
-      "status": "CORRECT",
-      "xpAwarded": 5,
-      "questionText": "[Variation #24] What is the tightest asymptotic time complexity $O(g(n))$ for the following Python algorithm snippet?\n```python\ndef compute_grid(n):\n    total = 0\n    for i in range(25):\n        j = 1\n        while j < n:\n            total += i * j\n            j *= 2\n    return total\n```",
-      "explanation": "The outer loop runs a constant number of times $(25)$ which is $O(1)$. The inner loop doubles $j$ each iteration ($j *= 2$), running $\\approx \\log_2(n)$ times. Thus the total complexity is $O(\\log n)$.",
-      "stepByStepSolution": [
-        "Analyze outer loop: fixed constant bounds $0 \\dots 24$, running $O(1)$ times.",
-        "Analyze inner loop: variable $j$ doubles each step, making iterations logarithmic $O(\\log n)$.",
-        "Multiply bounds: $O(1) \\times O(\\log n) = O(\\log n)$."
-      ]
-    },
-    "att-1791611015907-c65p7": {
-      "id": "att-1791611015907-c65p7",
-      "userId": "user-1788625702947-rafjf",
-      "questionId": "q-gen-cs-topic-grad-opt-15",
-      "subjectId": "cs",
-      "topicId": "cs-topic-grad-opt",
-      "conceptId": "concept-cs-topic-grad-opt-gen-15",
-      "difficulty": "hard",
-      "selectedAnswer": "2",
-      "correctAnswer": "11",
-      "isCorrect": false,
-      "solvingTimeSeconds": 3,
-      "hintsRevealedCount": 0,
-      "startedAt": "2026-10-10T05:43:32.908Z",
-      "submittedAt": "2026-10-10T05:43:35.908Z",
-      "status": "INCORRECT",
-      "xpAwarded": 0,
-      "questionText": "[Variation #15] In a binary search tree containing 2047 perfectly balanced nodes, what is the maximum number of comparisons required to search for any element?",
-      "explanation": "A perfectly balanced binary tree with $N = 2^h - 1$ nodes has height $h = \\log_2(N + 1)$. Here $N = 2047$, so $h = 11$.",
-      "stepByStepSolution": [
-        "Formula for max comparisons in balanced BST = height $h = \\log_2(N + 1)$",
-        "$N = 2^{11} - 1 \\implies h = 11$"
-      ]
-    }
-  },
-  "mistakes": [
-    {
-      "id": "mistake-1791611015908-1diqk",
-      "userId": "user-1788625702947-rafjf",
-      "attemptId": "att-1791611015907-c65p7",
-      "questionId": "q-gen-cs-topic-grad-opt-15",
-      "subjectId": "cs",
-      "topicId": "cs-topic-grad-opt",
-      "conceptId": "concept-cs-topic-grad-opt-gen-15",
-      "difficulty": "hard",
-      "questionText": "[Variation #15] In a binary search tree containing 2047 perfectly balanced nodes, what is the maximum number of comparisons required to search for any element?",
-      "userAnswer": "2",
-      "correctAnswer": "11",
-      "explanation": "A perfectly balanced binary tree with $N = 2^h - 1$ nodes has height $h = \\log_2(N + 1)$. Here $N = 2047$, so $h = 11$.",
-      "resolved": false,
-      "createdAt": "2026-10-10T05:43:35.908Z"
-    },
-    {
-      "id": "mistake-1791611002551-a2vz2",
-      "userId": "user-1788625702947-rafjf",
-      "attemptId": "att-1791611002551-nvixj",
-      "questionId": "q-gen-cs-topic-complexity-22",
-      "subjectId": "cs",
-      "topicId": "cs-topic-complexity",
-      "conceptId": "concept-cs-topic-complexity-gen-22",
-      "difficulty": "easy_medium",
-      "questionText": "[Variation #22] True or False: In distributed system theory (CAP Theorem), a system can simultaneously guarantee Consistency, Availability, and Partition Tolerance during a network partition.",
-      "userAnswer": "True",
-      "correctAnswer": "False",
-      "explanation": "According to Gilbert and Lynch's formal proof of the CAP Theorem, when a network partition occurs, a distributed system must choose between Consistency (CP) and Availability (AP).",
-      "resolved": false,
-      "createdAt": "2026-10-10T05:43:22.551Z"
-    },
-    {
-      "id": "mistake-1791610995156-s2ogx",
-      "userId": "user-1788625702947-rafjf",
-      "attemptId": "att-1791610995153-mv975",
-      "questionId": "q-gen-cs-topic-attention-21",
-      "subjectId": "cs",
-      "topicId": "cs-topic-attention",
-      "conceptId": "concept-cs-topic-attention-gen-21",
-      "difficulty": "easy",
-      "questionText": "[Variation #21] In a binary search tree containing 511 perfectly balanced nodes, what is the maximum number of comparisons required to search for any element?",
-      "userAnswer": "5",
-      "correctAnswer": "9",
-      "explanation": "A perfectly balanced binary tree with $N = 2^h - 1$ nodes has height $h = \\log_2(N + 1)$. Here $N = 511$, so $h = 9$.",
-      "resolved": false,
-      "createdAt": "2026-10-10T05:43:15.155Z"
-    }
-  ],
+  "xpTransactions": [],
+  "questionAttempts": [],
+  "attemptsById": {},
+  "mistakes": [],
   "sessions": {
     "f83286505da9434f2179b93f7b625b3ad5720f4447587ba6b7014dbf07629e36": {
       "userId": "user-1788625702947-rafjf",
