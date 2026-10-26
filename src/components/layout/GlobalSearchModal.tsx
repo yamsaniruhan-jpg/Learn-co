@@ -109,11 +109,11 @@ const SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: 'user-guide-item',
-    title: 'Platform User Guide & Scholar Manual',
+    title: 'User Guide & Daily Quota Limits Manual',
     category: 'Tool',
     tabId: 'user-guide',
     icon: <BookOpen className="w-4 h-4 text-purple-500" />,
-    detail: 'Complete user guide, daily routines, feature walkthroughs, and action roadmaps',
+    detail: 'Complete guide: Creator Studio (3/day), Gemini (25/day), Practice (25/day), 12 feature walkthroughs & workflows',
   },
   {
     id: 'practice-adaptive',

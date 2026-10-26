@@ -224,25 +224,65 @@ export const MentorAccessPanel: React.FC<MentorAccessPanelProps> = ({
           </div>
         )}
 
-        {pendingApplication && (
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-700 dark:text-slate-300">
-                Application Status:
-              </span>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                  pendingApplication.status === 'APPROVED'
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
-                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
-                }`}
-              >
-                {pendingApplication.status === 'APPROVED' ? 'Approved & Active' : 'Under Review'}
+        {pendingApplication && pendingApplication.status === 'PENDING' && (
+          <div className="p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-amber-500" />
+                <span className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                  Mentor Application Ready for Your Review
+                </span>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 font-bold">
+                Action Required
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">
-              Submitted on: {new Date(pendingApplication.submittedAt).toLocaleDateString()}
-            </p>
+
+            <div className="text-xs text-slate-700 dark:text-slate-300 space-y-1.5 bg-white/70 dark:bg-slate-900/70 p-3.5 rounded-xl border border-amber-500/20">
+              <p><strong>Applicant Name:</strong> {(pendingApplication as any).fullName || fullName}</p>
+              <p><strong>Credentials:</strong> {(pendingApplication as any).degree || degree} — {(pendingApplication as any).institution || institution}</p>
+              <p><strong>Subject & Experience:</strong> {String((pendingApplication as any).subject || subject).toUpperCase()} • {(pendingApplication as any).experienceYears || experienceYears} Years Tutoring</p>
+              <p className="italic text-slate-600 dark:text-slate-400 pt-1">"{(pendingApplication as any).bio || bio}"</p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleInstantGrant}
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Accept Application & Make Mentor</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const rejected = { ...pendingApplication, status: 'REJECTED' as const };
+                  setPendingApplication(rejected);
+                  localStorage.setItem(`learnco_mentor_app_${user.userId}`, JSON.stringify(rejected));
+                }}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 cursor-pointer"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        )}
+
+        {pendingApplication && pendingApplication.status === 'APPROVED' && (
+          <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Mentor Application has been <strong>Approved</strong>. Mentor privileges are active.</span>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenPortal}
+              className="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold text-[11px]"
+            >
+              Open Portal
+            </button>
           </div>
         )}
 

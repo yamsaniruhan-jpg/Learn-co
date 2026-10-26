@@ -947,13 +947,6 @@ export class Database {
 
     for (const [userId, gam] of Object.entries(memoryDb.gamification)) {
       const profile = memoryDb.profiles[userId];
-      const settings = memoryDb.settings[userId];
-
-      // Privacy check: If user opted out of leaderboard and is not current user, omit completely
-      if (settings && settings.privacy && !settings.privacy.leaderboardVisibility && userId !== currentUserId) {
-        continue;
-      }
-
       if (!profile) continue;
 
       let calculatedXp = gam.xp;

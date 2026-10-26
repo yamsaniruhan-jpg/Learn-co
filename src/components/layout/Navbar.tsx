@@ -283,6 +283,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <button
                         onClick={() => {
                           setShowUserDropdown(false);
+                          setActiveTab('user-guide');
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                        User Guide & Quotas
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowUserDropdown(false);
                           onOpenAuthModal();
                         }}
                         className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"

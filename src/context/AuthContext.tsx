@@ -111,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         longestStreak: userStreak.longestStreak,
       });
       setSettings(res.settings);
+      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       console.warn('Session verification failed or expired:', err?.message || err);
       AuthClient.removeToken();

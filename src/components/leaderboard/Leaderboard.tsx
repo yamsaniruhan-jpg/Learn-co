@@ -27,6 +27,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
 import { LeaderboardEntry, TimeframeFilter } from '../../types/auth';
+import { fetchFirestoreLeaderboardEntries } from '../../services/clientFirestoreSync';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -186,13 +187,38 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
     setError(null);
     try {
-      const data = await AuthClient.getLeaderboard(activeTimeframe, activeSubject);
-      if (Array.isArray(data) && data.length > 0) {
-        setServerEntries(data);
+      const [backendRes, firestoreRes] = await Promise.allSettled([
+        AuthClient.getLeaderboard(activeTimeframe, activeSubject),
+        fetchFirestoreLeaderboardEntries(),
+      ]);
+
+      const backendList: LeaderboardEntry[] =
+        backendRes.status === 'fulfilled' && Array.isArray(backendRes.value) ? backendRes.value : [];
+      const firestoreList: LeaderboardEntry[] =
+        firestoreRes.status === 'fulfilled' && Array.isArray(firestoreRes.value) ? firestoreRes.value : [];
+
+      // Merge entries by userId: every account stored in Firebase console or backend database is included
+      const mergedMap = new Map<string, LeaderboardEntry>();
+      for (const entry of firestoreList) {
+        mergedMap.set(entry.userId, entry);
+      }
+      for (const entry of backendList) {
+        const existing = mergedMap.get(entry.userId);
+        mergedMap.set(entry.userId, {
+          ...(existing || {}),
+          ...entry,
+          xp: Math.max(entry.xp || 0, existing?.xp || 0),
+          level: Math.max(entry.level || 1, existing?.level || 1),
+        });
+      }
+
+      const mergedList = Array.from(mergedMap.values());
+      if (mergedList.length > 0) {
+        setServerEntries(mergedList);
         setIsOffline(false);
         try {
-          localStorage.setItem(`learnco_leaderboard_${activeTimeframe}_${activeSubject}`, JSON.stringify(data));
-          localStorage.setItem('learnco_leaderboard_weekly_all', JSON.stringify(data));
+          localStorage.setItem(`learnco_leaderboard_${activeTimeframe}_${activeSubject}`, JSON.stringify(mergedList));
+          localStorage.setItem('learnco_leaderboard_weekly_all', JSON.stringify(mergedList));
         } catch (_) {}
       } else {
         loadFromCacheOrFallback();
