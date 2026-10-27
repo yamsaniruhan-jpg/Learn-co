@@ -153,11 +153,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               dailySourcesUploadLimit: 5,
             };
           }
-          return {
+          const updatedGam = {
             ...prev,
             xp: currentXp,
             level: lvl.level,
           };
+          if (user) {
+            syncClientToFirestore(user, profile, updatedGam).catch(() => {});
+          }
+          return updatedGam;
         });
       }
     };

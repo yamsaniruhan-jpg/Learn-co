@@ -885,6 +885,7 @@ export class Database {
   ): LeaderboardEntry[] {
     const list: Array<{
       userId: string;
+      email?: string;
       displayName: string;
       avatarUrl: string;
       xp: number;
@@ -1001,8 +1002,11 @@ export class Database {
       const userAcc = memoryDb.users[userId];
       const safeDisplayName = profile.displayName || profile.fullName || (userAcc?.email ? userAcc.email.split('@')[0] : 'Scholar');
 
+      const userEmail = userAcc?.email || profile.email || '';
+
       list.push({
         userId,
+        email: userEmail,
         displayName: safeDisplayName,
         avatarUrl: profile.avatarUrl,
         xp: calculatedXp,
@@ -1041,6 +1045,38 @@ export class Database {
       streakDays: item.streak,
       isCurrentUser: item.userId === currentUserId,
     }));
+  }
+
+  static updateUserXp(userId: string, newXp: number, reason: string = 'Activity'): { xp: number; level: number } {
+    let gam = memoryDb.gamification[userId];
+    if (!gam) {
+      gam = this.getGamification(userId) || {
+        userId,
+        xp: 0,
+        level: 1,
+        currentStreak: 1,
+        longestStreak: 1,
+        lastActiveDate: new Date().toISOString().split('T')[0],
+        dailyQuestionsSolvedToday: 0,
+        dailyAllowanceLimit: 25,
+      };
+      memoryDb.gamification[userId] = gam;
+    }
+    gam.xp = Math.max(0, newXp);
+    gam.level = Math.max(1, Math.floor(Math.sqrt(gam.xp / 25)) + 1);
+    gam.lastActiveDate = new Date().toISOString().split('T')[0];
+
+    // Save transaction
+    memoryDb.xpTransactions.unshift({
+      id: `xp-tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      userId,
+      amount: Math.max(0, newXp - (gam.xp || 0)),
+      reason: (reason as any) || 'QUESTION_CORRECT',
+      timestamp: new Date().toISOString(),
+    });
+
+    saveDbToDisk();
+    return { xp: gam.xp, level: gam.level };
   }
 
   // ==========================================

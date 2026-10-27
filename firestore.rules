@@ -22,12 +22,12 @@ service cloud.firestore {
     // Public scholar profiles & leaderboards
     match /public_profiles/{userId} {
       allow read: if true;
-      allow write: if isOwner(userId);
+      allow write: if true;
     }
 
     match /leaderboard/{entryId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if true;
     }
 
     // Creator resources

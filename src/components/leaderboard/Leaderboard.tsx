@@ -27,7 +27,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
 import { LeaderboardEntry, TimeframeFilter } from '../../types/auth';
-import { fetchFirestoreLeaderboardEntries } from '../../services/clientFirestoreSync';
+import { fetchFirestoreLeaderboardEntries, subscribeToFirestoreLeaderboard } from '../../services/clientFirestoreSync';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -207,7 +207,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         mergedMap.set(entry.userId, {
           ...(existing || {}),
           ...entry,
-          xp: Math.max(entry.xp || 0, existing?.xp || 0),
+          xp: Math.max(typeof entry.xp === 'number' ? entry.xp : 0, typeof existing?.xp === 'number' ? existing.xp : 0),
           level: Math.max(entry.level || 1, existing?.level || 1),
         });
       }
@@ -233,9 +233,34 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   };
 
   useEffect(() => {
-    if (!propEntries) {
-      fetchLeaderboard();
-    }
+    if (propEntries) return;
+
+    fetchLeaderboard();
+
+    // Subscribe to live Firebase Console Firestore updates so new accounts & XP gains reflect immediately
+    const unsubscribe = subscribeToFirestoreLeaderboard((liveEntries) => {
+      if (liveEntries && liveEntries.length > 0) {
+        setServerEntries((prev) => {
+          const map = new Map<string, LeaderboardEntry>();
+          for (const item of prev) {
+            map.set(item.userId, item);
+          }
+          for (const item of liveEntries) {
+            const existing = map.get(item.userId);
+            map.set(item.userId, {
+              ...(existing || {}),
+              ...item,
+            });
+          }
+          return Array.from(map.values());
+        });
+        setIsOffline(false);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [propEntries, activeTimeframe, activeSubject]);
 
   // Combined raw entries with unified streak and stages
@@ -258,19 +283,21 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     const currentUserId = user?.id || 'current-user-local';
     const currentUserXp = gamification?.xp ?? (user ? 0 : 450);
     const currentUserLevel = gamification?.level ?? 1;
+    const currentUserEmail = user?.email || profile?.email || '';
 
     // Authentic display name: Never default to 'You (Learner)'
     const currentUserName =
       profile?.displayName ||
       profile?.fullName ||
       user?.name ||
-      (user?.email ? user.email.split('@')[0] : '');
+      (currentUserEmail ? currentUserEmail.split('@')[0] : '');
 
     // Check if current user is already present in the list
     const existingIndex = baseList.findIndex(
       (e) =>
         e.isCurrentUser ||
         e.userId === currentUserId ||
+        (currentUserEmail && e.email && e.email.toLowerCase() === currentUserEmail.toLowerCase()) ||
         (currentUserName && e.displayName.toLowerCase() === currentUserName.toLowerCase())
     );
 
@@ -281,30 +308,32 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         (existing.displayName && !existing.displayName.includes('You (Learner)') ? existing.displayName : '') ||
         profile?.displayName ||
         profile?.fullName ||
-        (user?.email ? user.email.split('@')[0] : 'Scholar');
+        (currentUserEmail ? currentUserEmail.split('@')[0] : 'Scholar');
 
       baseList[existingIndex] = {
         ...existing,
+        email: currentUserEmail || existing.email || '',
         displayName: preservedName,
         avatarUrl: profile?.avatarUrl || existing.avatarUrl,
-        xp: Math.max(existing.xp, currentUserXp),
+        xp: Math.max(typeof existing.xp === 'number' ? existing.xp : 0, currentUserXp),
         streak: effectiveUserStreak,
         streakDays: effectiveUserStreak,
         level: Math.max(existing.level, currentUserLevel),
         isCurrentUser: true,
       };
-    } else if (currentUserName) {
+    } else if (currentUserName || currentUserEmail) {
       baseList.push({
         userId: currentUserId,
-        displayName: currentUserName,
-        avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUserName)}`,
+        email: currentUserEmail,
+        displayName: currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Scholar'),
+        avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUserEmail || currentUserName)}`,
         xp: currentUserXp,
         rank: baseList.length + 1,
         streak: effectiveUserStreak,
         streakDays: effectiveUserStreak,
         level: currentUserLevel,
         isCurrentUser: true,
-        tier: 'Silver II',
+        tier: 'Bronze I',
         tierBadgeIcon: 'trophy',
       });
     }
@@ -608,7 +637,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <div className="mt-4 mb-2">
               <Avatar src={topThree[1].avatarUrl} name={topThree[1].displayName} size="lg" />
             </div>
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-full">
+            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-full mb-1">
               {topThree[1].displayName} {topThree[1].isCurrentUser && '(You)'}
             </h4>
             <div className="flex items-center gap-1.5 mb-2">
@@ -649,7 +678,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider mb-1">
               Cohort Leader
             </div>
-            <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 truncate max-w-full">
+            <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 truncate max-w-full mb-1">
               {topThree[0].displayName} {topThree[0].isCurrentUser && '(You)'}
             </h4>
             <div className="flex items-center gap-1.5 mb-2">
@@ -681,7 +710,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <div className="mt-4 mb-2">
               <Avatar src={topThree[2].avatarUrl} name={topThree[2].displayName} size="lg" />
             </div>
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-full">
+            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-full mb-1">
               {topThree[2].displayName} {topThree[2].isCurrentUser && '(You)'}
             </h4>
             <div className="flex items-center gap-1.5 mb-2">
@@ -786,8 +815,15 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                         </span>
                       </div>
 
-                      {/* Division Pill */}
+
+
+                      {/* Division Pill & 0 XP Indicator */}
                       <div className="flex items-center gap-1.5 mt-0.5">
+                        {scholar.xp === 0 && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                            0 XP
+                          </span>
+                        )}
                         {promoInfo.zone !== 'safe' && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${promoInfo.badgeBg} ${promoInfo.badgeText} ${promoInfo.border}`}>
                             {promoInfo.label}
@@ -824,6 +860,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                       <span>{scholar.xp.toLocaleString()}</span>
                       <span className="text-[10px] font-bold text-slate-400">XP</span>
                     </div>
+                    {scholar.xp === 0 && (
+                      <div className="text-[10px] font-semibold text-slate-400">
+                        0 XP Active
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -843,17 +884,20 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         </div>
       </Card>
 
-      {/* Privacy Notice Banner */}
+      {/* Privacy & Firebase Automation Notice Banner */}
       {showPrivacyNotice && (
         <div className="p-4 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <h5 className="font-bold text-slate-900 dark:text-slate-100">
-                Privacy Protection Policy
+              <h5 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span>Firebase Console Real-Time Sync & Permanent Leaderboard</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase">
+                  Connected
+                </span>
               </h5>
               <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed max-w-2xl">
-                Only public handles, levels, streaks, and verified XP are displayed. Private data (email addresses, phone numbers, individual question errors, test target scores, and auth tokens) is strictly protected and never published to cohort leaderboards.
+                All registered learner accounts (including 0 XP learners) remain on the leaderboard permanently with live Firebase sync. Student email addresses and private credentials are never publicly displayed or exposed on the leaderboard.
               </p>
             </div>
           </div>

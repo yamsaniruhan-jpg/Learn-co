@@ -32,7 +32,7 @@ async function startServer() {
     next();
   });
 
-  // AI Studio internal control plane & health checks
+  // AI Studio internal control plane status check
   app.get(["/__aistudio_internal_control_plane/dev/status", "/__aistudio_internal_control_plane/dev/status/", "/dev/status"], (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.status(200).json({
@@ -42,16 +42,6 @@ async function startServer() {
       healthy: true,
       app: "Learn.co",
       uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  app.all("/__aistudio_internal_control_plane/*", (req, res) => {
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).json({
-      status: "ready",
-      ready: true,
-      state: "READY",
       timestamp: new Date().toISOString(),
     });
   });

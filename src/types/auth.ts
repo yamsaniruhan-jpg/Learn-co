@@ -261,6 +261,7 @@ export interface UserStatistics {
 export interface LeaderboardEntry {
   rank: number;
   userId: string;
+  email?: string;
   displayName: string;
   avatarUrl: string;
   xp: number;

@@ -66,6 +66,13 @@ export function awardXp(
     window.dispatchEvent(event);
   } catch (_) {}
 
+  // Automatically modify data in Firebase console and dataset
+  try {
+    import('../services/clientFirestoreSync').then(({ syncXpToFirestoreAndBackend }) => {
+      syncXpToFirestoreAndBackend(newTotal, reason).catch(() => {});
+    }).catch(() => {});
+  } catch (_) {}
+
   return { newTotal, levelInfo };
 }
 
@@ -86,5 +93,10 @@ export function setGlobalXp(newTotal: number): void {
         },
       })
     );
+
+    // Sync to Firestore
+    import('../services/clientFirestoreSync').then(({ syncXpToFirestoreAndBackend }) => {
+      syncXpToFirestoreAndBackend(newTotal, 'Sync').catch(() => {});
+    }).catch(() => {});
   } catch (_) {}
 }
