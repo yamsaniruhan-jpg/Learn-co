@@ -109,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const renderNavGroup = (title: string, items: NavItem[]) => (
     <div className="mb-6">
       {!isCollapsed && (
-        <h3 className="px-3 mb-2 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider select-none">
+        <h3 className="px-3 mb-2 text-[11px] font-black text-[#6B6890] dark:text-[#B4B0D5] uppercase tracking-wider select-none">
           {title}
         </h3>
       )}
@@ -128,10 +128,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
               }}
               title={isCollapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none group cursor-pointer ${
+              className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all select-none group cursor-pointer ${
                 isActive
-                  ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200 dark:shadow-none'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
+                  : 'text-[#2D2A4A] dark:text-[#F1EFFF] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]'
               }`}
             >
               <Icon
@@ -141,8 +141,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : item.color
                     ? item.color
                     : item.highlight
-                    ? 'text-amber-500'
-                    : 'text-slate-500 dark:text-slate-400'
+                    ? 'text-[#FFB84D]'
+                    : 'text-[#6B6890] dark:text-[#B4B0D5]'
                 }`}
               />
               {!isCollapsed && (
@@ -150,12 +150,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
               {!isCollapsed && item.badge && (
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0 ${
                     isActive
-                      ? 'bg-indigo-700 text-indigo-100'
+                      ? 'bg-white text-[#6C5CE7]'
                       : item.badge === 'Active'
-                      ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      ? 'bg-[#4CAF8E] text-white'
+                      : 'bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861]'
                   }`}
                 >
                   {item.badge}
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       aria-label="Sidebar Navigation"
-      className={`hidden md:flex flex-col border-r border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur transition-all duration-200 shrink-0 ${
+      className={`hidden md:flex flex-col border-r border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] transition-all duration-200 shrink-0 ${
         isCollapsed ? 'w-18 p-3' : 'w-64 p-4'
       }`}
     >
@@ -184,45 +184,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Real-time Level & XP Progress Card */}
       {!isCollapsed ? (
-        <div className="my-2 p-3 rounded-xl bg-gradient-to-br from-amber-500/10 via-indigo-500/5 to-purple-500/10 border border-amber-500/20 dark:border-amber-500/30 space-y-2">
+        <div className="my-2 p-3.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              <Zap className="w-4 h-4 fill-[#FFB84D] text-[#FFB84D]" />
+              <span className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
                 Level {levelInfo.level}
               </span>
             </div>
-            <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-black text-[#6C5CE7] dark:text-[#8577ED]">
               {userXp.toLocaleString()} XP
             </span>
           </div>
 
           {/* Progress Bar */}
           <div className="space-y-1">
-            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-[#E3DFF5] dark:bg-[#3D3861] rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-amber-500 to-indigo-500 rounded-full transition-all duration-500"
+                className="h-full bg-[#6C5CE7] dark:bg-[#8577ED] rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, Math.max(0, levelInfo.progressPercent))}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+            <div className="flex items-center justify-between text-[10px] text-[#6B6890] dark:text-[#B4B0D5] font-bold">
               <span>{levelInfo.progressPercent}%</span>
               <span>{levelInfo.xpRemainingToNextLevel} XP to Lvl {levelInfo.level + 1}</span>
             </div>
           </div>
         </div>
       ) : (
-        <div className="my-2 flex flex-col items-center justify-center p-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold" title={`${userXp} XP (Level ${levelInfo.level})`}>
-          <Zap className="w-3 h-3 fill-amber-500" />
+        <div className="my-2 flex flex-col items-center justify-center p-2 rounded-xl bg-[#FFB84D] text-[#2D2A4A] border border-[#e09d3b] text-[10px] font-black" title={`${userXp} XP (Level ${levelInfo.level})`}>
+          <Zap className="w-3.5 h-3.5 fill-[#2D2A4A]" />
           <span>L{levelInfo.level}</span>
         </div>
       )}
 
       {/* Collapse Toggle Footer */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+      <div className="pt-3 border-t border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">
         {!isCollapsed && (
-          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium select-none truncate">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <div className="flex items-center gap-2 text-[11px] text-[#6B6890] dark:text-[#B4B0D5] font-bold select-none truncate">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#4CAF8E] shrink-0" />
             <span className="truncate">
               {isAuthenticated ? `${profile?.displayName || user?.name || 'Scholar'}` : 'Guest Session'}
             </span>
@@ -230,10 +230,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
         <button
           onClick={() => setIsCollapsed((prev) => !prev)}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mx-auto md:mx-0 cursor-pointer"
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] hover:text-[#2D2A4A] dark:text-[#B4B0D5] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors mx-auto md:mx-0 cursor-pointer"
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </button>
       </div>
     </aside>

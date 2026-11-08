@@ -35,12 +35,14 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 
 export interface UserAccount {
   id: string;
+  uid?: string;
   email: string;
   passwordHash?: string;
   authProvider: 'email' | 'google';
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastLoginAt?: string;
+  subscription?: 'free' | 'pro' | 'super' | string;
 }
 
 export interface UserProfile {

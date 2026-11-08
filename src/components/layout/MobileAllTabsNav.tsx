@@ -245,7 +245,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
       {/* 1. Mobile Horizontal Scrollable Quick-Switch Strip */}
       <nav
         aria-label="All Features Quick Scroll"
-        className="md:hidden sticky top-16 z-25 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-1.5"
+        className="md:hidden sticky top-16 z-25 bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-2 shadow-xs"
       >
         {ALL_APP_FEATURES.map((feat) => {
           const Icon = feat.icon;
@@ -254,16 +254,16 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
             <button
               key={`strip-${feat.id}`}
               onClick={() => handleSelect(feat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
                 isActive
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  ? 'bg-[#6C5CE7] text-white shadow-[0_2px_4px_rgba(108,92,231,0.25)]'
+                  : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F0EDFA] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#6C5CE7] dark:text-[#8577ED]'}`} />
               <span>{feat.shortLabel}</span>
               {feat.id === 'practice' && dailyAllowanceRemaining > 0 && (
-                <span className="text-[10px] px-1 rounded-full bg-indigo-500/30 text-white font-bold">
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white text-[#6C5CE7] font-black">
                   {dailyAllowanceRemaining}
                 </span>
               )}
@@ -273,7 +273,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
       </nav>
 
       {/* 2. Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
-      <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-2 py-1.5 flex items-center justify-around sticky bottom-0 z-40">
+      <div className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-2 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
         {primaryBottomTabs.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -281,13 +281,13 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg text-[10px] font-semibold transition-colors min-h-[44px] cursor-pointer ${
+              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors min-h-[44px] cursor-pointer ${
                 isActive
-                  ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
+                  : 'text-[#6B6890] dark:text-[#B4B0D5]'
               }`}
             >
-              <Icon className="w-4 h-4 mb-0.5" />
+              <Icon className="w-5 h-5 mb-0.5" />
               <span>{item.shortLabel}</span>
             </button>
           );
@@ -296,15 +296,15 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
         {/* The 'All Tabs & Features' Trigger */}
         <button
           onClick={() => setIsOpenAllDrawer(true)}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg text-[10px] font-semibold transition-colors min-h-[44px] cursor-pointer ${
+          className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors min-h-[44px] cursor-pointer ${
             isOpenAllDrawer
-              ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-              : 'text-slate-500 dark:text-slate-400'
+              ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
+              : 'text-[#6B6890] dark:text-[#B4B0D5]'
           }`}
         >
           <div className="relative">
-            <Menu className="w-4 h-4 mb-0.5" />
-            <span className="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-indigo-500" />
+            <Menu className="w-5 h-5 mb-0.5" />
+            <span className="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-[#6C5CE7]" />
           </div>
           <span>All Tabs</span>
         </button>
@@ -312,29 +312,29 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 
       {/* 3. Full Mobile Navigation Drawer Modal ("All Tab Architecture") */}
       {isOpenAllDrawer && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-200">
           <div
             className="flex-1"
             onClick={() => setIsOpenAllDrawer(false)}
             aria-label="Close modal overlay"
           />
 
-          <div className="bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] rounded-t-3xl border-t border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_-8px_30px_rgba(45,42,74,0.2)] max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
             {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">
               <div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white font-display flex items-center gap-2">
-                  <Menu className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display flex items-center gap-2">
+                  <Menu className="w-5 h-5 text-[#6C5CE7] dark:text-[#8577ED]" />
                   <span>All Learn.co Tabs & Features</span>
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-medium">
                   Switch instantly to any area of the STEM platform
                 </p>
               </div>
 
               <button
                 onClick={() => setIsOpenAllDrawer(false)}
-                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] cursor-pointer"
                 aria-label="Close all tabs drawer"
               >
                 <X className="w-5 h-5" />

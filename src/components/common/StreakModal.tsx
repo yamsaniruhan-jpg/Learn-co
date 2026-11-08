@@ -28,25 +28,25 @@ export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => 
     >
       <div className="space-y-5 text-slate-800 dark:text-slate-100">
         {/* Main Fire Card */}
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-transparent border border-orange-500/30 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-          <div className="relative flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/20 shrink-0">
+        <div className="p-6 rounded-3xl bg-[#FFFFFF] dark:bg-[#1E1B33] border-2 border-[#FFB84D] flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left shadow-[0_4px_16px_rgba(255,184,77,0.12)]">
+          <div className="relative flex items-center justify-center w-20 h-20 rounded-2xl bg-[#FFB84D] text-[#2D2A4A] shadow-md shrink-0">
             <Flame className="w-10 h-10 animate-bounce" />
-            <span className="absolute -bottom-2 px-2 py-0.5 rounded-full bg-slate-900 text-[10px] font-black text-amber-300 border border-amber-500/40">
+            <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full bg-[#2D2A4A] text-[10px] font-black text-[#FFB84D] border border-[#FFB84D]">
               ACTIVE
             </span>
           </div>
 
           <div className="flex-1 space-y-1">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-orange-600 dark:text-orange-400 font-display">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
                 {currentCount} {currentCount === 1 ? 'Day' : 'Days'} Streak
               </span>
-              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+              <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-[#4CAF8E] text-white flex items-center gap-1 shadow-xs">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Active Today
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
+            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-medium">
               {currentCount === 1
                 ? 'Your streak started today! Come back tomorrow to continue your streak to Day 2.'
                 : `Awesome momentum! You have maintained a consecutive study streak for ${currentCount} days.`}
@@ -55,7 +55,7 @@ export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => 
         </div>
 
         {/* 7-Day Weekly Calendar Tracker */}
-        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3">
+        <div className="p-5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-3">
           <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
             <span className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-indigo-500" />

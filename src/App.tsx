@@ -41,6 +41,7 @@ import { ExamForecasterView } from './components/common/ExamForecasterView';
 import { OfflineSyncView } from './components/common/OfflineSyncView';
 import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { FlashCheckModal } from './components/practice/FlashCheckModal';
+import { WalkthroughModal } from './components/common/WalkthroughModal';
 import { awardXp } from './utils/xpManager';
 import {
   LayoutDashboard,
@@ -74,6 +75,9 @@ export default function App() {
   const [isFlashCheckOpen, setIsFlashCheckOpen] = useState<boolean>(false);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [inspectedFormula, setInspectedFormula] = useState<FormulaInspectionData | null>(null);
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(() => {
+    return !localStorage.getItem('learnco_walkthrough_seen');
+  });
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('learnco_theme');
@@ -311,7 +315,7 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-        <header className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur px-6 py-4 flex items-center justify-between">
+        <header className="w-full border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-6 py-4 flex items-center justify-between shadow-xs">
           <BrandLogo size="md" />
           <div className="flex items-center gap-3">
             <button
@@ -342,7 +346,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/60 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col font-sans selection:bg-[#6C5CE7] selection:text-white">
       {/* Top Universal Navigation Bar */}
       <Navbar
         activeTab={activeTab}
@@ -380,21 +384,21 @@ export default function App() {
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
             >
             {arrivalReminder && (
-              <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-200/80 dark:border-indigo-800/80 text-slate-900 dark:text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_rgba(45,42,74,0.06)] animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-indigo-600 text-white shrink-0 mt-0.5">
-                    <Sparkles className="w-4 h-4" />
+                  <div className="p-2.5 rounded-xl bg-[#6C5CE7] text-white shrink-0 mt-0.5 shadow-xs">
+                    <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-sm text-indigo-950 dark:text-indigo-200">
+                      <h4 className="font-black text-sm text-[#2D2A4A] dark:text-[#F1EFFF]">
                         {arrivalReminder.title}
                       </h4>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#4CAF8E] text-white">
                         0 AI Tokens • Free
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                    <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5 font-medium">
                       {arrivalReminder.message}
                     </p>
                   </div>
@@ -406,13 +410,13 @@ export default function App() {
                       setActiveTab(arrivalReminder.actionUrl);
                       setArrivalReminder(null);
                     }}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    className="px-4 py-2 min-h-[40px] rounded-xl bg-[#6C5CE7] hover:bg-[#5b4bc4] text-white text-xs font-black shadow-[0_2px_6px_rgba(108,92,231,0.25)] transition-colors cursor-pointer"
                   >
                     {arrivalReminder.actionLabel}
                   </button>
                   <button
                     onClick={() => setArrivalReminder(null)}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-[#6B6890] hover:text-[#2D2A4A] dark:text-[#B4B0D5] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
                     aria-label="Dismiss smart reminder"
                   >
                     <X className="w-4 h-4" />
@@ -647,6 +651,20 @@ export default function App() {
           setCopilotContext(prompt);
           setActiveTab('copilot');
           setInspectedFormula(null);
+        }}
+      />
+
+      {/* First-Time Onboarding Walkthrough Tour */}
+      <WalkthroughModal
+        isOpen={isWalkthroughOpen}
+        onClose={() => {
+          setIsWalkthroughOpen(false);
+          localStorage.setItem('learnco_walkthrough_seen', 'true');
+        }}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          setIsWalkthroughOpen(false);
+          localStorage.setItem('learnco_walkthrough_seen', 'true');
         }}
       />
     </div>

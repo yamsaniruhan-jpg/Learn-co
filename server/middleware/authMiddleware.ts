@@ -4,19 +4,20 @@ import { UserAccount } from '../../src/types/auth';
 import { adminAuth } from '../services/firebaseAdmin';
 
 export interface AuthenticatedRequest extends Request {
-  user?: UserAccount;
+  user?: UserAccount | any;
   userId?: string;
 }
 
-const tokenCache = new Map<string, { user: UserAccount, expires: number }>();
+const tokenCache = new Map<string, { user: UserAccount | any, expires: number }>();
 
-export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function verifyFirebaseAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // Provide guest/preview user account so the applet preview and guest exploration never crashes
     const guestUser = Database.getSessionUser('guest_token') || {
       id: 'user-alex-001',
+      uid: 'user-alex-001',
       email: 'alex@learn.co',
+      subscription: 'free',
       authProvider: 'email',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -30,26 +31,28 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
 
   const token = authHeader.substring(7).trim();
   
-  // 1. Try local session first
   let user = Database.getSessionUser(token);
   
-  // 2. Check cache
   const cached = tokenCache.get(token);
   if (!user && cached && cached.expires > Date.now()) {
     user = cached.user;
   }
   
-  // 3. Verify with Firebase
   if (!user && token && token !== 'null' && token !== 'undefined') {
     try {
       if (adminAuth && typeof adminAuth.verifyIdToken === 'function') {
-        const decodedToken = await adminAuth.verifyIdToken(token);
+        const decodedToken = await adminAuth.verifyIdToken(token, false);
         const uid = decodedToken.uid;
-        user = Database.findUserById(uid) || { id: uid, email: decodedToken.email || '', authProvider: 'google' } as UserAccount;
+        user = Database.findUserById(uid) || {
+          id: uid,
+          uid,
+          email: decodedToken.email || '',
+          subscription: decodedToken.subscription || 'free',
+          authProvider: 'google',
+        };
         tokenCache.set(token, { user, expires: Date.now() + 5 * 60 * 1000 });
       }
     } catch {
-      // Fallback gracefully to default active user so preview does not break
       user = Database.getSessionUser('guest_token');
     }
   }
@@ -57,7 +60,9 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   if (!user) {
     user = Database.getSessionUser('guest_token') || {
       id: 'user-alex-001',
+      uid: 'user-alex-001',
       email: 'alex@learn.co',
+      subscription: 'free',
       authProvider: 'email',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -66,6 +71,14 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   }
 
   req.user = user;
-  req.userId = user.id;
+  req.userId = user.id || user.uid;
   next();
 }
+
+export async function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  return verifyFirebaseAuth(req, res, next);
+}
+
+export const requireAuth = verifyFirebaseAuth;
+
+export default verifyFirebaseAuth;

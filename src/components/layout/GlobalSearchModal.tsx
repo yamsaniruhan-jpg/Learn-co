@@ -220,26 +220,26 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4">
-      {/* Backdrop */}
+      {/* Solid Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 transition-opacity"
         onClick={onClose}
       />
 
       {/* Palette Container */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-xl bg-[#FFFFFF] dark:bg-[#2A2647] rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
         {/* Search Input Bar */}
-        <div className="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 gap-3">
-          <Search className="w-5 h-5 text-slate-400 shrink-0" />
+        <div className="flex items-center px-4.5 py-4 border-b border-[#E3DFF5] dark:border-[#3D3861] gap-3">
+          <Search className="w-5 h-5 text-[#6B6890] dark:text-[#B4B0D5] shrink-0" />
           <input
             autoFocus
             type="text"
             placeholder="Search STEM tracks, practice ladders, AI tools, or study planner... (⌘K)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+            className="w-full bg-transparent text-sm font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] placeholder:text-[#8E8BAF] focus:outline-none min-h-[38px]"
           />
-          <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+          <kbd className="hidden sm:inline-block px-2.5 py-1 text-[10px] font-mono font-bold text-[#6B6890] dark:text-[#B4B0D5] bg-[#F7F5FF] dark:bg-[#1E1B33] rounded-lg border border-[#E3DFF5] dark:border-[#3D3861]">
             ESC
           </kbd>
         </div>

@@ -285,8 +285,8 @@ export const DigitalArchiveHub: React.FC<DigitalArchiveHubProps> = ({
 
       {/* Interactive In-Chapter Modal & Practice Solver */}
       {selectedBook && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6">
+        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] p-6 space-y-6">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>

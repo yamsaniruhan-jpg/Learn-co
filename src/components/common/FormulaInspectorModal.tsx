@@ -142,22 +142,22 @@ export const FormulaInspectorModal: React.FC<FormulaInspectorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-150">
       <div
-        className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-lg bg-[#FFFFFF] dark:bg-[#2A2647] rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-transparent dark:from-indigo-950/40 dark:via-purple-950/20">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+        <div className="px-6 py-4.5 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between bg-[#F7F5FF] dark:bg-[#1E1B33]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#6C5CE7] text-white flex items-center justify-center shadow-xs">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <h3 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5 font-display">
                 <span>{meta.name}</span>
               </h3>
-              <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+              <p className="text-[11px] text-[#6C5CE7] dark:text-[#8577ED] font-bold">
                 {meta.domain}
               </p>
             </div>

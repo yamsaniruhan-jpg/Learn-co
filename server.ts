@@ -14,16 +14,52 @@ import copilotRoutes from "./server/routes/copilotRoutes";
 import { mentorshipRouter } from "./server/routes/mentorshipRoutes";
 import plannerRoutes from "./server/routes/plannerRoutes";
 import { analyticsRouter } from "./server/routes/analyticsRoutes";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import securityHeaders from "./server/middleware/securityHeaders";
+import { requireAuth } from "./server/middleware/authMiddleware";
+import aiRateLimiter from "./server/middleware/aiRateLimit";
 
 async function startServer() {
   const app = express();
+  app.set("trust proxy", 1);
+
   const portArgIndex = process.argv.indexOf("--port");
   const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? parseInt(process.argv[portArgIndex + 1], 10) : null;
   const PORT = cliPort || parseInt(process.env.PORT || "3000", 10);
 
-  // JSON payload parser with generous limit for base64 image avatar uploads
+  // ORDER MATTERS — security first
+  app.use(securityHeaders);
+
+  // CORS configuration
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, or same-origin)
+        if (!origin) return callback(null, true);
+        if (
+          origin === "https://learn-co.ai.studio" ||
+          origin === "http://localhost:3000" ||
+          origin.endsWith(".run.app") ||
+          origin.endsWith(".google.com") ||
+          origin.endsWith(".aistudio.google.com")
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true); // Permissive fallback for preview environments
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    })
+  );
+
+  // Body parsers with payload limits
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+  // Cookie parser
+  app.use(cookieParser());
 
   app.use((req, res, next) => {
     if (req.url.startsWith("/api")) {
@@ -70,7 +106,7 @@ async function startServer() {
   app.use("/api/practice", practiceRoutes);
   app.use("/api/learning", learningRoutes);
   app.use("/api/leaderboard", leaderboardRoutes);
-  app.use("/api/ai", aiRoutes);
+  app.use("/api/ai", requireAuth, aiRateLimiter, aiRoutes);
   app.use("/api/creator", creatorRoutes);
   app.use("/api/copilot", copilotRoutes);
   app.use("/api/mentorship", mentorshipRouter);

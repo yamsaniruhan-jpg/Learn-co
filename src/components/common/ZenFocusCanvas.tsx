@@ -74,10 +74,10 @@ export const ZenFocusCanvas: React.FC<ZenFocusCanvasProps> = ({
   return (
     <div className="fixed inset-0 z-40 bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
       {/* Floating Minimalist Control Pill */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 p-1.5 px-3 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-xl text-xs">
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 p-2 px-4 rounded-full bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_8px_24px_rgba(45,42,74,0.15)] text-xs">
         {/* Timer Display */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 font-mono font-bold text-slate-800 dark:text-slate-200">
-          <Clock className="w-3.5 h-3.5 text-indigo-500" />
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F0EDFA] dark:bg-[#1E1B33] font-mono font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+          <Clock className="w-4 h-4 text-[#6C5CE7] dark:text-[#8577ED]" />
           <span>{timeFormatted}</span>
         </div>
 

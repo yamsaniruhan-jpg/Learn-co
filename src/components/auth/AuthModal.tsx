@@ -86,16 +86,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-150">
         <div
-          className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+          className="w-full max-w-md bg-[#FFFFFF] dark:bg-[#2A2647] rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] overflow-hidden animate-in zoom-in-95 duration-150"
           role="dialog"
           aria-modal="true"
         >
           {/* Modal Header */}
-          <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-950 border border-indigo-500/40 shadow-xs shrink-0">
+          <div className="p-6 pb-4 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 border border-[#6C5CE7] shadow-xs shrink-0">
                 <img
                   src="/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg"
                   alt="LearnCo Logo"
@@ -103,10 +103,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-display">
+                <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
                   {mode === 'signin' ? 'Sign In to Learn.co' : 'Create Learn.co Account'}
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-medium">
                   {mode === 'signin'
                     ? 'Access your personal learning matrix, streak & notes'
                     : 'Start your rigorous STEM mastery journey'}

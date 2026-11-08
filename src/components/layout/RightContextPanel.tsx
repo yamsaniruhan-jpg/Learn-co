@@ -48,29 +48,29 @@ export const RightContextPanel: React.FC<RightContextPanelProps> = ({
   return (
     <aside
       aria-label="Context Companion Panel"
-      className="w-80 xl:w-88 border-l border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur flex flex-col shrink-0 h-full overflow-hidden transition-all duration-200"
+      className="w-80 xl:w-88 border-l border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] flex flex-col shrink-0 h-full overflow-hidden transition-all duration-200 shadow-sm"
     >
       {/* Panel Header */}
-      <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400">
+      <div className="p-4 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-[#6C5CE7] text-white shadow-xs">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+            <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF] uppercase tracking-wider">
               Study Companion
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[170px]">
+            <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] truncate max-w-[170px] font-medium">
               {activeContextTitle}
             </p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] hover:text-[#2D2A4A] dark:text-[#B4B0D5] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
           aria-label="Close companion panel"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 

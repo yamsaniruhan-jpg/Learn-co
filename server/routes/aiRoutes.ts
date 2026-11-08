@@ -1,7 +1,52 @@
 import { Router, Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
+import { chatValidation, handleValidation, sanitizeInput } from '../middleware/validate';
 
 const router = Router();
+
+// Hourly AI usage tracker per user
+const userAiUsageMap = new Map<string, { count: number; windowStart: number }>();
+
+export function recordAiUsage(userId: string): number {
+  const now = Date.now();
+  const entry = userAiUsageMap.get(userId);
+  if (!entry || now - entry.windowStart > 60 * 60 * 1000) {
+    userAiUsageMap.set(userId, { count: 1, windowStart: now });
+    return 1;
+  }
+  entry.count += 1;
+  return entry.count;
+}
+
+export function getAiHourlyUsage(userId: string): number {
+  const now = Date.now();
+  const entry = userAiUsageMap.get(userId);
+  if (!entry || now - entry.windowStart > 60 * 60 * 1000) {
+    return 0;
+  }
+  return entry.count;
+}
+
+// GET /api/ai/usage
+router.get('/usage', (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const userId = user?.id || 'guest_user';
+    const userTier = user?.subscription || 'free';
+    const limit = userTier === 'super' ? 500 : userTier === 'pro' ? 100 : 10;
+    const used = getAiHourlyUsage(userId);
+
+    res.json({
+      used,
+      limit,
+      tier: userTier,
+      remaining: Math.max(0, limit - used),
+      windowMs: 60 * 60 * 1000,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch AI usage.' });
+  }
+});
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -74,9 +119,10 @@ async function generateWithFallback(
 }
 
 // POST /api/ai/chat
-router.post('/chat', async (req: Request, res: Response) => {
+router.post('/chat', chatValidation, handleValidation, async (req: Request, res: Response) => {
   try {
-    const { prompt, mode = 'socratic_hint', context } = req.body;
+    const prompt = req.body.prompt || req.body.message;
+    const { mode = 'socratic_hint', context } = req.body;
 
     if (!prompt) {
       res.status(400).json({ error: 'Prompt is required.' });
@@ -217,6 +263,130 @@ router.post('/voice-exam-eval', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Evaluation failed.' });
+  }
+});
+
+// POST /api/ai/generate-content
+router.post('/generate-content', async (req: Request, res: Response) => {
+  try {
+    const { topic, type = 'summary', subject = 'STEM' } = req.body;
+    const ai = getGeminiClient();
+
+    if (ai) {
+      try {
+        const prompt = `Generate high-yield educational study notes for the topic: "${topic || 'Core STEM Concept'}" in subject: "${subject}". Include fundamental definitions, core invariants, and a practical application checklist.`;
+        const systemInstruction = 'You are an elite academic curriculum architect. Provide rigorous, clear, markdown-formatted study notes with key principles highlighted.';
+        const content = await generateWithFallback(ai, prompt, systemInstruction, 500);
+        res.json({ success: true, topic, content, generatedAt: new Date().toISOString() });
+        return;
+      } catch (aiErr) {
+        console.warn('Gemini generate-content fallback:', aiErr);
+      }
+    }
+
+    res.json({
+      success: true,
+      topic: topic || 'Core Principle',
+      content: `### Synthesized Study Material: ${topic || 'Key Concept'}\n\n* **Core Idea**: Understanding ${subject} requires identifying core invariants and boundary conditions.\n* **Key Takeaway**: Apply active recall and spaced practice to lock in retention.`,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Content generation failed.' });
+  }
+});
+
+// POST /api/ai/copilot/chat
+router.post('/copilot/chat', chatValidation, handleValidation, async (req: Request, res: Response) => {
+  try {
+    const prompt = req.body.prompt || req.body.message;
+    const { mode = 'socratic_hint', context } = req.body;
+    if (!prompt) {
+      res.status(400).json({ error: 'Prompt is required.' });
+      return;
+    }
+
+    const ai = getGeminiClient();
+    if (ai) {
+      try {
+        const fullPrompt = `${context ? `[Context]: ${context}\n\n` : ''}[Student Query]: ${prompt}`;
+        const systemInstruction = 'You are the Learn.co Socratic Copilot. Guide the learner with probing questions and diagnostic hints rather than giving away answers immediately.';
+        const reply = await generateWithFallback(ai, fullPrompt, systemInstruction, 350);
+        res.json({ reply, mode, context });
+        return;
+      } catch (aiErr) {
+        console.warn('Gemini copilot/chat fallback:', aiErr);
+      }
+    }
+
+    res.json({
+      reply: `### Socratic Diagnostic Hint\n\nRegarding: "${prompt.slice(0, 100)}"\n\n1. What is the fundamental conservation law or invariant at play?\n2. What does setting the rate of change to zero ($\Delta = 0$) yield?`,
+      mode,
+      context,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Copilot chat failed.' });
+  }
+});
+
+// POST /api/ai/quiz/generate
+router.post('/quiz/generate', async (req: Request, res: Response) => {
+  try {
+    const { subject = 'Math', topic = 'Calculus', difficulty = 'medium', count = 3 } = req.body;
+    const ai = getGeminiClient();
+
+    if (ai) {
+      try {
+        const prompt = `Generate ${Math.min(count, 5)} multiple-choice practice questions on "${topic}" in ${subject} (${difficulty} difficulty). Return valid JSON array of objects with keys: id, questionText, options (array of 4 strings), correctAnswer (exact matching option string), explanation.`;
+        const raw = await generateWithFallback(ai, prompt, 'You are an expert exam question author. Output strictly valid JSON without code fences or surrounding text.', 600);
+        const jsonMatch = raw.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (jsonMatch) {
+          const questions = JSON.parse(jsonMatch[0]);
+          res.json({ success: true, subject, topic, questions });
+          return;
+        }
+      } catch (aiErr) {
+        console.warn('Gemini quiz/generate fallback:', aiErr);
+      }
+    }
+
+    const questions = Array.from({ length: Math.min(count, 5) }).map((_, i) => ({
+      id: `gen-quiz-${Date.now()}-${i + 1}`,
+      questionText: `Generated practice question #${i + 1} on ${topic} (${difficulty} level)`,
+      options: ['Option A: Convergent', 'Option B: Divergent', 'Option C: Undetermined', 'Option D: Zero'],
+      correctAnswer: 'Option A: Convergent',
+      explanation: `Under standard criteria for ${topic}, the series satisfies the test condition.`,
+    }));
+    res.json({ success: true, subject, topic, questions });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Quiz generation failed.' });
+  }
+});
+
+// POST /api/ai/recommendations
+router.post('/recommendations', async (req: Request, res: Response) => {
+  try {
+    const { currentSubject = 'math', weaknesses = [] } = req.body;
+    res.json({
+      success: true,
+      recommendations: [
+        {
+          type: 'review_concept',
+          title: `Review Core Fundamentals in ${currentSubject}`,
+          reason: weaknesses.length > 0
+            ? `Identified lower accuracy in: ${weaknesses.slice(0, 2).join(', ')}.`
+            : 'Reinforces baseline conceptual strength before advancing to higher difficulty.',
+          priority: 'high',
+        },
+        {
+          type: 'practice_drill',
+          title: 'Complete 5-Question Daily Sprint',
+          reason: 'Consolidates memory retrieval speed under time constraints.',
+          priority: 'medium',
+        },
+      ],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Recommendation engine failed.' });
   }
 });
 

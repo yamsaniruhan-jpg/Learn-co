@@ -95,28 +95,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Top Welcome Banner & Goal Hero Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-6 sm:p-8 lg:p-10 shadow-xl">
-        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 -mb-12 w-64 h-64 bg-cyan-500/15 rounded-full blur-2xl pointer-events-none" />
-
+      <div className="relative overflow-hidden rounded-3xl bg-[#2D2A4A] dark:bg-[#1E1B33] text-white p-6 sm:p-8 lg:p-10 shadow-[0_8px_24px_rgba(45,42,74,0.14)] border border-[#E3DFF5] dark:border-[#3D3861]">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-xs text-xs font-bold text-indigo-200 border border-white/15">
+              <span className="px-3.5 py-1 rounded-full bg-[#6C5CE7] text-xs font-black text-white">
                 Level {user.level} Scholar
               </span>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 text-orange-200 text-xs font-bold border border-orange-400/30">
-                <Flame className="w-3.5 h-3.5 fill-orange-400 text-orange-400" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFB84D] text-[#2D2A4A] text-xs font-black shadow-xs">
+                <Flame className="w-4 h-4 fill-[#2D2A4A] text-[#2D2A4A]" />
                 <span>{activeStreakCount > 0 ? `${activeStreakCount}-Day Active Streak` : '0-Day Streak (Start Today)'}</span>
               </div>
-              <span className="text-xs text-indigo-200/80 font-medium">
+              <span className="text-xs text-[#E3DFF5] font-bold">
                 Target: {user.targetExam || 'Advanced STEM Mastery'}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display tracking-tight text-white">
               Welcome back, {user.fullName.split(' ')[0]}
             </h1>
-            <p className="text-sm sm:text-base text-indigo-100/80 leading-relaxed">
+            <p className="text-sm sm:text-base text-[#F1EFFF]/90 leading-relaxed font-medium">
               {activeStreakCount > 0
                 ? `Your ${activeStreakCount}-day study streak is active. Complete today's calibrated diagnostic ladder to reinforce your retention curve.`
                 : `Ready to begin your journey? Complete your first diagnostic practice session today to ignite your study streak.`}
@@ -124,18 +121,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Streak Week Visualizer */}
             <div className="pt-2 flex items-center gap-2">
-              <span className="text-xs text-indigo-200 font-semibold mr-1">Weekly Streak:</span>
+              <span className="text-xs text-[#E3DFF5] font-bold mr-1">Weekly Streak:</span>
               <div className="flex items-center gap-1.5">
                 {weeklyPills.map((pill) => (
                   <div
                     key={pill.dateKey}
                     title={`${pill.dayName} (${pill.dateKey}): ${pill.isCompleted ? 'Completed' : 'Pending'}`}
-                    className={`flex flex-col items-center justify-center w-8 h-8 rounded-lg text-[10px] font-bold border transition-all ${
+                    className={`flex flex-col items-center justify-center w-8 h-8 rounded-xl text-[10px] font-black border transition-all ${
                       pill.isCompleted
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs'
+                        ? 'bg-[#FFB84D] text-[#2D2A4A] border-[#e09d3b] shadow-xs'
                         : pill.isToday
-                        ? 'bg-white/15 text-white border-white/40 ring-1 ring-amber-300'
-                        : 'bg-white/5 text-white/40 border-white/10'
+                        ? 'bg-[#6C5CE7] text-white border-white'
+                        : 'bg-[#1E1B33] text-white/50 border-[#3D3861]'
                     }`}
                   >
                     <span>{pill.dayName.slice(0, 1)}</span>
@@ -147,13 +144,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Quick Launch Practice CTA Box */}
-          <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/20 flex flex-col sm:flex-row items-center gap-4 shrink-0 shadow-lg">
+          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] p-6 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row items-center gap-4 shrink-0 shadow-[0_4px_16px_rgba(0,0,0,0.1)]">
             <div className="text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-bold text-amber-300 mb-0.5">
-                <Flame className="w-4 h-4 fill-amber-300" />
+              <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-black text-[#FFB84D] mb-0.5">
+                <Flame className="w-4 h-4 fill-[#FFB84D]" />
                 <span>Daily Quota</span>
               </div>
-              <p className="text-lg font-black text-white">
+              <p className="text-xl font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
                 {allowanceRemaining} Problems Left
               </p>
             </div>

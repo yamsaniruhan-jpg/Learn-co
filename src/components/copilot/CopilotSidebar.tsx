@@ -358,7 +358,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
+            className="fixed inset-0 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90"
             onClick={onCloseMobile}
           />
           <div className="relative w-4/5 max-w-xs h-full z-10 animate-in slide-in-from-left duration-200 shadow-2xl">

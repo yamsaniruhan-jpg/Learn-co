@@ -466,20 +466,17 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onNavigateToTab })
   return (
     <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-200 pb-16">
       {/* Hero Welcome Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-950 text-white p-6 sm:p-8 lg:p-10 shadow-2xl border border-indigo-900/40">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 -mb-10 w-72 h-72 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
-
+      <div className="relative overflow-hidden rounded-3xl bg-[#2D2A4A] dark:bg-[#1E1B33] text-white p-6 sm:p-8 lg:p-10 shadow-[0_8px_24px_rgba(45,42,74,0.14)] border border-[#E3DFF5] dark:border-[#3D3861]">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold text-indigo-200 border border-white/15 shadow-xs">
-              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#6C5CE7] text-xs font-black text-white shadow-xs">
+              <BookOpen className="w-3.5 h-3.5 text-white" />
               <span>Official Complete User Guide & Quota Limits Manual</span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display tracking-tight text-white">
               Learn.co Mastery Guide & Feature Manual
             </h1>
-            <p className="text-sm sm:text-base text-indigo-100/90 leading-relaxed">
+            <p className="text-sm sm:text-base text-[#F1EFFF]/90 leading-relaxed font-medium">
               Everything you need to master Learn.co: detailed walkthroughs for all 12 modules, daily quota limits for Creator Studio, Gemini Socratic Copilot, practice questions, and how to navigate every feature efficiently.
             </p>
           </div>

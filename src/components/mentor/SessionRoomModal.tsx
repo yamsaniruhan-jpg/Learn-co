@@ -114,23 +114,23 @@ export const SessionRoomModal: React.FC<SessionRoomModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-200">
       <div
         id="modal-session-room"
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95"
+        className="bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] overflow-hidden animate-in zoom-in-95"
       >
         {/* Top Room Bar */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between gap-4">
+        <div className="p-4 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-[#4CAF8E] text-white flex items-center justify-center font-black text-sm shadow-xs">
               1:1
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100">
+                <h3 className="font-black text-sm sm:text-base text-[#2D2A4A] dark:text-[#F1EFFF]">
                   {session.title}
                 </h3>
-                <span className="text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="text-[11px] bg-[#4CAF8E] text-white font-black px-2.5 py-0.5 rounded-full">
                   Live Study Room
                 </span>
               </div>
@@ -263,8 +263,8 @@ export const SessionRoomModal: React.FC<SessionRoomModalProps> = ({
 
         {/* Feedback Modal Overlay */}
         {showFeedbackModal && (
-          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="absolute inset-0 bg-[#2D2A4A]/90 dark:bg-[#100E1C]/90 flex items-center justify-center p-4 z-50">
+            <div className="bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-3xl p-6 max-w-md w-full shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] space-y-4">
               <div className="text-center space-y-1">
                 <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto mb-2">
                   <Star className="w-5 h-5 fill-emerald-500 text-emerald-500" />

@@ -452,30 +452,29 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
   return (
     <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 lg:p-10 border border-slate-800 shadow-xl">
-        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-[#2D2A4A] dark:bg-[#1E1B33] text-white p-6 sm:p-8 lg:p-10 border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_8px_24px_rgba(45,42,74,0.14)]">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-400/30">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#6C5CE7] text-white text-xs font-black shadow-xs">
               <Library className="w-3.5 h-3.5" />
               <span>STEM Concept Library & Interactive Textbooks</span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display tracking-tight text-white">
               Master Foundational & Advanced Concepts
             </h1>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+            <p className="text-sm sm:text-base text-[#F1EFFF]/90 leading-relaxed font-medium">
               Read curated STEM textbooks, explore AI-generated deep-dive concept synthesis documents, and practice step-by-step mathematical proofs.
             </p>
           </div>
 
           {/* Quick Stats Pill */}
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 flex items-center gap-4 shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black">
-              <GraduationCap className="w-5 h-5" />
+          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] p-5 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] flex items-center gap-4 shrink-0 shadow-[0_4px_16px_rgba(0,0,0,0.1)]">
+            <div className="w-12 h-12 rounded-xl bg-[#6C5CE7] text-white flex items-center justify-center font-black shadow-xs">
+              <GraduationCap className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-xs text-indigo-200 block">Available Resources</span>
-              <span className="text-sm font-bold text-white">
+              <span className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-bold block">Available Resources</span>
+              <span className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
                 {STEM_BOOKS.length} Textbooks • {AI_GENERATED_DOCUMENTS.length} AI Synthesis Guides
               </span>
             </div>
@@ -1002,19 +1001,19 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
               >
                 <div>
                   {/* Card Banner */}
-                  <div className={`p-6 bg-gradient-to-r ${book.color} text-white space-y-3 relative`}>
+                  <div className={`p-6 bg-[#2D2A4A] dark:bg-[#1E1B33] text-white space-y-3 relative border-b border-[#E3DFF5] dark:border-[#3D3861]`}>
                     <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-bold uppercase tracking-wider backdrop-blur-xs">
+                      <span className="px-3 py-1 rounded-full bg-[#6C5CE7] text-[10px] font-black uppercase tracking-wider text-white">
                         {book.subjectLabel}
                       </span>
-                      <span className="text-[10px] text-white/80 font-semibold">{book.edition}</span>
+                      <span className="text-[10px] text-[#E3DFF5] font-bold">{book.edition}</span>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-2xl bg-[#6C5CE7] flex items-center justify-center shrink-0 shadow-xs">
                         <Icon className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-base font-bold text-white font-display line-clamp-1">
+                      <h3 className="text-base font-black text-white font-display line-clamp-1">
                         {book.title}
                       </h3>
                     </div>

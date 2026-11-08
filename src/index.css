@@ -2,30 +2,55 @@
 
 @layer base {
   :root {
-    --color-bg-canvas: #f8fafc;
-    --color-bg-surface: #ffffff;
-    --color-bg-subtle: #f1f5f9;
-    --color-border-subtle: #e2e8f0;
-    --color-border-strong: #cbd5e1;
-    --color-text-primary: #0f172a;
-    --color-text-secondary: #475569;
-    --color-text-muted: #94a3b8;
+    /* Required Design Palette Variables */
+    --color-bg-canvas: #F7F5FF;
+    --color-bg-surface: #FFFFFF;
+    --color-primary: #6C5CE7;
+    --color-secondary: #00B8A9;
+    --color-accent: #FFB84D;
+    --color-success: #4CAF8E;
+    --color-error: #F25F5C;
+    --color-text-primary: #2D2A4A;
+    --color-text-secondary: #6B6890;
+    --color-border: #E3DFF5;
+
+    /* Theme Aliases */
+    --color-bg-subtle: #F0EDFA;
+    --color-border-subtle: #E3DFF5;
+    --color-border-strong: #CEC8EC;
+    --color-text-muted: #8E8BAF;
+
+    /* Solid Soft Shadows (No blur-glass) */
+    --shadow-soft-sm: 0 1px 2px rgba(45, 42, 74, 0.05);
+    --shadow-soft-md: 0 4px 12px rgba(45, 42, 74, 0.08);
+    --shadow-soft-lg: 0 10px 24px rgba(45, 42, 74, 0.12);
   }
 
   .dark {
-    --color-bg-canvas: #090d16;
-    --color-bg-surface: #0f172a;
-    --color-bg-subtle: #1e293b;
-    --color-border-subtle: #1e293b;
-    --color-border-strong: #334155;
-    --color-text-primary: #f8fafc;
-    --color-text-secondary: #cbd5e1;
-    --color-text-muted: #64748b;
+    --color-bg-canvas: #1E1B33;
+    --color-bg-surface: #2A2647;
+    --color-primary: #8577ED;
+    --color-secondary: #00D1C1;
+    --color-accent: #FFC066;
+    --color-success: #5AC29E;
+    --color-error: #FA7270;
+    --color-text-primary: #F1EFFF;
+    --color-text-secondary: #B4B0D5;
+    --color-border: #3D3861;
+
+    --color-bg-subtle: #24203E;
+    --color-border-subtle: #3D3861;
+    --color-border-strong: #4F497B;
+    --color-text-muted: #8C86AF;
+
+    --shadow-soft-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-soft-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-soft-lg: 0 10px 24px rgba(0, 0, 0, 0.45);
   }
 
   html {
     scroll-behavior: smooth;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: 'Nunito', 'Poppins', system-ui, -apple-system, sans-serif;
   }
 
   body {
@@ -33,12 +58,28 @@
     color: var(--color-text-primary);
     min-height: 100vh;
     overflow-x: hidden;
+    font-family: 'Nunito', 'Poppins', system-ui, -apple-system, sans-serif;
   }
 
-  /* Accessibility focus indicator */
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Poppins', 'Nunito', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Strict Surface Rule: No blur filters or translucent backgrounds on containers */
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Accessibility focus indicator - WCAG AA compliant */
   *:focus-visible {
-    outline: 2px solid #6366f1;
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+  }
+
+  /* Large Touch Target Defaults */
+  button, a, input, select, textarea, [role="button"] {
+    min-height: 40px;
   }
 
   /* Respect reduced motion */
@@ -52,29 +93,31 @@
   }
 }
 
-/* Custom subtle scrollbar */
+/* Crisp solid scrollbars (No semi-transparency) */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--color-bg-canvas);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: var(--color-border);
   border-radius: 9999px;
+  border: 2px solid var(--color-bg-canvas);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6);
+  background: var(--color-primary);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.6);
+  background: var(--color-border);
+  border: 2px solid var(--color-bg-canvas);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.8);
+  background: var(--color-primary);
 }

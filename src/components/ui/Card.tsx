@@ -19,17 +19,18 @@ export const Card: React.FC<CardProps> = ({
     lg: 'p-6 sm:p-8',
   };
 
+  // Requirement: Solid opaque surfaces (#FFFFFF light, #2A2647 dark), soft solid shadows, rounded 12-16px, border #E3DFF5
   const variantStyles = {
     default:
-      'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xs',
+      'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl shadow-[0_2px_8px_rgba(45,42,74,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]',
     subtle:
-      'bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl',
+      'bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl',
     elevated:
-      'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-md dark:shadow-slate-950/50',
+      'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl shadow-[0_8px_20px_rgba(45,42,74,0.08)] dark:shadow-[0_8px_20px_rgba(0,0,0,0.4)]',
     interactive:
-      'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xs hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600/60 transition-all duration-200 cursor-pointer',
+      'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl shadow-[0_2px_8px_rgba(45,42,74,0.06)] hover:shadow-[0_8px_20px_rgba(108,92,231,0.12)] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] transition-all duration-200 cursor-pointer',
     bordered:
-      'bg-transparent border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl',
+      'bg-transparent border-2 border-dashed border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl',
   };
 
   return (

@@ -42,16 +42,16 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="p-6 my-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-slate-900 dark:text-slate-100 shadow-sm animate-in fade-in duration-200">
+        <div className="p-6 my-4 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border-2 border-[#F25F5C] text-[#2D2A4A] dark:text-[#F1EFFF] shadow-[0_4px_16px_rgba(242,95,92,0.12)] animate-in fade-in duration-200">
           <div className="flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 shrink-0">
+            <div className="p-3 rounded-2xl bg-[#F25F5C] text-white shrink-0 shadow-xs">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-base font-bold text-rose-900 dark:text-rose-200">
+              <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
                 {this.props.fallbackTitle || 'Component Rendering Recovered'}
               </h3>
-              <p className="text-xs text-rose-700 dark:text-rose-300 mt-1 leading-relaxed">
+              <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed font-medium">
                 {this.props.fallbackMessage ||
                   'An unexpected issue occurred while rendering this module. You can reload this component without losing your global progress.'}
               </p>

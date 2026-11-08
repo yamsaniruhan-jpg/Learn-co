@@ -26,6 +26,7 @@ import { Avatar } from '../ui/Avatar';
 import { XPIndicator, StreakIndicator } from '../ui/GamificationIndicators';
 import { DAILY_PRACTICE_LIMIT } from '../../types/auth';
 import { useNetworkStatus } from '../../utils/offlineStorage';
+import { AIUsageIndicator } from '../common/AIUsageIndicator';
 
 interface NavbarProps {
   activeTab: string;
@@ -66,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const allowanceRemaining = Math.max(0, DAILY_PRACTICE_LIMIT - solvedToday);
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+    <header className="sticky top-0 z-30 w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] transition-colors shadow-[0_1px_3px_rgba(45,42,74,0.05)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
         {/* Left: Brand Logo */}
         <div className="flex items-center gap-6">
@@ -80,36 +81,36 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Command Palette Button on Desktop */}
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all text-xs w-56 lg:w-72 justify-between cursor-pointer"
+            className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-56 lg:w-72 justify-between cursor-pointer min-h-[40px]"
           >
             <span className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
+              <Search className="w-3.5 h-3.5 text-[#6B6890]" />
               <span>Search STEM modules & tools...</span>
             </span>
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700">
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#FFFFFF] dark:bg-[#2A2647] rounded border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]">
               ⌘K
             </kbd>
           </button>
         </div>
 
         {/* Right: Gamification Status, Quota, Notifications, Theme, and Profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Mobile Search Icon Trigger */}
           <button
             onClick={onOpenSearch}
-            className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="md:hidden p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]"
             aria-label="Open Search"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-5 h-5" />
           </button>
 
           {/* Offline Mode Indicator if disconnected */}
           {!isOnline && (
             <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-[11px] font-bold"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFB84D] text-[#2D2A4A] border border-[#e09d3b] text-xs font-black shadow-xs"
               title="Offline Mode: studying from local cached curriculum and offline attempts"
             >
-              <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+              <WifiOff className="w-3.5 h-3.5 text-[#2D2A4A]" />
               <span className="hidden sm:inline">Offline Mode</span>
             </div>
           )}
@@ -118,10 +119,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenFlashCheck && (
             <button
               onClick={onOpenFlashCheck}
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
               title="Start 60-second Spaced Retention Flash Check (+15 XP)"
             >
-              <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <Zap className="w-4 h-4 fill-[#FFB84D] text-[#FFB84D]" />
               <span>Flash Check</span>
             </button>
           )}
@@ -129,28 +130,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Zen Focus Timer Button */}
           <button
             onClick={() => setActiveTab('focus')}
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'focus'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
+                : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
             }`}
             title="Open Zen Focus Timer Workspace"
           >
-            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            <Clock className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#8577ED]" />
             <span>Zen Focus</span>
           </button>
 
           {/* Quick User Guide Button */}
           <button
             onClick={() => setActiveTab('user-guide')}
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'user-guide' || activeTab === 'guide'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
+                : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
             }`}
             title="Open Platform User Guide & Manual"
           >
-            <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
+            <HelpCircle className="w-3.5 h-3.5 text-[#00B8A9]" />
             <span>User Guide</span>
           </button>
 
@@ -158,7 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onToggleZenMode && (
             <button
               onClick={onToggleZenMode}
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
               title={isZenMode ? "Exit Zen Mode" : "Enter Distraction-Free Zen Study Canvas (Esc to exit)"}
               aria-label="Toggle Zen Focus Mode"
             >
@@ -167,11 +168,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Daily Allowance Quota Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-700">
-            <span className="text-[11px] text-slate-400 font-normal">Daily Quota:</span>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold border border-[#E3DFF5] dark:border-[#3D3861] min-h-[40px]">
+            <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] font-semibold">Quota:</span>
+            <span className="text-[#6C5CE7] dark:text-[#8577ED] font-black">
               {allowanceRemaining}/{DAILY_PRACTICE_LIMIT}
             </span>
+          </div>
+
+          {/* AI Hourly Quota Indicator */}
+          <div className="hidden lg:block">
+            <AIUsageIndicator userTier={user?.subscription} />
           </div>
 
           {/* Streak Flame */}
@@ -185,25 +191,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Notification Bell */}
           <button
             onClick={onOpenNotifications}
-            className="relative p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
             aria-label="Notifications"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-5 h-5" />
             {unreadNotificationsCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-600" />
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#6C5CE7] ring-2 ring-[#FFFFFF] dark:ring-[#2A2647]" />
             )}
           </button>
 
           {/* Theme Toggle (Dark/Light) */}
           <button
             onClick={onToggleTheme}
-            className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
             {isDarkMode ? (
-              <Sun className="w-4 h-4 text-amber-400" />
+              <Sun className="w-5 h-5 text-[#FFB84D]" />
             ) : (
-              <Moon className="w-4 h-4 text-slate-600" />
+              <Moon className="w-5 h-5 text-[#6B6890]" />
             )}
           </button>
 
@@ -211,10 +217,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onToggleContextPanel && (
             <button
               onClick={onToggleContextPanel}
-              className="hidden lg:flex p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="hidden lg:flex p-2.5 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
               title="Toggle Study Companion"
             >
-              <PanelRight className="w-4 h-4" />
+              <PanelRight className="w-5 h-5" />
             </button>
           )}
 
@@ -223,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative ml-1">
               <button
                 onClick={() => setShowUserDropdown((prev) => !prev)}
-                className="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-indigo-500/50 transition-all cursor-pointer"
+                className="flex items-center gap-2 p-1 min-h-[44px] min-w-[44px] justify-center rounded-full hover:ring-2 hover:ring-[#6C5CE7] transition-all cursor-pointer"
                 aria-expanded={showUserDropdown}
                 aria-label="User menu"
               >
@@ -238,22 +244,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               {showUserDropdown && (
                 <>
                   <div
-                    className="fixed inset-0 z-40"
+                    className="fixed inset-0 z-40 bg-[#2D2A4A]/20"
                     onClick={() => setShowUserDropdown(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in fade-in-50 zoom-in-95">
-                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                  <div className="absolute right-0 mt-2 w-64 bg-[#FFFFFF] dark:bg-[#2A2647] rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_10px_28px_rgba(45,42,74,0.15)] py-2 z-50 animate-in fade-in-50 zoom-in-95">
+                    <div className="px-4 py-2.5 border-b border-[#E3DFF5] dark:border-[#3D3861]">
+                      <p className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
                         {profile.displayName || profile.fullName}
                       </p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] truncate">
                         {profile.email}
                       </p>
-                      <div className="mt-1.5 flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-[#6C5CE7] text-white">
                           Level {gamification?.level || 1} Scholar
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] font-extrabold text-[#FFB84D]">
                           {gamification?.xp || 0} XP
                         </span>
                       </div>
@@ -265,9 +271,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowUserDropdown(false);
                           onOpenProfile();
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] flex items-center gap-2 cursor-pointer min-h-[40px]"
                       >
-                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <User className="w-4 h-4 text-[#6C5CE7]" />
                         Profile & Performance
                       </button>
                       <button
@@ -275,9 +281,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowUserDropdown(false);
                           setActiveTab('gamification');
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] flex items-center gap-2 cursor-pointer min-h-[40px]"
                       >
-                        <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        <Zap className="w-4 h-4 text-[#FFB84D]" />
                         Leaderboard & XP
                       </button>
                       <button
@@ -285,9 +291,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowUserDropdown(false);
                           setActiveTab('user-guide');
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] flex items-center gap-2 cursor-pointer min-h-[40px]"
                       >
-                        <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                        <HelpCircle className="w-4 h-4 text-[#00B8A9]" />
                         User Guide & Quotas
                       </button>
                       <button
@@ -295,9 +301,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowUserDropdown(false);
                           onOpenAuthModal();
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] flex items-center gap-2 cursor-pointer min-h-[40px]"
                       >
-                        <LogIn className="w-3.5 h-3.5 text-slate-400" />
+                        <LogIn className="w-4 h-4 text-[#6B6890]" />
                         Switch / Sign In Account
                       </button>
                       <button
@@ -305,9 +311,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowUserDropdown(false);
                           signOut();
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800 mt-1"
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#F25F5C] hover:bg-[#F25F5C]/10 flex items-center gap-2 cursor-pointer border-t border-[#E3DFF5] dark:border-[#3D3861] mt-1 min-h-[40px]"
                       >
-                        <LogOut className="w-3.5 h-3.5" />
+                        <LogOut className="w-4 h-4" />
                         Sign Out
                       </button>
                     </div>
@@ -318,9 +324,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={onOpenAuthModal}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              className="px-4 py-2.5 min-h-[44px] rounded-xl bg-[#6C5CE7] hover:bg-[#5b4bc4] text-white font-extrabold text-xs transition-colors flex items-center gap-2 shadow-[0_2px_6px_rgba(108,92,231,0.25)] cursor-pointer"
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogIn className="w-4 h-4" />
               <span>Sign In</span>
             </button>
           )}

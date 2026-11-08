@@ -389,35 +389,35 @@ export const Calculus3DLab: React.FC = () => {
 
         {/* 3D HUD Overlay: Navigation Help */}
         <div className="absolute top-4 left-4 z-10 pointer-events-none flex flex-col gap-1.5">
-          <div className="px-3 py-1.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700/60 text-white text-[11px] font-mono flex items-center gap-2 shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="px-3.5 py-2 rounded-xl bg-[#2D2A4A] border border-[#3D3861] text-white text-[11px] font-mono flex items-center gap-2 shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-[#4CAF8E] animate-pulse" />
             <span>WebGL 3D Surface Engine • Left-Click + Drag to Rotate</span>
           </div>
-          <div className="px-3 py-1 rounded-lg bg-slate-900/60 backdrop-blur-xs text-[10px] text-slate-400 font-mono">
+          <div className="px-3 py-1 rounded-lg bg-[#1E1B33] text-[10px] text-[#B4B0D5] font-mono border border-[#3D3861]">
             Scroll to Zoom • Right-Click + Drag to Pan
           </div>
         </div>
 
         {/* 3D HUD Overlay: Coordinate Axes Legend */}
-        <div className="absolute top-4 right-4 z-10 pointer-events-none px-3 py-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700/60 text-white text-[10px] font-mono space-y-1 shadow-lg">
-          <div className="font-bold text-slate-300 uppercase tracking-wider text-[9px]">Axes Orientation</div>
+        <div className="absolute top-4 right-4 z-10 pointer-events-none px-3.5 py-2.5 rounded-xl bg-[#2D2A4A] border border-[#3D3861] text-white text-[10px] font-mono space-y-1 shadow-lg">
+          <div className="font-bold text-[#FFB84D] uppercase tracking-wider text-[9px]">Axes Orientation</div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500" />
+            <span className="w-2 h-2 rounded-full bg-[#F25F5C]" />
             <span>X Axis (Ground Left/Right)</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="w-2 h-2 rounded-full bg-[#3867D6]" />
             <span>Y Axis (Ground Depth)</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="w-2 h-2 rounded-full bg-[#4CAF8E]" />
             <span>Z Axis (Vertical Height = f(x, y))</span>
           </div>
         </div>
 
         {/* 3D HUD Overlay: Live Derivative & Tangent Readout */}
         <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-none flex flex-wrap items-center justify-between gap-3">
-          <div className="px-4 py-2.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700/70 text-white shadow-xl flex items-center gap-4">
+          <div className="px-4 py-2.5 rounded-2xl bg-[#2D2A4A] border border-[#3D3861] text-white shadow-xl flex items-center gap-4">
             <div className="space-y-0.5">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Probe Coordinates</span>
               <span className="text-xs font-mono font-black text-amber-400">

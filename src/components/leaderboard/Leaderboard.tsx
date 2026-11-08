@@ -479,28 +479,28 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
       {/* 2. User Standing & Promotion Banner */}
       {currentUserEntry && !compact && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white shadow-lg border border-indigo-800/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 flex items-center justify-center text-2xl shadow-inner shrink-0">
+        <div className="p-5 sm:p-6 rounded-3xl bg-[#2D2A4A] dark:bg-[#1E1B33] text-white shadow-[0_8px_24px_rgba(45,42,74,0.14)] border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#6C5CE7] text-white border border-[#E3DFF5]/30 flex items-center justify-center text-3xl shadow-sm shrink-0">
               {userStageDetails.stage.badgeEmoji}
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                <span className="text-xs font-black text-[#FFB84D] uppercase tracking-wider">
                   Tier {userStageDetails.stage.tierNumber} • {userStageDetails.stage.name} League
                 </span>
-                <span className="text-slate-400">•</span>
-                <span className="px-2 py-0.5 rounded-md bg-white/15 text-white text-[10px] font-black">
+                <span className="text-[#E3DFF5]">•</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#FFFFFF] text-[#2D2A4A] text-[10px] font-black">
                   {userStageDetails.substage.substageName}
                 </span>
               </div>
               <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                 <span>Rank #{currentUserEntry.rank} in Division</span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/30">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#4CAF8E] text-white">
                   {currentUserEntry.rank <= userStageDetails.stage.promotionTopCount ? 'Promotion Zone 🚀' : 'Safe Zone 🛡️'}
                 </span>
               </h3>
-              <p className="text-xs text-indigo-200/90">
+              <p className="text-xs text-[#E3DFF5] font-medium">
                 Weekly Cutoff: Top {userStageDetails.stage.promotionTopCount} advance to next division on Sunday!
               </p>
             </div>

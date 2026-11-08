@@ -15,36 +15,37 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const sizeStyles = {
-    sm: 'text-[11px] px-2 py-0.5 font-semibold',
-    md: 'text-xs px-2.5 py-1 font-semibold',
-    lg: 'text-sm px-3 py-1.5 font-bold',
+    sm: 'text-[11px] px-2.5 py-0.5 font-bold',
+    md: 'text-xs px-3 py-1 font-bold',
+    lg: 'text-sm px-3.5 py-1.5 font-extrabold',
   };
 
+  // Requirement: Opaque solid backgrounds, high contrast WCAG AA, borders #E3DFF5
   const variantStyles = {
-    default: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
-    primary: 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80',
-    success: 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80',
-    warning: 'bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80',
-    error: 'bg-rose-50 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80',
-    outline: 'bg-transparent border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300',
-    xp: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold',
-    streak: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 font-bold',
-    math: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800',
-    cs: 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
-    physics: 'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border border-sky-200 dark:border-sky-800',
-    chemistry: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
-    biology: 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800',
-    english: 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
-    data_science: 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800',
+    default: 'bg-[#F0EDFA] dark:bg-[#2A2647] text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861]',
+    primary: 'bg-[#6C5CE7] text-white border border-[#5b4bc4]',
+    success: 'bg-[#4CAF8E] text-white border border-[#3e9375]',
+    warning: 'bg-[#FFB84D] text-[#2D2A4A] border border-[#e09d3b]',
+    error: 'bg-[#F25F5C] text-white border border-[#d64a47]',
+    outline: 'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]',
+    xp: 'bg-[#FFB84D] text-[#2D2A4A] border border-[#e09d3b] font-black',
+    streak: 'bg-[#FF9F43] text-[#2D2A4A] border border-[#e08630] font-black',
+    math: 'bg-[#6C5CE7] text-white border border-[#5b4bc4]',
+    cs: 'bg-[#00B8A9] text-white border border-[#009b8e]',
+    physics: 'bg-[#3867D6] text-white border border-[#2b53b0]',
+    chemistry: 'bg-[#20BF6B] text-white border border-[#199955]',
+    biology: 'bg-[#E056FD] text-white border border-[#b83acc]',
+    english: 'bg-[#8854D0] text-white border border-[#6f3fb0]',
+    data_science: 'bg-[#00D2D3] text-[#2D2A4A] border border-[#00abab]',
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full select-none whitespace-nowrap ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full select-none whitespace-nowrap shadow-[0_1px_2px_rgba(45,42,74,0.04)] ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
       {...props}
     >
       {dot && (
-        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
       )}
       {children}
     </span>

@@ -25,7 +25,7 @@ export const Tabs: React.FC<TabsProps> = ({
   if (variant === 'segmented') {
     return (
       <div
-        className={`flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-x-auto ${className}`}
+        className={`flex p-1 bg-[#F0EDFA] dark:bg-[#1E1B33] rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto ${className}`}
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -33,20 +33,20 @@ export const Tabs: React.FC<TabsProps> = ({
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className={`flex-1 min-w-fit flex items-center justify-center gap-2 py-1.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-150 select-none ${
+              className={`flex-1 min-w-fit min-h-[40px] flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-xs font-bold transition-all duration-150 select-none cursor-pointer ${
                 isActive
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#8577ED] shadow-[0_1px_3px_rgba(45,42,74,0.08)]'
+                  : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
               }`}
             >
               {tab.icon && <span className="shrink-0">{tab.icon}</span>}
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
                     isActive
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
-                      : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                      ? 'bg-[#6C5CE7] text-white'
+                      : 'bg-[#E3DFF5] dark:bg-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]'
                   }`}
                 >
                   {tab.badge}
@@ -61,25 +61,29 @@ export const Tabs: React.FC<TabsProps> = ({
 
   if (variant === 'underline') {
     return (
-      <div
-        className={`flex border-b border-slate-200 dark:border-slate-800 space-x-6 overflow-x-auto ${className}`}
-      >
+      <div className={`flex border-b border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto gap-4 sm:gap-6 ${className}`}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className={`flex items-center gap-2 py-3 px-1 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap select-none ${
+              className={`min-h-[44px] flex items-center gap-2 py-2.5 px-1 border-b-2 font-bold text-xs sm:text-sm whitespace-nowrap transition-colors select-none cursor-pointer ${
                 isActive
-                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                  ? 'border-[#6C5CE7] text-[#6C5CE7] dark:border-[#8577ED] dark:text-[#8577ED]'
+                  : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
               }`}
             >
               {tab.icon && <span className="shrink-0">{tab.icon}</span>}
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold">
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    isActive
+                      ? 'bg-[#6C5CE7] text-white'
+                      : 'bg-[#F0EDFA] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5]'
+                  }`}
+                >
                   {tab.badge}
                 </span>
               )}
@@ -99,20 +103,20 @@ export const Tabs: React.FC<TabsProps> = ({
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none ${
+            className={`min-h-[40px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all select-none cursor-pointer ${
               isActive
-                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200 dark:shadow-none'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60'
+                ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
+                : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
             }`}
           >
             {tab.icon && <span className="shrink-0">{tab.icon}</span>}
             <span>{tab.label}</span>
             {tab.badge !== undefined && (
               <span
-                className={`text-xs px-1.5 py-0.2 rounded-full font-bold ${
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                   isActive
-                    ? 'bg-indigo-700 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    ? 'bg-white text-[#6C5CE7]'
+                    : 'bg-[#F0EDFA] dark:bg-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]'
                 }`}
               >
                 {tab.badge}

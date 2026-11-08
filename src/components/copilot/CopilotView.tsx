@@ -454,7 +454,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       {/* 2. Center Main Chat Canvas */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
         {/* Top Control Header */}
-        <div className="h-14 px-3 sm:px-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur flex items-center justify-between gap-2 sm:gap-3 shrink-0">
+        <div className="h-14 px-3 sm:px-4 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xs">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Mobile Sessions Toggle Button */}
             <button

@@ -39,26 +39,27 @@ export const StagesLadderModal: React.FC<StagesLadderModalProps> = ({
   const countdown = getWeeklyResetCountdown();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-150">
+      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-3xl shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] overflow-hidden">
         {/* Header Banner */}
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 text-white flex items-start justify-between border-b border-indigo-900/50">
+        <div className="p-5 sm:p-6 bg-[#2D2A4A] dark:bg-[#1E1B33] text-white flex items-start justify-between border-b border-[#E3DFF5] dark:border-[#3D3861]">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-300 border border-white/15">
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#6C5CE7] text-xs font-black text-white">
+              <Trophy className="w-3.5 h-3.5 text-[#FFB84D]" />
               <span>10 Stages & 30 Substage Divisions</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black font-display tracking-tight text-white flex items-center gap-2">
               Competitive League Hierarchy
             </h2>
-            <p className="text-xs sm:text-sm text-indigo-200/90 max-w-xl">
+            <p className="text-xs sm:text-sm text-[#F1EFFF]/90 max-w-xl font-medium">
               Advance weekly through 10 ordered leagues, each containing 3 competitive divisions (III ➔ II ➔ I).
             </p>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-white/80 hover:text-white rounded-xl hover:bg-white/10 cursor-pointer"
+            aria-label="Close stages ladder"
           >
             <X className="w-5 h-5" />
           </button>
