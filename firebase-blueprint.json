@@ -15,18 +15,71 @@
     },
     "UserGamification": {
       "title": "UserGamification",
-      "description": "User XP, level, streak, and tier status",
+      "description": "User lifetime XP, level, daily streak, badges, and periodic XP metrics",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
         "xp": { "type": "number" },
         "level": { "type": "number" },
-        "currentStreak": { "type": "number" },
+        "streak": { "type": "number" },
         "longestStreak": { "type": "number" },
-        "tier": { "type": "string" },
-        "lastActiveDate": { "type": "string" }
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "badgeId": { "type": "string" },
+              "earnedAt": { "type": "string" },
+              "badgeName": { "type": "string" },
+              "icon": { "type": "string" }
+            },
+            "required": ["badgeId", "badgeName", "icon"]
+          }
+        },
+        "weeklyXP": { "type": "number" },
+        "monthlyXP": { "type": "number" },
+        "lastXpReset": { "type": "string" }
       },
-      "required": ["userId", "xp", "level", "currentStreak"]
+      "required": ["xp", "level", "streak"]
+    },
+    "XpRules": {
+      "title": "XpRules",
+      "description": "Global XP scoring values for educational activities and achievements",
+      "type": "object",
+      "properties": {
+        "completeLesson": { "type": "number" },
+        "passQuiz": { "type": "number" },
+        "perfectQuiz": { "type": "number" },
+        "createCourse": { "type": "number" },
+        "publishCourse": { "type": "number" },
+        "dailyLogin": { "type": "number" },
+        "streakBonus7": { "type": "number" },
+        "streakBonus30": { "type": "number" },
+        "reviewFlashcard": { "type": "number" },
+        "mentorSession": { "type": "number" }
+      },
+      "required": ["completeLesson", "passQuiz", "perfectQuiz", "createCourse", "publishCourse"]
+    },
+    "Badge": {
+      "title": "Badge",
+      "description": "Earnable badge definitions with category, requirements, and rarity tiers",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "category": { "type": "string", "enum": ["learner", "creator", "social", "streak"] },
+        "requirement": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "target": { "type": "number" },
+            "metric": { "type": "string" }
+          },
+          "required": ["type", "target", "metric"]
+        },
+        "rarity": { "type": "string", "enum": ["common", "rare", "epic", "legendary"] }
+      },
+      "required": ["name", "description", "icon", "category", "requirement", "rarity"]
     },
     "LeaderboardEntry": {
       "title": "LeaderboardEntry",
@@ -43,6 +96,124 @@
         "rank": { "type": "number" }
       },
       "required": ["userId", "displayName", "xp", "rank"]
+    },
+    "CourseProgress": {
+      "title": "CourseProgress",
+      "description": "User course progress, lesson completion, quiz scores, and study metrics",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "completedLessons": { "type": "number" },
+        "totalLessons": { "type": "number" },
+        "percentage": { "type": "number" },
+        "currentLesson": { "type": "string" },
+        "lastStudied": { "type": "string" },
+        "streakDays": { "type": "number" },
+        "timeSpentMinutes": { "type": "number" }
+      },
+      "required": ["courseId", "title", "completedLessons", "totalLessons", "percentage"]
+    },
+    "SpacedRepetitionCard": {
+      "title": "SpacedRepetitionCard",
+      "description": "User spaced repetition flashcards with SM-2 interval and ease scheduling",
+      "type": "object",
+      "properties": {
+        "topic": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "easeFactor": { "type": "number" },
+        "interval": { "type": "number" },
+        "repetitions": { "type": "number" },
+        "nextReview": { "type": "string" },
+        "lastReviewed": { "type": "string" }
+      },
+      "required": ["topic", "question", "answer", "easeFactor", "interval", "repetitions"]
+    },
+    "Mentor": {
+      "title": "Mentor",
+      "description": "Registered academic and domain mentors available for booking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } },
+        "levels": { "type": "array", "items": { "type": "string" } },
+        "specialties": { "type": "array", "items": { "type": "string" } },
+        "rating": { "type": "number" },
+        "totalSessions": { "type": "number" }
+      },
+      "required": ["name", "status", "subjects"]
+    },
+    "MentorshipSession": {
+      "title": "MentorshipSession",
+      "description": "Scheduled 1-on-1 mentorship bookings between learners and mentors",
+      "type": "object",
+      "properties": {
+        "learnerUid": { "type": "string" },
+        "mentorId": { "type": "string" },
+        "date": { "type": "string" },
+        "duration": { "type": "number" },
+        "topic": { "type": "string" },
+        "goals": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["learnerUid", "mentorId", "date", "topic", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System and session notifications for users and mentors",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "message", "read"]
+    },
+    "MarketplaceCourse": {
+      "title": "MarketplaceCourse",
+      "description": "Published public courses in the LearnCo marketplace",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "subject": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "creatorUid": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "totalLessons": { "type": "number" },
+        "totalModules": { "type": "number" },
+        "estimatedHours": { "type": "number" },
+        "difficulty": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+        "rating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "enrolledCount": { "type": "number" },
+        "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "publishedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "subject", "creatorUid", "status"]
+    },
+    "MarketplaceReview": {
+      "title": "MarketplaceReview",
+      "description": "User ratings and reviews for marketplace courses",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "rating", "comment"]
     }
   },
   "firestore": {
@@ -50,9 +221,37 @@
       "schema": "UserProfile",
       "description": "Private user profile and settings"
     },
-    "/users/{userId}/gamification/status": {
+    "/users/{userId}/gamification": {
       "schema": "UserGamification",
-      "description": "Private gamification status document"
+      "description": "Private gamification status, lifetime XP, streak, and badges"
+    },
+    "/gamification/xpRules": {
+      "schema": "XpRules",
+      "description": "Global XP scoring configuration for lessons, quizzes, creation, and streaks"
+    },
+    "/gamification/badges/{badgeId}": {
+      "schema": "Badge",
+      "description": "Catalog of earnable achievement badges"
+    },
+    "/users/{userId}/progress/{courseId}": {
+      "schema": "CourseProgress",
+      "description": "User course progress and learning milestones"
+    },
+    "/users/{userId}/spacedRepetition/{cardId}": {
+      "schema": "SpacedRepetitionCard",
+      "description": "User spaced repetition flashcards with review scheduling"
+    },
+    "/mentors/{mentorId}": {
+      "schema": "Mentor",
+      "description": "Mentor profile with subjects, specialties, and ratings"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "MentorshipSession",
+      "description": "Mentorship booking session between a learner and a mentor"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User and mentor alerts and session notifications"
     },
     "/public_profiles/{userId}": {
       "schema": "UserProfile",
@@ -61,6 +260,14 @@
     "/leaderboard/{entryId}": {
       "schema": "LeaderboardEntry",
       "description": "Public weekly and all-time leaderboard standings"
+    },
+    "/marketplace/{courseId}": {
+      "schema": "MarketplaceCourse",
+      "description": "Public courses published by creators on the LearnCo marketplace"
+    },
+    "/marketplace/{courseId}/reviews/{reviewId}": {
+      "schema": "MarketplaceReview",
+      "description": "Ratings and reviews for published marketplace courses"
     }
   }
 }

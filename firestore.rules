@@ -14,6 +14,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if isOwner(userId);
       
+      match /progress/{courseId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /spacedRepetition/{cardId} {
+        allow read, write: if isOwner(userId);
+      }
+
       match /{subcollection}/{docId} {
         allow read, write: if isOwner(userId);
       }
@@ -38,6 +46,43 @@ service cloud.firestore {
         resource.data.creatorId == request.auth.uid ||
         resource.data.userId == request.auth.uid
       );
+    }
+
+    // Mentors catalog
+    match /mentors/{mentorId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Mentorship sessions
+    match /sessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Gamification rules and badges
+    match /gamification/{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Marketplace courses & reviews
+    match /marketplace/{courseId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.creatorUid == request.auth.uid ||
+        request.auth.uid != null
+      );
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
     }
 
     // Default deny for unmapped documents

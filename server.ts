@@ -14,6 +14,12 @@ import copilotRoutes from "./server/routes/copilotRoutes";
 import { mentorshipRouter } from "./server/routes/mentorshipRoutes";
 import plannerRoutes from "./server/routes/plannerRoutes";
 import { analyticsRouter } from "./server/routes/analyticsRoutes";
+import { createRequire } from "module";
+
+const serverRequire = createRequire(import.meta.url);
+const subscriptionRoutes = serverRequire("./routes/subscription");
+const gamificationRoutes = serverRequire("./routes/gamification");
+const marketplaceRoutes = serverRequire("./routes/marketplace");
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import securityHeaders from "./server/middleware/securityHeaders";
@@ -110,6 +116,9 @@ async function startServer() {
   app.use("/api/creator", creatorRoutes);
   app.use("/api/copilot", copilotRoutes);
   app.use("/api/mentorship", mentorshipRouter);
+  app.use("/api/subscription", subscriptionRoutes);
+  app.use("/api/gamification", gamificationRoutes);
+  app.use("/api/marketplace", marketplaceRoutes);
   app.use("/api/planner", plannerRoutes);
   app.use("/api/analytics", analyticsRouter);
 

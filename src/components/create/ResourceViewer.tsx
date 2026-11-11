@@ -22,6 +22,8 @@ import {
   Clock,
   Code2,
   CheckCircle2,
+  Eye,
+  FunctionSquare,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -55,6 +57,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 }) => {
   const [showRawJson, setShowRawJson] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [readerMode, setReaderMode] = useState<'normal' | 'typeset'>('normal');
 
   const getResourceTypeIcon = (type: CreatorResourceType) => {
     switch (type) {
@@ -113,6 +116,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               }
             }
             title={resource.title}
+            defaultReaderMode={readerMode}
           />
         );
       case 'notes':
@@ -120,6 +124,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
           <NotesViewer
             notes={resource.content.notes || { title: resource.title, overview: '', sections: [] }}
             title={resource.title}
+            defaultReaderMode={readerMode}
           />
         );
       case 'worksheet':
@@ -138,7 +143,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
         );
       case 'key_concepts':
       default:
-        return <KeyConceptsViewer keyConcepts={resource.content.keyConcepts || []} title={resource.title} />;
+        return <KeyConceptsViewer keyConcepts={resource.content.keyConcepts || []} title={resource.title} defaultReaderMode={readerMode} />;
     }
   };
 
@@ -216,6 +221,17 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                 Edit Content
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReaderMode(readerMode === 'normal' ? 'typeset' : 'normal')}
+              leftIcon={readerMode === 'normal' ? <Eye className="w-3.5 h-3.5 text-indigo-600" /> : <FunctionSquare className="w-3.5 h-3.5" />}
+              className="text-xs"
+              title="Toggle between Normal Reader Mode (clean plain text) and LaTeX Typeset Mode"
+            >
+              {readerMode === 'normal' ? '📖 Reader Mode (Active)' : '🧮 LaTeX Typeset'}
+            </Button>
 
             <Button
               variant="ghost"

@@ -1,4 +1,3 @@
-// middleware/aiRateLimit.js
 const rateLimit = require('express-rate-limit');
 const admin = require('firebase-admin');
 
@@ -9,28 +8,25 @@ try {
   db = null;
 }
 
-// Tier limits (requests per hour and day)
 const TIER_LIMITS = {
   free:  { hourly: 10,  daily: 50 },
   pro:   { hourly: 100, daily: 1000 },
   super: { hourly: 500, daily: 5000 },
 };
 
-// Fast in-memory limiter for brute-force protection
 const bruteForceLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 30,
   message: { error: 'Too many requests. Please slow down.', code: 'BRUTE_FORCE' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.user?.uid || req.ip,
-  validate: { xForwardedForHeader: false, forwardedHeader: false },
+  keyGenerator: (req) => req.user?.uid || req.user?.id || req.ip || 'anonymous',
+  validate: { xForwardedForHeader: false, forwardedHeader: false, keyGeneratorIpFallback: false },
 });
 
-// Firestore-backed tier-aware limiter with fail-open resilience
 async function aiTierLimiter(req, res, next) {
   try {
-    const uid = req.user?.id || req.user?.uid;
+    const uid = req.user?.uid || req.user?.id;
     if (!uid) {
       return res.status(401).json({ error: 'Authentication required for AI features.' });
     }
@@ -46,7 +42,7 @@ async function aiTierLimiter(req, res, next) {
       }
     }
 
-    let usage = { hourlyCount: 0, dailyCount: 0 };
+    let usage = {};
     const now = admin.firestore.Timestamp.now();
     const usageRef = db.collection('users').doc(uid).collection('usage').doc('ai');
 
@@ -56,8 +52,7 @@ async function aiTierLimiter(req, res, next) {
         usage = usageDoc.data();
       }
     } catch (firestoreErr) {
-      // Fail open on permission denied or offline Firestore
-      console.warn('Firestore rate limit read skipped (permission/network):', firestoreErr.message);
+      console.warn('Firestore rate limit read skipped:', firestoreErr.message);
       return next();
     }
 
@@ -76,7 +71,6 @@ async function aiTierLimiter(req, res, next) {
         error: `Hourly AI limit reached (${limits.hourly}/${tier}).`,
         code: 'RATE_LIMIT_HOURLY',
         upgrade: tier === 'free' ? '/pricing' : null,
-        retryAfter: 3600,
       });
     }
     if (dailyCount >= limits.daily) {
@@ -84,7 +78,6 @@ async function aiTierLimiter(req, res, next) {
         error: `Daily AI limit reached (${limits.daily}/${tier}).`,
         code: 'RATE_LIMIT_DAILY',
         upgrade: tier === 'free' ? '/pricing' : null,
-        retryAfter: 86400,
       });
     }
 
@@ -97,7 +90,7 @@ async function aiTierLimiter(req, res, next) {
         lastRequest: now,
       }, { merge: true });
     } catch (writeErr) {
-      console.warn('Firestore rate limit write skipped (permission/network):', writeErr.message);
+      console.warn('Firestore rate limit write skipped:', writeErr.message);
     }
 
     res.set('X-AI-Remaining-Hourly', String(limits.hourly - hourlyCount - 1));
@@ -110,7 +103,6 @@ async function aiTierLimiter(req, res, next) {
   }
 }
 
-// Compatibility export
 function aiRateLimiter(req, res, next) {
   return aiTierLimiter(req, res, next);
 }

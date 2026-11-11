@@ -42,6 +42,7 @@ import { OfflineSyncView } from './components/common/OfflineSyncView';
 import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import { WalkthroughModal } from './components/common/WalkthroughModal';
+import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
 import {
   LayoutDashboard,
@@ -667,6 +668,9 @@ export default function App() {
           localStorage.setItem('learnco_walkthrough_seen', 'true');
         }}
       />
+
+      {/* Floating Omni Copilot Widget */}
+      {activeTab !== 'copilot' && !isZenMode && <OmniCopilot />}
     </div>
   );
 }

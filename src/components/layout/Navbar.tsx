@@ -27,6 +27,7 @@ import { XPIndicator, StreakIndicator } from '../ui/GamificationIndicators';
 import { DAILY_PRACTICE_LIMIT } from '../../types/auth';
 import { useNetworkStatus } from '../../utils/offlineStorage';
 import { AIUsageIndicator } from '../common/AIUsageIndicator';
+import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface NavbarProps {
   activeTab: string;
@@ -187,6 +188,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* XP Pill */}
           <XPIndicator xp={gamification?.xp ?? 0} size="sm" />
+
+          {/* In-App PWA Install Action */}
+          <PWAInstallButton />
 
           {/* Notification Bell */}
           <button

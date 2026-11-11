@@ -1,4 +1,3 @@
-// middleware/security.js
 const helmet = require('helmet');
 
 const securityMiddleware = helmet({
@@ -7,22 +6,22 @@ const securityMiddleware = helmet({
       defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'",
-        "'unsafe-eval'",    // Firebase SDK needs this
+        "'unsafe-eval'",
         "'unsafe-inline'",
-        "https://www.gstatic.com",   // Firebase
-        "https://apis.google.com"    // Google Auth
+        "https://www.gstatic.com",
+        "https://apis.google.com"
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
       connectSrc: [
         "'self'",
-        "https://generativelanguage.googleapis.com",  // Google AI Studio
-        "https://firestore.googleapis.com",            // Firestore
-        "https://identitytoolkit.googleapis.com",      // Firebase Auth
-        "https://securetoken.googleapis.com",          // Firebase token refresh
-        "https://www.googleapis.com",                  // Google APIs
-        "wss://firestore.googleapis.com",              // Firestore real-time
+        "https://generativelanguage.googleapis.com",
+        "https://firestore.googleapis.com",
+        "https://identitytoolkit.googleapis.com",
+        "https://securetoken.googleapis.com",
+        "https://www.googleapis.com",
+        "wss://firestore.googleapis.com",
         "https://*.googleapis.com",
         "https://*.firebaseio.com",
         "ws:",
@@ -35,15 +34,11 @@ const securityMiddleware = helmet({
       formAction: ["'self'"],
     },
   },
-  hsts: {
-    maxAge: 63072000,
-    includeSubDomains: true,
-    preload: true
-  },
+  hsts: { maxAge: 63072000, includeSubDomains: true, preload: true },
   frameguard: { action: 'deny' },
   noSniff: true,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  crossOriginEmbedderPolicy: false, // Firebase SDK compatibility
+  crossOriginEmbedderPolicy: false,
 });
 
 module.exports = securityMiddleware;

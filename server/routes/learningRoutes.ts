@@ -7,7 +7,9 @@ import { CURRICULUM_DATA, EXAM_TRACKS } from '../../src/data/curriculumData';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 import { PracticeSessionConfig, QuestionBankItem } from '../../src/types/curriculum';
 import { GoogleGenAI } from '@google/genai';
+import { createRequire } from 'module';
 
+const require = createRequire(import.meta.url);
 const router = Router();
 
 // Lazy Gemini AI initialization with resilience cascade
@@ -321,6 +323,97 @@ Provide a concise (1-2 sentences) Socratic hint that guides their first-principl
       success: true,
       hint: 'Recall the fundamental invariant governing this problem: check your boundary conditions and sign changes.',
     });
+  }
+});
+
+// ============================================
+// PROGRESS & SPACED REPETITION ENDPOINTS
+// ============================================
+
+// POST /api/learning/progress/:courseId/lesson/:lessonId
+router.post('/progress/:courseId/lesson/:lessonId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { courseId, lessonId } = req.params;
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const progressService = require('../../services/progressService');
+    await progressService.updateProgress(uid, courseId, lessonId, req.body);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to update progress.' });
+  }
+});
+
+// GET /api/learning/progress
+router.get('/progress', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const admin = require('firebase-admin');
+    let progress: any[] = [];
+    if (admin.apps.length) {
+      try {
+        let db = null;
+        try {
+          const config = require('../../firebase-applet-config.json');
+          if (config && config.firestoreDatabaseId) {
+            const { getFirestore } = require('firebase-admin/firestore');
+            db = getFirestore(admin.app(), config.firestoreDatabaseId);
+          } else {
+            db = admin.firestore();
+          }
+        } catch {
+          db = admin.firestore();
+        }
+
+        const snap = await db.collection('users').doc(uid).collection('progress').get();
+        progress = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      } catch (err: any) {
+        console.warn('Firestore progress query fallback:', err?.message);
+      }
+    }
+    res.json({ progress });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to fetch progress.' });
+  }
+});
+
+// GET /api/learning/review-cards
+router.get('/review-cards', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const progressService = require('../../services/progressService');
+    const cards = await progressService.getDueCards(uid);
+    res.json({ cards });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to fetch review cards.' });
+  }
+});
+
+// POST /api/learning/review-cards/:cardId
+router.post('/review-cards/:cardId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const progressService = require('../../services/progressService');
+    await progressService.reviewCard(uid, req.params.cardId, req.body.quality);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to save review.' });
+  }
+});
+
+// GET /api/learning/weaknesses
+router.get('/weaknesses', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const progressService = require('../../services/progressService');
+    const analysis = await progressService.analyzeWeaknesses(uid);
+    res.json(analysis);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to analyze.' });
   }
 });
 

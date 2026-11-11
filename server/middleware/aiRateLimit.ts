@@ -16,7 +16,7 @@ export const bruteForceLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: any) => req.user?.id || req.user?.uid || req.ip || 'anonymous',
-  validate: { xForwardedForHeader: false, forwardedHeader: false },
+  validate: { xForwardedForHeader: false, forwardedHeader: false, keyGeneratorIpFallback: false },
 });
 
 export async function aiTierLimiter(req: Request | any, res: Response, next: NextFunction) {

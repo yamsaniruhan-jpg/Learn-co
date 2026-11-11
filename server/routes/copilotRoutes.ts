@@ -12,6 +12,7 @@ import {
   CopilotContextPayload,
   CopilotPromptOptions,
 } from '../../src/types/copilot';
+import { adminDb } from '../services/firebaseAdmin';
 
 const router = Router();
 
@@ -466,6 +467,67 @@ router.post('/practice/submit', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Practice submission failed.' });
+  }
+});
+
+// POST /api/copilot/feedback
+router.post('/feedback', async (req: Request, res: Response) => {
+  try {
+    const userId = resolveUserId(req);
+    const { interactionId, messageId, rating } = req.body;
+
+    if (adminDb) {
+      try {
+        await adminDb
+          .collection('users').doc(userId)
+          .collection('copilotHistory').doc(interactionId || messageId || 'feedback')
+          .set({ feedback: rating, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err: any) {
+        console.warn('Firestore feedback write skipped:', err?.message);
+      }
+    }
+
+    res.json({ success: true, feedback: rating });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to save feedback.' });
+  }
+});
+
+// GET /api/copilot/history
+router.get('/history', async (req: Request, res: Response) => {
+  try {
+    const userId = resolveUserId(req);
+    let history: any[] = [];
+
+    if (adminDb) {
+      try {
+        const snap = await adminDb
+          .collection('users').doc(userId)
+          .collection('copilotHistory')
+          .orderBy('timestamp', 'desc')
+          .limit(50)
+          .get();
+
+        history = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      } catch (err: any) {
+        console.warn('Firestore history read skipped:', err?.message);
+      }
+    }
+
+    if (!history.length) {
+      const convs = Database.listCopilotConversations(userId);
+      history = convs.map((c) => ({
+        id: c.id,
+        role: 'assistant',
+        title: c.title,
+        mode: c.mode,
+        timestamp: c.updatedAt,
+      }));
+    }
+
+    res.json({ history });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch history.' });
   }
 });
 

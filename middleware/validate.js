@@ -1,17 +1,11 @@
-// middleware/validate.js
 const { body, validationResult } = require('express-validator');
 const DOMPurify = require('isomorphic-dompurify');
 
-/**
- * Sanitize text input and block prompt injection attacks
- * Specifically tuned for Google Gemini API patterns
- */
 function sanitizeAndGuard(value) {
   if (typeof value !== 'string') return value;
 
   let cleaned = value;
 
-  // 1. Block known prompt injection patterns
   const injectionPatterns = [
     /ignore\s+(all\s+)?(previous|above|prior|preceding)\s+(instructions?|prompts?|rules?|guidelines?)/gi,
     /you\s+are\s+now\s+(a|an)\s+/gi,
@@ -29,7 +23,6 @@ function sanitizeAndGuard(value) {
     cleaned = cleaned.replace(pattern, '[BLOCKED]');
   }
 
-  // 2. HTML/XSS sanitization
   cleaned = DOMPurify.sanitize(cleaned, {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br', 'ul', 'ol', 'li', 'code', 'pre', 'h1', 'h2', 'h3', 'blockquote'],
     ALLOWED_ATTR: ['class', 'href'],
@@ -38,7 +31,6 @@ function sanitizeAndGuard(value) {
   return cleaned;
 }
 
-// Validation chains
 const chatValidation = [
   body('message')
     .optional()
@@ -73,9 +65,6 @@ const courseValidation = [
     .optional()
     .trim()
     .isLength({ min: 2, max: 100 }).withMessage('Subject required')
-    .customSanitizer(sanitizeAndGuard),
-  body('content.*.text')
-    .optional()
     .customSanitizer(sanitizeAndGuard),
 ];
 

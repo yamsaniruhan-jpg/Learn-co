@@ -3,7 +3,9 @@ import { Database } from '../db';
 import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { MentorMatchEngine } from '../services/mentorMatchEngine';
 import { AdaptiveAnalyticsEngine } from '../services/adaptiveAnalyticsEngine';
+import { createRequire } from 'module';
 
+const require = createRequire(import.meta.url);
 export const mentorshipRouter = Router();
 
 // Middleware to extract user ID from auth headers
@@ -557,6 +559,86 @@ mentorshipRouter.get('/relationships/:id/mentee-analytics', (req: Request, res: 
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 23. POST /api/mentorship/find-mentors
+mentorshipRouter.post('/find-mentors', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mentorshipService = require('../../services/mentorshipService');
+    const mentors = await mentorshipService.findMentors(uid, req.body);
+    res.json({ mentors });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to find mentors.' });
+  }
+});
+
+// 24. POST /api/mentorship/book-session
+mentorshipRouter.post('/book-session', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mentorshipService = require('../../services/mentorshipService');
+    const sessionId = await mentorshipService.bookSession(uid, req.body.mentorId, req.body);
+    res.status(201).json({ sessionId, success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to book session.' });
+  }
+});
+
+// 25. GET /api/mentorship/my-sessions
+mentorshipRouter.get('/my-sessions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const admin = require('firebase-admin');
+    let sessions: any[] = [];
+
+    if (admin.apps.length) {
+      try {
+        let db = null;
+        try {
+          const config = require('../../firebase-applet-config.json');
+          if (config && config.firestoreDatabaseId) {
+            const { getFirestore } = require('firebase-admin/firestore');
+            db = getFirestore(admin.app(), config.firestoreDatabaseId);
+          } else {
+            db = admin.firestore();
+          }
+        } catch {
+          db = admin.firestore();
+        }
+
+        const snap = await db
+          .collection('sessions')
+          .where('learnerUid', '==', uid)
+          .orderBy('date', 'desc')
+          .limit(20)
+          .get();
+        sessions = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      } catch (e: any) {
+        console.warn('Firestore fetch sessions fallback:', e?.message);
+      }
+    }
+
+    if (!sessions.length) {
+      const dbSessions = Database.listMentorshipSessions(uid);
+      sessions = dbSessions.map((s) => ({
+        id: s.id,
+        learnerUid: uid,
+        mentorId: s.mentorId,
+        date: s.scheduledDate,
+        duration: s.durationMinutes,
+        topic: s.title || (s.topicsCovered && s.topicsCovered[0]) || 'STEM Mentorship',
+        status: s.status,
+      }));
+    }
+
+    res.json({ sessions });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to fetch sessions.' });
   }
 });
 
