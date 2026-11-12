@@ -1,13 +1,6 @@
 // services/marketplaceService.js
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  } catch {}
-}
 
 let db = null;
 function getDb() {

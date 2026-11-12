@@ -370,14 +370,23 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
       return;
     }
 
-    // Get source content
+    // Get source content. The API accepts either a single `sourceId` or a
+    // `sourceIds` array; every selected source contributes to the synthesis,
+    // which is what the Creator Studio source picker allows.
     let rawContent = sourceText || '';
     let associatedSourceId = sourceId;
 
-    if (sourceId) {
-      const source = Database.getSource(userId, sourceId);
-      if (source) {
-        rawContent = source.extractedText || source.originalContent;
+    if (sourcesToUse.length > 0) {
+      const collected: string[] = [];
+      sourcesToUse.forEach((id: string, index: number) => {
+        const source = Database.getSource(userId, id);
+        if (!source) return;
+        const text = source.extractedText || source.originalContent;
+        if (text && text.trim()) collected.push(text.trim());
+        if (index === 0 || !associatedSourceId) associatedSourceId = id;
+      });
+      if (collected.length > 0) {
+        rawContent = collected.join('\n\n---\n\n');
       }
     } else if (sourceText || sourceUrl) {
       // Auto-save a source document record if requested directly

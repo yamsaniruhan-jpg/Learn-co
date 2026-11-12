@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 const { verifyFirebaseAuth } = require('../middleware/auth');
 const { courseValidation, handleValidation } = require('../middleware/validate');
 

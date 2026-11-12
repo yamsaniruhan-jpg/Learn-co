@@ -43,23 +43,9 @@ router.post('/review/:courseId', verifyFirebaseAuth, async (req, res) => {
 
 router.get('/reviews/:courseId', async (req, res) => {
   try {
-    const admin = require('firebase-admin');
-    let db = null;
-    try {
-      let config = null;
-      try {
-        config = require('../firebase-applet-config.json');
-      } catch {}
-
-      if (config && config.firestoreDatabaseId && admin.apps.length) {
-        const { getFirestore } = require('firebase-admin/firestore');
-        db = getFirestore(admin.app(), config.firestoreDatabaseId);
-      } else if (admin.apps.length) {
-        db = admin.firestore();
-      }
-    } catch {
-      db = admin.apps.length ? admin.firestore() : null;
-    }
+    const admin = require('../server/services/firebaseAdminCompat.cjs');
+    // Returns null when Firestore is not configured for this environment.
+    const db = admin.firestore();
 
     if (!db) {
       return res.json({ reviews: [] });

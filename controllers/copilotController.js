@@ -24,7 +24,7 @@ exports.feedback = async (req, res) => {
     const { interactionId, rating } = req.body; // rating: 'up' | 'down'
     const uid = req.user?.uid || req.user?.id || 'guest-user';
 
-    const admin = require('firebase-admin');
+    const admin = require('../server/services/firebaseAdminCompat.cjs');
     if (admin.apps.length) {
       await admin.firestore()
         .collection('users').doc(uid)
@@ -42,7 +42,7 @@ exports.feedback = async (req, res) => {
 exports.history = async (req, res) => {
   try {
     const uid = req.user?.uid || req.user?.id || 'guest-user';
-    const admin = require('firebase-admin');
+    const admin = require('../server/services/firebaseAdminCompat.cjs');
 
     if (admin.apps.length) {
       const snap = await admin.firestore()

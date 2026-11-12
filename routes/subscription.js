@@ -1,7 +1,22 @@
 // routes/subscription.js
 const router = require('express').Router();
 const { verifyFirebaseAuth } = require('../middleware/auth');
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
+
+// Local store bridge. Firestore is optional here; the JSON store is the
+// authoritative fallback so a tier change is never acknowledged without being
+// persisted (which previously left checkout "successful" but the user on free).
+let appDatabase = null;
+function getAppDatabase() {
+  if (appDatabase) return appDatabase;
+  try {
+    appDatabase = require('../server/db').Database;
+  } catch (err) {
+    console.warn('Local subscription store unavailable:', err.message);
+    appDatabase = null;
+  }
+  return appDatabase;
+}
 
 // Initialize Stripe conditionally if API key is provided
 let stripe = null;
@@ -15,23 +30,9 @@ if (process.env.STRIPE_SECRET_KEY) {
 }
 
 function getDb() {
-  if (admin.apps.length) {
-    try {
-      let config = null;
-      try {
-        config = require('../firebase-applet-config.json');
-      } catch {}
-
-      if (config && config.firestoreDatabaseId) {
-        const { getFirestore } = require('firebase-admin/firestore');
-        return getFirestore(admin.app(), config.firestoreDatabaseId);
-      }
-      return admin.firestore();
-    } catch {
-      return admin.firestore();
-    }
-  }
-  return null;
+  // The compat layer returns null when Firestore is not configured; every
+  // caller already handles that by falling back to the local JSON store.
+  return admin.firestore();
 }
 
 const TIERS = {
@@ -87,6 +88,16 @@ router.get('/status', verifyFirebaseAuth, async (req, res) => {
         }
       } catch (err) {
         console.warn('Subscription fetch fallback:', err.message);
+      }
+    }
+
+    if (subscription === 'free') {
+      // Prefer the local store; it is authoritative when Firestore is absent.
+      const localDb = getAppDatabase();
+      const localUser = localDb ? localDb.findUserById(uid) : null;
+      if (localUser && localUser.subscription) {
+        subscription = localUser.subscription;
+        expiresAt = localUser.subscriptionExpiresAt || null;
       }
     }
 
@@ -163,6 +174,11 @@ router.post('/checkout', verifyFirebaseAuth, async (req, res) => {
       }
     }
 
+    const localDb = getAppDatabase();
+    if (localDb) {
+      localDb.updateSubscription(uid, tier, expiresDate.toISOString());
+    }
+
     res.json({
       success: true,
       mode: 'sandbox',
@@ -191,6 +207,11 @@ router.post('/cancel', verifyFirebaseAuth, async (req, res) => {
       } catch (err) {
         console.warn('Firestore subscription cancel error:', err.message);
       }
+    }
+
+    const localDb = getAppDatabase();
+    if (localDb) {
+      localDb.updateSubscription(uid, 'free');
     }
 
     res.json({ success: true, message: 'Subscription downgraded to Free Tier.' });

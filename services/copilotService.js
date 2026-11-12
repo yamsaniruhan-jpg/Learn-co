@@ -1,5 +1,5 @@
 const { callGemini } = require('./geminiService');
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 
 let db = null;
 try {

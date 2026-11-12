@@ -43,6 +43,7 @@ export interface UserAccount {
   updatedAt?: string;
   lastLoginAt?: string;
   subscription?: 'free' | 'pro' | 'super' | string;
+  subscriptionExpiresAt?: string;
 }
 
 export interface UserProfile {

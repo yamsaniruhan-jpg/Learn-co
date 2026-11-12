@@ -19,7 +19,7 @@ export class MentorMatchEngine {
 
     const learnerSubjects = learnerProfile.subjects || ['math', 'cs'];
     const targetExam = (learnerProfile.targetExam || '').toLowerCase();
-    const learningGoals = (learnerProfile.learningGoals || []).map((g) => g.toLowerCase());
+    const learningGoals = (learnerProfile.learningGoals || []).map((g: string) => g.toLowerCase());
 
     // Extract weak concepts and recent mistake topics
     const weakConceptTitles = masteries

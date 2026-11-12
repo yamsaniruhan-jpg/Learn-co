@@ -5,15 +5,27 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    // `@tailwindcss/vite` v4 returns an array of plugins, so it must be spread
+    // flat instead of nested inside the plugins array.
+    plugins: [react(), ...tailwindcss()],
     resolve: {
+      // `@` points at the project root (matches the tsconfig `paths` mapping).
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
     },
     server: {
+      host: '0.0.0.0',
+      // Dev/preview traffic is proxied through sandbox hostnames such as
+      // `3000-<id>.e2b.app`, so the host allowlist must not be restricted.
+      allowedHosts: true as const,
       hmr: false,
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      // Firebase + KaTeX + Recharts + Three are unavoidably large; keep the
+      // warning threshold meaningful instead of noisy.
+      chunkSizeWarningLimit: 4500,
     },
   };
 });

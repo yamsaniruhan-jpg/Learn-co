@@ -141,7 +141,7 @@ export const AiPlanWizardModal: React.FC<AiPlanWizardModalProps> = ({
       const data = await PlannerClient.generateAiPlan(payload);
       setPreviewPlan(data.plan);
       setPreviewTasks(data.tasks || []);
-      setPreviewGoal(data.goal);
+      setPreviewGoal(data.goal ?? null);
     } catch (err: any) {
       setError(err.message || 'Error generating plan. Please try again.');
     } finally {
