@@ -1,5 +1,5 @@
 const rateLimit = require('express-rate-limit');
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 
 let db;
 try {

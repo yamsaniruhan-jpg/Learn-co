@@ -23,24 +23,14 @@ router.post('/book-session', verifyFirebaseAuth, async (req, res) => {
 
 router.get('/my-sessions', verifyFirebaseAuth, async (req, res) => {
   try {
-    const admin = require('firebase-admin');
+    const admin = require('../server/services/firebaseAdminCompat.cjs');
     let sessions = [];
 
-    if (admin.apps.length) {
+    // Returns null when Firestore is not configured; the local store is then
+    // the authoritative source for booked sessions.
+    const db = admin.firestore();
+    if (db) {
       try {
-        let db = null;
-        try {
-          const config = require('../firebase-applet-config.json');
-          if (config && config.firestoreDatabaseId) {
-            const { getFirestore } = require('firebase-admin/firestore');
-            db = getFirestore(admin.app(), config.firestoreDatabaseId);
-          } else {
-            db = admin.firestore();
-          }
-        } catch {
-          db = admin.firestore();
-        }
-
         const snap = await db
           .collection('sessions')
           .where('learnerUid', '==', req.user.uid)

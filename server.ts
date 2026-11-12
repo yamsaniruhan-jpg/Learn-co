@@ -14,12 +14,13 @@ import copilotRoutes from "./server/routes/copilotRoutes";
 import { mentorshipRouter } from "./server/routes/mentorshipRoutes";
 import plannerRoutes from "./server/routes/plannerRoutes";
 import { analyticsRouter } from "./server/routes/analyticsRoutes";
-import { createRequire } from "module";
-
-const serverRequire = createRequire(import.meta.url);
-const subscriptionRoutes = serverRequire("./routes/subscription");
-const gamificationRoutes = serverRequire("./routes/gamification");
-const marketplaceRoutes = serverRequire("./routes/marketplace");
+// Legacy CommonJS routers. Their folders are marked `"type": "commonjs"`, so
+// these default imports resolve in dev (ESM + tsx) and in the bundled CJS build.
+import subscriptionRoutes from "./routes/subscription";
+import gamificationRoutes from "./routes/gamification";
+import marketplaceRoutes from "./routes/marketplace";
+import { setSessionResolver } from "./middleware/auth";
+import { Database } from "./server/db";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import securityHeaders from "./server/middleware/securityHeaders";
@@ -29,6 +30,15 @@ import aiRateLimiter from "./server/middleware/aiRateLimit";
 async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
+
+  // Last-resort safety net: a rejected promise from an optional integration
+  // (Firestore, Gemini, Stripe, SMTP) must never take the HTTP server down.
+  process.on("unhandledRejection", (reason: any) => {
+    console.error("[Server] Unhandled promise rejection:", reason?.message || reason);
+  });
+  process.on("uncaughtException", (err: any) => {
+    console.error("[Server] Uncaught exception:", err?.message || err);
+  });
 
   const portArgIndex = process.argv.indexOf("--port");
   const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? parseInt(process.argv[portArgIndex + 1], 10) : null;
@@ -106,6 +116,10 @@ async function startServer() {
     });
   });
 
+  // Let the legacy CommonJS routers authenticate tokens issued by
+  // /api/auth/signin|signup against the application session store.
+  setSessionResolver((token: string) => Database.getSessionUser(token));
+
   // Mount API Endpoints
   app.use("/api/auth", authRoutes);
   app.use("/api/user", userRoutes);
@@ -121,6 +135,11 @@ async function startServer() {
   app.use("/api/marketplace", marketplaceRoutes);
   app.use("/api/planner", plannerRoutes);
   app.use("/api/analytics", analyticsRouter);
+
+  // Unknown API paths must return JSON, never the SPA shell.
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ success: false, error: "API endpoint not found." });
+  });
 
   // Vite middleware for development vs static build for production
   if (process.env.NODE_ENV !== "production") {

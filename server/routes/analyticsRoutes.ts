@@ -294,6 +294,90 @@ analyticsRouter.post('/test-webhook', (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/analytics/ai-diagnostic-summary
+ * Deterministic (zero-token) diagnostic narrative derived from the learner's
+ * analytics snapshot. Consumed by the AI Diagnostic Modal in Intelligence Studio.
+ */
+analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId || 'user-alex-001';
+    const focus = typeof req.body?.focus === 'string' ? req.body.focus.trim() : 'overall';
+
+    const dashboard = AdaptiveAnalyticsEngine.getDashboard(userId);
+    const { masterySummary, mistakeAnalytics, examReadiness, nextBestActions, subjectSummaries } = dashboard;
+
+    const accuracy = dashboard.overallAccuracy;
+    const focusLabel = focus && focus !== 'overall' ? focus : 'overall performance';
+
+    const headline = dashboard.isColdStart
+      ? 'Diagnostic baseline pending — complete a few practice questions to unlock a full cognitive profile.'
+      : `Across ${focusLabel}, you are tracking at ${masterySummary.avgMasteryScore}% average mastery with ${
+          accuracy === null ? 'no graded accuracy yet' : `${accuracy}% accuracy`
+        }.`;
+
+    const diagnosticInsights: string[] = [];
+
+    if (!dashboard.isColdStart) {
+      diagnosticInsights.push(
+        `${masterySummary.masteredCount} of ${masterySummary.totalTracked} tracked concepts are mastered; ${
+          masterySummary.developingCount
+        } are still developing.`
+      );
+    }
+    if (masterySummary.weakCount > 0) {
+      diagnosticInsights.push(
+        `${masterySummary.weakCount} concept${masterySummary.weakCount === 1 ? '' : 's'} show retention below the mastery threshold and need spaced review.`
+      );
+    }
+    if (mistakeAnalytics.unresolvedCount > 0) {
+      diagnosticInsights.push(
+        `${mistakeAnalytics.unresolvedCount} unresolved misconception${
+          mistakeAnalytics.unresolvedCount === 1 ? '' : 's'
+        } remain in the Mistake Notebook.`
+      );
+    }
+    const strongest = [...subjectSummaries].sort((a, b) => b.masteryPercentage - a.masteryPercentage)[0];
+    const weakest = [...subjectSummaries].sort((a, b) => a.masteryPercentage - b.masteryPercentage)[0];
+    if (strongest && weakest && strongest.subjectId !== weakest.subjectId) {
+      diagnosticInsights.push(
+        `Relative strength is ${strongest.name} (${strongest.masteryPercentage}%) versus ${weakest.name} (${weakest.masteryPercentage}%) as the priority gap.`
+      );
+    }
+    if (diagnosticInsights.length === 0) {
+      diagnosticInsights.push(
+        'No graded attempts recorded yet — your first practice set will calibrate cognitive-load and retention estimates.'
+      );
+    }
+
+    const prescriptions = nextBestActions
+      .slice(0, 4)
+      .map((action) => `${action.title}: ${action.description}`.trim());
+
+    if (prescriptions.length === 0) {
+      prescriptions.push('Complete one 10-question adaptive set to establish a baseline diagnostic.', 'Schedule two 25-minute focus blocks focused on high-yield derivations.');
+    }
+
+    const readiness = examReadiness?.estimatedReadinessScore ?? 0;
+    const cognitiveProfile = dashboard.isColdStart
+      ? 'Uncalibrated: insufficient attempt data to model working-memory load and error patterns.'
+      : `Exam readiness index ${readiness}%. ${
+          readiness >= 75
+            ? 'Strong recall under timed pressure with stable accuracy.'
+            : readiness >= 50
+            ? 'Solid conceptual base; timed accuracy is the main limiter.'
+            : 'Foundational gaps dominate; prioritise remediation before speed work.'
+        }`;
+
+    res.json({
+      success: true,
+      data: { headline, diagnosticInsights, prescriptions, cognitiveProfile },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate diagnostic summary.' });
+  }
+});
+
+/**
  * POST /api/analytics/trigger-spaced-repetition
  */
 analyticsRouter.post('/trigger-spaced-repetition', (req: Request, res: Response) => {

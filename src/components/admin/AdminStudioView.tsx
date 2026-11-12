@@ -686,7 +686,7 @@ export const AdminStudioView: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
                       <span>ID: {q.id}</span>
                       <span>•</span>
-                      <span>{q.options.length} Options</span>
+                      <span>{q.options?.length ?? 0} Options</span>
                       {q.stepByStepSolution && (
                         <>
                           <span>•</span>
@@ -1179,7 +1179,7 @@ export const AdminStudioView: React.FC = () => {
                 Calibrated Options
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {inspectQuestion.options.map((opt, oIdx) => {
+                {(inspectQuestion.options ?? []).map((opt, oIdx) => {
                   const isCorrect = opt === inspectQuestion.correctAnswer;
                   return (
                     <div

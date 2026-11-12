@@ -1,12 +1,21 @@
 // services/gamificationService.js
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 
-if (!admin.apps.length) {
+
+// Bridge to the application's authoritative local store. Firestore is optional
+// infrastructure here; when it is unavailable the JSON store must still receive
+// every XP award so progress is never silently lost.
+let appDatabase = null;
+function getAppDatabase() {
+  if (appDatabase) return appDatabase;
   try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  } catch {}
+    // eslint-disable-next-line global-require
+    appDatabase = require('../server/db').Database;
+  } catch (err) {
+    console.warn('Local gamification store unavailable:', err.message);
+    appDatabase = null;
+  }
+  return appDatabase;
 }
 
 let db = null;
@@ -51,42 +60,19 @@ const XP_RULES = {
   shareCourse: 15,
 };
 
-// Level thresholds (cumulative XP needed)
+// Level curve — must match the canonical client/server implementation in
+// src/types/auth.ts (calculateLevelFromXp): level = floor(sqrt(xp / 25)) + 1.
+// Keeping both engines identical prevents the UI from showing two different
+// levels for the same XP total.
 function getLevel(xp) {
-  const levels = [
-    { level: 1, xp: 0 },
-    { level: 2, xp: 100 },
-    { level: 3, xp: 300 },
-    { level: 4, xp: 600 },
-    { level: 5, xp: 1000 },
-    { level: 6, xp: 1500 },
-    { level: 7, xp: 2200 },
-    { level: 8, xp: 3000 },
-    { level: 9, xp: 4000 },
-    { level: 10, xp: 5500 },
-    { level: 11, xp: 7500 },
-    { level: 12, xp: 10000 },
-    { level: 13, xp: 13000 },
-    { level: 14, xp: 17000 },
-    { level: 15, xp: 22000 },
-    { level: 16, xp: 28000 },
-    { level: 17, xp: 35000 },
-    { level: 18, xp: 44000 },
-    { level: 19, xp: 55000 },
-    { level: 20, xp: 70000 },
-  ];
-
-  let currentLevel = 1;
-  for (const threshold of levels) {
-    if (xp >= threshold.xp) currentLevel = threshold.level;
-  }
-  return currentLevel;
+  const safeXp = Math.max(0, Number(xp) || 0);
+  return Math.max(1, Math.floor(Math.sqrt(safeXp / 25)) + 1);
 }
 
 function getNextLevelXp(xp) {
+  // Next level starts at level^2 * 25 for the curve defined by getLevel().
   const level = getLevel(xp);
-  const thresholds = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500, 7500, 10000, 13000, 17000, 22000, 28000, 35000, 44000, 55000, 70000, 100000];
-  return thresholds[level] || thresholds[thresholds.length - 1];
+  return level * level * 25;
 }
 
 function gamRef(uid) {
@@ -105,13 +91,24 @@ async function awardXP(uid, action, metadata = {}) {
 
   const firestore = getDb();
   if (!firestore) {
+    const localDb = getAppDatabase();
+    const existing = localDb ? localDb.getGamification(uid) : null;
+    const previousXp = existing ? existing.xp || 0 : 0;
+    const previousLevel = existing ? existing.level || getLevel(previousXp) : 1;
+    const newXP = previousXp + xpAmount;
+    const newLevel = getLevel(newXP);
+
+    if (localDb) {
+      localDb.updateUserXp(uid, newXP, action);
+    }
+
     return {
       xpAwarded: xpAmount,
-      totalXP: xpAmount,
-      level: getLevel(xpAmount),
-      leveledUp: false,
+      totalXP: newXP,
+      level: newLevel,
+      leveledUp: newLevel > previousLevel,
       newBadges: [],
-      nextLevelXP: getNextLevelXp(xpAmount),
+      nextLevelXP: getNextLevelXp(newXP),
     };
   }
 
@@ -303,7 +300,26 @@ async function checkBadges(uid, action, totalXP, gamData = {}) {
  */
 async function getLeaderboard(timeframe = 'all', limit = 20) {
   const firestore = getDb();
-  if (!firestore) return [];
+  if (!firestore) {
+    const localDb = getAppDatabase();
+    if (!localDb) return [];
+    const users = localDb.getDb().users || {};
+    const entries = Object.values(users).map((user) => {
+      const gam = localDb.getGamification(user.id) || {};
+      const profile = localDb.getProfile(user.id) || {};
+      return {
+        rank: 0,
+        uid: user.id,
+        name: profile.displayName || profile.fullName || (user.email ? user.email.split('@')[0] : 'Scholar'),
+        picture: profile.avatarUrl || null,
+        xp: gam.xp || 0,
+        level: gam.level || getLevel(gam.xp || 0),
+        streak: gam.currentStreak || 0,
+      };
+    });
+    entries.sort((a, b) => b.xp - a.xp);
+    return entries.slice(0, limit).map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }
 
   try {
     const snap = await firestore.collection('users').limit(limit).get();
@@ -342,13 +358,27 @@ async function getLeaderboard(timeframe = 'all', limit = 20) {
 async function getProfile(uid) {
   const firestore = getDb();
   if (!firestore) {
+    const localDb = getAppDatabase();
+    const gam = localDb ? localDb.getGamification(uid) : null;
+    if (!gam) {
+      return {
+        xp: 0,
+        level: 1,
+        nextLevelXP: 100,
+        streak: 1,
+        longestStreak: 1,
+        badges: [],
+        weeklyXP: 0,
+        monthlyXP: 0,
+      };
+    }
     return {
-      xp: 0,
-      level: 1,
-      nextLevelXP: 100,
-      streak: 1,
-      longestStreak: 1,
-      badges: [],
+      xp: gam.xp || 0,
+      level: gam.level || getLevel(gam.xp || 0),
+      nextLevelXP: getNextLevelXp(gam.xp || 0),
+      streak: gam.currentStreak || 0,
+      longestStreak: gam.longestStreak || gam.currentStreak || 0,
+      badges: gam.badges || [],
       weeklyXP: 0,
       monthlyXP: 0,
     };

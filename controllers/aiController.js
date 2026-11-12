@@ -1,5 +1,5 @@
 const { callGemini } = require('../services/geminiService');
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 
 exports.copilotChat = async (req, res) => {
   try {

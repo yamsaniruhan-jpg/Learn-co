@@ -66,7 +66,7 @@ export class FirestoreSyncService {
   static async syncLeaderboardEntry(
     user: UserAccount,
     profile: UserProfile,
-    gamification: UserGamification
+    gamification: UserGamification | null
   ): Promise<void> {
     if (!isAdminDbAvailable || !adminDb) return;
     try {
@@ -75,10 +75,10 @@ export class FirestoreSyncService {
         userId: user.id,
         displayName,
         avatarUrl: profile.avatarUrl,
-        xp: gamification.xp,
-        level: gamification.level,
-        streak: gamification.currentStreak,
-        streakDays: gamification.currentStreak,
+        xp: gamification?.xp ?? 0,
+        level: gamification?.level ?? 1,
+        streak: gamification?.currentStreak ?? 0,
+        streakDays: gamification?.currentStreak ?? 0,
       };
 
       await adminDb.collection('leaderboard').doc(user.id).set(
@@ -105,7 +105,7 @@ export class FirestoreSyncService {
   static async syncUserOnAuth(
     user: UserAccount,
     profile: UserProfile,
-    gamification: UserGamification
+    gamification: UserGamification | null
   ): Promise<void> {
     if (!isAdminDbAvailable || !adminDb) return;
     Promise.allSettled([

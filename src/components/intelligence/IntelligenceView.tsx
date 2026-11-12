@@ -450,10 +450,10 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
               {data.mistakeSummary.unresolvedCount}
             </span>
             <span className="text-xs text-slate-400">
-              {data.mistakeSummary.remediationRate}% resolved
+              {data.mistakeSummary.remediationRate ?? 0}% resolved
             </span>
           </div>
-          <Progress value={data.mistakeSummary.remediationRate} color="rose" size="xs" />
+          <Progress value={data.mistakeSummary.remediationRate ?? 0} color="rose" size="xs" />
         </Card>
       </div>
 

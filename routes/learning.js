@@ -15,7 +15,7 @@ router.post('/progress/:courseId/lesson/:lessonId', verifyFirebaseAuth, async (r
 
 router.get('/progress', verifyFirebaseAuth, async (req, res) => {
   try {
-    const admin = require('firebase-admin');
+    const admin = require('../server/services/firebaseAdminCompat.cjs');
     const snap = await admin.firestore()
       .collection('users').doc(req.user.uid)
       .collection('progress')

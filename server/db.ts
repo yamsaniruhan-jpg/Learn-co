@@ -768,6 +768,26 @@ export class Database {
     return profile;
   }
 
+  /**
+   * Persist a subscription tier change in the local store. Returns the updated
+   * account, or null when the user does not exist.
+   */
+  static updateSubscription(
+    userId: string,
+    subscription: string,
+    expiresAt?: string
+  ): UserAccount | null {
+    const user = memoryDb.users[userId];
+    if (!user) return null;
+    user.subscription = subscription;
+    user.updatedAt = new Date().toISOString();
+    if (expiresAt) {
+      user.subscriptionExpiresAt = expiresAt;
+    }
+    saveDbToDisk();
+    return user;
+  }
+
   static updateSettings(userId: string, updates: Partial<UserSettings>): UserSettings {
     const current = memoryDb.settings[userId];
     if (!current) {

@@ -159,6 +159,8 @@ export const SimulationsHubView: React.FC<SimulationsHubViewProps> = ({ onNaviga
         return { rate: 'Sluggish (Relative Rate: 0.02x)', allowed: true, warning: 'Significant steric crowding; competing E2 elimination pathway likely.' };
       case 'tertiary':
         return { rate: 'Prohibited (Rate: ~0x)', allowed: false, warning: 'Severe steric hindrance prevents 180° backside approach. Exclusively proceeds via SN1/E1!' };
+      default:
+        return { rate: 'Unknown substrate', allowed: false, warning: null };
     }
   };
 

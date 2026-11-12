@@ -1,14 +1,21 @@
 // services/progressService.js
-const admin = require('firebase-admin');
+const admin = require('../server/services/firebaseAdminCompat.cjs');
 
-if (!admin.apps.length) {
+
+// Bridge to the application's authoritative local store. Firestore is optional
+// here; when it is absent these endpoints must stay functional instead of
+// silently discarding study progress and spaced-repetition reviews.
+let appDatabase = null;
+function getAppDatabase() {
+  if (appDatabase) return appDatabase;
   try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  } catch {
-    // Ignore if initialized elsewhere
+    // eslint-disable-next-line global-require
+    appDatabase = require('../server/db').Database;
+  } catch (err) {
+    console.warn('Local progress store unavailable:', err.message);
+    appDatabase = null;
   }
+  return appDatabase;
 }
 
 let db = null;
@@ -136,7 +143,22 @@ async function updateStreak(uid) {
  */
 async function getDueCards(uid, limit = 10) {
   const firestore = getDb();
-  if (!firestore) return [];
+  if (!firestore) {
+    const localDb = getAppDatabase();
+    if (!localDb) return [];
+    // Unresolved mistakes are the authoritative local spaced-repetition queue.
+    const mistakes = (localDb.getMistakes(uid) || []).filter((m) => !m.resolved);
+    return mistakes.slice(0, limit).map((m) => ({
+      id: m.id,
+      questionText: m.questionText,
+      subjectId: m.subjectId,
+      topicId: m.topicId,
+      easeFactor: 2.5,
+      interval: 1,
+      repetitions: 0,
+      nextReview: m.lastAttemptedAt || new Date().toISOString(),
+    }));
+  }
 
   const now = admin.firestore.Timestamp.now();
 
@@ -207,7 +229,31 @@ async function reviewCard(uid, cardId, quality) {
  */
 async function analyzeWeaknesses(uid) {
   const firestore = getDb();
-  if (!firestore) return { weakTopics: [], strongTopics: [] };
+  if (!firestore) {
+    const localDb = getAppDatabase();
+    if (!localDb) return { weakTopics: [], strongTopics: [] };
+
+    const aggregate = (records, key) => {
+      const buckets = {};
+      records.forEach((r) => {
+        const topic = r[key] || r.topicId || 'general';
+        if (!buckets[topic]) buckets[topic] = { topic, correct: 0, total: 0 };
+        buckets[topic].total += 1;
+        if (r.isCorrect) buckets[topic].correct += 1;
+      });
+      return Object.values(buckets).map((b) => ({
+        topic: b.topic,
+        accuracy: b.total ? Math.round((b.correct / b.total) * 100) : 0,
+        attempts: b.total,
+      }));
+    };
+
+    const attempts = localDb.getUserAttempts(uid) || [];
+    const stats = aggregate(attempts, 'topicId');
+    const weakTopics = stats.filter((t) => t.attempts >= 1 && t.accuracy < 60).sort((a, b) => a.accuracy - b.accuracy);
+    const strongTopics = stats.filter((t) => t.attempts >= 1 && t.accuracy >= 80).sort((a, b) => b.accuracy - a.accuracy);
+    return { weakTopics, strongTopics };
+  }
 
   const progressSnap = await firestore
     .collection('users').doc(uid)
