@@ -39,7 +39,6 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [accountNotFound, setAccountNotFound] = useState<boolean>(false);
   const [step, setStep] = useState<'prompt' | 'authorizing' | 'success'>('prompt');
-  const [oauthTokenData, setOauthTokenData] = useState<{ idToken: string; scope: string } | null>(null);
 
   // Suggest recently remembered Google email if available in localStorage
   const savedGoogleEmail = localStorage.getItem('learnco_last_google_email') || '';
@@ -81,24 +80,6 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
     setStep('authorizing');
 
     try {
-      // Generate simulated verified Google OAuth 2.0 JWT Token
-      const mockGoogleIdToken = `eyJhbGciOiJSUzI1NiIsImtpZCI6Imdvb2dsZS0xIn0.${btoa(
-        JSON.stringify({
-          iss: 'https://accounts.google.com',
-          sub: `goog_${Date.now()}`,
-          email: trimmedEmail,
-          email_verified: true,
-          name: nameToUse || trimmedEmail.split('@')[0],
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600,
-        })
-      )}.mock_sig_${Math.random().toString(36).substring(2, 10)}`;
-
-      setOauthTokenData({
-        idToken: mockGoogleIdToken,
-        scope: 'openid email profile',
-      });
-
       // Remember user's Google email for subsequent sign-in
       localStorage.setItem('learnco_last_google_email', trimmedEmail);
       if (nameToUse) {
@@ -117,8 +98,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
         trimmedEmail,
         formattedName,
         avatarUrl,
-        activeIntent,
-        mockGoogleIdToken
+        activeIntent
       );
 
       setStep('success');

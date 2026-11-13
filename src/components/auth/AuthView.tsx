@@ -32,6 +32,7 @@ interface AuthViewProps {
   initialMode?: 'signin' | 'signup' | 'session';
   /** Token from a /?reset_token=... link; opens the reset flow directly. */
   initialResetToken?: string | null;
+  onExitReset?: () => void;
   onNavigateToTab?: (tab: string) => void;
 }
 
@@ -39,6 +40,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   initialMode = 'signin',
   onNavigateToTab,
   initialResetToken,
+  onExitReset,
 }) => {
   const {
     user,
@@ -50,6 +52,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     signOut,
     authError,
     clearAuthError,
+    refreshUserData,
   } = useAuth();
 
   const [activeMode, setActiveMode] = useState<'signin' | 'signup' | 'session' | 'reset'>(
@@ -391,7 +394,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
             onBackToSignIn={() => {
               setActiveMode('signin');
               setLocalError(null);
+              onExitReset?.();
             }}
+            onResetComplete={() => { void refreshUserData(); }}
           />
         </Card>
       )}

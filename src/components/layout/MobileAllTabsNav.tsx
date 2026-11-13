@@ -227,6 +227,28 @@ export const ALL_APP_FEATURES: NavFeature[] = [
   },
 ];
 
+// Keep unknown categories visible after the known sections.
+export const CATEGORY_ORDER = [
+  'Core', 'AI Tools', 'Organization', 'Analytics', 'Gamification',
+  'Resources', 'Collaboration', 'Guidance', 'System', 'Account',
+];
+
+export function groupNavFeatures<T extends { category: string }>(features: T[]) {
+  const groups = new Map<string, T[]>();
+  for (const feature of features) {
+    const category = feature.category || 'Other';
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category)!.push(feature);
+  }
+  return [...groups.keys()].sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a), bi = CATEGORY_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  }).map((category) => ({ category, features: groups.get(category)! }));
+}
+
 export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   activeTab,
   setActiveTab,
@@ -237,6 +259,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
 
   const visibleFeatures = ALL_APP_FEATURES.filter((feat) => feat.id !== 'admin' || isAdmin);
+  const groupedFeatures = groupNavFeatures(visibleFeatures);
 
   const primaryBottomTabs = [
     visibleFeatures.find((f) => f.id === 'learn')!,
@@ -255,7 +278,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   return (
     <>
       {/* Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
-      <div className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-2 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
+      <nav aria-label="Mobile feature navigation" className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-2 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
         {primaryBottomTabs.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -295,7 +318,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
           </div>
           <span>All Tabs</span>
         </button>
-      </div>
+      </nav>
 
       {/* Full Mobile Navigation Drawer Modal */}
       {isOpenAllDrawer && (
@@ -328,10 +351,13 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
               </button>
             </div>
 
-            {/* Grid of All Features */}
-            <div className="p-4 overflow-y-auto space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {visibleFeatures.map((feat) => {
+            {/* Feature sections retain the role-filtered list. */}
+            <div className="p-4 overflow-y-auto space-y-5">
+              {groupedFeatures.map(({ category, features }) => (
+                <section key={category}>
+                  <h3 className="px-1 mb-2 text-[11px] font-black uppercase tracking-wider text-[#6B6890] dark:text-[#B4B0D5]">{category} <span>{features.length}</span></h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {features.map((feat) => {
                   const Icon = feat.icon;
                   const isActive = activeTab === feat.id;
                   return (
@@ -384,7 +410,9 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
                     </button>
                   );
                 })}
-              </div>
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
         </div>

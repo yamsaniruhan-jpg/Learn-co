@@ -75,6 +75,8 @@ describe('XP ledger', () => {
 
   it('keeps level consistent with XP across endpoints', async () => {
     const { token, userId } = await newUser();
+    // The endpoint bounds each client sync to at most 50 XP.
+    await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 50 });
     await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 100 });
 
     // 100 XP => floor(sqrt(100/25)) + 1 = 3
@@ -92,6 +94,8 @@ describe('XP ledger', () => {
 describe('leaderboard reads have no side effects', () => {
   it('does not change stored level when the leaderboard is viewed repeatedly', async () => {
     const { token } = await newUser();
+    // The endpoint bounds each client sync to at most 50 XP.
+    await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 50 });
     await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 100 });
 
     const before = await request(app).get('/api/user/profile').set(auth(token));

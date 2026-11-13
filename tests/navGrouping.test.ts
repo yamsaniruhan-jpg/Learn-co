@@ -5,7 +5,7 @@ import { ALL_APP_FEATURES, CATEGORY_ORDER } from '../src/components/layout/Mobil
 describe('mobile all-features drawer wiring', () => {
   it('uses the shared grouping function to render sections', () => {
     const source = readFileSync('src/components/layout/MobileAllTabsNav.tsx', 'utf8');
-    expect(source).toMatch(/groupNavFeatures\(ALL_APP_FEATURES\)/);
+    expect(source).toMatch(/groupNavFeatures\(visibleFeatures\)/);
     expect(source).toMatch(/groupedFeatures\.map/);
   });
 

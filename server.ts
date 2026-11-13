@@ -20,7 +20,7 @@ import subscriptionRoutes from "./routes/subscription";
 import gamificationRoutes from "./routes/gamification";
 import marketplaceRoutes from "./routes/marketplace";
 import { setSessionResolver } from "./middleware/auth";
-import { Database } from "./server/db";
+import { Database, flushDb } from "./server/db";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import securityHeaders from "./server/middleware/securityHeaders";
@@ -34,15 +34,6 @@ import aiRateLimiter from "./server/middleware/aiRateLimit";
 export async function createApp() {
   const app = express();
   app.set("trust proxy", 1);
-
-  // Last-resort safety net: a rejected promise from an optional integration
-  // (Firestore, Gemini, Stripe, SMTP) must never take the HTTP server down.
-  process.on("unhandledRejection", (reason: any) => {
-    console.error("[Server] Unhandled promise rejection:", reason?.message || reason);
-  });
-  process.on("uncaughtException", (err: any) => {
-    console.error("[Server] Uncaught exception:", err?.message || err);
-  });
 
   // ORDER MATTERS — security first
   app.use(securityHeaders);
@@ -79,7 +70,10 @@ export async function createApp() {
 
   app.use((req, res, next) => {
     if (req.url.startsWith("/api")) {
-      console.log(`[API Request] ${req.method} ${req.url}`);
+      const safeUrl = req.url
+        .replace(/(\/api\/auth\/reset-password\/)[^/?]+/i, '$1[REDACTED]')
+        .replace(/([?&]reset_token=)[^&]*/gi, '$1[REDACTED]');
+      console.log(`[API Request] ${req.method} ${safeUrl}`);
     }
     next();
   });
@@ -209,9 +203,18 @@ async function startServer() {
     process.exit(1);
   });
 
+  let shuttingDown = false;
   const shutdown = () => {
-    server.close(() => {
-      process.exit(0);
+    if (shuttingDown) return;
+    shuttingDown = true;
+    server.close(async () => {
+      try {
+        await flushDb();
+        process.exit(0);
+      } catch (error) {
+        console.error('[Server] Failed to flush data during shutdown:', error);
+        process.exit(1);
+      }
     });
   };
 
@@ -224,6 +227,9 @@ const isDirectRun =
   process.argv[1] && /server\.(ts|js|cjs|mts)$/.test(process.argv[1]) && !process.env.VITEST;
 
 if (isDirectRun) {
-  startServer();
+  startServer().catch((error) => {
+    console.error('[Server] Startup failed:', error);
+    process.exitCode = 1;
+  });
 }
 

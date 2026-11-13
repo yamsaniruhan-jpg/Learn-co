@@ -114,6 +114,7 @@ export async function extractPdfText(
   }
 
   let doc;
+  let loadingTask: ReturnType<typeof getDocument> | undefined;
   try {
     const params = {
       // pdfjs transfers ownership of the buffer, so hand it a copy.
@@ -123,8 +124,10 @@ export async function extractPdfText(
       disableFontFace: true,
       ...(standardFontDataUrl ? { standardFontDataUrl } : {}),
     };
-    doc = await getDocument(params as Parameters<typeof getDocument>[0]).promise;
+    loadingTask = getDocument(params as Parameters<typeof getDocument>[0]);
+    doc = await loadingTask.promise;
   } catch (err) {
+    await loadingTask?.destroy().catch(() => {});
     const message = err instanceof Error ? err.message : String(err);
     if (/password/i.test(message)) {
       throw new ExtractionError(
@@ -141,20 +144,22 @@ export async function extractPdfText(
   const pagesToRead = Math.min(doc.numPages, MAX_PDF_PAGES);
   const chunks: string[] = [];
 
-  for (let pageNumber = 1; pageNumber <= pagesToRead; pageNumber += 1) {
-    const page = await doc.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      // TextItem carries `str`; TextMarkedContent does not.
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ');
-    if (pageText.trim()) {
-      chunks.push(`[Page ${pageNumber}]\n${pageText}`);
+  try {
+    for (let pageNumber = 1; pageNumber <= pagesToRead; pageNumber += 1) {
+      const page = await doc.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        // TextItem carries `str`; TextMarkedContent does not.
+        .map((item) => ('str' in item ? item.str : ''))
+        .join(' ');
+      if (pageText.trim()) {
+        chunks.push(`[Page ${pageNumber}]\n${pageText}`);
+      }
+      page.cleanup();
     }
-    page.cleanup();
+  } finally {
+    await loadingTask!.destroy();
   }
-
-  await doc.destroy();
 
   const text = normaliseWhitespace(chunks.join('\n\n'));
 

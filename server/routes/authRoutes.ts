@@ -4,6 +4,8 @@ import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware'
 import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
+import { sendMail, isMailerConfigured, buildPasswordResetMessage } from '../services/mailer';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 
 const router = Router();
 
@@ -34,7 +36,7 @@ router.post('/signup', (req, res: Response) => {
     const settings = Database.getSettings(user.id);
 
     // Sync to Firestore & persist leaderboard entry
-    FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
+    void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
 
     res.status(201).json({
       token,
@@ -118,8 +120,8 @@ router.post('/signin', (req, res: Response) => {
     Database.saveToDisk();
 
     if (profile && gamification) {
-      FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
-      FirestoreSyncService.syncLeaderboardEntry(user, profile, gamification);
+      void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
+      void FirestoreSyncService.syncLeaderboardEntry(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Leaderboard sync failed:', error));
     }
 
     res.json({
@@ -149,24 +151,26 @@ router.post('/google', async (req, res: Response) => {
       return;
     }
 
-    let verifiedEmail = email.trim().toLowerCase();
-
-    // When Firebase Admin is configured and an idToken is provided, verify it cryptographically.
-    // Note: Simulated preview tokens from GoogleSignInDialog contain '.mock_sig_' when Firebase client auth isn't used.
-    if (adminAuth && typeof adminAuth.verifyIdToken === 'function' && idToken && !String(idToken).includes('.mock_sig_')) {
-      try {
-        const decoded = await adminAuth.verifyIdToken(idToken, false);
-        if (decoded.email) {
-          if (decoded.email.trim().toLowerCase() !== verifiedEmail) {
-            res.status(401).json({ error: 'Google token email does not match request email.' });
-            return;
-          }
-          verifiedEmail = decoded.email.trim().toLowerCase();
-        }
-      } catch {
-        res.status(401).json({ error: 'Invalid or expired Google ID token.' });
+    if (!adminAuth) {
+      res.status(503).json({ error: 'Google sign-in is unavailable until server-side Firebase authentication is configured.' });
+      return;
+    }
+    if (typeof idToken !== 'string' || !idToken || idToken.includes('.mock_sig_')) {
+      res.status(401).json({ error: 'A valid Google sign-in token is required.' });
+      return;
+    }
+    let verifiedEmail: string;
+    try {
+      const decoded = await adminAuth.verifyIdToken(idToken, true);
+      if (!decoded.email || !decoded.email_verified || decoded.firebase?.sign_in_provider !== 'google.com' ||
+          decoded.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+        res.status(401).json({ error: 'Google token does not match a verified Google account.' });
         return;
       }
+      verifiedEmail = decoded.email.trim().toLowerCase();
+    } catch {
+      res.status(401).json({ error: 'Invalid or expired Google ID token.' });
+      return;
     }
 
     let user = Database.findUserByEmail(verifiedEmail);
@@ -202,7 +206,7 @@ router.post('/google', async (req, res: Response) => {
     const settings = Database.getSettings(user.id);
 
     if (profile && gamification) {
-      FirestoreSyncService.syncUserOnAuth(user, profile, gamification);
+      void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
     }
 
     res.json({
@@ -301,6 +305,175 @@ router.post('/onboarding', requireAuth, (req: AuthenticatedRequest, res: Respons
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Failed to save onboarding data.' });
+  }
+});
+
+// ==========================================================
+// PASSWORD RESET
+// ==========================================================
+
+// Password reset sends email, so it needs throttling — but a limit keyed only by
+// IP would let one attacker lock every user out by exhausting the shared bucket
+// (and would also catch several people on the same campus NAT). Throttle per
+// address instead, so abuse is contained to the account being targeted.
+// Skipped in tests so the suite is not throttled by its own assertions.
+const resetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  keyGenerator: (req: any) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (email) return `reset:email:${email}`;
+    // Fall back to IP when no address was supplied. `ipKeyGenerator` is required:
+    // a bare `req.ip` lets anyone rotate through their own IPv6 /64 and bypass the
+    // limit (ERR_ERL_KEY_GEN_IPV6).
+    return `reset:ip:${ipKeyGenerator(req.ip)}`;
+  },
+  message: { error: 'Too many reset requests for this address. Please try again later.' },
+});
+
+function isValidEmail(email: string): boolean {
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+/**
+ * POST /api/auth/forgot-password
+ *
+ * Always answers with the same shape and status so the endpoint cannot be used to
+ * discover which addresses have accounts. The only variation is `delivery`:
+ *   - `"email"`          a real message was handed to the mail provider
+ *   - `"link"`           no provider configured; `resetUrl` is returned for the
+ *                        operator (self-hosted installs) — never claims an email went out
+ */
+router.post('/forgot-password', resetLimiter, async (req, res: Response) => {
+  // The response is identical whether or not the address has an account. The only
+  // field that varies describes the deployment's delivery capability, which is
+  // constant server-wide and therefore reveals nothing about any account.
+  const respond = (transport: 'email' | 'operator-console') =>
+    res.json({
+      success: true,
+      message: 'If an account exists for that address, a reset link has been sent.',
+      transport,
+      expiresInMinutes: 30,
+    });
+
+  try {
+    const email = String(req.body?.email || '').trim();
+    if (!email) {
+      res.status(400).json({ error: 'Email address is required.' });
+      return;
+    }
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: 'Please enter a valid email address.' });
+      return;
+    }
+
+    const usesEmail = isMailerConfigured();
+    const ttlMinutes = 30;
+    const issued = Database.createPasswordReset(email, ttlMinutes);
+
+    // Unknown address, or an OAuth-only account with no password to reset.
+    // Do nothing further, and answer exactly as we would for a real account.
+    if (!issued) {
+      respond(usesEmail ? 'email' : 'operator-console');
+      return;
+    }
+
+    // Do not trust Origin/Host request headers for password-reset links.
+    let origin = 'https://learn-co.ai.studio';
+    const configuredOrigin = process.env.APP_URL || process.env.APP_ORIGIN;
+    if (configuredOrigin) {
+      try {
+        const parsed = new URL(configuredOrigin);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') origin = parsed.origin;
+      } catch {
+        console.warn('[auth] Invalid APP_URL/APP_ORIGIN; using the default reset origin.');
+      }
+    }
+    const resetUrl = `${origin}/?reset_token=${issued.token}`;
+
+    if (!usesEmail) {
+      // No provider configured. Never pretend an email was sent: the link is
+      // written to the operator's server log instead of the HTTP response, so the
+      // API cannot be used to discover which addresses are registered.
+      console.warn(
+        `[auth] Password reset for ${email} generated, but no mail provider is configured ` +
+          `(set RESEND_API_KEY or SMTP_URL). Link (valid ${ttlMinutes}m): ${resetUrl}`,
+      );
+      respond('operator-console');
+      return;
+    }
+
+    const result = await sendMail(buildPasswordResetMessage(email, resetUrl, ttlMinutes));
+    if (result.delivered === false) {
+      // Log loudly for the operator, but still answer generically so a delivery
+      // failure cannot be used as an account-existence signal.
+      console.error('[auth] Password reset email could not be delivered:', result.reason);
+    }
+    respond('email');
+  } catch (err: any) {
+    console.error('[auth] forgot-password failed:', err?.message || err);
+    res.status(500).json({ error: 'Could not process the reset request.' });
+  }
+});
+
+/**
+ * GET /api/auth/reset-password/:token
+ * Lets the SPA confirm a link is valid before showing the "choose a password" form.
+ */
+router.get('/reset-password/:token', (req, res: Response) => {
+  const result = Database.peekPasswordReset(req.params.token);
+  if (!result) {
+    res.status(400).json({ valid: false, error: 'This reset link is invalid or has expired.' });
+    return;
+  }
+  res.json({ valid: true });
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Body: { token, password }
+ */
+router.post('/reset-password', resetLimiter, (req, res: Response) => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!token) {
+      res.status(400).json({ error: 'Reset token is required.' });
+      return;
+    }
+    // Mirrors the signup rule so a reset cannot be used to weaken the policy.
+    if (password.length < 8) {
+      res.status(400).json({ error: 'Password must be at least 8 characters.' });
+      return;
+    }
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      res.status(400).json({ error: 'Password must include at least one letter and one number.' });
+      return;
+    }
+
+    const result = Database.consumePasswordReset(token, password);
+    if (!result) {
+      res.status(400).json({ error: 'This reset link is invalid, expired, or already used.' });
+      return;
+    }
+
+    // Existing sessions were revoked by consumePasswordReset; hand back a fresh one
+    // so the user lands signed in rather than being bounced to the login screen.
+    const session = Database.createSession(result.userId);
+    const user = Database.findUserById(result.userId);
+    res.json({
+      success: true,
+      message: 'Your password has been updated.',
+      token: session,
+      user: user ? { id: user.id, email: user.email } : undefined,
+    });
+  } catch (err: any) {
+    console.error('[auth] reset-password failed:', err?.message || err);
+    res.status(500).json({ error: 'Could not reset the password.' });
   }
 });
 

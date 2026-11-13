@@ -33,6 +33,7 @@ import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import { WalkthroughModal } from './components/common/WalkthroughModal';
 import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
+import { readStoredArray } from './utils/storageSafety';
 import {
   Sparkles,
   ShieldCheck,
@@ -81,6 +82,18 @@ export default function App() {
   const { user, profile, gamification, settings, isLoading, isAuthenticated } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    try { return new URLSearchParams(window.location.search).get('reset_token'); }
+    catch { return null; }
+  });
+  useEffect(() => {
+    if (!resetToken) return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset_token');
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    } catch { /* keep the reset flow usable if history cannot be changed */ }
+  }, [resetToken]);
   const [copilotContext, setCopilotContext] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
@@ -122,23 +135,19 @@ export default function App() {
     }
   }, [settings?.theme]);
 
-  // Concept masteries state
-  const [masteries, setMasteries] = useState<ConceptMastery[]>(() => {
-    const savedAttempts = localStorage.getItem('learnco_attempts');
-    const hasAttempts = savedAttempts ? JSON.parse(savedAttempts).length > 0 : false;
-    if (!hasAttempts) return [];
-    const saved = localStorage.getItem('learnco_masteries');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [attempts, setAttempts] = useState<QuestionAttempt[]>(() => {
-    const saved = localStorage.getItem('learnco_attempts');
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  // Corrupt or stale local storage must not blank the entire app on startup.
+  const [masteries, setMasteries] = useState<ConceptMastery[]>(() =>
+    readStoredArray<QuestionAttempt>('learnco_attempts').length > 0
+      ? readStoredArray<ConceptMastery>('learnco_masteries') : [],
+  );
+  const [attempts, setAttempts] = useState<QuestionAttempt[]>(() =>
+    readStoredArray<QuestionAttempt>('learnco_attempts'),
+  );
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    const saved = localStorage.getItem('learnco_notifications');
-    return saved ? JSON.parse(saved) : SEED_NOTIFICATIONS;
+    try {
+      if (!localStorage.getItem('learnco_notifications')) return SEED_NOTIFICATIONS;
+    } catch { return SEED_NOTIFICATIONS; }
+    return readStoredArray<NotificationItem>('learnco_notifications');
   });
 
   useEffect(() => {
@@ -365,7 +374,7 @@ export default function App() {
   }
 
   // If user is not signed in: Strict Authentication Gating
-  if (!isAuthenticated) {
+  if (!isAuthenticated || resetToken) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
         <header className="w-full border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-6 py-4 flex items-center justify-between shadow-xs">
@@ -382,7 +391,7 @@ export default function App() {
         </header>
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-2xl py-4">
-            <AuthView onNavigateToTab={() => setActiveTab('dashboard')} />
+            <AuthView initialResetToken={resetToken} onExitReset={() => setResetToken(null)} onNavigateToTab={() => setActiveTab('dashboard')} />
           </div>
         </main>
       </div>

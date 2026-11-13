@@ -60,6 +60,7 @@ async function verifyFirebaseAuth(req, res, next) {
     const user = await resolveUserFromRequest(req);
     if (!user) {
       return res.status(401).json({
+        success: false,
         error: 'Authentication required. Please sign in to continue.',
         code: 'UNAUTHORIZED',
       });

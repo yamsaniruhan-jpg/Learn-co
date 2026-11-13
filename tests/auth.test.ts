@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { requireAuth, optionalAuth } from '../server/middleware/authMiddleware';
-import { hashPassword, verifyPassword, needsPasswordRehash } from '../server/db';
+import { hashPassword, verifyPassword } from '../server/db';
 
 /**
  * Regression tests for the authentication vulnerabilities found in the audit.
@@ -35,7 +35,7 @@ describe('requireAuth — anonymous access must be rejected', () => {
     const res = await request(app).get('/protected');
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
-    expect(res.body.code).toBe('UNAUTHENTICATED');
+    expect(res.body.code).toBe('UNAUTHORIZED');
   });
 
   it('rejects a request with no Authorization header (POST / write path)', async () => {
@@ -51,7 +51,7 @@ describe('requireAuth — anonymous access must be rejected', () => {
   it('rejects a bogus bearer token', async () => {
     const res = await request(app).get('/protected').set('Authorization', 'Bearer totally-fake-token');
     expect(res.status).toBe(401);
-    expect(res.body.code).toBe('INVALID_SESSION');
+    expect(res.body.code).toBe('UNAUTHORIZED');
   });
 
   it('rejects the literal string "null" as a token', async () => {
@@ -87,38 +87,38 @@ describe('password hashing', () => {
   it('produces a scrypt hash with a per-user salt', () => {
     const a = hashPassword('correct horse battery staple');
     const b = hashPassword('correct horse battery staple');
-    expect(a.startsWith('scrypt$')).toBe(true);
+    expect(a.startsWith('scrypt:')).toBe(true);
     // Same password must produce different hashes (unique salt per user).
     expect(a).not.toBe(b);
   });
 
   it('verifies a correct password', () => {
     const hash = hashPassword('Str0ngPass!23');
-    expect(verifyPassword('Str0ngPass!23', hash)).toBe(true);
+    expect(verifyPassword('Str0ngPass!23', hash).valid).toBe(true);
   });
 
   it('rejects an incorrect password', () => {
     const hash = hashPassword('Str0ngPass!23');
-    expect(verifyPassword('wrong-password', hash)).toBe(false);
+    expect(verifyPassword('wrong-password', hash).valid).toBe(false);
   });
 
   it('rejects empty credentials without throwing', () => {
-    expect(verifyPassword('', hashPassword('x'))).toBe(false);
-    expect(verifyPassword('x', '')).toBe(false);
-    expect(verifyPassword('x', 'malformed-hash')).toBe(false);
+    expect(verifyPassword('', hashPassword('x')).valid).toBe(false);
+    expect(verifyPassword('x', '').valid).toBe(false);
+    expect(verifyPassword('x', 'malformed-hash').valid).toBe(false);
   });
 
   it('still verifies legacy HMAC hashes so existing accounts can sign in', async () => {
     const crypto = await import('crypto');
     const legacy = crypto.createHmac('sha256', 'learnco_salt_2026').update('LegacyPass1!').digest('hex');
-    expect(verifyPassword('LegacyPass1!', legacy)).toBe(true);
-    expect(verifyPassword('WrongPass1!', legacy)).toBe(false);
+    expect(verifyPassword('LegacyPass1!', legacy).valid).toBe(true);
+    expect(verifyPassword('WrongPass1!', legacy).valid).toBe(false);
   });
 
   it('flags legacy hashes for upgrade and leaves scrypt hashes alone', async () => {
     const crypto = await import('crypto');
     const legacy = crypto.createHmac('sha256', 'learnco_salt_2026').update('x').digest('hex');
-    expect(needsPasswordRehash(legacy)).toBe(true);
-    expect(needsPasswordRehash(hashPassword('x'))).toBe(false);
+    expect(verifyPassword('x', legacy).needsRehash).toBe(true);
+    expect(verifyPassword('x', hashPassword('x')).needsRehash).toBe(false);
   });
 });

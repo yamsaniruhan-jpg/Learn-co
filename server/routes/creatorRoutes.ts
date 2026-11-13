@@ -73,6 +73,8 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
   const userId = req.userId!;
   // Tracked outside the try so a failed extraction can refund the quota slot.
   let quotaKind: 'source' | 'url' | null = null;
+  let quotaReserved = false;
+  let sourceCreated = false;
 
   try {
     const { title, sourceType, fileName, fileSize, url } = req.body;
@@ -82,6 +84,19 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
 
     if (!sourceType || !['text', 'pdf', 'url'].includes(sourceType)) {
       res.status(400).json({ error: 'Invalid or missing sourceType (must be "text", "pdf", or "url").' });
+      return;
+    }
+
+    if ((sourceType === 'text' || sourceType === 'pdf') && typeof content !== 'string') {
+      res.status(400).json({ error: 'Text or PDF content must be a string.' });
+      return;
+    }
+    if (sourceType === 'url' && typeof url !== 'string') {
+      res.status(400).json({ error: 'URL must be a string.' });
+      return;
+    }
+    if (title !== undefined && typeof title !== 'string') {
+      res.status(400).json({ error: 'Title must be a string.' });
       return;
     }
 
@@ -103,6 +118,8 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
       });
       return;
     }
+
+    quotaReserved = true;
 
     let extractedText = '';
     let determinedTitle = title || '';
@@ -167,14 +184,16 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
       url,
     });
 
+    sourceCreated = true;
     res.status(201).json({ success: true, source: newSource });
   } catch (err: any) {
-    if (quotaKind) Database.releaseQuota(userId, quotaKind);
     if (err instanceof ExtractionError) {
       res.status(err.status).json({ error: err.message, code: err.code });
       return;
     }
     res.status(500).json({ error: err.message || 'Failed to ingest source.' });
+  } finally {
+    if (quotaReserved && !sourceCreated && quotaKind) Database.releaseQuota(userId, quotaKind);
   }
 });
 

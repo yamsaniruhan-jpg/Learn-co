@@ -103,6 +103,7 @@ export interface DatabaseState {
   attemptsById: Record<string, QuestionAttemptRecord>;
   mistakes: MistakeRecord[];
   sessions: Record<string, { userId: string; createdAt: string; expiresAt: string }>;
+  passwordResets: Record<string, { userId: string; expiresAt: string; usedAt?: string; createdAt: string }>;
   creatorSources: Record<string, CreatorSource>;
   creatorResources: Record<string, CreatorResource>;
   creatorResourceVersions: Record<string, CreatorResourceVersion[]>;
@@ -128,7 +129,7 @@ export interface DatabaseState {
   notifications: any[];
 }
 
-const DB_FILE_PATH = path.join(process.cwd(), '.learnco_db.json');
+const DB_FILE_PATH = process.env.LEARNCO_DB_FILE ? path.resolve(process.env.LEARNCO_DB_FILE) : path.join(process.cwd(), '.learnco_db.json');
 
 // Memory store initialized with defaults
 let memoryDb: DatabaseState = {
@@ -142,6 +143,7 @@ let memoryDb: DatabaseState = {
   attemptsById: {},
   mistakes: [],
   sessions: {},
+  passwordResets: {},
   creatorSources: {},
   creatorResources: {},
   creatorResourceVersions: {},
@@ -223,12 +225,14 @@ export function verifyPassword(password: string, storedHash: string): { valid: b
   if (!storedHash || typeof storedHash !== 'string') {
     return { valid: false, needsRehash: false };
   }
-  if (storedHash.startsWith('scrypt:')) {
-    const parts = storedHash.split(':');
+  if (!password) return { valid: false, needsRehash: false };
+  if (storedHash.startsWith('scrypt:') || storedHash.startsWith('scrypt$')) {
+    const isDollar = storedHash.startsWith('scrypt$');
+    const parts = storedHash.split(isDollar ? '$' : ':');
     if (parts.length !== 3) return { valid: false, needsRehash: false };
     const [, salt, expectedHex] = parts;
     try {
-      const derived = crypto.scryptSync(password, salt, 64);
+      const derived = crypto.scryptSync(password, isDollar ? Buffer.from(salt, 'hex') : salt, 64);
       const expected = Buffer.from(expectedHex, 'hex');
       if (derived.length !== expected.length) return { valid: false, needsRehash: false };
       return { valid: crypto.timingSafeEqual(derived, expected), needsRehash: false };
@@ -332,6 +336,20 @@ export function loadDbFromDisk() {
         if (parsed.gamification) memoryDb.gamification = { ...memoryDb.gamification, ...parsed.gamification };
         if (parsed.settings) memoryDb.settings = { ...memoryDb.settings, ...parsed.settings };
         if (parsed.sessions) memoryDb.sessions = { ...memoryDb.sessions, ...parsed.sessions };
+        if (parsed.passwordResets) memoryDb.passwordResets = { ...memoryDb.passwordResets, ...parsed.passwordResets };
+        // Restore all persisted state, not just profiles and a subset of resources.
+        for (const key of ['attemptsById', 'creatorResourceVersions', 'creatorJobs',
+          'copilotConversations', 'copilotMessages', 'mentorProfiles', 'mentorshipRequests',
+          'mentorshipRelationships', 'mentorshipGoals', 'mentorshipTasks', 'mentorshipSessions',
+          'mentorshipMessages', 'studyScheduleSettings', 'studyPlanVersions', 'studyActiveSessions'] as const) {
+          if (parsed[key] && typeof parsed[key] === 'object' && !Array.isArray(parsed[key])) {
+            (memoryDb as any)[key] = { ...memoryDb[key], ...parsed[key] };
+          }
+        }
+        for (const key of ['xpTransactions', 'questionAttempts', 'mistakes', 'mentorshipFeedback',
+          'mentorshipReports', 'auditLogs', 'notifications'] as const) {
+          if (Array.isArray(parsed[key])) (memoryDb as any)[key] = parsed[key];
+        }
         if (parsed.studyPlans) {
           delete parsed.studyPlans['study-plan-001'];
           memoryDb.studyPlans = { ...memoryDb.studyPlans, ...parsed.studyPlans };
@@ -364,8 +382,13 @@ async function writeDbSnapshotAsync(): Promise<void> {
   await fs.promises.mkdir(dir, { recursive: true });
   const payload = JSON.stringify(memoryDb, null, 2);
   const tempPath = `${DB_FILE_PATH}.tmp`;
-  await fs.promises.writeFile(tempPath, payload, 'utf-8');
-  await fs.promises.rename(tempPath, DB_FILE_PATH);
+  try {
+    await fs.promises.writeFile(tempPath, payload, 'utf-8');
+    await fs.promises.rename(tempPath, DB_FILE_PATH);
+  } catch (error) {
+    isDirty = true;
+    throw error;
+  }
 }
 
 export function flushDbSync(): void {
@@ -399,6 +422,12 @@ export function saveDbToDisk() {
         console.error('Failed to save db_store.json to disk:', err);
       });
   }, 150);
+}
+
+export async function flushDb(): Promise<void> {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  await writeQueue;
+  if (isDirty) await writeDbSnapshotAsync();
 }
 
 process.once('beforeExit', () => {
@@ -456,11 +485,11 @@ export class Database {
     if (!gam) {
       gam = {
         userId,
-        xp: 420,
-        level: 3,
-        currentStreak: 1,
-        longestStreak: 3,
-        lastActiveDate: new Date().toISOString().split('T')[0],
+        xp: 0,
+        level: 1,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastActiveDate: '',
         dailyQuestionsSolvedToday: 0,
         dailyAllowanceLimit: 25,
         dailyDoubtsAskedToday: 0,
@@ -486,6 +515,7 @@ export class Database {
       gam.dailyDoubtsAskedToday = 0;
       gam.dailyArtifactsCreatedToday = 0;
       gam.dailySourcesUploadedToday = 0;
+      gam.dailyUrlsProcessedToday = 0;
       gam.dailyAiPlansGeneratedToday = 0;
       (gam as any).lastQuotaResetDate = today;
     }
@@ -593,6 +623,13 @@ export class Database {
     };
   }
 
+  static releaseQuota(userId: string, kind: 'source' | 'url'): void {
+    const gam = this.getGamification(userId);
+    if (!gam) return;
+    if (kind === 'source') gam.dailySourcesUploadedToday = Math.max(0, (gam.dailySourcesUploadedToday || 0) - 1);
+    else gam.dailyUrlsProcessedToday = Math.max(0, (gam.dailyUrlsProcessedToday || 0) - 1);
+  }
+
   static checkAndIncrementDoubtQuota(userId: string): { remaining: number; used: number } {
     const gam = this.getGamification(userId);
     if (!gam) {
@@ -672,6 +709,83 @@ export class Database {
     return memoryDb.settings[userId] || null;
   }
 
+  static createPasswordReset(email: string, ttlMinutes: number = 30): { token: string; userId: string } | null {
+    const normalised = (email || '').trim().toLowerCase();
+    if (!normalised) return null;
+
+    // `usersByEmail` maps email -> userId, so resolve the account separately.
+    const userId = memoryDb.usersByEmail[normalised];
+    const user = userId ? memoryDb.users[userId] : undefined;
+    if (!user) return null;
+    // OAuth-only accounts have no password to reset.
+    if (!user.passwordHash && user.authProvider && user.authProvider !== 'email') return null;
+
+    // Invalidate outstanding tokens for this user.
+    for (const [digest, record] of Object.entries(memoryDb.passwordResets)) {
+      if (record.userId === user.id && !record.usedAt) {
+        delete memoryDb.passwordResets[digest];
+      }
+    }
+
+    const token = generateToken();
+    const digest = crypto.createHash('sha256').update(token).digest('hex');
+    memoryDb.passwordResets[digest] = {
+      userId: user.id,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + ttlMinutes * 60 * 1000).toISOString(),
+    };
+    saveDbToDisk();
+    return { token, userId: user.id };
+  }
+
+  /** Look up an unused, unexpired reset token without consuming it. */
+  static peekPasswordReset(token: string): { userId: string } | null {
+    if (!token) return null;
+    const digest = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    const record = memoryDb.passwordResets[digest];
+    if (!record || record.usedAt) return null;
+    if (new Date(record.expiresAt).getTime() < Date.now()) {
+      delete memoryDb.passwordResets[digest];
+      saveDbToDisk();
+      return null;
+    }
+    return { userId: record.userId };
+  }
+
+  /**
+   * Consume a reset token and set a new password.
+   * The token is marked used and every existing session for that user is
+   * revoked, so a stolen session cannot survive a reset.
+   */
+  static consumePasswordReset(token: string, newPassword: string): { userId: string } | null {
+    if (!token || !newPassword) return null;
+    const digest = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    const record = memoryDb.passwordResets[digest];
+    if (!record || record.usedAt) return null;
+    if (new Date(record.expiresAt).getTime() < Date.now()) {
+      delete memoryDb.passwordResets[digest];
+      saveDbToDisk();
+      return null;
+    }
+
+    const user = memoryDb.users[record.userId];
+    if (!user) return null;
+
+    user.passwordHash = hashPassword(newPassword);
+    user.updatedAt = new Date().toISOString();
+
+    record.usedAt = new Date().toISOString();
+    delete memoryDb.passwordResets[digest];
+
+    // Revoke all live sessions for this account.
+    for (const [sessionToken, session] of Object.entries(memoryDb.sessions)) {
+      if (session.userId === user.id) delete memoryDb.sessions[sessionToken];
+    }
+
+    saveDbToDisk();
+    return { userId: user.id };
+  }
+
   static createSession(userId: string): string {
     const token = generateToken();
     const createdAt = new Date().toISOString();
@@ -704,6 +818,7 @@ export class Database {
   static revokeSession(token: string): boolean {
     if (memoryDb.sessions[token]) {
       delete memoryDb.sessions[token];
+      saveDbToDisk();
       return true;
     }
     return false;
@@ -1104,29 +1219,12 @@ export class Database {
         displayName: safeDisplayName,
         avatarUrl: profile.avatarUrl,
         xp: calculatedXp,
-        level: gam.level,
+        level: calculateLevelFromXp(gam.xp).level,
         streak: gam.currentStreak,
       });
     }
 
     list.sort((a, b) => b.xp - a.xp);
-
-    // Weekly Promotion Logic: If a scholar is in the promotion zone (rank <= 10) and 7 days have passed since last promotion, promote to next level
-    const nowMs = now.getTime();
-    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-    list.forEach((item, index) => {
-      const rank = index + 1;
-      const gam = memoryDb.gamification[item.userId];
-      if (gam) {
-        const lastPromo = (gam as any).lastPromotionDate ? new Date((gam as any).lastPromotionDate).getTime() : 0;
-        if (rank <= 10 && (nowMs - lastPromo > oneWeekMs || !(gam as any).lastPromotionDate)) {
-          gam.level = (gam.level || 1) + 1;
-          (gam as any).lastPromotionDate = todayStr;
-          item.level = gam.level;
-          saveDbToDisk();
-        }
-      }
-    });
 
     return list.map((item, index) => ({
       rank: index + 1,
@@ -1158,7 +1256,7 @@ export class Database {
     }
     const previousXp = gam.xp || 0;
     gam.xp = Math.max(0, newXp);
-    gam.level = Math.max(1, Math.floor(Math.sqrt(gam.xp / 25)) + 1);
+    gam.level = calculateLevelFromXp(gam.xp).level;
     gam.lastActiveDate = new Date().toISOString().split('T')[0];
 
     const delta = Math.max(0, gam.xp - previousXp);
@@ -1215,6 +1313,7 @@ export class Database {
     };
 
     memoryDb.creatorSources[id] = source;
+    saveDbToDisk();
     return source;
   }
 
