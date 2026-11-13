@@ -57,3 +57,40 @@ jobs:
             echo "::error::Expected 401 for anonymous request, got $STATUS"
             exit 1
           fi
+
+  bun-dev-smoke:
+    name: Bun lockfile & dev startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install locked dependencies with Bun
+        run: bun install --frozen-lockfile
+      - name: Verify PDF extraction
+        run: npm test -- tests/extraction.test.ts
+      - name: Smoke-test the development server
+        run: |
+          LEARNCO_DB_FILE="$RUNNER_TEMP/learnco-bun-smoke.json" npm run dev -- --port 4322 --host 0.0.0.0 > "$RUNNER_TEMP/learnco-dev.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4322/__aistudio_internal_control_plane/dev/status > /dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/learnco-dev.log"
+          if [ "$ready" != 1 ]; then
+            echo "::error::Development server did not become ready"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:4322/ > /dev/null
