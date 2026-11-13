@@ -1,63 +1,18 @@
 @import "tailwindcss";
 
-/**
- * Tailwind v4 design tokens.
- *
- * `@theme` is what makes these values available as utilities (bg-surface,
- * text-ink, border-line, ...). Without it, the `--color-*` variables declared in
- * `@layer base` are inert custom properties: the palette exists but nothing can
- * reference it from a class name, which is why the app drifted into ~100 hardcoded
- * hex values.
- *
- * The values here are the CURRENT shipped palette — verified against the most-used
- * hex values in `src/` and the fonts actually loaded in `index.html` (Nunito +
- * Poppins). This deliberately does not adopt the older `src/styles/tokens.ts`,
- * whose indigo/Inter values do not match the product.
- *
- * These are the static (light) defaults; light/dark switching continues to work
- * through the `--color-*` variables in `@layer base`, which components can use via
- * `var(--color-bg-surface)` or the utility names below.
- */
-@theme {
-  /* Brand */
-  --color-brand: #6C5CE7;
-  --color-brand-soft: #8577ED;
-  --color-brand-deep: #5B4BC4;
-
-  /* Surfaces */
-  --color-canvas: #F7F5FF;
-  --color-surface: #FFFFFF;
-  --color-subtle: #F0EDFA;
-
-  /* Text */
-  --color-ink: #2D2A4A;
-  --color-ink-soft: #6B6890;
-  --color-ink-muted: #8E8BAF;
-
-  /* Lines */
-  --color-line: #E3DFF5;
-  --color-line-strong: #CEC8EC;
-  --color-line-dark: #3D3861;
-
-  /* Status */
-  --color-success: #4CAF8E;
-  --color-danger: #F25F5C;
-  --color-warning: #FFB84D;
-  --color-teal: #00B8A9;
-
-  /* Dark surfaces (used by .dark scoped utilities) */
-  --color-canvas-dark: #1E1B33;
-  --color-surface-dark: #2A2647;
-  --color-subtle-dark: #24203E;
-
-  /* Typography — matches the fonts actually loaded in index.html */
-  --font-sans: 'Nunito', 'Poppins', system-ui, -apple-system, sans-serif;
-  --font-display: 'Poppins', 'Nunito', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-
-  /* Radius scale matching the shipped look */
-  --radius-card: 1rem;
-  --radius-panel: 1.5rem;
+/* Semantic utilities resolve the existing light/dark variables at the element. */
+@theme inline {
+  --color-brand: var(--color-primary);
+  --color-canvas: var(--color-bg-canvas);
+  --color-surface: var(--color-bg-surface);
+  --color-subtle: var(--color-bg-subtle);
+  --color-ink: var(--color-text-primary);
+  --color-ink-soft: var(--color-text-secondary);
+  --color-ink-muted: var(--color-text-muted);
+  --color-line: var(--color-border);
+  --color-line-strong: var(--color-border-strong);
+  --color-danger: var(--color-error);
+  --color-warning: var(--color-accent);
 }
 
 @layer base {

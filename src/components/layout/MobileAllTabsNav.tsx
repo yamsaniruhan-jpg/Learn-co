@@ -219,6 +219,29 @@ export const ALL_APP_FEATURES: NavFeature[] = [
   },
 ];
 
+// Unknown categories remain visible after the explicitly ordered ones.
+export const CATEGORY_ORDER = [
+  'Core', 'AI Tools', 'Organization', 'Analytics', 'Gamification',
+  'Resources', 'Collaboration', 'Guidance', 'System', 'Account',
+];
+
+export function groupNavFeatures<T extends { category: string }>(features: T[]) {
+  const byCategory = new Map<string, T[]>();
+  for (const feature of features) {
+    const category = feature.category || 'Other';
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category)!.push(feature);
+  }
+  return [...byCategory.keys()].sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  }).map((category) => ({ category, features: byCategory.get(category)! }));
+}
+
 export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   activeTab,
   setActiveTab,
@@ -226,46 +249,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 }) => {
   const [isOpenAllDrawer, setIsOpenAllDrawer] = useState(false);
 
-  /**
-   * Display order for the "All features" drawer.
-   *
-   * Every entry in ALL_APP_FEATURES declares a `category`, but the drawer used to
-   * ignore it and render all 21 features in one flat grid — the most common
-   * complaint about mobile navigation. Grouping by the existing category field
-   * fixes the scan-ability problem without removing or renaming a single feature.
-   * Any category not listed here is still rendered, appended at the end.
-   */
-  const CATEGORY_ORDER = [
-    'Core',
-    'AI Tools',
-    'Organization',
-    'Analytics',
-    'Gamification',
-    'Resources',
-    'Collaboration',
-    'Guidance',
-    'System',
-    'Account',
-  ];
-
-  const groupedFeatures = (() => {
-    const byCategory = new Map<string, typeof ALL_APP_FEATURES>();
-    for (const feat of ALL_APP_FEATURES) {
-      const key = feat.category || 'Other';
-      if (!byCategory.has(key)) byCategory.set(key, []);
-      byCategory.get(key)!.push(feat);
-    }
-    const ordered = [...byCategory.keys()].sort((a, b) => {
-      const ai = CATEGORY_ORDER.indexOf(a);
-      const bi = CATEGORY_ORDER.indexOf(b);
-      // Unlisted categories sort after known ones, alphabetically.
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-    return ordered.map((category) => ({ category, features: byCategory.get(category)! }));
-  })();
+  const groupedFeatures = groupNavFeatures(ALL_APP_FEATURES);
 
   const primaryBottomTabs = [
     ALL_APP_FEATURES.find((f) => f.id === 'learn')!,
@@ -286,7 +270,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
       {/* 1. Mobile Horizontal Scrollable Quick-Switch Strip */}
       <nav
         aria-label="All Features Quick Scroll"
-        className="md:hidden sticky top-16 z-25 bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-2 shadow-xs"
+        className="md:hidden sticky top-16 z-25 bg-surface border-b border-line overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-2 shadow-xs"
       >
         {ALL_APP_FEATURES.map((feat) => {
           const Icon = feat.icon;
@@ -386,7 +370,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
             <div className="p-4 overflow-y-auto space-y-5">
               {groupedFeatures.map(({ category, features }) => (
                 <section key={`cat-${category}`}>
-                  <h3 className="px-1 mb-2 text-[11px] font-black uppercase tracking-wider text-[#6B6890] dark:text-[#B4B0D5] select-none">
+                  <h3 className="px-1 mb-2 text-[11px] font-black uppercase tracking-wider text-ink-soft select-none">
                     {category}
                     <span className="ml-1.5 font-bold text-[#A9A5C9] dark:text-[#6B6890]">
                       {features.length}

@@ -797,120 +797,22 @@ email was sent. I chose (b).
 
 ---
 
-## 11. Round 3 — navigation grouping and the design system
+## 11. Mobile navigation and incremental design tokens
 
-Both items here were requested as "UI-safe and reversible". Neither removes a
-feature, renames a destination, or changes the visual design.
+### Mobile navigation
 
-### 11.1 Mobile navigation was a flat wall of 21 items
+**Problem:** The desktop sidebar already had groups, but the mobile All Features drawer displayed its 21 destinations as one flat grid, despite each having a category.
 
-**What I found:** I expected to group the nav, but the desktop `Sidebar` is
-*already* grouped into four sections (Learning / AI Studio / Intelligence /
-Account) — that part needed nothing. The defect was in
-`MobileAllTabsNav.tsx`: every feature carries a `category`, and the "All features"
-drawer **ignored it**, rendering all 21 features in one flat grid. The `category`
-data was dead weight, and mobile users got a 21-item wall with no grouping.
+**Change and benefit:** The drawer uses those existing categories to display ten labelled sections. The grouping function preserves every feature and appends unknown categories alphabetically; no destinations were removed or renamed. This should make scanning easier, though the open drawer has not been visually checked in a browser.
 
-**Fix:** the drawer now renders one section per category, using the category data
-that already existed, in a deliberate order:
+### Design tokens
 
-| Section | Features |
-|---|---|
-| Core (7) | dashboard, focus, simulations, user-guide, learn, practice, concepts |
-| AI Tools (3) | copilot, create, voice-exam |
-| Organization (1) | planner |
-| Analytics (2) | intelligence, forecaster |
-| Gamification (2) | leaderboard, gamification |
-| Resources (1) | digital-archive |
-| Collaboration (1) | study-rooms |
-| Guidance (1) | mentor |
-| System (2) | offline-sync, admin |
-| Account (1) | profile |
+**Problem:** The existing light and dark CSS custom properties were available to CSS, but there were no semantic Tailwind utility aliases for them. A separate, unused JavaScript token file described a different brand palette and typography.
 
-21 features → 10 labelled sections, **nothing added, renamed or removed**. Any
-future feature in a new category still renders (appended after the known ones), so
-this cannot silently hide anything.
+**Change and benefit:** Tailwind `@theme inline` aliases now refer to the existing CSS properties, so they follow light/dark overrides. The mobile navigation strip and drawer headings use these semantic utilities in place of equivalent hardcoded colors. The JavaScript token file's overlapping brand, surface, text, status, and font values were aligned with the existing palette. Tests check a subset of these values for drift. The file duplicates CSS values; it does not automatically import them. Subject-specific colors remain separate. No broad component migration or redesign was attempted.
 
-### 11.2 The design system existed but was switched off
+### Verification and limits
 
-This was the most interesting finding of the round, and it inverted my
-assumption.
+Grouping tests exercise the actual grouping function, including unknown categories; source-level checks verify the drawer calls it. A server-render test checks the initial navigation landmark. These do not test opening the drawer, visual layout, or responsive behavior. Type-check, full tests, production build, and server probes are reported in the accompanying response. Screenshots or browser-based testing are still needed for visual verification.
 
-**`src/index.css` already contains a proper design system** — a full light and dark
-palette as CSS custom properties (`--color-bg-canvas`, `--color-primary`,
-`--color-text-primary`, shadow ramps, everything). So the problem was not "no
-design system".
-
-The problem is that the file had **no Tailwind v4 `@theme` block**. In v4, that
-block is what turns a value into a utility class. Without it, `--color-*` are inert
-custom properties: the palette exists, but no class name can reference it. That is
-precisely why the codebase contains **104 distinct hardcoded hex values** — there
-was never a way to write `bg-surface`. Components had no choice.
-
-**Fix:** added a `@theme` block exposing the *current* palette as utilities
-(`bg-brand`, `text-ink`, `border-line`, `bg-surface`, `font-display`, …), mapped
-to the values already in use.
-
-I verified this rather than assuming: `font-display` generated immediately, but the
-colour utilities did not appear in the built CSS — because **Tailwind only emits
-utilities it sees used**. I confirmed the theme was wired by adding a temporary
-component using `bg-brand`/`text-ink`/`border-line`/`bg-surface`, rebuilding, and
-seeing all four appear in the output, then removed it. Had I stopped at "the build
-passed", I would have shipped a theme that did nothing.
-
-**No component was migrated.** Changing 104 hex values across 114 components is
-exactly the "unnecessary redesign" you excluded. The system is now *available*;
-migration can happen one view at a time.
-
-### 11.3 `src/styles/tokens.ts` was describing a different product
-
-`tokens.ts` claimed indigo primaries (`#6366f1` / `#4f46e5`) and Inter + Outfit
-fonts. The app actually ships `#6C5CE7` with Nunito + Poppins. Nobody noticed
-because **nothing imported the file** — harmless at runtime, but actively
-misleading to anyone who opened it to find "the design system", and a trap if
-someone had adopted it (it would have silently changed your brand colour).
-
-**Fix:** rewritten to match the shipped palette and fonts, and pointed at
-`index.css` as the single source of truth. Subject accent colours were verified
-correct against `curriculumData.ts` and left alone.
-
-### 11.4 Tests added (19)
-
-- `tests/designTokens.test.ts` (7) — token file and `index.css` cannot drift
-  apart again: brand, surfaces, text and status colours must match; every font
-  named in tokens must actually be loaded in `index.html`; the `@theme` block must
-  exist; and the old indigo/Inter values must not return.
-- `tests/navGrouping.test.ts` (4) — every one of the 21 features keeps a category,
-  the drawer renders grouped rather than flat, and the category order is explicit.
-- `tests/drawerGrouping.test.ts` (6) — runs the real grouping algorithm over the
-  real feature list: no feature dropped, 10 sections, deterministic order, core
-  destinations together, **and** a guard that the component's copy of the algorithm
-  and the test's copy stay identical.
-- `tests/drawerRender.test.tsx` (2) — actually renders the component to markup
-  (set `renderToStaticMarkup`) to assert the labelled `nav` landmark. I widened
-  `vitest.config.ts` to include `*.test.tsx` for this.
-
-I dropped a planned interaction test that would have driven the drawer open:
-`@testing-library/react` is not installed, and adding a dependency to satisfy a
-test was not worth it. The grouping is covered by the algorithm and drift-guard
-tests instead. Worth stating plainly: **the open drawer's visual output is
-therefore not directly asserted** — only that the algorithm is correct and that
-the component calls it.
-
-### 11.5 Verification
-
-- `npx tsc --noEmit` — clean
-- `npm test` — **154/154 across 11 files** (was 135; +19)
-- `npm run build` — exit 0, **0 warnings**; entry still **0.40 MB / 0.12 MB gzip**;
-  CSS unchanged at 237 KB (the `@theme` block adds negligible weight)
-- Production server: `GET /` → 200, and **all 68 built assets return 200**
-- `--color-brand:#6c5ce7` confirmed present in the built stylesheet
-
-### 11.6 Still honest about the limits
-
-- **Still no screenshots.** Everything above is verified by types, tests, built
-  output and HTTP probes. I have not seen the grouped drawer rendered in a browser,
-  and I have no opinion on whether the 10 sections look right. A 1-screen check
-  would settle it.
-- **The `@theme` utilities are available but unused.** Migration of the 104 hex
-  values is a separate, incremental job — deliberately not attempted.
+Final verification: `npm run lint` passed; `npm test` passed 147 tests across 11 files; `npm run build` succeeded. A production server returned 200 for `/` and `/api/health`, 401 for an anonymous `/api/user/profile`, and 200 for all 68 built JS/CSS assets. The build output contains the three adopted utilities referencing the intended CSS variables. The test suite emits a PDF parser warning when testing an intentionally unreadable PDF.

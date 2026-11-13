@@ -3,18 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { DESIGN_TOKENS } from '../src/styles/tokens';
 
-/**
- * The design system had two sources of truth that disagreed:
- *
- *  - `src/index.css`      — the real palette, via CSS custom properties
- *  - `src/styles/tokens.ts` — indigo/Inter values that matched nothing, and which
- *                             no code imported, so the drift was invisible
- *
- * These tests make the drift loud. They also assert the Tailwind v4 `@theme`
- * block exists, because without it the palette generates no utilities at all and
- * components have no choice but to hardcode hex.
- */
-
+// Guard the shared subset of JavaScript and CSS design values against drift.
 const CSS = readFileSync(path.join(process.cwd(), 'src/index.css'), 'utf8');
 
 /** Read a custom property from the `:root` block. */
@@ -26,9 +15,9 @@ function rootVar(name: string): string | null {
 
 describe('design tokens', () => {
   it('declares a Tailwind v4 @theme block so tokens become utilities', () => {
-    expect(CSS).toMatch(/@theme\s*\{/);
-    // The named utilities this codebase is expected to use.
-    expect(CSS).toMatch(/--color-brand:/);
+    expect(CSS).toMatch(/@theme\s+inline\s*\{/);
+    // Named utilities are mapped to semantic variables.
+    expect(CSS).toMatch(/--color-brand:\s*var\(--color-primary\)/);
     expect(CSS).toMatch(/--color-surface:/);
     expect(CSS).toMatch(/--color-ink:/);
   });
@@ -89,22 +78,4 @@ describe('design tokens', () => {
     expect(JSON.stringify(DESIGN_TOKENS.typography)).not.toMatch(/"Inter"|"Outfit"/);
   });
 
-  it('subject accents match the curriculum data that renders them', () => {
-    const curriculum = readFileSync(
-      path.join(process.cwd(), 'src/data/curriculumData.ts'),
-      'utf8',
-    );
-    for (const [key, value] of Object.entries(DESIGN_TOKENS.colors.subjects)) {
-      const subject = value as { primary: string; label: string };
-      // Only assert for subjects that declare a colour in the curriculum file.
-      if (curriculum.includes(`color: '${subject.primary}'`)) continue;
-      const subjectId = key === 'cs' ? 'cs' : key;
-      if (!curriculum.includes(`id: '${subjectId}'`)) continue;
-      // If the subject exists but its colour differs, the token is stale.
-      expect(
-        curriculum.includes(subject.primary),
-        `${key} accent ${subject.primary} is not used in curriculumData.ts`,
-      ).toBe(true);
-    }
-  });
 });

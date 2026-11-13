@@ -1,28 +1,14 @@
 /**
- * LEARN.CO DESIGN SYSTEM TOKENS — VOLUME 2
- *
- * IMPORTANT — read before using these numbers.
- *
- * This file previously described a palette the product does not use: indigo
- * (#6366f1 / #4f46e5) primaries and Inter + Outfit typography. The shipped UI
- * uses #6C5CE7 with Nunito + Poppins. Nobody noticed because **nothing imported
- * this file** — so it was never wrong at runtime, only misleading to anyone who
- * opened it looking for the design system.
- *
- * The authoritative tokens now live in `src/index.css` inside the Tailwind v4
- * `@theme` block, because that is where they have to be for utilities like
- * `bg-brand` / `text-ink` to exist at all. This file re-exports those values for
- * JS consumers (charts, canvas, email templates) that cannot use a CSS class.
- *
- * Keep this in sync with `src/index.css`. `tests/designTokens.test.ts` fails if
- * the two disagree.
+ * JavaScript design values for consumers that cannot use CSS custom properties.
+ * The shared UI palette lives in src/index.css. Keep overlapping values aligned;
+ * this file duplicates values rather than importing CSS at runtime.
  */
 
 export const DESIGN_TOKENS = {
   brand: {
-    name: 'LearnCo',
-    tagline: 'Immersive, Gamified Mastery',
-    version: '2.1.0',
+    name: 'Learn.co',
+    tagline: 'Intelligent STEM Learning Operating System',
+    version: '2.0.0',
   },
   colors: {
     // Matches `--color-brand*` in src/index.css. The old indigo ramp was wrong.
