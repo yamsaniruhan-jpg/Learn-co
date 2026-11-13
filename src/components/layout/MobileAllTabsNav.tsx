@@ -20,7 +20,13 @@ import {
   Clock,
   HelpCircle,
   FlaskConical,
+  Users,
+  TrendingUp,
+  Mic,
+  RefreshCw,
+  ShoppingBag,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface MobileAllTabsNavProps {
   activeTab: string;
@@ -55,7 +61,6 @@ export const ALL_APP_FEATURES: NavFeature[] = [
     category: 'Core',
     icon: Clock,
     description: 'Deep work timer with ambient binaural soundscapes & XP pulses',
-    highlight: true,
   },
   {
     id: 'simulations',
@@ -73,7 +78,6 @@ export const ALL_APP_FEATURES: NavFeature[] = [
     category: 'Core',
     icon: HelpCircle,
     description: 'Complete platform guide, feature walkthroughs & daily routines',
-    highlight: true,
   },
   {
     id: 'learn',
@@ -90,6 +94,14 @@ export const ALL_APP_FEATURES: NavFeature[] = [
     category: 'Core',
     icon: Target,
     description: 'Diagnostic question ladder with instant Socratic feedback',
+  },
+  {
+    id: 'marketplace',
+    label: 'Course Marketplace',
+    shortLabel: 'Courses',
+    category: 'Core',
+    icon: ShoppingBag,
+    description: 'Browse curated courses and structured learning modules',
   },
   {
     id: 'copilot',
@@ -140,7 +152,6 @@ export const ALL_APP_FEATURES: NavFeature[] = [
     category: 'Gamification',
     icon: Trophy,
     description: 'Global cohort standings, XP ladder, and milestone legacy',
-    highlight: true,
   },
   {
     id: 'intelligence',
@@ -163,34 +174,31 @@ export const ALL_APP_FEATURES: NavFeature[] = [
     label: 'Peer Study Rooms',
     shortLabel: 'Study Rooms',
     category: 'Collaboration',
-    icon: Bot,
+    icon: Users,
     description: 'Real-time collaborative study sessions and group streak bonuses',
-    highlight: true,
   },
   {
     id: 'voice-exam',
     label: 'Voice Oral Exam',
     shortLabel: 'Voice Exam',
     category: 'AI Tools',
-    icon: Compass,
+    icon: Mic,
     description: 'Speech-to-text Socratic oral examinations & concept defenses',
-    highlight: true,
   },
   {
     id: 'forecaster',
     label: 'Exam Forecaster',
     shortLabel: 'Forecaster',
     category: 'Analytics',
-    icon: BarChart3,
+    icon: TrendingUp,
     description: 'Predictive score ranges, percentile forecasts & readiness analytics',
-    highlight: true,
   },
   {
     id: 'offline-sync',
     label: 'PWA Offline Sync',
     shortLabel: 'Offline Sync',
     category: 'System',
-    icon: ShieldCheck,
+    icon: RefreshCw,
     description: 'Service worker status, offline curriculum cache & retry queue',
   },
   {
@@ -219,45 +227,24 @@ export const ALL_APP_FEATURES: NavFeature[] = [
   },
 ];
 
-// Unknown categories remain visible after the explicitly ordered ones.
-export const CATEGORY_ORDER = [
-  'Core', 'AI Tools', 'Organization', 'Analytics', 'Gamification',
-  'Resources', 'Collaboration', 'Guidance', 'System', 'Account',
-];
-
-export function groupNavFeatures<T extends { category: string }>(features: T[]) {
-  const byCategory = new Map<string, T[]>();
-  for (const feature of features) {
-    const category = feature.category || 'Other';
-    if (!byCategory.has(category)) byCategory.set(category, []);
-    byCategory.get(category)!.push(feature);
-  }
-  return [...byCategory.keys()].sort((a, b) => {
-    const ai = CATEGORY_ORDER.indexOf(a);
-    const bi = CATEGORY_ORDER.indexOf(b);
-    if (ai === -1 && bi === -1) return a.localeCompare(b);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  }).map((category) => ({ category, features: byCategory.get(category)! }));
-}
-
 export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   activeTab,
   setActiveTab,
   dailyAllowanceRemaining,
 }) => {
+  const { user, profile } = useAuth();
   const [isOpenAllDrawer, setIsOpenAllDrawer] = useState(false);
+  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
 
-  const groupedFeatures = groupNavFeatures(ALL_APP_FEATURES);
+  const visibleFeatures = ALL_APP_FEATURES.filter((feat) => feat.id !== 'admin' || isAdmin);
 
   const primaryBottomTabs = [
-    ALL_APP_FEATURES.find((f) => f.id === 'learn')!,
-    ALL_APP_FEATURES.find((f) => f.id === 'practice')!,
-    ALL_APP_FEATURES.find((f) => f.id === 'copilot')!,
-    ALL_APP_FEATURES.find((f) => f.id === 'create')!,
-    ALL_APP_FEATURES.find((f) => f.id === 'planner')!,
-    ALL_APP_FEATURES.find((f) => f.id === 'profile')!,
+    visibleFeatures.find((f) => f.id === 'learn')!,
+    visibleFeatures.find((f) => f.id === 'practice')!,
+    visibleFeatures.find((f) => f.id === 'copilot')!,
+    visibleFeatures.find((f) => f.id === 'create')!,
+    visibleFeatures.find((f) => f.id === 'planner')!,
+    visibleFeatures.find((f) => f.id === 'profile')!,
   ];
 
   const handleSelect = (tabId: string) => {
@@ -267,37 +254,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 
   return (
     <>
-      {/* 1. Mobile Horizontal Scrollable Quick-Switch Strip */}
-      <nav
-        aria-label="All Features Quick Scroll"
-        className="md:hidden sticky top-16 z-25 bg-surface border-b border-line overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-2 shadow-xs"
-      >
-        {ALL_APP_FEATURES.map((feat) => {
-          const Icon = feat.icon;
-          const isActive = activeTab === feat.id;
-          return (
-            <button
-              key={`strip-${feat.id}`}
-              onClick={() => handleSelect(feat.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
-                isActive
-                  ? 'bg-[#6C5CE7] text-white shadow-[0_2px_4px_rgba(108,92,231,0.25)]'
-                  : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F0EDFA] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
-              }`}
-            >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#6C5CE7] dark:text-[#8577ED]'}`} />
-              <span>{feat.shortLabel}</span>
-              {feat.id === 'practice' && dailyAllowanceRemaining > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white text-[#6C5CE7] font-black">
-                  {dailyAllowanceRemaining}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* 2. Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
+      {/* Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
       <div className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-2 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
         {primaryBottomTabs.map((item) => {
           const Icon = item.icon;
@@ -306,7 +263,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
-              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors min-h-[44px] cursor-pointer ${
+              className={`relative flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors min-h-[44px] cursor-pointer ${
                 isActive
                   ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
                   : 'text-[#6B6890] dark:text-[#B4B0D5]'
@@ -314,6 +271,11 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
             >
               <Icon className="w-5 h-5 mb-0.5" />
               <span>{item.shortLabel}</span>
+              {item.id === 'practice' && dailyAllowanceRemaining > 0 && (
+                <span className="absolute top-0.5 right-0.5 text-[9px] px-1 rounded-full bg-[#6C5CE7] text-white font-black">
+                  {dailyAllowanceRemaining}
+                </span>
+              )}
             </button>
           );
         })}
@@ -335,7 +297,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
         </button>
       </div>
 
-      {/* 3. Full Mobile Navigation Drawer Modal ("All Tab Architecture") */}
+      {/* Full Mobile Navigation Drawer Modal */}
       {isOpenAllDrawer && (
         <div className="fixed inset-0 z-50 md:hidden flex flex-col bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-200">
           <div
@@ -366,75 +328,63 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
               </button>
             </div>
 
-            {/* Features grouped by category (was one flat 21-item grid) */}
-            <div className="p-4 overflow-y-auto space-y-5">
-              {groupedFeatures.map(({ category, features }) => (
-                <section key={`cat-${category}`}>
-                  <h3 className="px-1 mb-2 text-[11px] font-black uppercase tracking-wider text-ink-soft select-none">
-                    {category}
-                    <span className="ml-1.5 font-bold text-[#A9A5C9] dark:text-[#6B6890]">
-                      {features.length}
-                    </span>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {features.map((feat) => {
-                    const Icon = feat.icon;
-                    const isActive = activeTab === feat.id;
-                    return (
-                      <button
-                        key={`drawer-${feat.id}`}
-                        onClick={() => handleSelect(feat.id)}
-                        className={`flex items-start gap-3 p-3 rounded-2xl text-left transition-all cursor-pointer ${
+            {/* Grid of All Features */}
+            <div className="p-4 overflow-y-auto space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {visibleFeatures.map((feat) => {
+                  const Icon = feat.icon;
+                  const isActive = activeTab === feat.id;
+                  return (
+                    <button
+                      key={`drawer-${feat.id}`}
+                      onClick={() => handleSelect(feat.id)}
+                      className={`flex items-start gap-3 p-3 rounded-2xl text-left transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+                      }`}
+                    >
+                      <div
+                        className={`p-2.5 rounded-xl shrink-0 ${
                           isActive
-                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 shadow-xs'
-                            : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                         }`}
                       >
-                        <div
-                          className={`p-2.5 rounded-xl shrink-0 ${
-                            isActive
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </div>
+                        <Icon className="w-4 h-4" />
+                      </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span
-                              className={`text-sm font-bold truncate ${
-                                isActive
-                                  ? 'text-indigo-700 dark:text-indigo-300'
-                                  : 'text-slate-900 dark:text-white'
-                              }`}
-                            >
-                              {feat.label}
-                            </span>
-                            {feat.highlight && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
-                                Pro
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
-                            {feat.description}
-                          </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span
+                            className={`text-sm font-bold truncate ${
+                              isActive
+                                ? 'text-indigo-700 dark:text-indigo-300'
+                                : 'text-slate-900 dark:text-white'
+                            }`}
+                          >
+                            {feat.label}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                            {feat.category}
+                          </span>
                         </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                          {feat.description}
+                        </p>
+                      </div>
 
-                        <ChevronRight
-                          className={`w-4 h-4 shrink-0 mt-2 ${
-                            isActive
-                              ? 'text-indigo-600 dark:text-indigo-400'
-                              : 'text-slate-400 opacity-40'
-                          }`}
-                        />
-                      </button>
-                    );
-                  })}
-                  </div>
-                </section>
-              ))}
+                      <ChevronRight
+                        className={`w-4 h-4 shrink-0 mt-2 ${
+                          isActive
+                            ? 'text-indigo-600 dark:text-indigo-400'
+                            : 'text-slate-400 opacity-40'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

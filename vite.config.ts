@@ -20,15 +20,24 @@ export default defineConfig(() => {
       // `3000-<id>.e2b.app`, so the host allowlist must not be restricted.
       allowedHosts: true as const,
       hmr: false,
+      ws: false as const,
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
-      // The entry chunk is now ~0.40 MB (gzip ~0.12 MB) after route-level code
-      // splitting, so this threshold is meaningful again: a 500 kB warning would
-      // surface any future import that drags a heavy SDK back into first load.
-      // Individual lazy chunks (SimulationsHubView/three, firebaseClient) are
-      // legitimately larger and are fetched only when their feature is opened.
-      chunkSizeWarningLimit: 800,
+      // Firebase + KaTeX + Recharts + Three are unavoidably large; keep the
+      // warning threshold meaningful instead of noisy.
+      chunkSizeWarningLimit: 2000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-three': ['three'],
+            'vendor-recharts': ['recharts'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+            'vendor-katex': ['katex'],
+            'vendor-icons': ['lucide-react'],
+          },
+        },
+      },
     },
   };
 });

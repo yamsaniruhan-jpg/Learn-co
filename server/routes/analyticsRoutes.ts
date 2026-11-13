@@ -1,14 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { Database, withUserLock } from '../db';
+import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { AdaptiveAnalyticsEngine, invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
 import { SubjectId, ExamTrackId } from '../../src/types/curriculum';
-import { verifyFirebaseAuth, requireAdmin, AuthenticatedRequest } from '../middleware/authMiddleware';
 
 export const analyticsRouter = Router();
 
-// Authentication is delegated to the shared strict guard so analytics can never
-// be read (or written) anonymously. It previously defaulted to a seeded account.
-analyticsRouter.use(verifyFirebaseAuth);
+analyticsRouter.use(requireAuth);
 
 /**
  * GET /api/analytics/dashboard
@@ -208,9 +206,9 @@ analyticsRouter.get('/trends', (req: Request, res: Response) => {
 
 /**
  * GET /api/analytics/logs
- * Retrieves system, attempt, verification, and audit logs
+ * Retrieves system, attempt, verification, and audit logs (Admin only)
  */
-analyticsRouter.get('/logs', requireAdmin, (req: Request, res: Response) => {
+analyticsRouter.get('/logs', requireRole('admin'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { category, search, limit } = req.query;
     const maxLimit = limit ? parseInt(limit as string, 10) : 100;
@@ -225,9 +223,9 @@ analyticsRouter.get('/logs', requireAdmin, (req: Request, res: Response) => {
  * POST /api/analytics/logs
  * Create a new audit log entry
  */
-analyticsRouter.post('/logs', (req: Request, res: Response) => {
+analyticsRouter.post('/logs', (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.userId!;
     const { category, action, details, status, metadata } = req.body;
     const log = Database.logEvent(category || 'SYSTEM', action || 'CLIENT_ACTION', details || '', status || 'INFO', userId, metadata);
     res.json({ success: true, log });
@@ -237,9 +235,9 @@ analyticsRouter.post('/logs', (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/analytics/webhook-config
+ * GET /api/analytics/webhook-config (Admin only)
  */
-analyticsRouter.get('/webhook-config', requireAdmin, (req: Request, res: Response) => {
+analyticsRouter.get('/webhook-config', requireRole('admin'), (_req: AuthenticatedRequest, res: Response) => {
   try {
     const config = Database.getAlertWebhookConfig();
     res.json({ success: true, config });
@@ -249,9 +247,9 @@ analyticsRouter.get('/webhook-config', requireAdmin, (req: Request, res: Respons
 });
 
 /**
- * POST /api/analytics/webhook-config
+ * POST /api/analytics/webhook-config (Admin only)
  */
-analyticsRouter.post('/webhook-config', requireAdmin, (req: Request, res: Response) => {
+analyticsRouter.post('/webhook-config', requireRole('admin'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { enabled, webhookUrl, minSeverity, channelName } = req.body;
     const updated = Database.setAlertWebhookConfig({ enabled, webhookUrl, minSeverity, channelName });
@@ -262,16 +260,16 @@ analyticsRouter.post('/webhook-config', requireAdmin, (req: Request, res: Respon
 });
 
 /**
- * POST /api/analytics/test-webhook
+ * POST /api/analytics/test-webhook (Admin only)
  */
-analyticsRouter.post('/test-webhook', requireAdmin, (req: Request, res: Response) => {
+analyticsRouter.post('/test-webhook', requireRole('admin'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const log = Database.logEvent(
       'SYSTEM',
       'WEBHOOK_TEST_DISPATCH',
       'Simulated diagnostic alert successfully dispatched to webhook channel.',
       'SUCCESS',
-      (req as any).userId,
+      req.userId,
       { testTimestamp: new Date().toISOString() }
     );
     res.json({ success: true, message: 'Test webhook event dispatched successfully.', log });
@@ -285,9 +283,9 @@ analyticsRouter.post('/test-webhook', requireAdmin, (req: Request, res: Response
  * Deterministic (zero-token) diagnostic narrative derived from the learner's
  * analytics snapshot. Consumed by the AI Diagnostic Modal in Intelligence Studio.
  */
-analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => {
+analyticsRouter.post('/ai-diagnostic-summary', (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = (req as AuthenticatedRequest).userId!;
+    const userId = req.userId!;
     const focus = typeof req.body?.focus === 'string' ? req.body.focus.trim() : 'overall';
 
     const dashboard = AdaptiveAnalyticsEngine.getDashboard(userId);
@@ -367,9 +365,9 @@ analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => 
 /**
  * POST /api/analytics/trigger-spaced-repetition
  */
-analyticsRouter.post('/trigger-spaced-repetition', (req: Request, res: Response) => {
+analyticsRouter.post('/trigger-spaced-repetition', (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = (req as AuthenticatedRequest).userId!;
+    const userId = req.userId!;
     const result = Database.triggerSpacedRepetitionReminders(userId);
     res.json({ success: true, data: result });
   } catch (error: any) {

@@ -1,9 +1,8 @@
 // src/client/firebase.js
 
 export async function apiCall(endpoint, options = {}) {
-  const token = typeof window !== 'undefined'
-    ? localStorage.getItem('learnco_auth_token') || 'guest_token'
-    : 'guest_token';
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('learnco_auth_token') : null;
 
   const normalizedEndpoint = endpoint.startsWith('/api')
     ? endpoint

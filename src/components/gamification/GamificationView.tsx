@@ -41,6 +41,70 @@ export const GamificationView: React.FC = () => {
       ? 'Silver Scholar'
       : 'Bronze Scholar';
 
+  const evaluatedBadges = React.useMemo(() => {
+    let attempts: any[] = [];
+    let creatorCount = 0;
+    try {
+      const rawAttempts = localStorage.getItem('learnco_attempts');
+      if (rawAttempts) attempts = JSON.parse(rawAttempts);
+      const rawCreator = localStorage.getItem('learnco_creator_resources');
+      if (rawCreator) {
+        const parsed = JSON.parse(rawCreator);
+        if (Array.isArray(parsed)) creatorCount = parsed.length;
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    const mathAttempts = attempts.filter((a) => a.subjectId === 'math');
+    const mathAccuracy =
+      mathAttempts.length >= 3
+        ? (mathAttempts.filter((a) => a.isCorrect).length / mathAttempts.length) * 100
+        : 0;
+
+    let maxConsecutiveCorrectNoHint = 0;
+    let runningPerfect = 0;
+    for (const att of attempts) {
+      if (att.isCorrect && !att.usedHint) {
+        runningPerfect++;
+        if (runningPerfect > maxConsecutiveCorrectNoHint) maxConsecutiveCorrectNoHint = runningPerfect;
+      } else {
+        runningPerfect = 0;
+      }
+    }
+
+    return SEED_BADGES.map((badge) => {
+      let unlocked = badge.unlocked;
+      switch (badge.id) {
+        case 'badge-streak-3':
+          unlocked = longestStreak >= 3 || currentStreak >= 3;
+          break;
+        case 'badge-streak-7':
+          unlocked = longestStreak >= 7 || currentStreak >= 7;
+          break;
+        case 'badge-mastery-calc':
+          unlocked = mathAccuracy > 80;
+          break;
+        case 'badge-creator-first':
+          unlocked = creatorCount > 0 || xp >= 40;
+          break;
+        case 'badge-copilot-scholar':
+          unlocked = xp >= 200;
+          break;
+        case 'badge-ladder-perfect':
+          unlocked = maxConsecutiveCorrectNoHint >= 5;
+          break;
+        default:
+          break;
+      }
+      return {
+        ...badge,
+        unlocked,
+        unlockedAt: unlocked ? badge.unlockedAt || 'Earned' : undefined,
+      };
+    });
+  }, [xp, currentStreak, longestStreak]);
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
       {/* Header */}
@@ -163,12 +227,12 @@ export const GamificationView: React.FC = () => {
               <span>Earned & Upcoming Badges</span>
             </h3>
             <span className="text-xs text-slate-400 font-semibold">
-              {SEED_BADGES.filter((b) => b.unlocked).length} of {SEED_BADGES.length} Unlocked
+              {evaluatedBadges.filter((b) => b.unlocked).length} of {evaluatedBadges.length} Unlocked
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {SEED_BADGES.map((badge) => (
+            {evaluatedBadges.map((badge) => (
               <Card
                 key={badge.id}
                 variant={badge.unlocked ? 'elevated' : 'bordered'}
@@ -209,7 +273,7 @@ export const GamificationView: React.FC = () => {
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
                   <span className="uppercase font-bold tracking-wider">{badge.tier} Tier</span>
-                  <span>{badge.unlocked ? `Unlocked ${badge.unlockedAt || 'Aug 2026'}` : 'Locked'}</span>
+                  <span>{badge.unlocked ? `Unlocked (${badge.unlockedAt || 'Earned'})` : 'Locked'}</span>
                 </div>
               </Card>
             ))}

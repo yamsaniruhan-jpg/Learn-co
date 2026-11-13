@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PracticeSessionConfig, QuestionTypeId, SubjectId } from '../../types/curriculum';
 import { Zap, Clock, ShieldCheck, X, CheckSquare, Sparkles } from 'lucide-react';
 
@@ -24,6 +24,11 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
   dailyQuotaRemaining,
 }) => {
   const [sessionTitle, setSessionTitle] = useState(initialTitle || 'Calibrated 5-Question Ladder');
+  useEffect(() => {
+    if (isOpen && initialTitle) {
+      setSessionTitle(initialTitle);
+    }
+  }, [isOpen, initialTitle]);
   const [difficultyMode, setDifficultyMode] = useState<'calibrated_ladder' | 'easy' | 'medium' | 'hard'>('calibrated_ladder');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [isTimed, setIsTimed] = useState<boolean>(false);

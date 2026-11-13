@@ -16,6 +16,7 @@ import {
   BookMarked,
   BrainCircuit,
   Clock,
+  ShoppingBag,
 } from 'lucide-react';
 
 interface GlobalSearchModalProps {
@@ -170,6 +171,14 @@ const SEARCH_ITEMS: SearchItem[] = [
     tabId: 'gamification',
     icon: <Award className="w-4 h-4 text-amber-500" />,
     detail: 'View tier progression, unlocked badges, and daily study streak',
+  },
+  {
+    id: 'marketplace-courses',
+    title: 'Course Marketplace & Structured Modules',
+    category: 'Tool',
+    tabId: 'marketplace',
+    icon: <ShoppingBag className="w-4 h-4 text-[#6C5CE7]" />,
+    detail: 'Search curated courses by subject, difficulty, and rating',
   },
 ];
 

@@ -8,6 +8,7 @@ import {
   GenerateResourceRequest,
 } from '../../src/types/creator';
 import { QuestionBankItem } from '../../src/types/curriculum';
+import { DAILY_ARTIFACTS_LIMIT, DAILY_SOURCES_UPLOAD_LIMIT } from '../../src/types/auth';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 import {
   extractPdfText,
@@ -97,7 +98,7 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
       res.status(429).json({
         error: quotaErr.message || 'Daily limit reached.',
         isLimitReached: true,
-        limit: 5,
+        limit: DAILY_SOURCES_UPLOAD_LIMIT,
         remaining: 0,
       });
       return;
@@ -373,15 +374,15 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
       return;
     }
 
-    // Enforce daily artifact quota (4 artifacts per day)
+    // Enforce daily artifact quota (DAILY_ARTIFACTS_LIMIT per day)
     let quotaResult;
     try {
       quotaResult = Database.checkAndIncrementArtifactQuota(userId, sourcesToUse.length);
     } catch (quotaErr: any) {
       res.status(429).json({
-        error: quotaErr.message || 'Daily artifact generation limit reached (4/4).',
+        error: quotaErr.message || `Daily artifact generation limit reached (${DAILY_ARTIFACTS_LIMIT}/${DAILY_ARTIFACTS_LIMIT}).`,
         isLimitReached: true,
-        limit: 4,
+        limit: DAILY_ARTIFACTS_LIMIT,
         remaining: 0,
       });
       return;

@@ -67,14 +67,19 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
   const [selectedTopicId, setSelectedTopicId] = useState<string>('');
   const [focusGoalText, setFocusGoalText] = useState('Master core topic invariants & derivations');
 
-  // Stats in localStorage
+  // Stats in localStorage keyed by YYYY-MM-DD so daily counters start at 0 each day
+  const todayKey = new Date().toISOString().slice(0, 10);
   const [completedSessionsToday, setCompletedSessionsToday] = useState<number>(() => {
+    const savedDate = localStorage.getItem('learnco_focus_stats_date');
+    if (savedDate !== todayKey) return 0;
     const saved = localStorage.getItem('learnco_focus_sessions_today');
-    return saved ? parseInt(saved, 10) : 3;
+    return saved ? Math.max(0, parseInt(saved, 10) || 0) : 0;
   });
   const [totalMinutesFocusedToday, setTotalMinutesFocusedToday] = useState<number>(() => {
+    const savedDate = localStorage.getItem('learnco_focus_stats_date');
+    if (savedDate !== todayKey) return 0;
     const saved = localStorage.getItem('learnco_focus_minutes_today');
-    return saved ? parseInt(saved, 10) : 75;
+    return saved ? Math.max(0, parseInt(saved, 10) || 0) : 0;
   });
 
   // Scratchpad State
@@ -116,22 +121,7 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
     setIsRunning(false);
   }, [activeMode, sessionType, customMinutes]);
 
-  // Main countdown timer interval
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const interval = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev <= 1) {
-          handleSessionCompletion();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isRunning, sessionType, activeMode]);
+  const completionRef = useRef<() => void>(() => {});
 
   // Handle completion of a focus block
   const handleSessionCompletion = () => {
@@ -139,20 +129,21 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
     playCompletionChime();
 
     if (sessionType === 'focus') {
-      const durationMins = Math.round(totalDurationSeconds / 60);
+      const durationMins = Math.max(1, Math.round(totalDurationSeconds / 60));
       const newSessions = completedSessionsToday + 1;
       const newMinutes = totalMinutesFocusedToday + durationMins;
 
       setCompletedSessionsToday(newSessions);
       setTotalMinutesFocusedToday(newMinutes);
+      localStorage.setItem('learnco_focus_stats_date', todayKey);
       localStorage.setItem('learnco_focus_sessions_today', String(newSessions));
       localStorage.setItem('learnco_focus_minutes_today', String(newMinutes));
 
       const xpEarned = durationMins * 2; // e.g. 50 XP for 25m sprint
-      awardXp(xpEarned, `Completed ${durationMins}-minute Focus Sprint`);
-
       if (onAwardXp) {
         onAwardXp(xpEarned, `Completed ${durationMins}-minute Gen Focus Block`);
+      } else {
+        awardXp(xpEarned, `Completed ${durationMins}-minute Focus Sprint`);
       }
 
       // Switch to short break
@@ -162,6 +153,25 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
       setSessionType('focus');
     }
   };
+
+  completionRef.current = handleSessionCompletion;
+
+  // Main countdown timer interval
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const interval = setInterval(() => {
+      setTimerSeconds((prev) => {
+        if (prev <= 1) {
+          completionRef.current();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
   // Web Audio Synthesizer: Soundscapes
   const stopAmbientAudio = () => {
@@ -359,14 +369,16 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
 
   const handleLogFocusPulse = () => {
     const xp = 25;
-    awardXp(xp, 'Logged Focus Pulse');
     if (onAwardXp) {
       onAwardXp(xp, 'Logged Focus Pulse');
+    } else {
+      awardXp(xp, 'Logged Focus Pulse');
     }
     const newSessions = completedSessionsToday + 1;
     const newMinutes = totalMinutesFocusedToday + 15;
     setCompletedSessionsToday(newSessions);
     setTotalMinutesFocusedToday(newMinutes);
+    localStorage.setItem('learnco_focus_stats_date', todayKey);
     localStorage.setItem('learnco_focus_sessions_today', String(newSessions));
     localStorage.setItem('learnco_focus_minutes_today', String(newMinutes));
     setPulseToast('+25 XP awarded for Focus Pulse!');

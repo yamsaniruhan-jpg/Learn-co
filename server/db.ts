@@ -103,11 +103,6 @@ export interface DatabaseState {
   attemptsById: Record<string, QuestionAttemptRecord>;
   mistakes: MistakeRecord[];
   sessions: Record<string, { userId: string; createdAt: string; expiresAt: string }>;
-  /**
-   * Password-reset tokens, keyed by the SHA-256 of the token itself (never the
-   * raw value, so a database disclosure cannot be used to hijack accounts).
-   */
-  passwordResets: Record<string, { userId: string; expiresAt: string; usedAt?: string; createdAt: string }>;
   creatorSources: Record<string, CreatorSource>;
   creatorResources: Record<string, CreatorResource>;
   creatorResourceVersions: Record<string, CreatorResourceVersion[]>;
@@ -133,11 +128,7 @@ export interface DatabaseState {
   notifications: any[];
 }
 
-// The data file path is overridable so tests (and alt deployments) never write
-// into the developer's live dataset. Defaults to the historical location.
-const DB_FILE_PATH = process.env.LEARNCO_DB_FILE
-  ? path.resolve(process.env.LEARNCO_DB_FILE)
-  : path.join(process.cwd(), '.learnco_db.json');
+const DB_FILE_PATH = path.join(process.cwd(), '.learnco_db.json');
 
 // Memory store initialized with defaults
 let memoryDb: DatabaseState = {
@@ -151,7 +142,6 @@ let memoryDb: DatabaseState = {
   attemptsById: {},
   mistakes: [],
   sessions: {},
-  passwordResets: {},
   creatorSources: {},
   creatorResources: {},
   creatorResourceVersions: {},
@@ -218,64 +208,46 @@ export async function withUserLock<T>(userId: string, task: () => Promise<T>, ti
 }
 
 /**
- * Password hashing.
- *
- * Uses scrypt with a unique random salt per user. The previous implementation
- * used a single hardcoded salt shared by every account with fast HMAC-SHA256,
- * which meant identical passwords produced identical hashes and the whole
- * dataset could be brute-forced cheaply.
- *
- * Format: `scrypt$<saltHex>$<derivedKeyHex>`
+ * Hash password with per-user random salt using scrypt
  */
-
-const SCRYPT_KEYLEN = 64;
-const SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
-
-function scryptHash(password: string, salt: Buffer): string {
-  return crypto.scryptSync(password, salt, SCRYPT_KEYLEN, SCRYPT_OPTIONS).toString('hex');
-}
-
-/** Legacy HMAC-SHA256 hash, retained only to verify and migrate old accounts. */
-function legacyHashPassword(password: string): string {
-  const salt = 'learnco_salt_2026';
-  return crypto.createHmac('sha256', salt).update(password).digest('hex');
-}
-
 export function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16);
-  return `scrypt$${salt.toString('hex')}$${scryptHash(password, salt)}`;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${derived}`;
 }
 
 /**
- * Verify a password against a stored hash, supporting both the current scrypt
- * format and the legacy HMAC format so existing accounts keep working.
+ * Verify password against stored hash (supports scrypt + legacy static-salt HMAC for migration)
  */
-export function verifyPassword(password: string, storedHash: string): boolean {
-  if (!password || !storedHash) return false;
-
-  if (storedHash.startsWith('scrypt$')) {
-    const [, saltHex, expectedHex] = storedHash.split('$');
-    if (!saltHex || !expectedHex) return false;
+export function verifyPassword(password: string, storedHash: string): { valid: boolean; needsRehash: boolean } {
+  if (!storedHash || typeof storedHash !== 'string') {
+    return { valid: false, needsRehash: false };
+  }
+  if (storedHash.startsWith('scrypt:')) {
+    const parts = storedHash.split(':');
+    if (parts.length !== 3) return { valid: false, needsRehash: false };
+    const [, salt, expectedHex] = parts;
     try {
-      const actual = Buffer.from(scryptHash(password, Buffer.from(saltHex, 'hex')), 'hex');
+      const derived = crypto.scryptSync(password, salt, 64);
       const expected = Buffer.from(expectedHex, 'hex');
-      if (actual.length !== expected.length) return false;
-      return crypto.timingSafeEqual(actual, expected);
+      if (derived.length !== expected.length) return { valid: false, needsRehash: false };
+      return { valid: crypto.timingSafeEqual(derived, expected), needsRehash: false };
     } catch {
-      return false;
+      return { valid: false, needsRehash: false };
     }
   }
 
-  // Legacy format — constant-time comparison to avoid timing leaks.
-  const legacyActual = Buffer.from(legacyHashPassword(password), 'hex');
-  const legacyExpected = Buffer.from(storedHash, 'hex');
-  if (legacyActual.length !== legacyExpected.length) return false;
-  return crypto.timingSafeEqual(legacyActual, legacyExpected);
-}
-
-/** True when a stored hash predates the scrypt format and should be upgraded. */
-export function needsPasswordRehash(storedHash: string): boolean {
-  return !!storedHash && !storedHash.startsWith('scrypt$');
+  // Legacy HMAC-SHA256 verification (auto-upgraded on login)
+  const legacyHash = crypto.createHmac('sha256', 'learnco_salt_2026').update(password).digest('hex');
+  try {
+    const a = Buffer.from(legacyHash, 'hex');
+    const b = Buffer.from(storedHash, 'hex');
+    if (a.length !== b.length) return { valid: false, needsRehash: false };
+    const valid = crypto.timingSafeEqual(a, b);
+    return { valid, needsRehash: valid };
+  } catch {
+    return { valid: false, needsRehash: false };
+  }
 }
 
 /**
@@ -382,17 +354,56 @@ export function loadDbFromDisk() {
   }
 }
 
-export function saveDbToDisk() {
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let writeQueue: Promise<void> = Promise.resolve();
+let isDirty = false;
+
+async function writeDbSnapshotAsync(): Promise<void> {
+  isDirty = false;
+  const dir = path.dirname(DB_FILE_PATH);
+  await fs.promises.mkdir(dir, { recursive: true });
+  const payload = JSON.stringify(memoryDb, null, 2);
+  const tempPath = `${DB_FILE_PATH}.tmp`;
+  await fs.promises.writeFile(tempPath, payload, 'utf-8');
+  await fs.promises.rename(tempPath, DB_FILE_PATH);
+}
+
+export function flushDbSync(): void {
+  if (!isDirty && !saveTimer) return;
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
   try {
+    isDirty = false;
     const dir = path.dirname(DB_FILE_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(memoryDb, null, 2), 'utf-8');
+    const tempPath = `${DB_FILE_PATH}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(memoryDb, null, 2), 'utf-8');
+    fs.renameSync(tempPath, DB_FILE_PATH);
   } catch (err) {
-    console.error('Failed to save db_store.json to disk:', err);
+    console.error('Failed to flush db_store.json to disk:', err);
   }
 }
+
+export function saveDbToDisk() {
+  isDirty = true;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    writeQueue = writeQueue
+      .then(() => writeDbSnapshotAsync())
+      .catch((err) => {
+        console.error('Failed to save db_store.json to disk:', err);
+      });
+  }, 150);
+}
+
+process.once('beforeExit', () => {
+  flushDbSync();
+});
 
 // Initialize database
 export function getDaysBetweenDateKeys(dateStr1: string, dateStr2: string): number {
@@ -443,16 +454,12 @@ export class Database {
     const profile = memoryDb.profiles[userId];
     let gam = memoryDb.gamification[userId];
     if (!gam) {
-      // A brand-new scholar starts with nothing. This previously seeded
-      // xp: 420 / level: 3 / longestStreak: 3, so every new account was awarded
-      // ~420 XP and a 3-day streak it had never earned — inflating the
-      // leaderboard and making the first real study session look like a demotion.
       gam = {
         userId,
-        xp: 0,
-        level: 1,
-        currentStreak: 0,
-        longestStreak: 0,
+        xp: 420,
+        level: 3,
+        currentStreak: 1,
+        longestStreak: 3,
         lastActiveDate: new Date().toISOString().split('T')[0],
         dailyQuestionsSolvedToday: 0,
         dailyAllowanceLimit: 25,
@@ -620,21 +627,6 @@ export class Database {
     };
   }
 
-  /**
-   * Give back a quota unit when the work it paid for failed. Without this a
-   * user who hits an unreadable PDF or a dead link burns a daily slot and has
-   * nothing to show for it.
-   */
-  static releaseQuota(userId: string, kind: 'source' | 'url'): void {
-    const gam = this.getGamification(userId);
-    if (!gam) return;
-    if (kind === 'url') {
-      gam.dailyUrlsProcessedToday = Math.max(0, (gam.dailyUrlsProcessedToday || 0) - 1);
-    } else {
-      gam.dailySourcesUploadedToday = Math.max(0, (gam.dailySourcesUploadedToday || 0) - 1);
-    }
-  }
-
   static checkAndIncrementArtifactQuota(
     userId: string,
     sourceCount?: number
@@ -680,97 +672,6 @@ export class Database {
     return memoryDb.settings[userId] || null;
   }
 
-  // ==========================================
-  // PASSWORD RESET
-  // ==========================================
-
-  /**
-   * Issue a single-use password-reset token for an email address.
-   *
-   * Returns the RAW token exactly once (the caller must deliver it); only its
-   * SHA-256 digest is persisted. Returns `null` when the address is unknown so
-   * callers can respond identically either way and avoid account enumeration.
-   *
-   * Any previously issued, still-unused token for the same user is invalidated,
-   * so requesting a fresh link cannot leave an older one live.
-   */
-  static createPasswordReset(email: string, ttlMinutes: number = 30): { token: string; userId: string } | null {
-    const normalised = (email || '').trim().toLowerCase();
-    if (!normalised) return null;
-
-    // `usersByEmail` maps email -> userId, so resolve the account separately.
-    const userId = memoryDb.usersByEmail[normalised];
-    const user = userId ? memoryDb.users[userId] : undefined;
-    if (!user) return null;
-    // OAuth-only accounts have no password to reset.
-    if (!user.passwordHash && user.authProvider && user.authProvider !== 'email') return null;
-
-    // Invalidate outstanding tokens for this user.
-    for (const [digest, record] of Object.entries(memoryDb.passwordResets)) {
-      if (record.userId === user.id && !record.usedAt) {
-        delete memoryDb.passwordResets[digest];
-      }
-    }
-
-    const token = generateToken();
-    const digest = crypto.createHash('sha256').update(token).digest('hex');
-    memoryDb.passwordResets[digest] = {
-      userId: user.id,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + ttlMinutes * 60 * 1000).toISOString(),
-    };
-    saveDbToDisk();
-    return { token, userId: user.id };
-  }
-
-  /** Look up an unused, unexpired reset token without consuming it. */
-  static peekPasswordReset(token: string): { userId: string } | null {
-    if (!token) return null;
-    const digest = crypto.createHash('sha256').update(token.trim()).digest('hex');
-    const record = memoryDb.passwordResets[digest];
-    if (!record || record.usedAt) return null;
-    if (new Date(record.expiresAt).getTime() < Date.now()) {
-      delete memoryDb.passwordResets[digest];
-      saveDbToDisk();
-      return null;
-    }
-    return { userId: record.userId };
-  }
-
-  /**
-   * Consume a reset token and set a new password.
-   * The token is marked used and every existing session for that user is
-   * revoked, so a stolen session cannot survive a reset.
-   */
-  static consumePasswordReset(token: string, newPassword: string): { userId: string } | null {
-    if (!token || !newPassword) return null;
-    const digest = crypto.createHash('sha256').update(token.trim()).digest('hex');
-    const record = memoryDb.passwordResets[digest];
-    if (!record || record.usedAt) return null;
-    if (new Date(record.expiresAt).getTime() < Date.now()) {
-      delete memoryDb.passwordResets[digest];
-      saveDbToDisk();
-      return null;
-    }
-
-    const user = memoryDb.users[record.userId];
-    if (!user) return null;
-
-    user.passwordHash = hashPassword(newPassword);
-    user.updatedAt = new Date().toISOString();
-
-    record.usedAt = new Date().toISOString();
-    delete memoryDb.passwordResets[digest];
-
-    // Revoke all live sessions for this account.
-    for (const [sessionToken, session] of Object.entries(memoryDb.sessions)) {
-      if (session.userId === user.id) delete memoryDb.sessions[sessionToken];
-    }
-
-    saveDbToDisk();
-    return { userId: user.id };
-  }
-
   static createSession(userId: string): string {
     const token = generateToken();
     const createdAt = new Date().toISOString();
@@ -783,9 +684,8 @@ export class Database {
   static getSessionUser(token: string): UserAccount | null {
     if (!token) return null;
     const cleanToken = token.trim();
-    if (cleanToken === 'token-alex-001' || cleanToken === 'guest_token' || cleanToken === 'default_token') {
-      const alex = memoryDb.users['user-alex-001'] || Object.values(memoryDb.users)[0];
-      if (alex) return alex;
+    if (!cleanToken || cleanToken === 'null' || cleanToken === 'undefined') {
+      return null;
     }
     const session = memoryDb.sessions[cleanToken];
     if (!session) {
@@ -794,6 +694,7 @@ export class Database {
 
     if (new Date(session.expiresAt) < new Date()) {
       delete memoryDb.sessions[cleanToken];
+      saveDbToDisk();
       return null;
     }
 
@@ -1203,22 +1104,29 @@ export class Database {
         displayName: safeDisplayName,
         avatarUrl: profile.avatarUrl,
         xp: calculatedXp,
-        // Derived, not stored: keeps the leaderboard consistent with the rest of
-        // the app regardless of what a stale `gam.level` happens to hold.
-        level: calculateLevelFromXp(calculatedXp).level,
+        level: gam.level,
         streak: gam.currentStreak,
       });
     }
 
     list.sort((a, b) => b.xp - a.xp);
 
-    // NOTE: this function previously performed a "weekly promotion" side effect
-    // here: for any user in the top 10 it incremented `gam.level` and wrote the
-    // whole database to disk. Because it was attached to a GET, *viewing the
-    // leaderboard* permanently changed stored levels, made `level` disagree with
-    // `xp` (the same user reported level 1 on /api/user/profile and level 2 on
-    // /api/leaderboard), and rewarded every reread once the 7-day window elapsed.
-    // Level is now derived from XP on read, so a GET has no side effects.
+    // Weekly Promotion Logic: If a scholar is in the promotion zone (rank <= 10) and 7 days have passed since last promotion, promote to next level
+    const nowMs = now.getTime();
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    list.forEach((item, index) => {
+      const rank = index + 1;
+      const gam = memoryDb.gamification[item.userId];
+      if (gam) {
+        const lastPromo = (gam as any).lastPromotionDate ? new Date((gam as any).lastPromotionDate).getTime() : 0;
+        if (rank <= 10 && (nowMs - lastPromo > oneWeekMs || !(gam as any).lastPromotionDate)) {
+          gam.level = (gam.level || 1) + 1;
+          (gam as any).lastPromotionDate = todayStr;
+          item.level = gam.level;
+          saveDbToDisk();
+        }
+      }
+    });
 
     return list.map((item, index) => ({
       rank: index + 1,
@@ -1248,24 +1156,21 @@ export class Database {
       };
       memoryDb.gamification[userId] = gam;
     }
-    // Capture the previous value BEFORE overwriting `gam.xp`; the ledger delta is
-    // the difference between the old and new total. Computed after the assignment
-    // it was always `newXp - newXp === 0`, so every transaction recorded 0.
-    const previousXp = Math.max(0, gam.xp || 0);
-    const nextXp = Math.max(0, newXp);
-
-    gam.xp = nextXp;
-    gam.level = calculateLevelFromXp(nextXp).level;
+    const previousXp = gam.xp || 0;
+    gam.xp = Math.max(0, newXp);
+    gam.level = Math.max(1, Math.floor(Math.sqrt(gam.xp / 25)) + 1);
     gam.lastActiveDate = new Date().toISOString().split('T')[0];
 
-    // Save transaction (signed, so XP penalties are recorded honestly too)
-    memoryDb.xpTransactions.unshift({
-      id: `xp-tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      userId,
-      amount: nextXp - previousXp,
-      reason: (reason as any) || 'QUESTION_CORRECT',
-      timestamp: new Date().toISOString(),
-    });
+    const delta = Math.max(0, gam.xp - previousXp);
+    if (delta > 0) {
+      memoryDb.xpTransactions.unshift({
+        id: `xp-tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        userId,
+        amount: delta,
+        reason: (reason as any) || 'QUESTION_CORRECT',
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     saveDbToDisk();
     return { xp: gam.xp, level: gam.level };

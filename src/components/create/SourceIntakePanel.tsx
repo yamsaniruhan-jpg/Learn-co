@@ -26,17 +26,6 @@ import {
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { uploadUserFile, auth } from '../../services/firebaseClient';
-import { CreatorClient } from '../../services/creatorClient';
-
-/** Read a picked file into a data URI (base64) for real document extraction. */
-function readFileAsDataUri(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error || new Error('File read failed'));
-    reader.readAsDataURL(file);
-  });
-}
 
 interface SourceIntakePanelProps {
   onGenerate: (params: GenerateResourceRequest) => Promise<void>;
@@ -67,16 +56,8 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   const [uploadedFile, setUploadedFile] = useState<{
     name: string;
     size: number;
-    /** Base64 data URI (or storage URL) used for upload/backup. */
     base64Data?: string;
   } | null>(null);
-  // The real bytes of the picked file, kept so PDF text can be extracted rather
-  // than described with a placeholder. Storage upload URLs are not readable by
-  // the extractor, so the local data URI is the source of truth here.
-  const [uploadedFileDataUri, setUploadedFileDataUri] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const showUploadError = (message: string) => setUploadError(message);
 
   const [subjectId, setSubjectId] = useState<SubjectId>('math');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
@@ -164,35 +145,33 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     if (!file) return;
     setIsUploading(true);
     try {
-      // Read the bytes locally first: extraction needs the actual document, and
-      // Firebase Storage URLs are not fetchable by the extractor.
-      const dataUri = await readFileAsDataUri(file);
-      setUploadedFileDataUri(dataUri);
-
-      try {
-        const userId = auth.currentUser?.uid || 'user-alex-001';
-        const downloadUrl = await uploadUserFile(userId, file);
-        setUploadedFile({
-          name: file.name,
-          size: file.size,
-          base64Data: downloadUrl,
-        });
-      } catch (err) {
-        console.warn('Firebase Storage upload unavailable, keeping local copy:', err);
-        setUploadedFile({
-          name: file.name,
-          size: file.size,
-          base64Data: dataUri,
-        });
-      }
-
+      const userId = auth.currentUser?.uid;
+      if (!userId) throw new Error('Firebase user not signed in; using local reader.');
+      const downloadUrl = await uploadUserFile(userId, file);
+      setUploadedFile({
+        name: file.name,
+        size: file.size,
+        base64Data: downloadUrl,
+      });
+      setUrlInput(downloadUrl);
       if (!title) {
         setTitle(file.name.replace(/\.[^/.]+$/, ''));
       }
     } catch (err) {
-      console.error('Could not read the selected file:', err);
-      setUploadedFile(null);
-      setUploadedFileDataUri(null);
+      console.warn('Firebase Storage upload failed, falling back to local reader:', err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setUploadedFile({
+          name: file.name,
+          size: file.size,
+          base64Data: base64,
+        });
+        if (!title) {
+          setTitle(file.name.replace(/\.[^/.]+$/, ''));
+        }
+      };
+      reader.readAsDataURL(file);
     } finally {
       setIsUploading(false);
     }
@@ -222,11 +201,8 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     let sourceText = textContent;
     let sourceUrl = urlInput;
 
-    // PDFs are uploaded as real bytes so the server can extract the text layer.
-    // Text is only sent when the document itself is unavailable (e.g. the user
-    // pasted content directly), never as a stand-in description of a file.
     if (sourceType === 'pdf' && uploadedFile) {
-      sourceText = '';
+      sourceText = `PDF Document: ${uploadedFile.name} (Uploaded content buffer)`;
     }
 
     const payload: GenerateResourceRequest = {
@@ -244,34 +220,6 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
         includeBloomTaxonomy,
       },
     };
-
-    if (sourceType === 'pdf' && uploadedFile) {
-      if (!uploadedFileDataUri) {
-        showUploadError('That file could not be read. Please pick it again.');
-        return;
-      }
-      let created: { id: string };
-      try {
-        created = await CreatorClient.createSource({
-          title: payload.title,
-          sourceType: 'pdf',
-          fileName: uploadedFile.name,
-          fileSize: uploadedFile.size,
-          fileBase64: uploadedFileDataUri,
-        });
-      } catch (err: any) {
-        showUploadError(err?.message || 'Could not process that document.');
-        return;
-      }
-      // The source now holds the extracted text layer; synthesize from it.
-      await onGenerate({
-        ...payload,
-        sourceType: 'pdf',
-        sourceText: undefined,
-        sourceId: created.id,
-      });
-      return;
-    }
 
     await onGenerate(payload);
   };
@@ -359,24 +307,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
               ref={fileInputRef}
               type="file"
               accept=".pdf,.doc,.docx,.txt"
-              onChange={(e) => {
-                setUploadError(null);
-                if (e.target.files && e.target.files[0]) {
-                  void handleFileChange(e.target.files[0]);
-                }
-              }}
+              onChange={(e) => e.target.files && handleFileChange(e.target.files[0])}
               className="hidden"
             />
-
-            {uploadError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-[11px] sm:text-xs text-red-700 dark:text-red-300"
-              >
-                <X className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                <span>{uploadError}</span>
-              </div>
-            )}
 
             {!uploadedFile ? (
               <div

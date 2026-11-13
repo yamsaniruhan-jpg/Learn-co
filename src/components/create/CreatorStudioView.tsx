@@ -58,6 +58,10 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   // Modals state
   const [editingResource, setEditingResource] = useState<CreatorResource | null>(null);
   const [exportingResource, setExportingResource] = useState<CreatorResource | null>(null);
+  const [pendingDeleteTarget, setPendingDeleteTarget] = useState<{
+    type: 'resource' | 'source';
+    id: string;
+  } | null>(null);
 
   // Alert/Toast feedback
   const [toastMessage, setToastMessage] = useState<{
@@ -147,32 +151,39 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   };
 
   // Delete resource
-  const handleDeleteResource = async (resourceId: string) => {
-    if (!window.confirm('Are you sure you want to delete this resource artifact?')) {
-      return;
-    }
-    try {
-      await CreatorClient.deleteResource(resourceId);
-      setResources((prev) => prev.filter((r) => r.id !== resourceId));
-      if (activeResource?.id === resourceId) {
-        const remaining = resources.filter((r) => r.id !== resourceId);
-        setActiveResource(remaining.length > 0 ? remaining[0] : null);
-      }
-      showToast('Resource artifact deleted.');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to delete resource.', 'error');
-    }
+  const handleDeleteResource = (resourceId: string) => {
+    setPendingDeleteTarget({ type: 'resource', id: resourceId });
   };
 
   // Delete source
-  const handleDeleteSource = async (sourceId: string) => {
-    if (!window.confirm('Delete this source document?')) return;
-    try {
-      await CreatorClient.deleteSource(sourceId);
-      setSources((prev) => prev.filter((s) => s.id !== sourceId));
-      showToast('Source document deleted.');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to delete source.', 'error');
+  const handleDeleteSource = (sourceId: string) => {
+    setPendingDeleteTarget({ type: 'source', id: sourceId });
+  };
+
+  const confirmPendingDelete = async () => {
+    if (!pendingDeleteTarget) return;
+    const { type, id } = pendingDeleteTarget;
+    setPendingDeleteTarget(null);
+    if (type === 'resource') {
+      try {
+        await CreatorClient.deleteResource(id);
+        const remaining = resources.filter((r) => r.id !== id);
+        setResources(remaining);
+        if (activeResource?.id === id) {
+          setActiveResource(remaining.length > 0 ? remaining[0] : null);
+        }
+        showToast('Resource artifact deleted.');
+      } catch (err: any) {
+        showToast(err.message || 'Failed to delete resource.', 'error');
+      }
+    } else {
+      try {
+        await CreatorClient.deleteSource(id);
+        setSources((prev) => prev.filter((s) => s.id !== id));
+        showToast('Source document deleted.');
+      } catch (err: any) {
+        showToast(err.message || 'Failed to delete source.', 'error');
+      }
     }
   };
 
@@ -420,6 +431,27 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
           isOpen={!!exportingResource}
           onClose={() => setExportingResource(null)}
         />
+      )}
+
+      {pendingDeleteTarget && (
+        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+              {pendingDeleteTarget.type === 'resource' ? 'Delete Resource Artifact?' : 'Delete Source Document?'}
+            </h3>
+            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
+              This action permanently removes the selected {pendingDeleteTarget.type} from your studio library.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setPendingDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" size="sm" onClick={confirmPendingDelete}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

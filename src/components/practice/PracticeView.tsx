@@ -31,11 +31,24 @@ import {
   Award,
 } from 'lucide-react';
 
-interface PracticeViewProps {
-  onOpenCopilotWithContext: (context: string) => void;
+export interface PracticeNavigationContext {
+  subjectId?: SubjectId;
+  topicId?: string;
+  conceptId?: string;
+  title?: string;
 }
 
-export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithContext }) => {
+interface PracticeViewProps {
+  onOpenCopilotWithContext: (context: string) => void;
+  initialPracticeContext?: PracticeNavigationContext | null;
+  onConsumePracticeContext?: () => void;
+}
+
+export const PracticeView: React.FC<PracticeViewProps> = ({
+  onOpenCopilotWithContext,
+  initialPracticeContext,
+  onConsumePracticeContext,
+}) => {
   const { gamification, refreshUserData } = useAuth();
   const [activeTab, setActiveTab] = useState<'hub' | 'recommendations' | 'weak_topics' | 'history' | 'bank'>('hub');
   
@@ -49,7 +62,28 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [modalSubject, setModalSubject] = useState<SubjectId>('math');
   const [modalTopic, setModalTopic] = useState<string | undefined>(undefined);
+  const [modalConcept, setModalConcept] = useState<string | undefined>(undefined);
   const [modalTitle, setModalTitle] = useState<string>('Calibrated 5-Question Ladder');
+
+  // Consume navigation context (e.g. from Intelligence / Mistake Notebook / Dashboard)
+  useEffect(() => {
+    if (initialPracticeContext) {
+      const subj = initialPracticeContext.subjectId || 'math';
+      setModalSubject(subj);
+      setModalTopic(initialPracticeContext.topicId);
+      setModalConcept(initialPracticeContext.conceptId);
+      setModalTitle(
+        initialPracticeContext.title ||
+          (initialPracticeContext.topicId
+            ? `Targeted Drill: ${initialPracticeContext.topicId}`
+            : `${subj.toUpperCase()} Calibrated 5-Question Ladder`)
+      );
+      setActivePracticeSession(null);
+      setSessionResults(null);
+      setIsConfigModalOpen(true);
+      onConsumePracticeContext?.();
+    }
+  }, [initialPracticeContext, onConsumePracticeContext]);
 
   // Creator Studio transfer session state
   const [creatorImportSession, setCreatorImportSession] = useState<{
@@ -149,6 +183,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
   const handleStartQuickSubject = (subjectId: SubjectId) => {
     setModalSubject(subjectId);
     setModalTopic(undefined);
+    setModalConcept(undefined);
     setModalTitle(`${subjectId.toUpperCase()} Calibrated 5-Question Ladder`);
     setIsConfigModalOpen(true);
   };
@@ -553,6 +588,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({ onOpenCopilotWithCon
         onStart={handleLaunchSession}
         initialSubjectId={modalSubject}
         initialTopicId={modalTopic}
+        initialConceptId={modalConcept}
         initialTitle={modalTitle}
         dailyQuotaRemaining={dailyQuotaRemaining}
       />

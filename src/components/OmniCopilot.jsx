@@ -9,6 +9,13 @@ const MODES = [
   { id: 'mentor', icon: '🎯', label: 'Mentor' },
 ];
 
+const MODE_MAP = {
+  general: 'socratic_hint',
+  learner: 'socratic_hint',
+  creator: 'conceptual_explainer',
+  mentor: 'exam_solver',
+};
+
 export default function OmniCopilot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -24,26 +31,30 @@ export default function OmniCopilot() {
   useEffect(scrollToBottom, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+    const textToSend = input.trim();
+    if (!textToSend || isLoading) return;
 
-    const userMessage = { role: 'user', content: input, timestamp: Date.now() };
+    const userMessage = { role: 'user', content: textToSend, timestamp: Date.now() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
+      const mappedMode = MODE_MAP[mode] || 'socratic_hint';
       const res = await apiCall('/copilot/chat', {
         method: 'POST',
-        body: JSON.stringify({ message: input, mode }),
+        body: JSON.stringify({ prompt: textToSend, mode: mappedMode }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
+        const replyText =
+          data.message?.content ?? data.response ?? data.reply ?? 'No response received.';
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: data.response || data.reply,
-          model: data.model,
+          content: replyText,
+          model: data.message?.modelUsed || data.model,
           timestamp: Date.now(),
         }]);
       } else {
@@ -75,7 +86,7 @@ export default function OmniCopilot() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-50 cursor-pointer"
+        className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-14 h-14 bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40 cursor-pointer"
         aria-label="Open AI Copilot"
       >
         🤖
@@ -84,14 +95,14 @@ export default function OmniCopilot() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white dark:bg-[#2A2647] rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200 dark:border-[#3D3861] overflow-hidden">
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-[calc(100vw-2rem)] sm:w-96 h-[520px] sm:h-[600px] bg-white dark:bg-[#2A2647] rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200 dark:border-[#3D3861] overflow-hidden">
       {/* Header */}
       <div className="bg-[#6C5CE7] text-white p-4 flex justify-between items-center">
         <div>
           <h3 className="font-bold">Omni Copilot</h3>
           <p className="text-xs opacity-80">AI-powered assistant</p>
         </div>
-        <button onClick={() => setIsOpen(false)} className="text-xl hover:opacity-70 cursor-pointer">✕</button>
+        <button onClick={() => setIsOpen(false)} className="text-xl hover:opacity-70 cursor-pointer" aria-label="Close AI Copilot">✕</button>
       </div>
 
       {/* Mode Selector */}

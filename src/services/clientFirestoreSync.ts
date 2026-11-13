@@ -15,9 +15,11 @@ export async function syncClientToFirestore(
 ): Promise<void> {
   try {
     const currentAuthUser = auth?.currentUser;
-    const uid = user?.id || currentAuthUser?.uid;
-    if (!uid) return;
+    const backendUid = user?.id || currentAuthUser?.uid;
+    const firestoreUid = currentAuthUser?.uid;
+    if (!backendUid && !firestoreUid) return;
 
+    const uid = backendUid || firestoreUid!;
     const email = currentAuthUser?.email || user?.email || profile?.email || '';
     const displayName =
       profile?.displayName ||
@@ -32,22 +34,25 @@ export async function syncClientToFirestore(
       `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || uid)}`;
 
     const now = new Date().toISOString();
-    const xpVal = typeof gamification?.xp === 'number' ? gamification.xp : 0;
-    const levelVal = typeof gamification?.level === 'number' ? gamification.level : calculateLevelFromXp(xpVal).level;
-    const streakVal = typeof gamification?.currentStreak === 'number' ? gamification.currentStreak : 0;
+    const xpVal = typeof gamification?.xp === 'number' ? Math.max(0, gamification.xp) : 0;
+    const levelVal =
+      typeof gamification?.level === 'number' && gamification.level >= 1
+        ? gamification.level
+        : calculateLevelFromXp(xpVal).level;
+    const streakVal = typeof gamification?.currentStreak === 'number' ? Math.max(0, gamification.currentStreak) : 0;
 
-    // 1. Direct Firestore writes if db is initialized
-    if (db) {
-      // 1. Sync User Document to 'users' collection
+    // 1. Direct Firestore writes only when Firebase Auth user is signed in (matches firestore.rules isOwner)
+    if (db && firestoreUid) {
+      // Sync User Document to 'users' collection
       try {
-        const userDocRef = doc(db, 'users', uid);
+        const userDocRef = doc(db, 'users', firestoreUid);
         await setDoc(
           userDocRef,
           {
-            id: uid,
+            id: firestoreUid,
             email,
             displayName,
-            authProvider: user?.authProvider || (currentAuthUser ? 'firebase' : 'email'),
+            authProvider: user?.authProvider || 'firebase',
             xp: xpVal,
             level: levelVal,
             updatedAt: now,
@@ -58,19 +63,18 @@ export async function syncClientToFirestore(
         console.debug('[ClientFirestoreSync] Note on users collection sync:', e);
       }
 
-      // 2. Sync Public Profile Document to 'public_profiles' collection
+      // Sync Public Profile Document to 'public_profiles' collection
       try {
-        const profileDocRef = doc(db, 'public_profiles', uid);
+        const profileDocRef = doc(db, 'public_profiles', firestoreUid);
         await setDoc(
           profileDocRef,
           {
-            userId: uid,
-            email,
-            displayName,
+            userId: firestoreUid,
+            displayName: displayName.slice(0, 120) || 'Scholar',
             avatarUrl,
             targetExam: profile?.targetExam || 'STEM Mastery',
             targetScore: profile?.targetScore || '100%',
-            bio: profile?.bio || '',
+            bio: (profile?.bio || '').slice(0, 1000),
             xp: xpVal,
             level: levelVal,
             updatedAt: now,
@@ -81,14 +85,14 @@ export async function syncClientToFirestore(
         console.debug('[ClientFirestoreSync] Note on public_profiles collection sync:', e);
       }
 
-      // 3. Sync Leaderboard Document to 'leaderboard' collection (keeps account in leaderboard forever)
+      // Sync Leaderboard Document to 'leaderboard' collection
       try {
-        const leaderboardDocRef = doc(db, 'leaderboard', uid);
+        const leaderboardDocRef = doc(db, 'leaderboard', firestoreUid);
         await setDoc(
           leaderboardDocRef,
           {
-            userId: uid,
-            displayName,
+            userId: firestoreUid,
+            displayName: displayName.slice(0, 120) || 'Scholar',
             avatarUrl,
             xp: xpVal,
             level: levelVal,
@@ -103,25 +107,27 @@ export async function syncClientToFirestore(
       }
     }
 
-    // 2. Dual-write to backend dataset to ensure permanent persistence across server restarts
+    // 2. Dual-write to backend dataset when authenticated to ensure permanent persistence across server restarts
     try {
       const token = localStorage.getItem('learnco_auth_token');
-      await fetch('/api/leaderboard/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          userId: uid,
-          email,
-          displayName,
-          avatarUrl,
-          xp: xpVal,
-          level: levelVal,
-          streak: streakVal,
-        }),
-      });
+      if (token) {
+        await fetch('/api/leaderboard/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId: uid,
+            email,
+            displayName,
+            avatarUrl,
+            xp: xpVal,
+            level: levelVal,
+            streak: streakVal,
+          }),
+        });
+      }
     } catch (_) {}
   } catch (err: any) {
     console.debug('[ClientFirestoreSync] Global sync note:', err?.message || err);
@@ -144,29 +150,32 @@ export async function syncXpToFirestoreAndBackend(
       if (saved) storedUser = JSON.parse(saved);
     } catch (_) {}
 
-    const uid = storedUser?.id || currentAuthUser?.uid;
-    if (!uid) return;
+    const firestoreUid = currentAuthUser?.uid;
+    const uid = storedUser?.id || firestoreUid;
+    if (!uid && !firestoreUid) return;
 
     const email = currentAuthUser?.email || storedUser?.email || '';
-    const displayName =
+    const displayName = (
       storedUser?.name ||
       storedUser?.displayName ||
       currentAuthUser?.displayName ||
-      (email ? email.split('@')[0] : 'Scholar');
+      (email ? email.split('@')[0] : 'Scholar')
+    ).slice(0, 120);
 
-    const levelInfo = calculateLevelFromXp(newTotalXp);
+    const safeXp = Math.max(0, Math.round(Number.isFinite(newTotalXp) ? newTotalXp : 0));
+    const levelInfo = calculateLevelFromXp(safeXp);
     const now = new Date().toISOString();
 
-    // 1. Update Firestore leaderboard doc directly
-    if (db) {
+    // 1. Update Firestore leaderboard doc directly only when Firebase Auth user is active
+    if (db && firestoreUid) {
       try {
-        const lbDocRef = doc(db, 'leaderboard', uid);
+        const lbDocRef = doc(db, 'leaderboard', firestoreUid);
         await setDoc(
           lbDocRef,
           {
-            userId: uid,
+            userId: firestoreUid,
             displayName,
-            xp: newTotalXp,
+            xp: safeXp,
             level: levelInfo.level,
             updatedAt: now,
           },
@@ -177,21 +186,22 @@ export async function syncXpToFirestoreAndBackend(
       }
     }
 
-    // 2. Update backend dataset
+    // 2. Update backend dataset when authenticated
     try {
       const token = localStorage.getItem('learnco_auth_token');
-      await fetch('/api/leaderboard/xp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          userId: uid,
-          xp: newTotalXp,
-          reason,
-        }),
-      });
+      if (token) {
+        await fetch('/api/leaderboard/xp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            xp: newTotalXp,
+            reason,
+          }),
+        });
+      }
     } catch (_) {}
   } catch (err: any) {
     console.debug('[ClientFirestoreSync] Failed to sync XP update:', err?.message || err);

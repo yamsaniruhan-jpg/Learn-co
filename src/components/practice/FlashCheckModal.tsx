@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Zap,
   Clock,
@@ -93,6 +93,7 @@ export const FlashCheckModal: React.FC<FlashCheckModalProps> = ({
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);
   const [isFinished, setIsFinished] = useState(false);
+  const hasCompletedRef = useRef(false);
 
   const questions = SAMPLE_FLASH_QUESTIONS;
   const currentQ = questions[currentIndex];
@@ -124,8 +125,19 @@ export const FlashCheckModal: React.FC<FlashCheckModalProps> = ({
       setScore(0);
       setTimeLeft(60);
       setIsFinished(false);
+      hasCompletedRef.current = false;
     }
   }, [isOpen]);
+
+  // Fire onComplete exactly once when quiz finishes (manual or timer expiration)
+  useEffect(() => {
+    if (isOpen && isFinished && !hasCompletedRef.current) {
+      hasCompletedRef.current = true;
+      if (onComplete) {
+        onComplete(15 + score * 5);
+      }
+    }
+  }, [isOpen, isFinished, score, onComplete]);
 
   if (!isOpen) return null;
 
@@ -152,9 +164,6 @@ export const FlashCheckModal: React.FC<FlashCheckModalProps> = ({
       setIsAnswered(false);
     } else {
       setIsFinished(true);
-      if (onComplete) {
-        onComplete(15 + score * 5);
-      }
     }
   };
 

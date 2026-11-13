@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenFlashCheck && (
             <button
               onClick={onOpenFlashCheck}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
+              className="hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
               title="Start 60-second Spaced Retention Flash Check (+15 XP)"
             >
               <Zap className="w-4 h-4 fill-[#FFB84D] text-[#FFB84D]" />
@@ -131,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Zen Focus Timer Button */}
           <button
             onClick={() => setActiveTab('focus')}
-            className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'focus'
                 ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
                 : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
@@ -145,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick User Guide Button */}
           <button
             onClick={() => setActiveTab('user-guide')}
-            className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'user-guide' || activeTab === 'guide'
                 ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
                 : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'

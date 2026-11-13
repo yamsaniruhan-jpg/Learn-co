@@ -54,6 +54,7 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
   const [dashboardData, setDashboardData] = useState<LearnerAnalyticsDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<SubjectId>('math');
   const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrackId>('jee_advanced');
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState<boolean>(false);
@@ -66,6 +67,7 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
 
   const fetchDashboard = async (silent = false) => {
     try {
+      setLoadError(null);
       if (!silent) setIsLoading(true);
       else setIsRefreshing(true);
 
@@ -74,8 +76,9 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
       if (data.examReadiness?.examTrackId) {
         setSelectedExamTrack(data.examReadiness.examTrackId);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load learner analytics:', err);
+      setLoadError(err?.message || 'Unable to load analytics from server.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -115,176 +118,83 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
     );
   }
 
-  const fallbackData: LearnerAnalyticsDashboardData = {
+  const emptyDashboardData: LearnerAnalyticsDashboardData = {
     userStatistics: {
-      userId: user?.id || 'learner',
-      totalAttempts: 142,
-      completedAttempts: 142,
-      correctAnswers: 116,
-      incorrectAnswers: 26,
+      userId: user?.id || 'guest',
+      totalAttempts: 0,
+      completedAttempts: 0,
+      correctAnswers: 0,
+      incorrectAnswers: 0,
       abandonedCount: 0,
-      accuracyPercentage: 82,
-      totalXp: user?.xp || 420,
-      currentStreak: 3,
-      longestStreak: 7,
-      totalStudyTimeMinutes: 185,
+      accuracyPercentage: 0,
+      totalXp: user?.xp || 0,
+      currentStreak: user?.currentStreak || 0,
+      longestStreak: user?.longestStreak || 0,
+      totalStudyTimeMinutes: 0,
       subjectBreakdown: {
-        math: { attempted: 45, correct: 40, accuracy: 88 },
-        cs: { attempted: 38, correct: 34, accuracy: 90 },
-        physics: { attempted: 30, correct: 22, accuracy: 74 },
-        chemistry: { attempted: 18, correct: 13, accuracy: 71 },
-        biology: { attempted: 11, correct: 7, accuracy: 80 },
-        english: { attempted: 20, correct: 18, accuracy: 90 },
-        data_science: { attempted: 15, correct: 13, accuracy: 87 },
+        math: { attempted: 0, correct: 0, accuracy: 0 },
+        cs: { attempted: 0, correct: 0, accuracy: 0 },
+        physics: { attempted: 0, correct: 0, accuracy: 0 },
+        chemistry: { attempted: 0, correct: 0, accuracy: 0 },
+        biology: { attempted: 0, correct: 0, accuracy: 0 },
+        english: { attempted: 0, correct: 0, accuracy: 0 },
+        data_science: { attempted: 0, correct: 0, accuracy: 0 },
       },
-      recentActivity: [
-        { date: new Date().toISOString().split('T')[0], questionsSolved: 5, xpEarned: 150 },
-      ],
+      recentActivity: [],
     },
-    overallMasteryScore: 78,
-    overallAccuracy: 82,
-    totalAttemptsCount: 142,
+    overallMasteryScore: 0,
+    overallAccuracy: 0,
+    totalAttemptsCount: 0,
     masterySummary: {
-      totalTracked: 62,
-      masteredCount: 34,
-      developingCount: 18,
+      totalTracked: 0,
+      masteredCount: 0,
+      developingCount: 0,
       weakCount: 0,
-      notStartedCount: 10,
-      avgMasteryScore: 78,
-      overallAccuracy: 82,
+      notStartedCount: 0,
+      avgMasteryScore: 0,
+      overallAccuracy: 0,
     },
-    subjectSummaries: [
-      {
-        subjectId: 'math',
-        name: 'Mathematics',
-        color: 'indigo',
-        totalAttempts: 45,
-        accuracyPercentage: 88,
-        masteryPercentage: 84,
-        conceptsTracked: 15,
-        conceptsMastered: 12,
-        conceptsDeveloping: 3,
-        conceptsWeak: 0,
-        strongTopics: ['Differential Calculus', 'Linear Algebra'],
-        developingTopics: ['Integration Techniques'],
-        weakTopics: [],
-        recentActivityCount: 12,
-        improvementTrend: 'IMPROVING',
-        decayRiskCount: 0,
-      },
-      {
-        subjectId: 'cs',
-        name: 'Computer Science',
-        color: 'blue',
-        totalAttempts: 38,
-        accuracyPercentage: 90,
-        masteryPercentage: 88,
-        conceptsTracked: 12,
-        conceptsMastered: 10,
-        conceptsDeveloping: 2,
-        conceptsWeak: 0,
-        strongTopics: ['Dynamic Programming', 'Graph Theory'],
-        developingTopics: ['System Design'],
-        weakTopics: [],
-        recentActivityCount: 10,
-        improvementTrend: 'IMPROVING',
-        decayRiskCount: 0,
-      },
-      {
-        subjectId: 'physics',
-        name: 'Physics',
-        color: 'amber',
-        totalAttempts: 30,
-        accuracyPercentage: 74,
-        masteryPercentage: 72,
-        conceptsTracked: 10,
-        conceptsMastered: 6,
-        conceptsDeveloping: 3,
-        conceptsWeak: 1,
-        strongTopics: ['Classical Mechanics'],
-        developingTopics: ['Thermodynamics'],
-        weakTopics: ['Electromagnetism'],
-        recentActivityCount: 8,
-        improvementTrend: 'STABLE',
-        decayRiskCount: 1,
-      },
-      {
-        subjectId: 'chemistry',
-        name: 'Chemistry',
-        color: 'emerald',
-        totalAttempts: 18,
-        accuracyPercentage: 71,
-        masteryPercentage: 70,
-        conceptsTracked: 8,
-        conceptsMastered: 4,
-        conceptsDeveloping: 4,
-        conceptsWeak: 0,
-        strongTopics: ['Organic Synthesis'],
-        developingTopics: ['Chemical Kinetics'],
-        weakTopics: [],
-        recentActivityCount: 5,
-        improvementTrend: 'STABLE',
-        decayRiskCount: 0,
-      },
-      {
-        subjectId: 'biology',
-        name: 'Biology',
-        color: 'rose',
-        totalAttempts: 11,
-        accuracyPercentage: 80,
-        masteryPercentage: 76,
-        conceptsTracked: 5,
-        conceptsMastered: 2,
-        conceptsDeveloping: 3,
-        conceptsWeak: 0,
-        strongTopics: ['Cell Biology'],
-        developingTopics: ['Genetics'],
-        weakTopics: [],
-        recentActivityCount: 3,
-        improvementTrend: 'IMPROVING',
-        decayRiskCount: 0,
-      },
-    ],
+    subjectSummaries: [],
     nextBestActions: [],
     mistakeAnalytics: {
-      totalMistakes: 26,
-      unresolvedCount: 8,
-      resolvedCount: 18,
+      totalMistakes: 0,
+      unresolvedCount: 0,
+      resolvedCount: 0,
       repeatedMistakeConcepts: [],
-      subjectBreakdown: { math: 6, cs: 4, physics: 9, chemistry: 5, biology: 2, english: 1, data_science: 1 },
-      difficultyDistribution: { easy: 2, easy_medium: 5, medium: 10, medium_hard: 6, hard: 3 },
-      questionTypeDistribution: { multiple_choice: 18, numerical: 5, multi_select: 3 },
-      frequentTrapTypes: ['Sign Errors', 'Boundary Conditions'],
+      subjectBreakdown: { math: 0, cs: 0, physics: 0, chemistry: 0, biology: 0, english: 0, data_science: 0 },
+      difficultyDistribution: { easy: 0, easy_medium: 0, medium: 0, medium_hard: 0, hard: 0 },
+      questionTypeDistribution: { multiple_choice: 0, numerical: 0, multi_select: 0 },
+      frequentTrapTypes: [],
     },
     mistakeSummary: {
-      totalMistakes: 26,
-      unresolvedCount: 8,
-      resolvedCount: 18,
+      totalMistakes: 0,
+      unresolvedCount: 0,
+      resolvedCount: 0,
       repeatedMistakeConcepts: [],
-      subjectBreakdown: { math: 6, cs: 4, physics: 9, chemistry: 5, biology: 2, english: 1, data_science: 1 },
-      difficultyDistribution: { easy: 2, easy_medium: 5, medium: 10, medium_hard: 6, hard: 3 },
-      questionTypeDistribution: { multiple_choice: 18, numerical: 5, multi_select: 3 },
-      frequentTrapTypes: ['Sign Errors', 'Boundary Conditions'],
+      subjectBreakdown: { math: 0, cs: 0, physics: 0, chemistry: 0, biology: 0, english: 0, data_science: 0 },
+      difficultyDistribution: { easy: 0, easy_medium: 0, medium: 0, medium_hard: 0, hard: 0 },
+      questionTypeDistribution: { multiple_choice: 0, numerical: 0, multi_select: 0 },
+      frequentTrapTypes: [],
     },
     examReadiness: {
       examTrack: selectedExamTrack,
-      examName: 'Advanced STEM Mastery',
-      estimatedReadinessScore: 84,
-      readinessBand: 'COMPETITIVE',
-      syllabusCoveragePercent: 78,
-      conceptMasteryPercent: 82,
-      practiceVolumeScore: 85,
-      accuracyScore: 82,
+      examName: 'STEM Mastery Readiness',
+      estimatedReadinessScore: 0,
+      readinessBand: 'FOUNDATIONAL',
+      syllabusCoveragePercent: 0,
+      conceptMasteryPercent: 0,
+      practiceVolumeScore: 0,
+      accuracyScore: 0,
       difficultyTierDistribution: {
-        easy: 40,
-        medium: 70,
-        hard: 32,
+        easy: 0,
+        medium: 0,
+        hard: 0,
       },
-      revisionConsistencyScore: 88,
-      keyStrengthAreas: ['Differential Calculus', 'Dynamic Programming', 'Classical Mechanics'],
-      criticalGaps: ['Electromagnetism', 'Stochastic Systems'],
-      projectedPacingDaysRemaining: 45,
-      summaryNarrative: 'Solid mastery trajectory with strong foundational calculus and algorithmic skills.',
+      revisionConsistencyScore: 0,
+      keyStrengthAreas: [],
+      criticalGaps: [],
+      projectedPacingDaysRemaining: 0,
+      summaryNarrative: 'Complete a calibrated practice ladder to generate empirical exam readiness metrics.',
     },
     masteryList: [],
     progressTrends: {
@@ -292,11 +202,11 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
       weekly: [],
       monthly: [],
     },
-    isColdStart: false,
+    isColdStart: true,
     generatedAt: new Date().toISOString(),
   };
 
-  const data = dashboardData || fallbackData;
+  const data = dashboardData || emptyDashboardData;
   const masteriesList = data?.masteryList || [];
 
   // Filtered concepts in the Mastery Explorer tab
@@ -378,6 +288,24 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Analytics Fetch Error Banner */}
+      {loadError && (
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300 font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{loadError}</span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => fetchDashboard(false)}
+            className="text-xs shrink-0"
+          >
+            Retry Analytics
+          </Button>
+        </div>
+      )}
 
       {/* Top 4 KPI Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

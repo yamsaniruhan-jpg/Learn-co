@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { QuestionBankItem, PracticeSessionConfig } from '../../types/curriculum';
 import { AuthClient } from '../../services/authClient';
 import { LearningClient } from '../../services/learningClient';
+import { useAuth } from '../../context/AuthContext';
 import { sounds } from '../../utils/sound';
 import { recordDailyActivity } from '../../utils/streakManager';
+import { OfflineStorageManager } from '../../utils/offlineStorage';
+import { syncLocalXpOnly } from '../../utils/xpManager';
 import confetti from 'canvas-confetti';
 import { FormattedMathText } from '../common/FormattedMathText';
 import {
@@ -50,6 +53,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
   onFinishSession,
   onExit,
 }) => {
+  const { updateGamificationState } = useAuth();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, any>>({});
   const [numericalInput, setNumericalInput] = useState<string>('');
@@ -57,6 +61,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
   
   const [isSubmitted, setIsSubmitted] = useState<Record<string, boolean>>({});
   const [submissionFeedback, setSubmissionFeedback] = useState<Record<string, any>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [hintsRevealed, setHintsRevealed] = useState<Record<string, number>>({});
   const [aiHints, setAiHints] = useState<Record<string, string[]>>({});
   const [isLoadingAiHint, setIsLoadingAiHint] = useState<boolean>(false);
@@ -155,15 +160,86 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
     }
   };
 
+  const persistLocalAttemptAndMastery = (
+    q: QuestionBankItem,
+    rawAnswer: any,
+    isCorrect: boolean,
+    timeSpent: number,
+    hintsCount: number
+  ) => {
+    try {
+      const savedAttempts = JSON.parse(localStorage.getItem('learnco_attempts') || '[]');
+      const nextAttempts = [
+        {
+          id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          questionId: q.id,
+          conceptId: q.conceptId || q.topicId,
+          subjectId: q.subjectId,
+          questionText: q.questionText,
+          selectedAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : String(rawAnswer),
+          correctAnswer: Array.isArray(q.correctAnswer)
+            ? q.correctAnswer.join(', ')
+            : String(q.correctAnswer),
+          isCorrect,
+          solvingTimeSeconds: timeSpent,
+          hintsRevealedCount: hintsCount,
+          submittedAt: new Date().toISOString(),
+        },
+        ...savedAttempts,
+      ].slice(0, 200);
+      localStorage.setItem('learnco_attempts', JSON.stringify(nextAttempts));
+
+      const savedMasteries = JSON.parse(localStorage.getItem('learnco_masteries') || '[]');
+      const cid = q.conceptId || q.topicId || `${q.subjectId}-concept`;
+      const existingIdx = savedMasteries.findIndex((m: any) => m.conceptId === cid);
+      if (existingIdx >= 0) {
+        const cur = savedMasteries[existingIdx];
+        const attemptsCount = (cur.attemptsCount || 0) + 1;
+        const correctCount = (cur.correctCount || 0) + (isCorrect ? 1 : 0);
+        const accuracy = Math.round((correctCount / attemptsCount) * 100);
+        savedMasteries[existingIdx] = {
+          ...cur,
+          attemptsCount,
+          correctCount,
+          accuracy,
+          masteryScore: Math.max(0, Math.min(100, Math.round(accuracy * 0.7 + 30))),
+          retentionStrength: isCorrect
+            ? Math.min(100, (cur.retentionStrength || 70) + 8)
+            : Math.max(30, (cur.retentionStrength || 70) - 10),
+          isWeakArea: accuracy < 65,
+          lastPracticedAt: new Date().toISOString(),
+        };
+      } else {
+        savedMasteries.push({
+          conceptId: cid,
+          conceptTitle: q.topicId || cid,
+          subjectId: q.subjectId,
+          attemptsCount: 1,
+          correctCount: isCorrect ? 1 : 0,
+          accuracy: isCorrect ? 100 : 0,
+          masteryScore: isCorrect ? 85 : 35,
+          retentionStrength: isCorrect ? 90 : 50,
+          difficultyResilience: isCorrect ? 80 : 40,
+          recencyFactor: 100,
+          isWeakArea: !isCorrect,
+          lastPracticedAt: new Date().toISOString(),
+        });
+      }
+      localStorage.setItem('learnco_masteries', JSON.stringify(savedMasteries));
+      window.dispatchEvent(new CustomEvent('learnco_attempts_updated'));
+    } catch (_) {}
+  };
+
   const handleSubmitAttempt = async () => {
     const rawAnswer = selectedAnswers[questionId];
     if (rawAnswer === undefined || rawAnswer === '' || (Array.isArray(rawAnswer) && rawAnswer.length === 0)) {
       return;
     }
 
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
-      // Evaluate locally first for rich representation
+      // Evaluate locally first for fallback & representation
       let isCorrect = false;
 
       if (currentQuestion.questionType === 'multiple_choice') {
@@ -187,34 +263,67 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           currentQuestion.correctAnswer.toString().trim().toLowerCase();
       }
 
-      const effectiveUserId = AuthClient.getCurrentUser()?.id || 'default_user';
+      const effectiveUserId = AuthClient.getCurrentUser()?.id || 'guest';
+      const token = AuthClient.getToken();
+      const timeSpent = timeSpentPerQuestion[questionId] || 15;
+      const hintsCount = hintsRevealed[questionId] || 0;
+
+      if (!token) {
+        setSubmitError('Please sign in to submit answers and earn verified XP.');
+        return;
+      }
 
       try {
         const submitRes = await fetch('/api/practice/submit-attempt', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${AuthClient.getToken()}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             questionId: currentQuestion.id,
-            selectedAnswer: rawAnswer.toString(),
+            selectedAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : rawAnswer.toString(),
             isCorrect,
-            timeSpentSeconds: timeSpentPerQuestion[questionId] || 15,
+            timeSpentSeconds: timeSpent,
             conceptId: currentQuestion.conceptId,
             topicId: currentQuestion.topicId,
             subjectId: currentQuestion.subjectId,
-            hintsUsedCount: hintsRevealed[questionId] || 0,
+            hintsUsedCount: hintsCount,
           }),
         });
 
-        const data = await submitRes.json();
+        const data = await submitRes.json().catch(() => ({}));
 
-        // Record daily streak activity in gamification system (works online and offline)
+        if (!submitRes.ok) {
+          // Do not fake success on client/auth/quota errors (400, 401, 403, 429)
+          if (submitRes.status < 500) {
+            setSubmitError(data.error || `Submission rejected (${submitRes.status}).`);
+            return;
+          }
+          throw new Error(data.error || `Server error (${submitRes.status})`);
+        }
+
+        const serverCorrect = typeof data.isCorrect === 'boolean' ? data.isCorrect : isCorrect;
+        const xpEarned = typeof data.xpEarned === 'number' ? data.xpEarned : (serverCorrect ? 5 : 0);
+
         const updatedStreak = recordDailyActivity(effectiveUserId, {
           questionsSolved: 1,
-          xpEarned: isCorrect ? (data.xpEarned || 15) : 5,
-          minutesStudied: Math.ceil((timeSpentPerQuestion[questionId] || 15) / 60),
+          xpEarned,
+          minutesStudied: Math.ceil(timeSpent / 60),
+        });
+
+        persistLocalAttemptAndMastery(currentQuestion, rawAnswer, serverCorrect, timeSpent, hintsCount);
+
+        if (typeof data.newTotalXp === 'number') {
+          syncLocalXpOnly(data.newTotalXp);
+        }
+        updateGamificationState({
+          ...(typeof data.newTotalXp === 'number' ? { xp: data.newTotalXp } : {}),
+          ...(typeof data.newLevel === 'number' ? { level: data.newLevel } : {}),
+          ...(typeof data.dailySolvedToday === 'number'
+            ? { dailyQuestionsSolvedToday: data.dailySolvedToday }
+            : {}),
+          currentStreak: data.currentStreak || updatedStreak.currentStreak,
         });
 
         try {
@@ -225,16 +334,16 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         setSubmissionFeedback((prev) => ({
           ...prev,
           [questionId]: {
-            isCorrect,
-            xpEarned: data.xpEarned || (isCorrect ? 15 : 5),
+            isCorrect: serverCorrect,
+            xpEarned,
             dailyQuotaRemaining: data.dailyQuotaRemaining,
             newStreak: data.currentStreak || updatedStreak.currentStreak,
           },
         }));
 
-        if (isCorrect) {
+        if (serverCorrect) {
           sounds.playSuccess();
-          setTotalXpAwarded((prev) => prev + (data.xpEarned || 15));
+          setTotalXpAwarded((prev) => prev + xpEarned);
           confetti({
             particleCount: 40,
             spread: 60,
@@ -243,13 +352,25 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         } else {
           sounds.playFailure();
         }
-      } catch (err) {
-        // Fallback local submission (offline mode)
+      } catch (_networkErr) {
+        // Offline / unreachable server fallback: queue attempt for later sync
+        OfflineStorageManager.saveOfflineAttempt({
+          questionId: currentQuestion.id,
+          subjectId: currentQuestion.subjectId,
+          topic: currentQuestion.topicId,
+          userAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : rawAnswer.toString(),
+          isCorrect,
+          timeSpentSeconds: timeSpent,
+        });
+
+        const fallbackXp = isCorrect ? 5 : 0;
         const updatedStreak = recordDailyActivity(effectiveUserId, {
           questionsSolved: 1,
-          xpEarned: isCorrect ? 15 : 5,
-          minutesStudied: Math.ceil((timeSpentPerQuestion[questionId] || 15) / 60),
+          xpEarned: fallbackXp,
+          minutesStudied: Math.ceil(timeSpent / 60),
         });
+
+        persistLocalAttemptAndMastery(currentQuestion, rawAnswer, isCorrect, timeSpent, hintsCount);
 
         try {
           window.dispatchEvent(new Event('learnco_streak_updated'));
@@ -260,15 +381,16 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           ...prev,
           [questionId]: {
             isCorrect,
-            xpEarned: isCorrect ? 15 : 5,
-            dailyQuotaRemaining: 24,
+            xpEarned: fallbackXp,
+            dailyQuotaRemaining: null,
             newStreak: updatedStreak.currentStreak,
+            queuedOffline: true,
           },
         }));
 
         if (isCorrect) {
           sounds.playSuccess();
-          setTotalXpAwarded((prev) => prev + 15);
+          setTotalXpAwarded((prev) => prev + fallbackXp);
           confetti({
             particleCount: 30,
             spread: 50,
@@ -677,7 +799,8 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                   <>
                     <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                     <span className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
-                      Correct! +5 XP Awarded
+                      Correct! +{currentFeedback?.xpEarned ?? 5} XP Awarded
+                      {currentFeedback?.queuedOffline ? ' (Queued for Sync)' : ''}
                     </span>
                   </>
                 ) : (
@@ -722,10 +845,20 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           </div>
         )}
 
+        {/* Submission Error Banner */}
+        {submitError && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-300">
+            {submitError}
+          </div>
+        )}
+
         {/* Action Controls */}
         <div className="pt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
           <button
-            onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+            onClick={() => {
+              setSubmitError(null);
+              setCurrentIndex(Math.max(0, currentIndex - 1));
+            }}
             disabled={currentIndex === 0}
             className="px-4 py-2 bg-slate-100 dark:bg-slate-800 disabled:opacity-30 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
           >

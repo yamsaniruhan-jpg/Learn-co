@@ -23,6 +23,8 @@ import {
   CheckCircle2,
   Trash2,
   Cpu,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import {
   CopilotMessage,
@@ -81,6 +83,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [streamingCitations, setStreamingCitations] = useState<CopilotCitation[]>([]);
   const [streamingArtifact, setStreamingArtifact] = useState<CopilotArtifact | undefined>();
+  const [pendingConfirmAction, setPendingConfirmAction] = useState<'delete_all' | 'clear_chat' | null>(null);
+  const [statusNotice, setStatusNotice] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -156,7 +160,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
         {
           id: `welcome-${Date.now()}`,
           conversationId: newConv.id,
-          userId: user.id || 'user-alex-001',
+          userId: user.id || 'guest',
           role: 'assistant',
           content: `Hello **${user.fullName.split(' ')[0]}**! I am your **Omni Socratic AI Copilot**.\n\nI am configured for **${learnerLevel.toUpperCase()}** academic rigor across Mathematics, CS, Physics, Chemistry, and AI.\n\nAsk any question, request a step-by-step mathematical proof, or choose a tutoring mode below to begin.`,
           mode: activeMode,
@@ -187,17 +191,23 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
     }
   };
 
-  const handleDeleteAllHistory = async () => {
-    if (window.confirm('Are you sure you want to delete ALL tutoring session history? This cannot be undone.')) {
-      const success = await CopilotClient.deleteAllConversations();
-      if (success) {
-        setConversations([]);
-        setActiveConversationId(null);
-        setActiveConversation(null);
-        setMessages([]);
-        handleNewConversation();
-      }
+  const handleDeleteAllHistory = () => {
+    setPendingConfirmAction('delete_all');
+  };
+
+  const confirmDeleteAllHistory = async () => {
+    const success = await CopilotClient.deleteAllConversations();
+    if (success) {
+      setConversations([]);
+      setActiveConversationId(null);
+      setActiveConversation(null);
+      setMessages([]);
+      handleNewConversation();
+      setStatusNotice({ type: 'info', message: 'All tutoring session history deleted.' });
+    } else {
+      setStatusNotice({ type: 'error', message: 'Failed to delete tutoring session history.' });
     }
+    setPendingConfirmAction(null);
   };
 
   const handleExportHistory = async () => {
@@ -212,8 +222,9 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      setStatusNotice({ type: 'info', message: 'Tutoring history exported as JSON.' });
     } else {
-      alert('Failed to export history.');
+      setStatusNotice({ type: 'error', message: 'Failed to export history. Please sign in and try again.' });
     }
   };
 
@@ -275,12 +286,20 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
     }
   };
 
-  const handleClearConversation = async () => {
+  const handleClearConversation = () => {
     if (!activeConversationId) return;
-    if (window.confirm('Clear all message history in this session?')) {
-      await CopilotClient.clearConversation(activeConversationId);
-      setMessages([]);
+    setPendingConfirmAction('clear_chat');
+  };
+
+  const confirmClearConversation = async () => {
+    if (!activeConversationId) {
+      setPendingConfirmAction(null);
+      return;
     }
+    await CopilotClient.clearConversation(activeConversationId);
+    setMessages([]);
+    setPendingConfirmAction(null);
+    setStatusNotice({ type: 'info', message: 'Current session messages cleared.' });
   };
 
   const handleSendMessage = async (customPrompt?: string) => {
@@ -307,7 +326,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
     const userMsg: CopilotMessage = {
       id: `usr-${Date.now()}`,
       conversationId: currentConvId,
-      userId: user.id || 'user-alex-001',
+      userId: user.id || 'guest',
       role: 'user',
       content: textToSend,
       mode: activeMode,
@@ -361,7 +380,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             const assistantMsg: CopilotMessage = {
               id: doneData.messageId || `ai-${Date.now()}`,
               conversationId: currentConvId!,
-              userId: user.id || 'user-alex-001',
+              userId: user.id || 'guest',
               role: 'assistant',
               content: accumulatedContent,
               mode: activeMode,
@@ -538,6 +557,33 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Inline Status Notice Banner */}
+        {statusNotice && (
+          <div
+            className={`px-4 py-2 border-b flex items-center justify-between text-xs shrink-0 ${
+              statusNotice.type === 'error'
+                ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200'
+                : 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200'
+            }`}
+          >
+            <div className="flex items-center gap-2 truncate">
+              {statusNotice.type === 'error' ? (
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              )}
+              <span className="font-medium truncate">{statusNotice.message}</span>
+            </div>
+            <button
+              onClick={() => setStatusNotice(null)}
+              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 shrink-0 cursor-pointer"
+              aria-label="Dismiss notice"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Active Study Context Banner if present */}
         {activeContextNote && (
@@ -918,6 +964,50 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             </div>
           </div>
         </aside>
+      )}
+      {/* In-App Confirmation Modal */}
+      {pendingConfirmAction && (
+        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {pendingConfirmAction === 'delete_all'
+                    ? 'Delete All Tutoring History?'
+                    : 'Clear Session Messages?'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {pendingConfirmAction === 'delete_all'
+                    ? 'This will permanently delete all saved Omni Copilot conversations and cannot be undone.'
+                    : 'This will remove all messages in the current tutoring session.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPendingConfirmAction(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={
+                  pendingConfirmAction === 'delete_all'
+                    ? confirmDeleteAllHistory
+                    : confirmClearConversation
+                }
+              >
+                {pendingConfirmAction === 'delete_all' ? 'Delete All' : 'Clear Messages'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

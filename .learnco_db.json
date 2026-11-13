@@ -16,11 +16,31 @@
       "createdAt": "2026-10-10T05:47:05.252Z",
       "updatedAt": "2026-10-10T05:47:05.252Z",
       "lastLoginAt": "2026-10-10T05:47:05.252Z"
+    },
+    "user-1794583180965-tbuv8": {
+      "id": "user-1794583180965-tbuv8",
+      "email": "p1_verify_1794583180959@learn.co",
+      "passwordHash": "scrypt:c12aaf0d288fcab5c51257c630042afb:08ac3b8b4982bdbedce1d81058b93409b85c7e4a8ac61b8dda201d43e82f08e5621cee1839b8f2b617cf0cfe05e9e0c6c5282812b77de80f85d1afb6c6ed8b2a",
+      "authProvider": "email",
+      "createdAt": "2026-11-13T15:19:40.965Z",
+      "updatedAt": "2026-11-13T15:19:40.965Z",
+      "lastLoginAt": "2026-11-13T15:19:40.965Z"
+    },
+    "user-1794583191915-dskir": {
+      "id": "user-1794583191915-dskir",
+      "email": "p1_chat_1794583191763@learn.co",
+      "passwordHash": "scrypt:59c32c215bd538c49c4a4d59542213c6:51bcbed49b34e108df79376915cc52d51b967150c83cc43052ff60aced2cf081a76d80f9e8e1eec839ddf5ef3460cdfdd78af0fd5401247cb5b303ceb3c7ac36",
+      "authProvider": "email",
+      "createdAt": "2026-11-13T15:19:51.915Z",
+      "updatedAt": "2026-11-13T15:19:51.915Z",
+      "lastLoginAt": "2026-11-13T15:19:51.915Z"
     }
   },
   "usersByEmail": {
     "yamsaniruhan@gmail.com": "user-1788625702947-rafjf",
-    "test_scholar@learn.co": "user-1791611225252-uwfhk"
+    "test_scholar@learn.co": "user-1791611225252-uwfhk",
+    "p1_verify_1794583180959@learn.co": "user-1794583180965-tbuv8",
+    "p1_chat_1794583191763@learn.co": "user-1794583191915-dskir"
   },
   "profiles": {
     "user-1788625702947-rafjf": {
@@ -69,13 +89,57 @@
       "onboardingStatus": "NOT_STARTED",
       "timezone": "UTC",
       "joinedDate": "2026-10-10"
+    },
+    "user-1794583180965-tbuv8": {
+      "id": "prof-user-1794583180965-tbuv8",
+      "userId": "user-1794583180965-tbuv8",
+      "email": "p1_verify_1794583180959@learn.co",
+      "fullName": "P1 Tester",
+      "displayName": "P1 Tester",
+      "avatarUrl": "https://api.dicebear.com/7.x/bottts/svg?seed=p1_verify_1794583180959%40learn.co",
+      "educationLevel": "",
+      "targetExam": "",
+      "targetScore": "",
+      "examDate": "",
+      "subjects": [
+        "math"
+      ],
+      "learningGoals": [],
+      "preferredStudyTimeMinutes": 30,
+      "studyTimeMinutesThisWeek": 0,
+      "role": "student",
+      "onboardingStatus": "NOT_STARTED",
+      "timezone": "UTC",
+      "joinedDate": "2026-11-13"
+    },
+    "user-1794583191915-dskir": {
+      "id": "prof-user-1794583191915-dskir",
+      "userId": "user-1794583191915-dskir",
+      "email": "p1_chat_1794583191763@learn.co",
+      "fullName": "Chat Tester",
+      "displayName": "Chat Tester",
+      "avatarUrl": "https://api.dicebear.com/7.x/bottts/svg?seed=p1_chat_1794583191763%40learn.co",
+      "educationLevel": "",
+      "targetExam": "",
+      "targetScore": "",
+      "examDate": "",
+      "subjects": [
+        "math"
+      ],
+      "learningGoals": [],
+      "preferredStudyTimeMinutes": 30,
+      "studyTimeMinutesThisWeek": 0,
+      "role": "student",
+      "onboardingStatus": "NOT_STARTED",
+      "timezone": "UTC",
+      "joinedDate": "2026-11-13"
     }
   },
   "gamification": {
     "user-1788625702947-rafjf": {
       "userId": "user-1788625702947-rafjf",
       "xp": 10,
-      "level": 2,
+      "level": 3,
       "currentStreak": 1,
       "longestStreak": 1,
       "lastActiveDate": "2026-10-10",
@@ -88,12 +152,12 @@
       "dailySourcesUploadedToday": 0,
       "dailySourcesUploadLimit": 4,
       "lastQuotaResetDate": "2026-10-10",
-      "lastPromotionDate": "2026-10-25"
+      "lastPromotionDate": "2026-11-13"
     },
     "user-1791611225252-uwfhk": {
       "userId": "user-1791611225252-uwfhk",
       "xp": 0,
-      "level": 2,
+      "level": 3,
       "currentStreak": 0,
       "longestStreak": 0,
       "lastActiveDate": "",
@@ -105,7 +169,49 @@
       "dailyArtifactsLimit": 4,
       "dailySourcesUploadedToday": 0,
       "dailySourcesUploadLimit": 4,
-      "lastPromotionDate": "2026-10-25"
+      "lastPromotionDate": "2026-11-13"
+    },
+    "user-1794583180965-tbuv8": {
+      "userId": "user-1794583180965-tbuv8",
+      "xp": 5,
+      "level": 1,
+      "currentStreak": 1,
+      "longestStreak": 1,
+      "lastActiveDate": "2026-11-13",
+      "dailyQuestionsSolvedToday": 1,
+      "dailyAllowanceLimit": 25,
+      "dailyDoubtsAskedToday": 1,
+      "dailyDoubtsLimit": 25,
+      "dailyArtifactsCreatedToday": 0,
+      "dailyArtifactsLimit": 3,
+      "dailySourcesUploadedToday": 0,
+      "dailySourcesUploadLimit": 5,
+      "dailyAiPlansGeneratedToday": 0,
+      "lastQuotaResetDate": "2026-11-13",
+      "dailyUrlsLimit": 5,
+      "dailyAiPlansLimit": 2,
+      "dailyUrlsProcessedToday": 0
+    },
+    "user-1794583191915-dskir": {
+      "userId": "user-1794583191915-dskir",
+      "xp": 0,
+      "level": 1,
+      "currentStreak": 0,
+      "longestStreak": 0,
+      "lastActiveDate": "",
+      "dailyQuestionsSolvedToday": 0,
+      "dailyAllowanceLimit": 25,
+      "dailyDoubtsAskedToday": 1,
+      "dailyDoubtsLimit": 25,
+      "dailyArtifactsCreatedToday": 0,
+      "dailyArtifactsLimit": 3,
+      "dailySourcesUploadedToday": 0,
+      "dailySourcesUploadLimit": 5,
+      "dailyAiPlansGeneratedToday": 0,
+      "lastQuotaResetDate": "2026-11-13",
+      "dailyUrlsLimit": 5,
+      "dailyAiPlansLimit": 2,
+      "dailyUrlsProcessedToday": 0
     }
   },
   "settings": {
@@ -152,11 +258,108 @@
         "timerVisible": true,
         "soundEffects": true
       }
+    },
+    "user-1794583180965-tbuv8": {
+      "userId": "user-1794583180965-tbuv8",
+      "theme": "system",
+      "notifications": {
+        "studyReminders": true,
+        "streakAlerts": true,
+        "achievementAlerts": true,
+        "mentorAlerts": true,
+        "copilotAlerts": true
+      },
+      "privacy": {
+        "profileVisibility": "public",
+        "leaderboardVisibility": true,
+        "analyticsSharing": true
+      },
+      "learningPreferences": {
+        "socraticGuidanceLevel": "high",
+        "showDetailedDerivations": true,
+        "timerVisible": true,
+        "soundEffects": true
+      }
+    },
+    "user-1794583191915-dskir": {
+      "userId": "user-1794583191915-dskir",
+      "theme": "system",
+      "notifications": {
+        "studyReminders": true,
+        "streakAlerts": true,
+        "achievementAlerts": true,
+        "mentorAlerts": true,
+        "copilotAlerts": true
+      },
+      "privacy": {
+        "profileVisibility": "public",
+        "leaderboardVisibility": true,
+        "analyticsSharing": true
+      },
+      "learningPreferences": {
+        "socraticGuidanceLevel": "high",
+        "showDetailedDerivations": true,
+        "timerVisible": true,
+        "soundEffects": true
+      }
     }
   },
-  "xpTransactions": [],
-  "questionAttempts": [],
-  "attemptsById": {},
+  "xpTransactions": [
+    {
+      "id": "tx-1794583181282-msk8t",
+      "userId": "user-1794583180965-tbuv8",
+      "amount": 5,
+      "reason": "QUESTION_CORRECT",
+      "relatedAttemptId": "att-1794583181280-l7tbf",
+      "metadata": {
+        "questionId": "math-calc-001",
+        "subjectId": "math"
+      },
+      "timestamp": "2026-11-13T15:19:41.282Z"
+    }
+  ],
+  "questionAttempts": [
+    {
+      "id": "att-1794583181280-l7tbf",
+      "userId": "user-1794583180965-tbuv8",
+      "questionId": "math-calc-001",
+      "subjectId": "math",
+      "topicId": "Differential Calculus",
+      "difficulty": "medium",
+      "selectedAnswer": "2x",
+      "correctAnswer": "2x",
+      "isCorrect": true,
+      "solvingTimeSeconds": 12,
+      "hintsRevealedCount": 0,
+      "startedAt": "2026-11-13T15:19:29.282Z",
+      "submittedAt": "2026-11-13T15:19:41.282Z",
+      "status": "CORRECT",
+      "xpAwarded": 5,
+      "questionText": "",
+      "explanation": ""
+    }
+  ],
+  "attemptsById": {
+    "att-1794583181280-l7tbf": {
+      "id": "att-1794583181280-l7tbf",
+      "userId": "user-1794583180965-tbuv8",
+      "questionId": "math-calc-001",
+      "subjectId": "math",
+      "topicId": "Differential Calculus",
+      "difficulty": "medium",
+      "selectedAnswer": "2x",
+      "correctAnswer": "2x",
+      "isCorrect": true,
+      "solvingTimeSeconds": 12,
+      "hintsRevealedCount": 0,
+      "startedAt": "2026-11-13T15:19:29.282Z",
+      "submittedAt": "2026-11-13T15:19:41.282Z",
+      "status": "CORRECT",
+      "xpAwarded": 5,
+      "questionText": "",
+      "explanation": ""
+    }
+  },
   "mistakes": [],
   "sessions": {
     "f83286505da9434f2179b93f7b625b3ad5720f4447587ba6b7014dbf07629e36": {
@@ -173,14 +376,72 @@
       "userId": "user-1791611225252-uwfhk",
       "createdAt": "2026-10-10T05:47:05.256Z",
       "expiresAt": "2026-11-09T05:47:05.256Z"
+    },
+    "bb7cee0bcc4b5949746e18c1764dad7525928cc832e76ca100669cb0df3e8f38": {
+      "userId": "user-1794583180965-tbuv8",
+      "createdAt": "2026-11-13T15:19:41.074Z",
+      "expiresAt": "2026-12-13T15:19:41.074Z"
+    },
+    "cb1c1f15910b8db52681a541c09ecc1489104c34ad1642e07402fd83f3029e70": {
+      "userId": "user-1794583191915-dskir",
+      "createdAt": "2026-11-13T15:19:52.001Z",
+      "expiresAt": "2026-12-13T15:19:52.001Z"
     }
   },
   "creatorSources": {},
   "creatorResources": {},
   "creatorResourceVersions": {},
   "creatorJobs": {},
-  "copilotConversations": {},
-  "copilotMessages": {},
+  "copilotConversations": {
+    "conv-1794583181353-umvw": {
+      "id": "conv-1794583181353-umvw",
+      "userId": "user-1794583180965-tbuv8",
+      "title": "State the derivative of x^2 briefly.",
+      "mode": "conceptual_explainer",
+      "learnerLevel": "intermediate",
+      "pinned": false,
+      "messageCount": 1,
+      "createdAt": "2026-11-13T15:19:41.353Z",
+      "updatedAt": "2026-11-13T15:19:41.353Z",
+      "lastMessageSnippet": "State the derivative of x^2 briefly."
+    },
+    "conv-1794583192022-wn2w": {
+      "id": "conv-1794583192022-wn2w",
+      "userId": "user-1794583191915-dskir",
+      "title": "State the derivative of x^2 in one line.",
+      "mode": "conceptual_explainer",
+      "learnerLevel": "intermediate",
+      "pinned": false,
+      "messageCount": 1,
+      "createdAt": "2026-11-13T15:19:52.022Z",
+      "updatedAt": "2026-11-13T15:19:52.022Z",
+      "lastMessageSnippet": "State the derivative of x^2 in one line."
+    }
+  },
+  "copilotMessages": {
+    "conv-1794583181353-umvw": [
+      {
+        "id": "msg-1794583181353-6hlw",
+        "conversationId": "conv-1794583181353-umvw",
+        "userId": "user-1794583180965-tbuv8",
+        "role": "user",
+        "content": "State the derivative of x^2 briefly.",
+        "mode": "conceptual_explainer",
+        "timestamp": "2026-11-13T15:19:41.353Z"
+      }
+    ],
+    "conv-1794583192022-wn2w": [
+      {
+        "id": "msg-1794583192022-jo4e",
+        "conversationId": "conv-1794583192022-wn2w",
+        "userId": "user-1794583191915-dskir",
+        "role": "user",
+        "content": "State the derivative of x^2 in one line.",
+        "mode": "conceptual_explainer",
+        "timestamp": "2026-11-13T15:19:52.022Z"
+      }
+    ]
+  },
   "mentorProfiles": {
     "mentor-dr-turing-001": {
       "id": "mentor-dr-turing-001",
@@ -887,6 +1148,27 @@
       "reminderNotifications": true,
       "reminderMinutesBefore": 15,
       "targetExamTrack": "Advanced STEM Mastery & JEE/AP"
+    },
+    "user-1794583180965-tbuv8": {
+      "userId": "user-1794583180965-tbuv8",
+      "availableDays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat"
+      ],
+      "dailyAvailableMinutes": 120,
+      "preferredStartTime": "17:30",
+      "preferredEndTime": "20:00",
+      "preferredSessionLength": 45,
+      "breakDurationMinutes": 10,
+      "unavailablePeriods": [],
+      "autoRescheduleMissed": true,
+      "reminderNotifications": true,
+      "reminderMinutesBefore": 15,
+      "targetExamTrack": "Advanced STEM Mastery"
     }
   },
   "studyPlanVersions": {},

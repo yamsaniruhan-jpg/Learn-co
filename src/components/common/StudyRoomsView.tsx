@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Users, Video, MessageSquare, Play, Sparkles, Trophy, Clock, CheckCircle2, Plus, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Plus, X } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../context/AuthContext';
 
 interface StudyRoomsViewProps {
   onNavigateToTab: (tabId: string) => void;
@@ -14,27 +15,83 @@ interface Room {
   color: string;
 }
 
-export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab }) => {
-  const [rooms, setRooms] = useState<Room[]>([
-    { id: 'room-calculus', title: 'Advanced Calculus & 3D Surfaces', peers: 4, topic: 'Multivariable Optimization', color: 'indigo' },
-    { id: 'room-physics', title: 'Classical Mechanics & Oscillators', peers: 3, topic: 'Phase Space Dynamics', color: 'amber' },
-    { id: 'room-chem', title: 'Organic Chemistry SN2 Mechanism', peers: 5, topic: 'Stereochemical Inversion', color: 'rose' },
-    { id: 'room-cs', title: 'Algorithms & Machine Learning', peers: 6, topic: 'Gradient Descent Landscapes', color: 'purple' },
-  ]);
+interface RoomMessage {
+  id: string;
+  roomId: string;
+  user: string;
+  text: string;
+  time: string;
+}
 
-  const [activeRoomId, setActiveRoomId] = useState<string>('room-calculus');
+const STORAGE_KEY_ROOMS = 'learnco_study_rooms_v1';
+const STORAGE_KEY_MESSAGES = 'learnco_study_room_messages_v1';
+
+const DEFAULT_ROOMS: Room[] = [
+  { id: 'room-calculus', title: 'Advanced Calculus & 3D Surfaces', peers: 4, topic: 'Multivariable Optimization', color: 'indigo' },
+  { id: 'room-physics', title: 'Classical Mechanics & Oscillators', peers: 3, topic: 'Phase Space Dynamics', color: 'amber' },
+  { id: 'room-chem', title: 'Organic Chemistry SN2 Mechanism', peers: 5, topic: 'Stereochemical Inversion', color: 'rose' },
+  { id: 'room-cs', title: 'Algorithms & Machine Learning', peers: 6, topic: 'Gradient Descent Landscapes', color: 'purple' },
+];
+
+const DEFAULT_MESSAGES: RoomMessage[] = [
+  { id: '1', roomId: 'room-calculus', user: 'Alex C.', text: 'Hey everyone! Working on multivariable optimization problems in Calculus room.', time: '10:14 AM' },
+  { id: '2', roomId: 'room-calculus', user: 'Maria S.', text: 'Does anyone have the step-by-step derivation for Lagrange multipliers?', time: '10:16 AM' },
+  { id: '3', roomId: 'room-physics', user: 'David K.', text: 'Simulating harmonic oscillator phase orbits with damping.', time: '09:45 AM' },
+];
+
+export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab }) => {
+  const { profile, user } = useAuth();
+  const displayName = profile?.displayName || profile?.fullName || user?.fullName || 'Scholar';
+
+  const [rooms, setRooms] = useState<Room[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ROOMS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return DEFAULT_ROOMS;
+  });
+
+  const [activeRoomId, setActiveRoomId] = useState<string>(() => rooms[0]?.id || 'room-calculus');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // New Room Form state
   const [newTitle, setNewTitle] = useState('');
   const [newTopic, setNewTopic] = useState('');
 
-  const [messages, setMessages] = useState<Array<{ id: string; roomId: string; user: string; text: string; time: string }>>([
-    { id: '1', roomId: 'room-calculus', user: 'Alex C.', text: 'Hey everyone! Working on multivariable optimization problems in Calculus room.', time: '10:14 AM' },
-    { id: '2', roomId: 'room-calculus', user: 'Maria S.', text: 'Does anyone have the step-by-step derivation for Lagrange multipliers?', time: '10:16 AM' },
-    { id: '3', roomId: 'room-physics', user: 'David K.', text: 'Simulating harmonic oscillator phase orbits with damping.', time: '09:45 AM' },
-  ]);
+  const [messages, setMessages] = useState<RoomMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_MESSAGES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return DEFAULT_MESSAGES;
+  });
   const [inputMsg, setInputMsg] = useState('');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(rooms));
+    } catch {
+      // ignore storage errors
+    }
+  }, [rooms]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
+    } catch {
+      // ignore storage errors
+    }
+  }, [messages]);
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) || rooms[0];
   const currentMessages = messages.filter((m) => m.roomId === activeRoomId);
@@ -47,7 +104,7 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
       {
         id: Date.now().toString(),
         roomId: activeRoomId,
-        user: 'You (Scholar)',
+        user: displayName,
         text: inputMsg.trim(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },

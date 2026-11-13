@@ -33,7 +33,7 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
   onOpenVersionHistory,
 }) => {
   const { gamification } = useAuth();
-  const currentXp = gamification?.xp ?? 420;
+  const currentXp = gamification?.xp ?? 0;
 
   const tabs = [
     { id: 'today', label: "Today's Tasks", icon: '⚡' },

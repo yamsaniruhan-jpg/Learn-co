@@ -174,6 +174,7 @@ export async function createApp() {
       server: {
         middlewareMode: true,
         hmr: false,
+        ws: false,
       },
       appType: "spa",
     });

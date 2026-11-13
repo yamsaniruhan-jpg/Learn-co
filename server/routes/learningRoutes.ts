@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, optionalAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { Database } from '../db';
 import { XpEngine } from '../xpEngine';
 import { QuestionSelectionEngine } from '../services/questionSelectionEngine';
@@ -12,6 +12,7 @@ import progressService from '../../services/progressService';
 import { adminDb } from '../services/firebaseAdmin';
 
 const router = Router();
+const userImportedQuestions = new Map<string, QuestionBankItem[]>();
 
 // Lazy Gemini AI initialization with resilience cascade
 function getGeminiClient(): GoogleGenAI | null {
@@ -130,11 +131,12 @@ router.post('/session/start', requireAuth, (req: AuthenticatedRequest, res: Resp
 });
 
 // GET /api/learning/questions
-router.get('/questions', (req, res: Response) => {
+router.get('/questions', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { subjectId, difficulty, questionType, search, limit = 20, page = 1 } = req.query;
 
-    let pool = [...MASTER_QUESTION_BANK];
+    const userCustom = req.userId ? (userImportedQuestions.get(req.userId) || []) : [];
+    let pool = [...userCustom, ...MASTER_QUESTION_BANK];
 
     if (subjectId && subjectId !== 'all') {
       pool = pool.filter((q) => q.subjectId === subjectId);
@@ -250,12 +252,14 @@ router.post('/import-creator-quiz', requireAuth, (req: AuthenticatedRequest, res
       }
     );
 
-    // Append to temporary master bank in memory
+    // Store imported quiz questions scoped to the authenticated user
+    const existing = userImportedQuestions.get(userId) || [];
     for (const cq of convertedQuestions) {
-      if (!MASTER_QUESTION_BANK.find((existing) => existing.id === cq.id)) {
-        MASTER_QUESTION_BANK.push(cq);
+      if (!existing.find((item) => item.id === cq.id)) {
+        existing.push(cq);
       }
     }
+    userImportedQuestions.set(userId, existing);
 
     res.json({
       success: true,
@@ -335,7 +339,8 @@ Provide a concise (1-2 sentences) Socratic hint that guides their first-principl
 router.post('/progress/:courseId/lesson/:lessonId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { courseId, lessonId } = req.params;
-    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    const uid = req.userId;
+    if (!uid) return res.status(401).json({ error: 'Authentication required.' });
     await progressService.updateProgress(uid, courseId, lessonId, req.body);
     res.json({ success: true });
   } catch (error: any) {
@@ -346,7 +351,8 @@ router.post('/progress/:courseId/lesson/:lessonId', requireAuth, async (req: Aut
 // GET /api/learning/progress
 router.get('/progress', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    const uid = req.userId;
+    if (!uid) return res.status(401).json({ error: 'Authentication required.' });
     let progress: any[] = [];
     try {
       if (!adminDb) throw new Error('Firestore is not configured; using local store only.');
@@ -365,7 +371,8 @@ router.get('/progress', requireAuth, async (req: AuthenticatedRequest, res: Resp
 // GET /api/learning/review-cards
 router.get('/review-cards', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    const uid = req.userId;
+    if (!uid) return res.status(401).json({ error: 'Authentication required.' });
     const cards = await progressService.getDueCards(uid);
     res.json({ cards });
   } catch (error: any) {
@@ -376,7 +383,8 @@ router.get('/review-cards', requireAuth, async (req: AuthenticatedRequest, res: 
 // POST /api/learning/review-cards/:cardId
 router.post('/review-cards/:cardId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    const uid = req.userId;
+    if (!uid) return res.status(401).json({ error: 'Authentication required.' });
     await progressService.reviewCard(uid, req.params.cardId, req.body.quality);
     res.json({ success: true });
   } catch (error: any) {
@@ -387,7 +395,8 @@ router.post('/review-cards/:cardId', requireAuth, async (req: AuthenticatedReque
 // GET /api/learning/weaknesses
 router.get('/weaknesses', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const uid = req.userId || (req as any).user?.uid || 'user-alex-001';
+    const uid = req.userId;
+    if (!uid) return res.status(401).json({ error: 'Authentication required.' });
     const analysis = await progressService.analyzeWeaknesses(uid);
     res.json(analysis);
   } catch (error: any) {

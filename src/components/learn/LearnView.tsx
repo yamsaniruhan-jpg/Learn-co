@@ -189,7 +189,7 @@ export const LearnView: React.FC<LearnViewProps> = ({
                 <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
                   Data-Driven STEM Curriculum
                 </span>
-                <XPIndicator xp={gamification?.xp ?? 420} size="sm" />
+                <XPIndicator xp={gamification?.xp ?? 0} size="sm" />
                 <span className="text-xs text-slate-400 font-mono">5,000+ Question Architecture</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">

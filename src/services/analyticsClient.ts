@@ -16,11 +16,10 @@ export class AnalyticsClient {
     const token =
       AuthClient.getToken() ||
       localStorage.getItem('learnco_auth_token') ||
-      localStorage.getItem('auth_token') ||
-      'token-alex-001';
+      localStorage.getItem('auth_token');
     return {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 

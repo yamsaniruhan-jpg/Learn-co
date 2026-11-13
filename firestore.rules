@@ -1,119 +1,152 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isAuthenticated() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    function isValidPublicProfile(data, userId) {
+      return data.userId == userId
+        && data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000))
+        && (!('xp' in data) || (data.xp is number && data.xp >= 0 && data.xp <= 10000000))
+        && (!('level' in data) || (data.level is number && data.level >= 1 && data.level <= 1000));
+    }
+
+    function isValidLeaderboardEntry(data, entryId) {
+      return isValidId(entryId)
+        && data.userId == request.auth.uid
+        && data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120
+        && data.xp is number && data.xp >= 0 && data.xp <= 10000000
+        && data.level is number && data.level >= 1 && data.level <= 1000
+        && (!('streak' in data) || (data.streak is number && data.streak >= 0 && data.streak <= 10000))
+        && (!('streakDays' in data) || (data.streakDays is number && data.streakDays >= 0 && data.streakDays <= 10000));
     }
 
     // User private data
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
-      
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && (!('role' in request.resource.data) || request.resource.data.role != 'admin');
+      allow delete: if isOwner(userId);
+
       match /progress/{courseId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isValidId(courseId);
       }
 
       match /spacedRepetition/{cardId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isValidId(cardId);
       }
 
       match /{subcollection}/{docId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isValidId(docId);
       }
     }
 
-    // Public scholar profiles & leaderboards
-    // Read stays public (profiles are shown on leaderboards). Write must be
-    // owner-only: `allow write: if true` let anyone rewrite any scholar's profile
-    // without authenticating at all.
+    // Public scholar profiles (no PII; owner-only writes)
     match /public_profiles/{userId} {
       allow read: if true;
-      allow create, update: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidPublicProfile(request.resource.data, userId);
       allow delete: if isOwner(userId);
     }
 
-    // Leaderboard entries are keyed by the owner's uid (doc id === uid), and the
-    // client legitimately writes its OWN entry after each XP change. Owner-write
-    // keeps that working while stopping the previous `allow write: if true`, which
-    // let any anonymous visitor forge anybody's XP, level and rank.
+    // Public cohort leaderboard (owner-only bounded writes)
     match /leaderboard/{entryId} {
       allow read: if true;
-      allow create, update: if isOwner(entryId);
+      allow create, update: if isOwner(entryId) && isValidLeaderboardEntry(request.resource.data, entryId);
       allow delete: if isOwner(entryId);
     }
 
     // Creator resources
     match /resources/{resourceId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
+      allow create: if isAuthenticated() && isValidId(resourceId) && (
+        request.resource.data.creatorId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow update, delete: if isAuthenticated() && isValidId(resourceId) && (
         resource.data.creatorId == request.auth.uid ||
         resource.data.userId == request.auth.uid
       );
     }
 
-    // Mentors catalog
+    // Mentors catalog (owner-only writes)
     match /mentors/{mentorId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidId(mentorId)
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && isValidId(mentorId)
+        && (resource.data.userId == request.auth.uid || mentorId == request.auth.uid);
     }
 
-    // Mentorship sessions -- scoped to the participants, not every signed-in user.
+    // Mentorship sessions (participant-scoped)
     match /sessions/{sessionId} {
-      allow read, write: if isAuthenticated() && (
-        resource.data.mentorId == request.auth.uid ||
-        resource.data.menteeId == request.auth.uid ||
-        resource.data.userId == request.auth.uid ||
-        request.auth.uid in resource.data.participants
+      allow get: if isAuthenticated() && isValidId(sessionId) && (
+        resource.data.learnerUid == request.auth.uid ||
+        resource.data.mentorUid == request.auth.uid
       );
-      allow create: if isAuthenticated();
+      allow list: if isAuthenticated() && (
+        resource.data.learnerUid == request.auth.uid ||
+        resource.data.mentorUid == request.auth.uid
+      );
+      allow create: if isAuthenticated() && isValidId(sessionId)
+        && request.resource.data.learnerUid == request.auth.uid;
+      allow update, delete: if isAuthenticated() && isValidId(sessionId) && (
+        resource.data.learnerUid == request.auth.uid ||
+        resource.data.mentorUid == request.auth.uid
+      );
     }
 
-    // Notifications -- previously any signed-in user could read everyone's.
+    // Notifications (recipient-scoped)
     match /notifications/{notifId} {
-      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated();
+      allow get: if isAuthenticated() && isValidId(notifId)
+        && resource.data.userId == request.auth.uid;
+      allow list: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidId(notifId)
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && isValidId(notifId)
+        && resource.data.userId == request.auth.uid;
     }
 
-    // Gamification rules and badges
-    // XP/streak data is personal. Previously readable by anyone with
-    // `allow read: if true` on every document in the collection, and writable by
-    // any signed-in user (so anyone could grant themselves XP).
-    match /gamification/{userId}/{document=**} {
-      allow read: if isOwner(userId);
-      allow write: if false; // written by the backend / Admin SDK
-    }
-    match /gamification/{userId} {
-      allow read: if isOwner(userId);
+    // Gamification rules and badges (server-managed catalog)
+    match /gamification/{document=**} {
+      allow read: if true;
       allow write: if false;
     }
 
     // Marketplace courses & reviews
     match /marketplace/{courseId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      // Owner check only. The previous clause `|| request.auth.uid != null` is
-      // true for every signed-in user, so any student could edit or delete any
-      // listing (it reduced the whole condition to "is logged in").
-      allow update, delete: if isAuthenticated() && (
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.creatorId == request.auth.uid
-      );
+      allow create: if isAuthenticated() && isValidId(courseId)
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() <= 200;
+      allow update, delete: if isAuthenticated() && isValidId(courseId)
+        && resource.data.creatorUid == request.auth.uid;
 
       match /reviews/{reviewId} {
         allow read: if true;
-        allow write: if isAuthenticated();
+        allow create: if isAuthenticated() && isValidId(reviewId)
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+        allow update, delete: if isAuthenticated() && isValidId(reviewId)
+          && resource.data.userId == request.auth.uid;
       }
-    }
-
-    // Default deny for unmapped documents
-    match /{document=**} {
-      allow read, write: if false;
     }
   }
 }

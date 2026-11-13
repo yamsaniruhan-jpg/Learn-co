@@ -1,21 +1,13 @@
 import { Router, Response } from 'express';
 import { Database } from '../db';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, optionalAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 
 const router = Router();
 
 // GET /api/leaderboard
-router.get('/', (req: AuthenticatedRequest, res: Response) => {
+router.get('/', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Check optional token if user is signed in to mark isCurrentUser
-    let currentUserId: string | undefined;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7).trim();
-      const user = Database.getSessionUser(token);
-      if (user) currentUserId = user.id;
-    }
-
+    const currentUserId = req.userId;
     const { timeframe, subject } = req.query; // 'daily', 'weekly', 'monthly', 'all_time'
     const leaderboard = Database.getLeaderboard(
       currentUserId,
@@ -33,49 +25,41 @@ router.get('/', (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// POST /api/leaderboard/xp - Update user XP and propagate to Firestore
-router.post('/xp', (req: AuthenticatedRequest, res: Response) => {
+// POST /api/leaderboard/xp - Sync authenticated user's bounded XP increment
+router.post('/xp', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { userId, xp, reason } = req.body;
-    let targetUserId = userId;
+    const targetUserId = req.userId!;
+    const { xp, reason } = req.body;
 
-    if (!targetUserId) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7).trim();
-        const user = Database.getSessionUser(token);
-        if (user) targetUserId = user.id;
-      }
-    }
-
-    if (!targetUserId) {
-      res.status(400).json({ error: 'User ID is required to award XP.' });
+    if (typeof xp !== 'number' || !Number.isFinite(xp) || xp < 0) {
+      res.status(400).json({ error: 'Valid non-negative numeric XP value is required.' });
       return;
     }
 
-    const updated = Database.updateUserXp(targetUserId, typeof xp === 'number' ? xp : 0, reason);
+    const currentGam = Database.getGamification(targetUserId);
+    const currentXp = currentGam?.xp ?? 0;
+    // Prevent arbitrary client-side XP inflation: allow at most +50 XP delta per direct sync call
+    const boundedXp = Math.max(currentXp, Math.min(xp, currentXp + 50));
+
+    const updated = Database.updateUserXp(targetUserId, boundedXp, typeof reason === 'string' ? reason : 'Activity');
     res.json({ success: true, ...updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to update user XP.' });
   }
 });
 
-// POST /api/leaderboard/sync - Enroll or sync user in leaderboard
-router.post('/sync', (req: AuthenticatedRequest, res: Response) => {
+// POST /api/leaderboard/sync - Synchronize authenticated user with leaderboard dataset
+router.post('/sync', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { userId, email, displayName, avatarUrl, xp, level, streak } = req.body;
-    if (!userId && !email) {
-      res.status(400).json({ error: 'User ID or email is required.' });
-      return;
-    }
+    const targetUserId = req.userId!;
+    const profile = Database.getProfile(targetUserId);
+    const { displayName, avatarUrl } = req.body || {};
 
-    const id = userId || `user-${Date.now()}`;
-    const user = Database.findUserById(id) || Database.findUserByEmail(email);
-
-    if (user) {
-      if (typeof xp === 'number') {
-        Database.updateUserXp(user.id, xp, 'Sync');
-      }
+    if (profile && (typeof displayName === 'string' || typeof avatarUrl === 'string')) {
+      Database.updateProfile(targetUserId, {
+        ...(typeof displayName === 'string' && displayName.trim() ? { displayName: displayName.trim() } : {}),
+        ...(typeof avatarUrl === 'string' && avatarUrl.trim() ? { avatarUrl: avatarUrl.trim() } : {}),
+      });
     }
 
     res.json({ success: true, message: 'User synchronized with leaderboard dataset.' });

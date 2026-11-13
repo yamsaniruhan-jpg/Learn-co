@@ -1,43 +1,23 @@
-import { Router, Response, Request } from 'express';
-import { Database, withUserLock } from '../db';
-import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { Router, Response } from 'express';
+import { Database } from '../db';
+import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { CopilotGateway } from '../services/copilotGateway';
 import { CopilotToolRegistry } from '../services/copilotTools';
-import { RagEngine } from '../services/ragEngine';
 import { CopilotCacheEngine } from '../services/copilotCacheEngine';
 import { XpEngine } from '../xpEngine';
+import { DAILY_DOUBTS_LIMIT } from '../../src/types/auth';
+import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 import {
-  CopilotMode,
-  LearnerLevel,
-  CopilotContextPayload,
   CopilotPromptOptions,
 } from '../../src/types/copilot';
 import { adminDb } from '../services/firebaseAdmin';
 
 const router = Router();
 
-// Middleware to resolve user ID (supports logged-in users and demo/guest learners)
-/**
- * Returns the authenticated user id, or an empty string when unauthenticated.
- *
- * This previously defaulted to a seeded account, which allowed anonymous
- * callers to read and write another user's copilot conversations. The router
- * now applies `requireAuth` so this should always be populated.
- */
-function resolveUserId(req: Request): string {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
-    const sessionUser = Database.getSessionUser(token);
-    if (sessionUser) return sessionUser.id;
-  }
-  return '';
-}
-
 // GET /api/copilot/quota
-router.get('/quota', (req: Request, res: Response) => {
+router.get('/quota', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const quotas = Database.getUserDailyQuotas(userId);
     res.json({ success: true, quota: quotas.doubts });
   } catch (err: any) {
@@ -45,8 +25,8 @@ router.get('/quota', (req: Request, res: Response) => {
   }
 });
 
-// GET /api/copilot/cache-stats - Telemetry on AI cost savings & token efficiency
-router.get('/cache-stats', (req: Request, res: Response) => {
+// GET /api/copilot/cache-stats - Telemetry on AI cost savings & token efficiency (Admin only)
+router.get('/cache-stats', requireAuth, requireRole('admin'), (_req: AuthenticatedRequest, res: Response) => {
   try {
     const stats = CopilotCacheEngine.getStats();
     res.json({ success: true, stats });
@@ -55,8 +35,8 @@ router.get('/cache-stats', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/copilot/cache-clear - Reset cache
-router.post('/cache-clear', (req: Request, res: Response) => {
+// POST /api/copilot/cache-clear - Reset cache (Admin only)
+router.post('/cache-clear', requireAuth, requireRole('admin'), (_req: AuthenticatedRequest, res: Response) => {
   try {
     CopilotCacheEngine.clear();
     res.json({ success: true, message: 'Copilot AI response cache purged.' });
@@ -70,9 +50,9 @@ router.post('/cache-clear', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 
 // GET /api/copilot/conversations
-router.get('/conversations', (req: Request, res: Response) => {
+router.get('/conversations', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const { search } = req.query;
     const conversations = Database.listCopilotConversations(userId, search as string);
     res.json({ conversations });
@@ -82,9 +62,9 @@ router.get('/conversations', (req: Request, res: Response) => {
 });
 
 // POST /api/copilot/conversations
-router.post('/conversations', (req: Request, res: Response) => {
+router.post('/conversations', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const { title, mode, learnerLevel, subjectId } = req.body;
 
     const conversation = Database.createCopilotConversation(userId, {
@@ -101,9 +81,9 @@ router.post('/conversations', (req: Request, res: Response) => {
 });
 
 // GET /api/copilot/conversations/:id
-router.get('/conversations/:id', (req: Request, res: Response) => {
+router.get('/conversations/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const convId = req.params.id;
 
     const result = Database.getCopilotConversation(userId, convId);
@@ -119,9 +99,9 @@ router.get('/conversations/:id', (req: Request, res: Response) => {
 });
 
 // PATCH /api/copilot/conversations/:id
-router.patch('/conversations/:id', (req: Request, res: Response) => {
+router.patch('/conversations/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const convId = req.params.id;
     const { title, mode, learnerLevel, subjectId, pinned } = req.body;
 
@@ -145,9 +125,9 @@ router.patch('/conversations/:id', (req: Request, res: Response) => {
 });
 
 // DELETE /api/copilot/conversations/:id
-router.delete('/conversations/:id', (req: Request, res: Response) => {
+router.delete('/conversations/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const convId = req.params.id;
 
     const deleted = Database.deleteCopilotConversation(userId, convId);
@@ -163,9 +143,9 @@ router.delete('/conversations/:id', (req: Request, res: Response) => {
 });
 
 // POST /api/copilot/conversations/:id/clear
-router.post('/conversations/:id/clear', (req: Request, res: Response) => {
+router.post('/conversations/:id/clear', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const convId = req.params.id;
 
     const cleared = Database.clearCopilotConversation(userId, convId);
@@ -181,9 +161,9 @@ router.post('/conversations/:id/clear', (req: Request, res: Response) => {
 });
 
 // DELETE /api/copilot/conversations - Delete all conversations
-router.delete('/conversations', (req: Request, res: Response) => {
+router.delete('/conversations', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     Database.deleteAllCopilotConversations(userId);
     res.json({ success: true, message: 'All conversation history deleted.' });
   } catch (err: any) {
@@ -192,9 +172,9 @@ router.delete('/conversations', (req: Request, res: Response) => {
 });
 
 // GET /api/copilot/history/export - Export all history
-router.get('/history/export', (req: Request, res: Response) => {
+router.get('/history/export', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const exportData = Database.exportAllCopilotHistory(userId);
     res.json({ success: true, data: exportData });
   } catch (err: any) {
@@ -207,24 +187,27 @@ router.get('/history/export', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 
 // POST /api/copilot/chat
-router.post('/chat', async (req: Request, res: Response) => {
+router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
+    const body = req.body as CopilotPromptOptions & { message?: string };
     const {
       conversationId,
-      prompt,
       mode = 'socratic_hint',
       learnerLevel = 'intermediate',
       context,
       selectedModel,
-    } = req.body as CopilotPromptOptions;
+    } = body;
+    const rawPrompt = typeof body.prompt === 'string' ? body.prompt : typeof body.message === 'string' ? body.message : '';
 
-    if (!prompt || !prompt.trim()) {
+    if (!rawPrompt.trim()) {
       res.status(400).json({ error: 'Prompt is required.' });
       return;
     }
 
-    // Enforce daily doubts quota (5 doubts per day, refreshes at midnight)
+    const prompt = rawPrompt.trim();
+
+    // Enforce daily doubts quota (DAILY_DOUBTS_LIMIT per day, refreshes at midnight)
     let quotaInfo;
     try {
       quotaInfo = Database.checkAndIncrementDoubtQuota(userId);
@@ -232,7 +215,7 @@ router.post('/chat', async (req: Request, res: Response) => {
       res.status(429).json({
         error: quotaErr.message || 'Daily doubts quota exceeded.',
         isLimitReached: true,
-        limit: 5,
+        limit: DAILY_DOUBTS_LIMIT,
         remaining: 0,
       });
       return;
@@ -296,9 +279,9 @@ router.post('/chat', async (req: Request, res: Response) => {
 });
 
 // POST /api/copilot/stream (Server-Sent Events streaming)
-router.post('/stream', async (req: Request, res: Response) => {
+router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const {
       conversationId,
       prompt,
@@ -313,14 +296,14 @@ router.post('/stream', async (req: Request, res: Response) => {
       return;
     }
 
-    // Enforce daily doubts quota (5 doubts per day, refreshes at midnight)
+    // Enforce daily doubts quota (DAILY_DOUBTS_LIMIT per day, refreshes at midnight)
     try {
       Database.checkAndIncrementDoubtQuota(userId);
     } catch (quotaErr: any) {
       res.status(429).json({
         error: quotaErr.message || 'Daily doubts quota exceeded.',
         isLimitReached: true,
-        limit: 5,
+        limit: DAILY_DOUBTS_LIMIT,
         remaining: 0,
       });
       return;
@@ -415,9 +398,9 @@ router.post('/stream', async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 
 // POST /api/copilot/tools/execute
-router.post('/tools/execute', async (req: Request, res: Response) => {
+router.post('/tools/execute', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const { toolName, toolInput } = req.body;
 
     if (!toolName) {
@@ -433,19 +416,33 @@ router.post('/tools/execute', async (req: Request, res: Response) => {
 });
 
 // POST /api/copilot/practice/submit
-router.post('/practice/submit', async (req: Request, res: Response) => {
+router.post('/practice/submit', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const {
       questionId = `q-gen-${Date.now()}`,
       subjectId = 'math',
       topic = 'STEM Practice',
       userAnswer,
-      correctAnswer,
+      correctAnswer: providedCorrectAnswer,
+      isCorrect: providedIsCorrect,
       timeSpentSeconds = 30,
     } = req.body;
 
-    if (!userAnswer || !correctAnswer) {
+    let resolvedCorrectAnswer = providedCorrectAnswer;
+    if (resolvedCorrectAnswer === undefined && questionId) {
+      const bankQuestion = MASTER_QUESTION_BANK.find((q) => q.id === questionId);
+      if (bankQuestion) {
+        resolvedCorrectAnswer = Array.isArray(bankQuestion.correctAnswer)
+          ? bankQuestion.correctAnswer.join(', ')
+          : bankQuestion.correctAnswer;
+      }
+    }
+    if (resolvedCorrectAnswer === undefined && providedIsCorrect !== undefined && userAnswer !== undefined) {
+      resolvedCorrectAnswer = providedIsCorrect ? userAnswer : '__INCORRECT__';
+    }
+
+    if (userAnswer === undefined || userAnswer === null || userAnswer === '' || !resolvedCorrectAnswer) {
       res.status(400).json({ error: 'userAnswer and correctAnswer are required.' });
       return;
     }
@@ -458,7 +455,7 @@ router.post('/practice/submit', async (req: Request, res: Response) => {
       difficulty: 'medium',
       questionText: `Practice Question: ${topic}`,
       selectedAnswer: userAnswer,
-      correctAnswer,
+      correctAnswer: resolvedCorrectAnswer,
       explanation: 'Copilot verified derivation.',
       solvingTimeSeconds: timeSpentSeconds,
       hintsRevealedCount: 0,
@@ -478,9 +475,9 @@ router.post('/practice/submit', async (req: Request, res: Response) => {
 });
 
 // POST /api/copilot/feedback
-router.post('/feedback', async (req: Request, res: Response) => {
+router.post('/feedback', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     const { interactionId, messageId, rating } = req.body;
 
     if (adminDb) {
@@ -501,9 +498,9 @@ router.post('/feedback', async (req: Request, res: Response) => {
 });
 
 // GET /api/copilot/history
-router.get('/history', async (req: Request, res: Response) => {
+router.get('/history', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = resolveUserId(req);
+    const userId = req.userId!;
     let history: any[] = [];
 
     if (adminDb) {

@@ -1,120 +1,93 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { RightContextPanel } from './components/layout/RightContextPanel';
 import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
+import { NotificationCenter } from './components/layout/NotificationCenter';
 import { AuthModal } from './components/auth/AuthModal';
 import { OnboardingWizard } from './components/auth/OnboardingWizard';
 
-// Heavy workspace views are code-split: each is fetched only when its tab is
-// first opened, so the initial payload stays small.
-import { lazyNamed } from './utils/lazyNamed';
-const DashboardView = lazyNamed(() => import('./components/dashboard/DashboardView'), 'DashboardView');
-const LearnView = lazyNamed(() => import('./components/learn/LearnView'), 'LearnView');
-const CreatorStudioView = lazyNamed(() => import('./components/create/CreatorStudioView'), 'CreatorStudioView');
-const MentorView = lazyNamed(() => import('./components/mentor/MentorView'), 'MentorView');
-const CopilotView = lazyNamed(() => import('./components/copilot/CopilotView'), 'CopilotView');
-const PracticeView = lazyNamed(() => import('./components/practice/PracticeView'), 'PracticeView');
-const PlannerView = lazyNamed(() => import('./components/planner/PlannerView'), 'PlannerView');
-const GamificationView = lazyNamed(() => import('./components/gamification/GamificationView'), 'GamificationView');
-const IntelligenceView = lazyNamed(() => import('./components/intelligence/IntelligenceView'), 'IntelligenceView');
-const AdminStudioView = lazyNamed(() => import('./components/admin/AdminStudioView'), 'AdminStudioView');
-const DocsViewer = lazyNamed(() => import('./components/docs/DocsViewer'), 'DocsViewer');
-const ProfileView = lazyNamed(() => import('./components/profile/ProfileView'), 'ProfileView');
-const AuthView = lazyNamed(() => import('./components/auth/AuthView'), 'AuthView');
-const Leaderboard = lazyNamed(() => import('./components/leaderboard/Leaderboard'), 'Leaderboard');
-const ConceptLibraryView = lazyNamed(() => import('./components/concepts/ConceptLibraryView'), 'ConceptLibraryView');
-const DigitalArchiveHub = lazyNamed(() => import('./components/learn/DigitalArchiveHub'), 'DigitalArchiveHub');
-const SimulationsHubView = lazyNamed(() => import('./components/simulations/SimulationsHubView'), 'SimulationsHubView');
-const UserGuideView = lazyNamed(() => import('./components/guide/UserGuideView'), 'UserGuideView');
-const GenFocusTimerView = lazyNamed(() => import('./components/focus/GenFocusTimerView'), 'GenFocusTimerView');
-const StudyRoomsView = lazyNamed(() => import('./components/common/StudyRoomsView'), 'StudyRoomsView');
-const VoiceExamView = lazyNamed(() => import('./components/common/VoiceExamView'), 'VoiceExamView');
-const ExamForecasterView = lazyNamed(() => import('./components/common/ExamForecasterView'), 'ExamForecasterView');
-const OfflineSyncView = lazyNamed(() => import('./components/common/OfflineSyncView'), 'OfflineSyncView');
-const FormulaInspectorModal = lazyNamed(() => import('./components/common/FormulaInspectorModal'), 'FormulaInspectorModal');
-const NotificationCenter = lazyNamed(() => import('./components/layout/NotificationCenter'), 'NotificationCenter');
-
-/**
- * Shown while a lazily-loaded tab chunk is in flight. Deliberately minimal and
- * layout-stable: it occupies the same content slot so the shell (navbar, sidebar)
- * does not jump when the real view arrives.
- */
-function ViewLoadingFallback() {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 gap-3" role="status" aria-live="polite">
-      <Loader2 className="w-8 h-8 text-[#6C5CE7] animate-spin" aria-hidden="true" />
-      <p className="text-sm text-[#6B6890] dark:text-[#B4B0D5]">Loading workspace…</p>
-    </div>
-  );
-}
-
+import { DashboardView } from './components/dashboard/DashboardView';
+import { LearnView } from './components/learn/LearnView';
+import { CopilotView } from './components/copilot/CopilotView';
+import { PracticeView, PracticeNavigationContext } from './components/practice/PracticeView';
+import { GamificationView } from './components/gamification/GamificationView';
+import { ProfileView } from './components/profile/ProfileView';
+import { AuthView } from './components/auth/AuthView';
+import { Leaderboard } from './components/leaderboard/Leaderboard';
 import { MobileAllTabsNav } from './components/layout/MobileAllTabsNav';
 
 import { useAuth } from './context/AuthContext';
 import { ConceptMastery, QuestionAttempt, SubjectId, UserProfile, NotificationItem } from './types';
-import { INITIAL_MASTERIES, SEED_NOTIFICATIONS } from './data/seedData';
+import { SEED_NOTIFICATIONS } from './data/seedData';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
-import type { FormulaInspectionData } from './components/common/FormulaInspectorModal';
-const FlashCheckModal = lazyNamed(() => import('./components/practice/FlashCheckModal'), 'FlashCheckModal');
-const WalkthroughModal = lazyNamed(() => import('./components/common/WalkthroughModal'), 'WalkthroughModal');
+import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
+import { StudyRoomsView } from './components/common/StudyRoomsView';
+import { ExamForecasterView } from './components/common/ExamForecasterView';
+import { OfflineSyncView } from './components/common/OfflineSyncView';
+import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
+import { FlashCheckModal } from './components/practice/FlashCheckModal';
+import { WalkthroughModal } from './components/common/WalkthroughModal';
 import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
 import {
-  LayoutDashboard,
-  BookOpen,
-  Target,
   Sparkles,
-  Compass,
-  Bot,
-  Calendar,
-  Award,
-  BarChart3,
   ShieldCheck,
-  FileCode2,
-  User,
   Loader2,
   Sun,
   Moon,
   X,
 } from 'lucide-react';
 
+const SimulationsHubView = lazy(() =>
+  import('./components/simulations/SimulationsHubView').then((m) => ({ default: m.SimulationsHubView }))
+);
+const ConceptLibraryView = lazy(() =>
+  import('./components/concepts/ConceptLibraryView').then((m) => ({ default: m.ConceptLibraryView }))
+);
+const IntelligenceView = lazy(() =>
+  import('./components/intelligence/IntelligenceView').then((m) => ({ default: m.IntelligenceView }))
+);
+const CreatorStudioView = lazy(() =>
+  import('./components/create/CreatorStudioView').then((m) => ({ default: m.CreatorStudioView }))
+);
+const AdminStudioView = lazy(() =>
+  import('./components/admin/AdminStudioView').then((m) => ({ default: m.AdminStudioView }))
+);
+const VoiceExamView = lazy(() =>
+  import('./components/common/VoiceExamView').then((m) => ({ default: m.VoiceExamView }))
+);
+const DocsViewer = lazy(() =>
+  import('./components/docs/DocsViewer').then((m) => ({ default: m.DocsViewer }))
+);
+const UserGuideView = lazy(() =>
+  import('./components/guide/UserGuideView').then((m) => ({ default: m.UserGuideView }))
+);
+const MentorView = lazy(() =>
+  import('./components/mentor/MentorView').then((m) => ({ default: m.MentorView }))
+);
+const PlannerView = lazy(() =>
+  import('./components/planner/PlannerView').then((m) => ({ default: m.PlannerView }))
+);
+const DigitalArchiveHub = lazy(() =>
+  import('./components/learn/DigitalArchiveHub').then((m) => ({ default: m.DigitalArchiveHub }))
+);
+const Marketplace = lazy(() => import('./components/Marketplace'));
+
 export default function App() {
   const { user, profile, gamification, settings, isLoading, isAuthenticated } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [copilotContext, setCopilotContext] = useState<string>('');
-  // A reset link arrives as /?reset_token=... . Read it once on mount, then strip
-  // it from the address bar so the token is not left in history or copied into a
-  // share, and so a refresh does not replay a single-use token.
-  const [resetToken, setResetToken] = useState<string | null>(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('reset_token');
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    if (!resetToken) return;
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('reset_token');
-      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
-    } catch {
-      /* non-fatal */
-    }
-  }, [resetToken]);
-
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [isContextPanelOpen, setIsContextPanelOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>('math');
+  const [practiceLaunchContext, setPracticeLaunchContext] = useState<PracticeNavigationContext | null>(null);
   const [isFlashCheckOpen, setIsFlashCheckOpen] = useState<boolean>(false);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [inspectedFormula, setInspectedFormula] = useState<FormulaInspectionData | null>(null);
@@ -179,6 +152,20 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('learnco_notifications', JSON.stringify(notifications));
   }, [notifications]);
+
+  // Keep App-level attempts and masteries live-synced when PracticeArena or OfflineSync records activity
+  useEffect(() => {
+    const syncLocalPracticeState = () => {
+      try {
+        const savedAttempts = JSON.parse(localStorage.getItem('learnco_attempts') || '[]');
+        const savedMasteries = JSON.parse(localStorage.getItem('learnco_masteries') || '[]');
+        setAttempts(Array.isArray(savedAttempts) ? savedAttempts : []);
+        setMasteries(Array.isArray(savedMasteries) ? savedMasteries : []);
+      } catch (_) {}
+    };
+    window.addEventListener('learnco_attempts_updated', syncLocalPracticeState);
+    return () => window.removeEventListener('learnco_attempts_updated', syncLocalPracticeState);
+  }, []);
 
   // Smart Study Reminder upon arrival (Deterministic, Zero AI cost)
   const [arrivalReminder, setArrivalReminder] = useState<{
@@ -310,10 +297,33 @@ export default function App() {
     setActiveTab('copilot');
   };
 
-  const handleSelectSubject = (subjectId: SubjectId) => {
-    setSelectedSubjectId(subjectId);
-    setActiveTab('learn');
+  const handleNavigateWithContext = (tabId: string, context?: any) => {
+    if (context?.subjectId) {
+      setSelectedSubjectId(context.subjectId);
+    }
+    if (tabId === 'practice' && context && (context.subjectId || context.topicId || context.conceptId || context.title)) {
+      setPracticeLaunchContext({
+        subjectId: context.subjectId,
+        topicId: context.topicId,
+        conceptId: context.conceptId,
+        title: context.title,
+      });
+    }
+    if (tabId === 'copilot' && (context?.prompt || context?.initialPrompt)) {
+      setCopilotContext(context.prompt || context.initialPrompt);
+    }
+    setActiveTab(tabId);
   };
+
+  const handleConsumePracticeContext = useCallback(() => {
+    setPracticeLaunchContext(null);
+  }, []);
+
+  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
+  const averageMasteryPercent =
+    attempts.length > 0 && masteries.length > 0
+      ? Math.round(masteries.reduce((sum, m) => sum + m.masteryScore, 0) / masteries.length)
+      : 0;
 
   // Convert auth profile to legacy UserProfile view format
   const effectiveLegacyUser: UserProfile = {
@@ -372,12 +382,7 @@ export default function App() {
         </header>
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-2xl py-4">
-            <Suspense fallback={<ViewLoadingFallback />}>
-              <AuthView
-                onNavigateToTab={() => setActiveTab('dashboard')}
-                initialResetToken={resetToken}
-              />
-            </Suspense>
+            <AuthView onNavigateToTab={() => setActiveTab('dashboard')} />
           </div>
         </main>
       </div>
@@ -431,8 +436,7 @@ export default function App() {
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
             >
-            <Suspense fallback={<ViewLoadingFallback />}>
-            {arrivalReminder && (
+            {arrivalReminder && !isWalkthroughOpen && (
               <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_rgba(45,42,74,0.06)] animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-start gap-3">
                   <div className="p-2.5 rounded-xl bg-[#6C5CE7] text-white shrink-0 mt-0.5 shadow-xs">
@@ -474,156 +478,179 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'dashboard' && (
-              <DashboardView
-                user={effectiveLegacyUser}
-                masteries={masteries}
-                onNavigate={(tab) => setActiveTab(tab)}
-                onSelectSubject={handleSelectSubject}
-              />
-            )}
-
-          {activeTab === 'concepts' && (
-            <ConceptLibraryView
-              onOpenCopilotWithContext={handleOpenCopilotWithContext}
-              onNavigateToPractice={() => setActiveTab('practice')}
-            />
-          )}
-
-          {activeTab === 'learn' && (
-            <LearnView
-              initialSubjectId={selectedSubjectId}
-              onCompleteConcept={(conceptId, xpEarned) => {
-                // Concept completed
-              }}
-              onOpenCopilotWithContext={handleOpenCopilotWithContext}
-            />
-          )}
-
-          {activeTab === 'practice' && (
-            <PracticeView onOpenCopilotWithContext={handleOpenCopilotWithContext} />
-          )}
-
-          {activeTab === 'focus' && (
-            <GenFocusTimerView
-              onNavigateToTab={(tab, ctx) => {
-                if (ctx?.subjectId) setSelectedSubjectId(ctx.subjectId);
-                setActiveTab(tab);
-              }}
-              onToggleZenMode={() => setIsZenMode((prev) => !prev)}
-              onAwardXp={(xp, reason) => awardXp(xp, reason)}
-            />
-          )}
-
-          {activeTab === 'create' && (
-            <CreatorStudioView onNavigateToPractice={() => setActiveTab('practice')} />
-          )}
-
-          {activeTab === 'mentor' && (
-            <MentorView
-              user={effectiveLegacyUser}
-              masteries={masteries}
-              attempts={attempts}
-              onStartRevision={(conceptId) => setActiveTab('practice')}
-              onNavigateToCopilot={(prompt) => {
-                setCopilotContext(prompt || '');
-                setActiveTab('copilot');
-              }}
-            />
-          )}
-
-          {activeTab === 'copilot' && (
-            <CopilotView
-              user={effectiveLegacyUser}
-              initialContext={copilotContext}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
-            />
-          )}
-
-          {activeTab === 'simulations' && (
-            <SimulationsHubView onNavigateToTab={(tab) => setActiveTab(tab)} />
-          )}
-
-          {activeTab === 'planner' && <PlannerView />}
-
-          {activeTab === 'leaderboard' && (
-            <div className="max-w-5xl mx-auto animate-in fade-in duration-200">
-              <Leaderboard
-                onNavigateToPrivacySettings={() => {
-                  setProfileInitialTab('settings');
-                  setProfileInitialSection('privacy');
-                  setActiveTab('profile');
-                }}
-              />
-            </div>
-          )}
-
-          {activeTab === 'gamification' && <GamificationView />}
-
-          {activeTab === 'intelligence' && (
-            <IntelligenceView
-              user={effectiveLegacyUser}
-              masteries={masteries}
-              attempts={attempts}
-              onNavigateTab={(tab, context) => {
-                if (tab === 'copilot' && context?.prompt) {
-                  setCopilotContext(context.prompt);
-                }
-                if (context?.subjectId) {
-                  setSelectedSubjectId(context.subjectId);
-                }
-                setActiveTab(tab);
-              }}
-            />
-          )}
-
-          {activeTab === 'admin' && <AdminStudioView />}
-
-          {activeTab === 'digital-archive' && (
-            <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-200">
-              <DigitalArchiveHub selectedSubject="math" />
-            </div>
-          )}
-
-          {activeTab === 'docs' && <DocsViewer />}
-
-          {activeTab === 'study-rooms' && <StudyRoomsView onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'voice-exam' && <VoiceExamView onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'forecaster' && <ExamForecasterView onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'offline-sync' && <OfflineSyncView onNavigateToTab={(tab) => setActiveTab(tab)} />}
-
-          {(activeTab === 'user-guide' || activeTab === 'guide') && (
-            <UserGuideView
-              onNavigateToTab={(tab, ctx) => {
-                if (ctx?.subjectId) setSelectedSubjectId(ctx.subjectId);
-                setActiveTab(tab);
-              }}
-            />
-          )}
-
-          {activeTab === 'profile' && (
-            <ProfileView
-              onOpenCopilotWithContext={handleOpenCopilotWithContext}
-              initialTab={profileInitialTab}
-              initialSettingsSection={profileInitialSection}
-            />
-          )}
-
-          {(activeTab === 'auth' ||
-            activeTab === 'signin' ||
-            activeTab === 'signup' ||
-            activeTab === 'signout') && (
-            <AuthView
-              initialMode={
-                activeTab === 'signup'
-                  ? 'signup'
-                  : activeTab === 'signout'
-                  ? 'session'
-                  : 'signin'
+            <Suspense
+              fallback={
+                <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-[#6C5CE7] animate-spin" />
+                  <p className="text-xs font-bold text-[#6B6890] dark:text-[#B4B0D5]">
+                    Loading workspace module...
+                  </p>
+                </div>
               }
-              onNavigateToTab={(tab) => setActiveTab(tab)}
-            />
-          )}
+            >
+              {activeTab === 'dashboard' && (
+                <DashboardView
+                  user={effectiveLegacyUser}
+                  masteries={masteries}
+                  attempts={attempts}
+                  onNavigate={handleNavigateWithContext}
+                  onSelectSubject={(subjectId) => {
+                    setSelectedSubjectId(subjectId);
+                    setActiveTab('learn');
+                  }}
+                />
+              )}
+
+              {activeTab === 'concepts' && (
+                <ConceptLibraryView
+                  onOpenCopilotWithContext={handleOpenCopilotWithContext}
+                  onNavigateToPractice={() => setActiveTab('practice')}
+                />
+              )}
+
+              {activeTab === 'learn' && (
+                <LearnView
+                  initialSubjectId={selectedSubjectId}
+                  onCompleteConcept={() => {}}
+                  onOpenCopilotWithContext={handleOpenCopilotWithContext}
+                />
+              )}
+
+              {activeTab === 'practice' && (
+                <PracticeView
+                  onOpenCopilotWithContext={handleOpenCopilotWithContext}
+                  initialPracticeContext={practiceLaunchContext}
+                  onConsumePracticeContext={handleConsumePracticeContext}
+                />
+              )}
+
+              {activeTab === 'focus' && (
+                <GenFocusTimerView
+                  onNavigateToTab={handleNavigateWithContext}
+                  onToggleZenMode={() => setIsZenMode((prev) => !prev)}
+                  onAwardXp={(xp, reason) => awardXp(xp, reason)}
+                />
+              )}
+
+              {activeTab === 'create' && (
+                <CreatorStudioView onNavigateToPractice={() => setActiveTab('practice')} />
+              )}
+
+              {activeTab === 'mentor' && (
+                <MentorView
+                  user={effectiveLegacyUser}
+                  masteries={masteries}
+                  attempts={attempts}
+                  onStartRevision={() => setActiveTab('practice')}
+                  onNavigateToCopilot={(prompt) => {
+                    setCopilotContext(prompt || '');
+                    setActiveTab('copilot');
+                  }}
+                />
+              )}
+
+              {activeTab === 'copilot' && (
+                <CopilotView
+                  user={effectiveLegacyUser}
+                  initialContext={copilotContext}
+                  onNavigateToTab={(tab) => setActiveTab(tab)}
+                />
+              )}
+
+              {activeTab === 'simulations' && (
+                <SimulationsHubView onNavigateToTab={(tab) => setActiveTab(tab)} />
+              )}
+
+              {activeTab === 'planner' && <PlannerView />}
+
+              {activeTab === 'marketplace' && <Marketplace />}
+
+              {activeTab === 'leaderboard' && (
+                <div className="max-w-5xl mx-auto animate-in fade-in duration-200">
+                  <Leaderboard
+                    onNavigateToPrivacySettings={() => {
+                      setProfileInitialTab('settings');
+                      setProfileInitialSection('privacy');
+                      setActiveTab('profile');
+                    }}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'gamification' && <GamificationView />}
+
+              {activeTab === 'intelligence' && (
+                <IntelligenceView
+                  user={effectiveLegacyUser}
+                  masteries={masteries}
+                  attempts={attempts}
+                  onNavigateTab={handleNavigateWithContext}
+                />
+              )}
+
+              {activeTab === 'admin' &&
+                (isAdmin ? (
+                  <AdminStudioView />
+                ) : (
+                  <div className="max-w-xl mx-auto mt-12 p-8 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-center space-y-4 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <h2 className="text-lg font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+                      Administrator Access Required
+                    </h2>
+                    <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
+                      Admin Studio is restricted to verified administrators. Return to your learning dashboard to continue studying.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('dashboard')}
+                      className="px-5 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold cursor-pointer"
+                    >
+                      Back to Dashboard
+                    </button>
+                  </div>
+                ))}
+
+              {activeTab === 'digital-archive' && (
+                <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-200">
+                  <DigitalArchiveHub selectedSubject="math" />
+                </div>
+              )}
+
+              {activeTab === 'docs' && <DocsViewer />}
+
+              {activeTab === 'study-rooms' && <StudyRoomsView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+              {activeTab === 'voice-exam' && <VoiceExamView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+              {activeTab === 'forecaster' && <ExamForecasterView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+              {activeTab === 'offline-sync' && <OfflineSyncView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+
+              {(activeTab === 'user-guide' || activeTab === 'guide') && (
+                <UserGuideView onNavigateToTab={handleNavigateWithContext} />
+              )}
+
+              {activeTab === 'profile' && (
+                <ProfileView
+                  onOpenCopilotWithContext={handleOpenCopilotWithContext}
+                  initialTab={profileInitialTab}
+                  initialSettingsSection={profileInitialSection}
+                />
+              )}
+
+              {(activeTab === 'auth' ||
+                activeTab === 'signin' ||
+                activeTab === 'signup' ||
+                activeTab === 'signout') && (
+                <AuthView
+                  initialMode={
+                    activeTab === 'signup'
+                      ? 'signup'
+                      : activeTab === 'signout'
+                      ? 'session'
+                      : 'signin'
+                  }
+                  onNavigateToTab={(tab) => setActiveTab(tab)}
+                />
+              )}
             </Suspense>
           </ErrorBoundary>
         </main>
@@ -634,6 +661,8 @@ export default function App() {
           isOpen={isContextPanelOpen}
           onClose={() => setIsContextPanelOpen(false)}
           activeSubject={selectedSubjectId}
+          averageMastery={averageMasteryPercent}
+          activeStreak={gamification?.currentStreak ?? 0}
           onAskCopilot={(prompt) => {
             setCopilotContext(prompt);
             setActiveTab('copilot');
@@ -646,17 +675,13 @@ export default function App() {
       <GlobalSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        onNavigate={(tab) => setActiveTab(tab)}
-        onSelectConcept={(conceptId) => {
+        onNavigate={handleNavigateWithContext}
+        onSelectConcept={() => {
           setActiveTab('learn');
           setIsSearchOpen(false);
         }}
       />
 
-      {/* Lazily-loaded overlays. `null` is the correct fallback: these are all
-          hidden until their state flag flips, so there is nothing to show while
-          the chunk downloads, and a spinner here would flash on first open. */}
-      <Suspense fallback={null}>
       {/* Notification Center Drawer */}
       <NotificationCenter
         isOpen={isNotificationOpen}
@@ -688,7 +713,19 @@ export default function App() {
         isOpen={isFlashCheckOpen}
         onClose={() => setIsFlashCheckOpen(false)}
         onComplete={(xpEarned) => {
-          // Can refresh gamification or show streak toast
+          awardXp(xpEarned, 'Completed 60s Flash Check');
+          setNotifications((prev) => [
+            {
+              id: `notif-fc-${Date.now()}`,
+              type: 'achievement',
+              title: `⚡ Flash Check Completed (+${xpEarned} XP)`,
+              message: 'Spaced repetition retention intervals have been updated.',
+              timestamp: 'Just now',
+              isRead: false,
+              actionUrl: 'practice',
+            },
+            ...prev,
+          ]);
         }}
         onAskCopilot={(prompt) => {
           setCopilotContext(prompt);
@@ -721,8 +758,6 @@ export default function App() {
           localStorage.setItem('learnco_walkthrough_seen', 'true');
         }}
       />
-
-      </Suspense>
 
       {/* Floating Omni Copilot Widget */}
       {activeTab !== 'copilot' && !isZenMode && <OmniCopilot />}

@@ -21,7 +21,6 @@ export class FirestoreSyncService {
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           lastLoginAt: user.lastLoginAt,
-          ...(user.passwordHash ? { passwordHash: user.passwordHash } : {}),
         },
         { merge: true }
       );

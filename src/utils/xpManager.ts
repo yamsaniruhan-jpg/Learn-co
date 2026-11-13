@@ -13,7 +13,7 @@ export interface XpEventDetail {
 /**
  * Get current user XP from localStorage with safe default
  */
-export function getCurrentXp(defaultXp: number = 420): number {
+export function getCurrentXp(defaultXp: number = 0): number {
   try {
     const saved = localStorage.getItem(XP_STORAGE_KEY);
     if (saved !== null) {
@@ -25,13 +25,23 @@ export function getCurrentXp(defaultXp: number = 420): number {
 }
 
 /**
+ * Sync localStorage XP silently from authoritative backend state without triggering duplicate remote writes
+ */
+export function syncLocalXpOnly(xp: number): void {
+  try {
+    const safeXp = Math.max(0, Math.round(Number.isFinite(xp) ? xp : 0));
+    localStorage.setItem(XP_STORAGE_KEY, safeXp.toString());
+  } catch (_) {}
+}
+
+/**
  * Award XP to learner, persist in localStorage, and dispatch global window event
  */
 export function awardXp(
   amount: number,
   reason: string = 'Completed Activity'
 ): { newTotal: number; levelInfo: ReturnType<typeof calculateLevelFromXp> } {
-  const current = getCurrentXp();
+  const current = getCurrentXp(0);
   const safeAmount = Math.max(0, amount);
   const newTotal = current + safeAmount;
 
@@ -81,14 +91,15 @@ export function awardXp(
  */
 export function setGlobalXp(newTotal: number): void {
   try {
-    localStorage.setItem(XP_STORAGE_KEY, Math.max(0, newTotal).toString());
-    const levelInfo = calculateLevelFromXp(newTotal);
+    const safeXp = Math.max(0, Math.round(Number.isFinite(newTotal) ? newTotal : 0));
+    localStorage.setItem(XP_STORAGE_KEY, safeXp.toString());
+    const levelInfo = calculateLevelFromXp(safeXp);
     window.dispatchEvent(
       new CustomEvent<XpEventDetail>('learnco_xp_awarded', {
         detail: {
           amount: 0,
           reason: 'Sync',
-          totalXp: newTotal,
+          totalXp: safeXp,
           level: levelInfo.level,
         },
       })
@@ -96,7 +107,7 @@ export function setGlobalXp(newTotal: number): void {
 
     // Sync to Firestore
     import('../services/clientFirestoreSync').then(({ syncXpToFirestoreAndBackend }) => {
-      syncXpToFirestoreAndBackend(newTotal, 'Sync').catch(() => {});
+      syncXpToFirestoreAndBackend(safeXp, 'Sync').catch(() => {});
     }).catch(() => {});
   } catch (_) {}
 }

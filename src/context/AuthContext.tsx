@@ -5,23 +5,25 @@ import {
   UserGamification,
   UserSettings,
   OnboardingStatus,
-  DailyPracticeQuota,
+  DAILY_PRACTICE_LIMIT,
+  DAILY_DOUBTS_LIMIT,
+  DAILY_ARTIFACTS_LIMIT,
+  DAILY_SOURCES_UPLOAD_LIMIT,
+  DAILY_URLS_LIMIT,
+  DAILY_AI_PLANS_LIMIT,
   calculateLevelFromXp,
 } from '../types/auth';
-import { getCurrentXp } from '../utils/xpManager';
+import { getCurrentXp, syncLocalXpOnly } from '../utils/xpManager';
 import { loadUserStreak } from '../utils/streakManager';
-
-/**
- * Firestore mirroring is a best-effort side channel: the authoritative state lives
- * on the Learn.co backend. It is therefore loaded on demand so that the whole
- * Firebase SDK stays out of the initial bundle, and any failure is swallowed
- * exactly as the previous fire-and-forget calls did (.catch(() => {})).
- */
-function syncClientToFirestore(user: any, profile: any, gamification: any) {
-  return import('../services/clientFirestoreSync')
-    .then(({ syncClientToFirestore: sync }) => sync(user, profile, gamification))
-    .catch(() => {});
-}
+import { syncClientToFirestore } from '../services/clientFirestoreSync';
+import {
+  auth,
+  googleProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as fbSignOut,
+} from '../services/firebaseClient';
 
 interface AuthContextType {
   user: any | null;
@@ -57,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [gamification, setGamification] = useState<UserGamification | null>(() => {
-    const initXp = getCurrentXp(420);
+    const initXp = getCurrentXp(0);
     const lvl = calculateLevelFromXp(initXp);
     const streakState = loadUserStreak('guest');
     return {
@@ -68,13 +70,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       longestStreak: streakState.longestStreak,
       lastActiveDate: streakState.lastActiveDate,
       dailyQuestionsSolvedToday: 0,
-      dailyAllowanceLimit: 25,
+      dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
       dailyDoubtsAskedToday: 0,
-      dailyDoubtsLimit: 10,
+      dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
       dailyArtifactsCreatedToday: 0,
-      dailyArtifactsLimit: 5,
+      dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
       dailySourcesUploadedToday: 0,
-      dailySourcesUploadLimit: 5,
+      dailySourcesUploadLimit: DAILY_SOURCES_UPLOAD_LIMIT,
+      dailyUrlsProcessedToday: 0,
+      dailyUrlsLimit: DAILY_URLS_LIMIT,
+      dailyAiPlansGeneratedToday: 0,
+      dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
     };
   });
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -90,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setProfile(null);
         setSettings(null);
-        const currentLocalXp = getCurrentXp(420);
+        const currentLocalXp = getCurrentXp(0);
         const lvl = calculateLevelFromXp(currentLocalXp);
         const streakState = loadUserStreak('guest');
         setGamification((prev) => ({
@@ -101,13 +107,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           longestStreak: streakState.longestStreak,
           lastActiveDate: streakState.lastActiveDate,
           dailyQuestionsSolvedToday: prev?.dailyQuestionsSolvedToday || 0,
-          dailyAllowanceLimit: prev?.dailyAllowanceLimit || 25,
+          dailyAllowanceLimit: prev?.dailyAllowanceLimit || DAILY_PRACTICE_LIMIT,
           dailyDoubtsAskedToday: prev?.dailyDoubtsAskedToday || 0,
-          dailyDoubtsLimit: prev?.dailyDoubtsLimit || 10,
+          dailyDoubtsLimit: prev?.dailyDoubtsLimit || DAILY_DOUBTS_LIMIT,
           dailyArtifactsCreatedToday: prev?.dailyArtifactsCreatedToday || 0,
-          dailyArtifactsLimit: prev?.dailyArtifactsLimit || 5,
+          dailyArtifactsLimit: prev?.dailyArtifactsLimit || DAILY_ARTIFACTS_LIMIT,
           dailySourcesUploadedToday: prev?.dailySourcesUploadedToday || 0,
-          dailySourcesUploadLimit: prev?.dailySourcesUploadLimit || 5,
+          dailySourcesUploadLimit: prev?.dailySourcesUploadLimit || DAILY_SOURCES_UPLOAD_LIMIT,
+          dailyUrlsProcessedToday: prev?.dailyUrlsProcessedToday || 0,
+          dailyUrlsLimit: prev?.dailyUrlsLimit || DAILY_URLS_LIMIT,
+          dailyAiPlansGeneratedToday: prev?.dailyAiPlansGeneratedToday || 0,
+          dailyAiPlansLimit: prev?.dailyAiPlansLimit || DAILY_AI_PLANS_LIMIT,
         }));
         return;
       }
@@ -115,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await AuthClient.getMe();
       setUser(res.user);
       setProfile(res.profile);
+      syncLocalXpOnly(res.gamification?.xp ?? 0);
       const userStreak = loadUserStreak(res.user.id || 'default_user');
       setGamification({
         ...res.gamification,
@@ -126,9 +137,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       console.warn('Session verification failed or expired:', err?.message || err);
       AuthClient.removeToken();
+      syncLocalXpOnly(0);
       setUser(null);
       setProfile(null);
       setSettings(null);
+      const streakState = loadUserStreak('guest');
+      setGamification({
+        userId: 'guest',
+        xp: 0,
+        level: 1,
+        currentStreak: streakState.currentStreak,
+        longestStreak: streakState.longestStreak,
+        lastActiveDate: streakState.lastActiveDate,
+        dailyQuestionsSolvedToday: 0,
+        dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
+        dailyDoubtsAskedToday: 0,
+        dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
+        dailyArtifactsCreatedToday: 0,
+        dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
+        dailySourcesUploadedToday: 0,
+        dailySourcesUploadLimit: DAILY_SOURCES_UPLOAD_LIMIT,
+        dailyUrlsProcessedToday: 0,
+        dailyUrlsLimit: DAILY_URLS_LIMIT,
+        dailyAiPlansGeneratedToday: 0,
+        dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -151,17 +184,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               userId: 'guest',
               xp: currentXp,
               level: lvl.level,
-              currentStreak: 3,
-              longestStreak: 7,
+              currentStreak: 0,
+              longestStreak: 0,
               lastActiveDate: new Date().toISOString().split('T')[0],
-              dailyQuestionsSolvedToday: 4,
-              dailyAllowanceLimit: 25,
-              dailyDoubtsAskedToday: 1,
-              dailyDoubtsLimit: 10,
+              dailyQuestionsSolvedToday: 0,
+              dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
+              dailyDoubtsAskedToday: 0,
+              dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
               dailyArtifactsCreatedToday: 0,
-              dailyArtifactsLimit: 5,
+              dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
               dailySourcesUploadedToday: 0,
-              dailySourcesUploadLimit: 5,
+              dailySourcesUploadLimit: DAILY_SOURCES_UPLOAD_LIMIT,
+              dailyUrlsProcessedToday: 0,
+              dailyUrlsLimit: DAILY_URLS_LIMIT,
+              dailyAiPlansGeneratedToday: 0,
+              dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
             };
           }
           const updatedGam = {
@@ -181,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       window.removeEventListener('learnco_xp_awarded', handleXpAwarded);
     };
-  }, []);
+  }, [user, profile]);
 
   const signInWithEmail = async (email: string, password?: string) => {
     setAuthError(null);
@@ -191,9 +228,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Authenticate with Firebase Authentication first if password is provided
       if (password) {
         try {
-          const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import(
-            '../services/firebaseClient'
-          );
           if (auth && auth.app) {
             try {
               const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -222,6 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await AuthClient.signIn(email, password, firebaseIdToken);
       setUser(res.user);
       setProfile(res.profile);
+      syncLocalXpOnly(res.gamification?.xp ?? 0);
       setGamification(res.gamification);
       setSettings(res.settings);
       syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
@@ -239,9 +274,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Register with Firebase Authentication
       if (password) {
         try {
-          const { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import(
-            '../services/firebaseClient'
-          );
           if (auth && auth.app) {
             try {
               const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -262,6 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await AuthClient.signUp({ email, password, fullName, idToken: firebaseIdToken });
       setUser(res.user);
       setProfile(res.profile);
+      syncLocalXpOnly(res.gamification?.xp ?? 0);
       setGamification(res.gamification);
       setSettings(res.settings);
       syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
@@ -283,8 +316,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 1. Use Firebase Auth if not already provided via idToken
       let firebaseToken = idToken;
       if (!firebaseToken) {
-        const { signInWithPopup } = await import('../services/firebaseClient');
-        const { googleProvider, auth } = await import('../services/firebaseClient');
         const result = await signInWithPopup(auth, googleProvider);
         firebaseToken = await result.user.getIdToken();
       }
@@ -299,6 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       setUser(res.user);
       setProfile(res.profile);
+      syncLocalXpOnly(res.gamification?.xp ?? 0);
       setGamification(res.gamification);
       setSettings(res.settings);
       syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
@@ -312,7 +344,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null);
     try {
       try {
-        const { auth, signOut: fbSignOut } = await import('../services/firebaseClient');
         if (auth && auth.app) {
           await fbSignOut(auth);
         }
@@ -321,27 +352,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       await AuthClient.signOut();
     } finally {
+      syncLocalXpOnly(0);
       setUser(null);
       setProfile(null);
       setSettings(null);
-      const currentLocalXp = getCurrentXp(420);
-      const lvl = calculateLevelFromXp(currentLocalXp);
       const streakState = loadUserStreak('guest');
       setGamification({
         userId: 'guest',
-        xp: currentLocalXp,
-        level: lvl.level,
+        xp: 0,
+        level: 1,
         currentStreak: streakState.currentStreak,
         longestStreak: streakState.longestStreak,
         lastActiveDate: streakState.lastActiveDate,
         dailyQuestionsSolvedToday: 0,
-        dailyAllowanceLimit: 25,
+        dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
         dailyDoubtsAskedToday: 0,
-        dailyDoubtsLimit: 10,
+        dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
         dailyArtifactsCreatedToday: 0,
-        dailyArtifactsLimit: 5,
+        dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
         dailySourcesUploadedToday: 0,
-        dailySourcesUploadLimit: 5,
+        dailySourcesUploadLimit: DAILY_SOURCES_UPLOAD_LIMIT,
+        dailyUrlsProcessedToday: 0,
+        dailyUrlsLimit: DAILY_URLS_LIMIT,
+        dailyAiPlansGeneratedToday: 0,
+        dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
       });
     }
   };
@@ -374,7 +408,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGamification((prev) => {
       const streakState = loadUserStreak(prev?.userId || 'guest');
       if (!prev) {
-        const initXp = newGam.xp ?? getCurrentXp(420);
+        const initXp = newGam.xp ?? getCurrentXp(0);
         const lvl = calculateLevelFromXp(initXp);
         return {
           userId: 'guest',
@@ -384,13 +418,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           longestStreak: streakState.longestStreak,
           lastActiveDate: streakState.lastActiveDate,
           dailyQuestionsSolvedToday: 0,
-          dailyAllowanceLimit: 25,
+          dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
           dailyDoubtsAskedToday: 0,
-          dailyDoubtsLimit: 10,
+          dailyDoubtsLimit: DAILY_DOUBTS_LIMIT,
           dailyArtifactsCreatedToday: 0,
-          dailyArtifactsLimit: 5,
+          dailyArtifactsLimit: DAILY_ARTIFACTS_LIMIT,
           dailySourcesUploadedToday: 0,
-          dailySourcesUploadLimit: 5,
+          dailySourcesUploadLimit: DAILY_SOURCES_UPLOAD_LIMIT,
+          dailyUrlsProcessedToday: 0,
+          dailyUrlsLimit: DAILY_URLS_LIMIT,
+          dailyAiPlansGeneratedToday: 0,
+          dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
           ...newGam,
         };
       }

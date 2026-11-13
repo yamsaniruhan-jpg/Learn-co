@@ -157,6 +157,13 @@ router.post('/checkout', verifyFirebaseAuth, async (req, res) => {
       }
     }
 
+    if (process.env.NODE_ENV === 'production' && (!stripe || !process.env.STRIPE_SECRET_KEY)) {
+      return res.status(503).json({
+        error: 'Payment checkout is not configured in this environment.',
+        code: 'BILLING_UNAVAILABLE',
+      });
+    }
+
     // Sandbox / Instant upgrade mode for development and testing
     const db = getDb();
     const expiresDate = new Date();
@@ -226,10 +233,18 @@ router.post('/cancel', verifyFirebaseAuth, async (req, res) => {
 router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const isProd = process.env.NODE_ENV === 'production';
 
   let event = req.body;
 
-  if (stripe && webhookSecret && sig) {
+  if (isProd && (!stripe || !webhookSecret || !sig)) {
+    return res.status(400).json({ error: 'Stripe webhook verification is required.' });
+  }
+
+  if (stripe && webhookSecret) {
+    if (!sig) {
+      return res.status(400).send('Webhook Error: Missing stripe-signature header.');
+    }
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {

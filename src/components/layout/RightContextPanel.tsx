@@ -17,6 +17,8 @@ interface RightContextPanelProps {
   onClose: () => void;
   activeContextTitle?: string;
   activeSubject?: string;
+  averageMastery?: number;
+  activeStreak?: number;
   onAskCopilot: (prompt: string) => void;
 }
 
@@ -25,6 +27,8 @@ export const RightContextPanel: React.FC<RightContextPanelProps> = ({
   onClose,
   activeContextTitle = 'General Learning Space',
   activeSubject,
+  averageMastery = 0,
+  activeStreak = 0,
   onAskCopilot,
 }) => {
   const [quickQuestion, setQuickQuestion] = useState('');
@@ -110,17 +114,22 @@ export const RightContextPanel: React.FC<RightContextPanelProps> = ({
         <div className="p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40">
           <div className="flex items-center justify-between mb-1.5">
             <span className="font-bold text-indigo-900 dark:text-indigo-200 text-[11px]">
-              Memory Stability
+              Memory Stability{activeSubject ? ` (${activeSubject.toUpperCase()})` : ''}
             </span>
             <span className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400">
-              92%
+              {averageMastery}%
             </span>
           </div>
           <div className="w-full bg-indigo-200/50 dark:bg-indigo-900/50 rounded-full h-1.5">
-            <div className="bg-indigo-600 h-1.5 rounded-full w-[92%]" />
+            <div
+              className="bg-[#6C5CE7] h-1.5 rounded-full transition-all duration-300"
+              style={{ width: `${Math.min(100, Math.max(0, averageMastery))}%` }}
+            />
           </div>
           <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
-            Projected half-life: 14 days before next interval drill.
+            {averageMastery > 0
+              ? `Current streak: ${activeStreak} day${activeStreak === 1 ? '' : 's'} • Calibrated from practice attempts.`
+              : 'Complete a diagnostic practice session to calibrate memory stability.'}
           </p>
         </div>
       </div>

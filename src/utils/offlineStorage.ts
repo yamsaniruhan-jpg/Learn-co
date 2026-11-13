@@ -27,6 +27,7 @@ export class OfflineStorageManager {
     };
     list.push(newEntry);
     localStorage.setItem(STORAGE_KEY_PENDING_ATTEMPTS, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent('learnco_offline_queue_updated'));
   }
 
   /**
@@ -67,6 +68,7 @@ export class OfflineStorageManager {
             subjectId: item.subjectId,
             topic: item.topic,
             userAnswer: item.userAnswer,
+            isCorrect: item.isCorrect,
             timeSpentSeconds: item.timeSpentSeconds,
           }),
         });
@@ -82,6 +84,7 @@ export class OfflineStorageManager {
     }
 
     localStorage.setItem(STORAGE_KEY_PENDING_ATTEMPTS, JSON.stringify(remainingAttempts));
+    window.dispatchEvent(new CustomEvent('learnco_offline_queue_updated'));
     return syncedCount;
   }
 
@@ -90,6 +93,7 @@ export class OfflineStorageManager {
    */
   static clearPendingAttempts(): void {
     localStorage.removeItem(STORAGE_KEY_PENDING_ATTEMPTS);
+    window.dispatchEvent(new CustomEvent('learnco_offline_queue_updated'));
   }
 }
 
@@ -109,23 +113,29 @@ export function useNetworkStatus(): {
   });
 
   useEffect(() => {
+    const refreshCount = () => {
+      setPendingCount(OfflineStorageManager.getPendingAttempts().length);
+    };
+
     const handleOnline = async () => {
       setIsOnline(true);
-      const synced = await OfflineStorageManager.syncPendingAttemptsToServer();
-      setPendingCount(OfflineStorageManager.getPendingAttempts().length);
+      await OfflineStorageManager.syncPendingAttemptsToServer();
+      refreshCount();
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      setPendingCount(OfflineStorageManager.getPendingAttempts().length);
+      refreshCount();
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('learnco_offline_queue_updated', refreshCount);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('learnco_offline_queue_updated', refreshCount);
     };
   }, []);
 

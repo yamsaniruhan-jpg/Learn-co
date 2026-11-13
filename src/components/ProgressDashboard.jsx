@@ -111,11 +111,13 @@ function StatCard({ icon, label, value, color }) {
   );
 }
 
-function ReviewCards({ cards }) {
+function ReviewCards({ cards = [] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
 
-  if (currentIndex >= cards.length) {
+  const safeCards = Array.isArray(cards) ? cards : [];
+
+  if (!safeCards.length || currentIndex >= safeCards.length) {
     return (
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
         <p className="text-emerald-700 font-semibold text-base">✅ All caught up! Great job.</p>
@@ -124,7 +126,7 @@ function ReviewCards({ cards }) {
     );
   }
 
-  const card = cards[currentIndex];
+  const card = safeCards[currentIndex];
 
   const handleRate = async (quality) => {
     try {
@@ -141,7 +143,7 @@ function ReviewCards({ cards }) {
 
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 text-center">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Card {currentIndex + 1} of {cards.length}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Card {currentIndex + 1} of {safeCards.length}</p>
       {card.topic && (
         <span className="inline-block px-2.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 mb-3">
           {card.topic}

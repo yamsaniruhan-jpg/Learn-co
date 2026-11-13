@@ -19,10 +19,14 @@ import {
   LogIn,
   LogOut,
   User,
-  KeyRound,
   Clock,
   HelpCircle,
   FlaskConical,
+  Users,
+  TrendingUp,
+  Mic,
+  RefreshCw,
+  ShoppingBag,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateLevelFromXp } from '../../types/auth';
@@ -51,35 +55,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { isAuthenticated, user, profile, gamification, signOut } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const userXp = gamification?.xp ?? 420;
+  const userXp = gamification?.xp ?? 0;
   const levelInfo = calculateLevelFromXp(userXp);
+  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
 
   const coreNav: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'concepts', label: 'Concept Library', icon: Library, highlight: true },
+    { id: 'concepts', label: 'Concept Library', icon: Library },
     { id: 'learn', label: 'Learn & Explore', icon: BookOpen },
     { id: 'practice', label: 'Practice Arena', icon: Target, badge: `${dailyAllowanceRemaining} left` },
-    { id: 'focus', label: 'Zen Focus Timer', icon: Clock, highlight: true },
-    { id: 'user-guide', label: 'User Guide', icon: HelpCircle, highlight: true },
+    { id: 'focus', label: 'Zen Focus Timer', icon: Clock },
     { id: 'simulations', label: 'Virtual Simulations', icon: FlaskConical, highlight: true },
     { id: 'planner', label: 'Study Planner', icon: Calendar },
+    { id: 'marketplace', label: 'Course Marketplace', icon: ShoppingBag },
+    { id: 'user-guide', label: 'User Guide', icon: HelpCircle },
   ];
 
   const aiNav: NavItem[] = [
     { id: 'create', label: 'Creator Studio', icon: Sparkles, highlight: true },
-    { id: 'copilot', label: 'Omni Copilot', icon: Bot },
+    { id: 'copilot', label: 'Omni Copilot', icon: Bot, highlight: true },
     { id: 'mentor', label: 'Personal Mentor', icon: Compass },
-    { id: 'voice-exam', label: 'Voice Oral Exam', icon: Sparkles, highlight: true },
+    { id: 'voice-exam', label: 'Voice Oral Exam', icon: Mic },
   ];
 
   const intelligenceNav: NavItem[] = [
-    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, highlight: true },
+    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
     { id: 'intelligence', label: 'Mastery Matrix', icon: BarChart3 },
-    { id: 'forecaster', label: 'Exam Forecaster', icon: BarChart3, highlight: true },
+    { id: 'forecaster', label: 'Exam Forecaster', icon: TrendingUp },
     { id: 'gamification', label: 'XP & Badges', icon: Award },
-    { id: 'study-rooms', label: 'Peer Study Rooms', icon: User, highlight: true },
-    { id: 'offline-sync', label: 'PWA Offline Sync', icon: ShieldCheck },
-    { id: 'admin', label: 'Admin Studio', icon: ShieldCheck },
+    { id: 'study-rooms', label: 'Peer Study Rooms', icon: Users },
+    { id: 'offline-sync', label: 'PWA Offline Sync', icon: RefreshCw },
+    ...(isAdmin ? [{ id: 'admin', label: 'Admin Studio', icon: ShieldCheck }] : []),
     { id: 'docs', label: 'Specs & Docs', icon: FileCode2 },
   ];
 
@@ -98,7 +104,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             label: 'Sign Out',
             icon: LogOut,
             color: 'text-rose-500 hover:text-rose-600',
-            action: () => {
+            action: async () => {
+              await signOut();
               setActiveTab('auth');
             },
           },

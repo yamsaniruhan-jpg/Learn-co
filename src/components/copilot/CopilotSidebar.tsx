@@ -68,6 +68,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleStartRename = (conv: CopilotConversation, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -222,37 +223,67 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
                         </span>
                       </div>
 
-                      {/* Hover action buttons */}
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTogglePin(conv.id, !conv.pinned);
-                          }}
-                          title={conv.pinned ? 'Unpin conversation' : 'Pin conversation'}
-                          className="p-1 text-slate-400 hover:text-amber-500 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                          <Pin className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => handleStartRename(conv, e)}
-                          title="Rename conversation"
-                          className="p-1 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm('Delete this tutoring session?')) {
-                              onDeleteConversation(conv.id);
-                            }
-                          }}
-                          title="Delete conversation"
-                          className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                      {/* Hover action buttons (kept visible while confirming delete) */}
+                      <div
+                        className={`${
+                          confirmDeleteId === conv.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        } flex items-center gap-0.5 shrink-0 transition-opacity`}
+                      >
+                        {confirmDeleteId === conv.id ? (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(null);
+                                onDeleteConversation(conv.id);
+                              }}
+                              title="Confirm delete"
+                              className="p-1 text-white bg-rose-600 hover:bg-rose-700 rounded cursor-pointer"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(null);
+                              }}
+                              title="Cancel delete"
+                              className="p-1 text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTogglePin(conv.id, !conv.pinned);
+                              }}
+                              title={conv.pinned ? 'Unpin conversation' : 'Pin conversation'}
+                              className="p-1 text-slate-400 hover:text-amber-500 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                            >
+                              <Pin className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleStartRename(conv, e)}
+                              title="Rename conversation"
+                              className="p-1 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(conv.id);
+                              }}
+                              title="Delete conversation"
+                              className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 

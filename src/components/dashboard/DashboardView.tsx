@@ -24,9 +24,11 @@ import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Badge } from '../ui/Badge';
 import { XPIndicator, StreakIndicator, MasteryIndicator } from '../ui/GamificationIndicators';
-import { SEED_SUBJECTS, SEED_STUDY_SESSIONS } from '../../data/seedData';
+import { SEED_SUBJECTS } from '../../data/seedData';
 import { Leaderboard } from '../leaderboard/Leaderboard';
 import { loadUserStreak, getWeeklyStreakPills, StreakData } from '../../utils/streakManager';
+import { PlannerClient } from '../../services/plannerClient';
+import { StudyTask } from '../../types/planner';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -48,6 +50,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [streakData, setStreakData] = useState<StreakData>(() =>
     loadUserStreak(user.id || 'default_user')
   );
+  const [upcomingTasks, setUpcomingTasks] = useState<StudyTask[]>([]);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -57,6 +60,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     handleUpdate();
     window.addEventListener('learnco_streak_updated', handleUpdate);
     return () => window.removeEventListener('learnco_streak_updated', handleUpdate);
+  }, [user.id]);
+
+  useEffect(() => {
+    let active = true;
+    PlannerClient.getOverview()
+      .then((res) => {
+        if (!active) return;
+        const pending = (res.tasks || [])
+          .filter((t) => t.status !== 'COMPLETED' && t.status !== 'SKIPPED')
+          .slice(0, 3);
+        setUpcomingTasks(pending);
+      })
+      .catch(() => {
+        if (active) setUpcomingTasks([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [user.id]);
 
   const weeklyPills = getWeeklyStreakPills(streakData);
@@ -84,7 +105,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ? masteries.filter((m) => m.isWeakArea || m.masteryScore < 60)
     : [];
 
-  const upcomingSessions = SEED_STUDY_SESSIONS.filter((s) => !s.isCompleted).slice(0, 3);
+  const mentorNote = !hasStartedPractice
+    ? 'Complete your first calibrated practice drill to unlock personalized retention diagnostics and weak-area remediation recommendations.'
+    : weakConcepts.length > 0
+    ? `Your overall verified mastery is ${averageMastery}%. Prioritize remediating "${weakConcepts[0].conceptTitle}" (${weakConcepts[0].masteryScore}%) before retention decays further.`
+    : `Strong momentum at ${averageMastery}% average mastery across ${attempts.length} verified attempts. Challenge yourself with higher-difficulty problems in the Practice Arena.`;
 
   const quickPrompts = [
     { title: 'Derive First Derivative Test', category: 'Math', tab: 'copilot', prompt: 'Derive the first derivative test for local extrema from first principles.' },
@@ -447,25 +472,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="space-y-2.5">
-              {upcomingSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-1.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                      {session.title}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                      {session.time}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                    <span>{session.topicTitle}</span>
-                    <span>{session.durationMinutes} mins</span>
-                  </div>
+              {upcomingTasks.length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    No upcoming tasks scheduled yet.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onNavigate('planner')}
+                    className="text-xs"
+                  >
+                    Create a study schedule in Planner
+                  </Button>
                 </div>
-              ))}
+              ) : (
+                upcomingTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        {task.title}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 shrink-0">
+                        {task.scheduledStartTime || task.scheduledDate}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="truncate">{task.conceptTitle || task.subjectId.toUpperCase()}</span>
+                      <span className="shrink-0">{task.estimatedDurationMinutes} mins</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 
@@ -507,7 +548,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </h3>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-              "Your monotonicity calculus retention is at 92%. Solidify your edge by reviewing Walden Inversion stereochemistry today."
+              "{mentorNote}"
             </p>
             <Button
               variant="secondary"

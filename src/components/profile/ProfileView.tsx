@@ -144,8 +144,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           AuthClient.getXpHistory(),
         ]);
         setStats(statsData);
-        setMistakes(mistakesData);
-        setXpTransactions(xpData);
+        setMistakes(Array.isArray(mistakesData) ? mistakesData : []);
+        setXpTransactions(Array.isArray(xpData) ? xpData : []);
       } catch (err) {
         console.error('Failed to load user analytics', err);
       } finally {
@@ -309,7 +309,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   {profile?.role ? profile.role.toUpperCase() : 'STUDENT'}
                 </Badge>
                 <span className="text-[11px] font-mono text-slate-400">
-                  ID: {profile?.userId || profile?.id || 'user-alex-001'}
+                  ID: {profile?.userId || profile?.id || 'guest'}
                 </span>
               </div>
 
@@ -387,7 +387,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           }`}
         >
           <RotateCcw className="w-4 h-4" />
-          <span>Mistake Notebook ({mistakes.length})</span>
+          <span>Mistake Notebook ({mistakes?.length || 0})</span>
         </button>
 
         <button
@@ -534,9 +534,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 { name: 'Data Science', key: 'data_science', color: 'teal', icon: '🤖' },
               ].map((sub) => {
                 const subStats = stats?.subjectBreakdown?.[sub.key as SubjectId] || {
-                  attempted: 1,
-                  correct: 1,
-                  accuracy: 100,
+                  attempted: 0,
+                  correct: 0,
+                  accuracy: 0,
                 };
                 return (
                   <div
@@ -1143,7 +1143,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Active Mistake Notebook ({mistakes.length})
+                Active Mistake Notebook ({mistakes?.length || 0})
               </h3>
               <p className="text-xs text-slate-400">
                 Questions answered incorrectly in diagnostic practice. Re-test to clear misconceptions.
@@ -1168,7 +1168,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
 
-          {mistakes.length === 0 ? (
+          {(mistakes?.length || 0) === 0 ? (
             <Card variant="bordered" padding="lg" className="text-center py-12 space-y-2">
               <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -1259,10 +1259,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             <div className="space-y-2">
-              {xpTransactions.length === 0 ? (
+              {(xpTransactions?.length || 0) === 0 ? (
                 <p className="text-xs text-slate-400 py-4 text-center">No XP transactions logged yet.</p>
               ) : (
-                xpTransactions.map((tx) => (
+                (xpTransactions || []).map((tx) => (
                   <div
                     key={tx.id}
                     className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs"

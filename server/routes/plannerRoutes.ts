@@ -11,15 +11,10 @@ router.use(requireAuth);
 
 function resolveUserId(req: Request): string {
   const authReq = req as AuthenticatedRequest;
-  if (authReq.userId) return authReq.userId;
-  if (authReq.user?.id) return authReq.user.id;
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
-    const sessionUser = Database.getSessionUser(token);
-    if (sessionUser) return sessionUser.id;
+  if (!authReq.userId) {
+    throw new Error('Authentication required.');
   }
-  return 'user-alex-001';
+  return authReq.userId;
 }
 
 // -------------------------------------------------------------
