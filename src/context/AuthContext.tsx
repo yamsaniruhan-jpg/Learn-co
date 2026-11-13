@@ -318,6 +318,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!firebaseToken) {
         const result = await signInWithPopup(auth, googleProvider);
         firebaseToken = await result.user.getIdToken();
+        if (email && result.user.email?.trim().toLowerCase() !== email.trim().toLowerCase()) {
+          throw new Error('The Google account selected does not match the email entered.');
+        }
+        email = result.user.email || email;
+        name = result.user.displayName || name;
+        avatarUrl = result.user.photoURL || avatarUrl;
       }
 
       // 2. Pass the Firebase ID token to the backend

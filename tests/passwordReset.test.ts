@@ -73,6 +73,38 @@ describe('password reset', () => {
     expect(JSON.stringify(a.body)).toBe(JSON.stringify(b.body));
   });
 
+  it('uses the configured reset origin rather than the request Origin header', async () => {
+    const email = uniqueEmail();
+    await signUp(email);
+    const previous = process.env.APP_URL;
+    process.env.APP_URL = 'https://learn.example';
+    try {
+      const response = await request(app).post('/api/auth/forgot-password')
+        .set('Origin', 'https://attacker.example').send({ email });
+      expect(response.status).toBe(200);
+      const logged = warnSpy.mock.calls.map((line) => line.join(' ')).reverse()
+        .find((line) => line.includes(email) && line.includes('reset_token='));
+      expect(logged).toContain('https://learn.example/?reset_token=');
+      expect(logged).not.toContain('attacker.example');
+    } finally {
+      if (previous === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = previous;
+    }
+  });
+
+  it('does not log reset tokens in API request paths', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const token = 'test-secret-token-123';
+      await request(app).get(`/api/auth/reset-password/${token}`);
+      const messages = log.mock.calls.map((line) => line.join(' ')).join('\n');
+      expect(messages).not.toContain(token);
+      expect(messages).toContain('[REDACTED]');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('never returns the reset token in the HTTP response', async () => {
     const email = uniqueEmail();
     await signUp(email);
@@ -187,17 +219,17 @@ describe('admin-only endpoints (S3)', () => {
 
     // A normal scholar must not be able to read the global alert webhook config.
     const read = await request(app).get('/api/analytics/webhook-config').set('Authorization', `Bearer ${token}`);
-    expect(read.status).toBe(404); // 404, not 403: existence is not advertised
+    expect(read.status).toBe(403); // Non-admins must be denied.
 
     // …nor rewrite it. Previously any signed-in user could do both.
     const write = await request(app)
       .post('/api/analytics/webhook-config')
       .set('Authorization', `Bearer ${token}`)
       .send({ enabled: true, webhookUrl: 'https://attacker.example/hook' });
-    expect(write.status).toBe(404);
+    expect(write.status).toBe(403);
 
     const dispatch = await request(app).post('/api/analytics/test-webhook').set('Authorization', `Bearer ${token}`);
-    expect(dispatch.status).toBe(404);
+    expect(dispatch.status).toBe(403);
   });
 
   it('still rejects anonymous callers with 401', async () => {
