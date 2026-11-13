@@ -43,6 +43,7 @@
     "motion": "^12.23.24",
     "node-cron": "^4.6.0",
     "nodemailer": "^10.4.0",
+    "pdfjs-dist": "^5.7.284",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",

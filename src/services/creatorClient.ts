@@ -42,6 +42,7 @@ export class CreatorClient {
     fileName?: string;
     fileSize?: number;
     url?: string;
+    fileBase64?: string;
   }): Promise<CreatorSource> {
     const res = await fetch('/api/creator/sources', {
       method: 'POST',

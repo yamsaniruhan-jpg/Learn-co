@@ -9,6 +9,11 @@ import {
 } from '../../src/types/creator';
 import { QuestionBankItem } from '../../src/types/curriculum';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
+import {
+  extractPdfText,
+  extractUrlText,
+  ExtractionError,
+} from '../services/documentExtraction';
 
 const router = Router();
 
@@ -64,16 +69,24 @@ router.get('/sources', requireAuth, (req: AuthenticatedRequest, res: Response) =
 
 // POST /api/creator/sources
 router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  // Tracked outside the try so a failed extraction can refund the quota slot.
+  let quotaKind: 'source' | 'url' | null = null;
+
   try {
-    const userId = req.userId!;
-    const { title, sourceType, content, fileName, fileSize, url } = req.body;
+    const { title, sourceType, fileName, fileSize, url } = req.body;
+    // `fileBase64` is the preferred transport for uploads; `content` is kept for
+    // backwards compatibility with existing clients and pasted text.
+    const content: string | undefined = req.body.fileBase64 || req.body.content;
 
     if (!sourceType || !['text', 'pdf', 'url'].includes(sourceType)) {
       res.status(400).json({ error: 'Invalid or missing sourceType (must be "text", "pdf", or "url").' });
       return;
     }
 
-    // Enforce daily quotas based on sourceType
+    // Enforce daily quotas based on sourceType. A slot is only consumed once
+    // extraction actually succeeds, so failed uploads don't cost the user.
+    quotaKind = sourceType === 'url' ? 'url' : 'source';
     try {
       if (sourceType === 'url') {
         Database.checkAndIncrementUrlQuota(userId);
@@ -109,14 +122,17 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
         res.status(400).json({ error: 'PDF data or document text is required.' });
         return;
       }
-      // If content is base64 data URI, extract or clean
-      if (content.startsWith('data:application/pdf') || content.startsWith('data:')) {
-        extractedText = `[Extracted from uploaded document ${fileName || 'Lecture.pdf'}]\n\n` +
-          `Subject: STEM Foundation Lecture & Analysis\n` +
-          `Key Sections: Mathematical formulations, formal definitions, invariance relations, and analytical applications.`;
+
+      if (content.startsWith('data:') || /^[A-Za-z0-9+/=\s]{200,}$/.test(content)) {
+        // Real extraction. Throws ExtractionError with a precise status when the
+        // file is encrypted, scanned, oversized, or not a PDF at all.
+        const extraction = await extractPdfText(content);
+        extractedText = extraction.text;
       } else {
+        // Caller pasted the document text directly instead of uploading bytes.
         extractedText = content.trim();
       }
+
       if (!determinedTitle) {
         determinedTitle = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'Uploaded PDF Resource';
       }
@@ -126,21 +142,17 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
         return;
       }
 
-      // Perform URL extraction simulation / real fetch
-      try {
-        const parsedUrl = new URL(url);
-        const host = parsedUrl.hostname;
-        const pathSlug = parsedUrl.pathname.split('/').filter(Boolean).pop() || 'Article';
-        determinedTitle = determinedTitle || `${pathSlug.replace(/[-_]/g, ' ')} (${host})`;
-
-        // Clean extracted simulated text from web source
-        extractedText = `[Web Ingestion: ${url}]\n\n` +
-          `Article Focus: Core Principles & Methodologies (${host})\n` +
-          `Overview: Comprehensive exploration of theoretical foundations, systematic derivations, and rigorous problem-solving frameworks.\n` +
-          (content ? `\nExtracted Highlights:\n${content}` : '');
-      } catch {
-        res.status(400).json({ error: 'Invalid URL format provided.' });
-        return;
+      // Real server-side fetch + HTML reduction (SSRF-guarded, size-capped).
+      const extraction = await extractUrlText(url);
+      extractedText = extraction.text;
+      if (!determinedTitle) {
+        if (extraction.title) {
+          determinedTitle = extraction.title.slice(0, 200);
+        } else {
+          const parsedUrl = new URL(extraction.finalUrl);
+          const slug = parsedUrl.pathname.split('/').filter(Boolean).pop() || 'Article';
+          determinedTitle = `${slug.replace(/[-_]/g, ' ')} (${parsedUrl.hostname})`;
+        }
       }
     }
 
@@ -156,6 +168,11 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
 
     res.status(201).json({ success: true, source: newSource });
   } catch (err: any) {
+    if (quotaKind) Database.releaseQuota(userId, quotaKind);
+    if (err instanceof ExtractionError) {
+      res.status(err.status).json({ error: err.message, code: err.code });
+      return;
+    }
     res.status(500).json({ error: err.message || 'Failed to ingest source.' });
   }
 });
@@ -389,12 +406,24 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
         rawContent = collected.join('\n\n---\n\n');
       }
     } else if (sourceText || sourceUrl) {
-      // Auto-save a source document record if requested directly
+      // Auto-save a source document record when the caller did not pre-create
+      // one. URLs are really fetched so synthesis works from the actual page,
+      // not the link string.
+      let autoText = sourceText || '';
+      if (!autoText && sourceUrl) {
+        autoText = (await extractUrlText(sourceUrl)).text;
+      }
+
+      if (!autoText.trim()) {
+        res.status(400).json({ error: 'Source text or valid source document is required for synthesis.' });
+        return;
+      }
+
       const autoSource = Database.createSource(userId, {
         title: title || 'Source Document',
         sourceType,
         originalContent: sourceText || sourceUrl || '',
-        extractedText: sourceText || `Source URL: ${sourceUrl}`,
+        extractedText: autoText,
         url: sourceUrl,
       });
       associatedSourceId = autoSource.id;
@@ -442,6 +471,10 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
       resource,
     });
   } catch (err: any) {
+    if (err instanceof ExtractionError) {
+      res.status(err.status).json({ error: err.message, code: err.code });
+      return;
+    }
     res.status(500).json({ error: err.message || 'AI Pedagogical Generation failed.' });
   }
 });

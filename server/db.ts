@@ -610,6 +610,21 @@ export class Database {
     };
   }
 
+  /**
+   * Give back a quota unit when the work it paid for failed. Without this a
+   * user who hits an unreadable PDF or a dead link burns a daily slot and has
+   * nothing to show for it.
+   */
+  static releaseQuota(userId: string, kind: 'source' | 'url'): void {
+    const gam = this.getGamification(userId);
+    if (!gam) return;
+    if (kind === 'url') {
+      gam.dailyUrlsProcessedToday = Math.max(0, (gam.dailyUrlsProcessedToday || 0) - 1);
+    } else {
+      gam.dailySourcesUploadedToday = Math.max(0, (gam.dailySourcesUploadedToday || 0) - 1);
+    }
+  }
+
   static checkAndIncrementArtifactQuota(
     userId: string,
     sourceCount?: number
