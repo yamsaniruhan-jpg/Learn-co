@@ -30,15 +30,16 @@ const MAX_PDF_PAGES = 300;
  * font. Resolve the packaged directory once (works from src and dist).
  */
 function resolveStandardFontDataUrl(): string | undefined {
-  // Resolved by filesystem probing rather than import.meta/require.resolve so
-  // the same code works in the ESM dev server and the CJS production bundle.
-  const candidates = [
-    path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'standard_fonts'),
-    path.join(__dirname, '..', '..', 'node_modules', 'pdfjs-dist', 'standard_fonts'),
-    path.join(__dirname, 'node_modules', 'pdfjs-dist', 'standard_fonts'),
-  ];
-  for (const candidate of candidates) {
+  // Probe the filesystem instead of using import.meta/require.resolve so the
+  // same file works under the ESM dev server and the CJS production bundle
+  // (neither `__dirname` nor `import.meta` is available in both).
+  let dir = process.cwd();
+  for (let depth = 0; depth < 4; depth += 1) {
+    const candidate = path.join(dir, 'node_modules', 'pdfjs-dist', 'standard_fonts');
     if (fs.existsSync(candidate)) return candidate + path.sep;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
   return undefined;
 }
