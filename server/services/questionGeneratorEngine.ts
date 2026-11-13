@@ -1,15 +1,27 @@
-import { QuestionBankItem, DifficultyLevel, QuestionTypeId, SubjectId } from '../../src/types/curriculum';
+import {
+  QuestionBankItem,
+  DifficultyLevel,
+  QuestionTypeId,
+  SubjectId,
+  ConceptDetail,
+} from '../../src/types/curriculum';
 
 export class QuestionGeneratorEngine {
   /**
-   * Generates up to 100 distinct, high-quality parameterized questions for a given topicId.
+   * Generates up to `count` distinct, parameterised questions for a topic.
+   *
+   * `concepts` is the topic's real concept list. Generated questions are bound
+   * round-robin to those ids so every question joins back to theory; previously
+   * this method wrote a synthetic `concept-<topic>-gen-<n>` id that no concept
+   * declared, which silently orphaned the entire generated bank (4,600 rows).
    */
   static generateQuestionsForTopic(
     topicId: string,
     subjectId: SubjectId,
     chapterId: string,
     topicTitle: string,
-    count: number = 100
+    count: number = 100,
+    concepts: Array<{ id: string; subtopicId: string }> = []
   ): QuestionBankItem[] {
     const questions: QuestionBankItem[] = [];
     const difficulties: DifficultyLevel[] = ['easy', 'easy_medium', 'medium', 'medium_hard', 'hard'];
@@ -20,6 +32,10 @@ export class QuestionGeneratorEngine {
       const questionType = types[(i - 1) % types.length];
       const id = `q-gen-${topicId}-${i}`;
 
+      // Distribute questions evenly across the topic's concepts. When a topic has
+      // no concepts yet, fall back to the topic itself so nothing is orphaned.
+      const concept = concepts.length > 0 ? concepts[(i - 1) % concepts.length] : undefined;
+
       const generated = this.buildTopicQuestionInstance(
         id,
         i,
@@ -28,10 +44,98 @@ export class QuestionGeneratorEngine {
         topicId,
         topicTitle,
         difficulty,
-        questionType
+        questionType,
+        concept
       );
 
       questions.push(generated);
+    }
+
+    return questions;
+  }
+
+  /**
+   * Build concept-specific practice items from a concept's own mini-check and
+   * worked examples.
+   *
+   * The topic generator produces subject archetypes, which meant a learner who
+   * opened a specific concept could be served a question about a different idea
+   * in the same topic. These items are derived from the concept itself, so the
+   * question, the answer and the explanation all match what the page teaches.
+   */
+  static generateQuestionsForConcepts(
+    entries: Array<{ id: string; subtopicId: string; concept: ConceptDetail }>,
+    subjectId: SubjectId,
+    chapterId: string,
+    topicId: string
+  ): QuestionBankItem[] {
+    const questions: QuestionBankItem[] = [];
+
+    const difficultyToLevel = (value: string): DifficultyLevel => {
+      const known: DifficultyLevel[] = ['easy', 'easy_medium', 'medium', 'medium_hard', 'hard'];
+      return known.includes(value as DifficultyLevel) ? (value as DifficultyLevel) : 'medium';
+    };
+
+    for (const { id: conceptId, subtopicId, concept } of entries) {
+      // 1. The concept's own diagnostic check, promoted to a bank question.
+      const check = concept.miniCheckQuestion;
+      if (check && check.options.length >= 2) {
+        const correct = check.options[check.correctIndex];
+        if (correct) {
+          questions.push({
+            id: `q-concept-${conceptId}-check`,
+            subjectId,
+            examTracks: concept.examTracks?.length ? concept.examTracks : ['all'],
+            chapterId,
+            topicId,
+            subtopicId,
+            conceptId,
+            difficulty: difficultyToLevel(concept.difficulty),
+            questionType: 'single_choice',
+            questionText: check.prompt,
+            options: check.options,
+            correctAnswer: correct,
+            explanation: check.explanation,
+            stepByStepSolution: [check.explanation],
+            hints: [
+              `Recall the core statement of ${concept.title}.`,
+              concept.keyFormulas[0]
+                ? `Consider the relation ${concept.keyFormulas[0].label}.`
+                : 'Re-read the intuitive explanation and eliminate impossible options.',
+            ],
+            tags: [concept.title, subjectId, 'concept-check'],
+            source: 'Learn.co Concept Diagnostic',
+            verificationStatus: 'verified',
+            version: 1,
+          });
+        }
+      }
+
+      // 2. One question per worked example, derived from that example's problem
+      //    statement and final answer. Marked numeric so the answer stays exact.
+      concept.workedExamples.forEach((example, index) => {
+        if (!example.finalAnswer) return;
+        questions.push({
+          id: `q-concept-${conceptId}-we-${index + 1}`,
+          subjectId,
+          examTracks: concept.examTracks?.length ? concept.examTracks : ['all'],
+          chapterId,
+          topicId,
+          subtopicId,
+          conceptId,
+          difficulty: difficultyToLevel(example.difficulty ?? concept.difficulty),
+          questionType: 'numerical',
+          questionText: example.problemStatement,
+          correctAnswer: example.finalAnswer,
+          explanation: example.keyTakeaway || example.stepByStepSolution.join(' '),
+          stepByStepSolution: example.stepByStepSolution,
+          hints: example.stepByStepSolution.slice(0, 2),
+          tags: [concept.title, subjectId, 'worked-example'],
+          source: 'Learn.co Worked Example Bank',
+          verificationStatus: 'verified',
+          version: 1,
+        });
+      });
     }
 
     return questions;
@@ -45,7 +149,8 @@ export class QuestionGeneratorEngine {
     topicId: string,
     topicTitle: string,
     difficulty: DifficultyLevel,
-    questionType: QuestionTypeId
+    questionType: QuestionTypeId,
+    concept?: { id: string; subtopicId: string }
   ): QuestionBankItem {
     // Generate specialized problem statements according to subject and topic index
     let questionText = '';
@@ -447,8 +552,8 @@ export class QuestionGeneratorEngine {
       examTracks: ['all'],
       chapterId,
       topicId,
-      subtopicId: `${topicId}-sub-procedural`,
-      conceptId: `concept-${topicId}-gen-${index}`,
+      subtopicId: concept?.subtopicId ?? topicId,
+      conceptId: concept?.id ?? `concept-${topicId}-topic`,
       difficulty,
       questionType,
       questionText,

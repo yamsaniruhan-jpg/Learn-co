@@ -2,6 +2,17 @@ import { SubjectCurriculum, ExamTrack, ExamTrackId } from '../types/curriculum';
 import { ENGLISH_CURRICULUM } from './curricula/englishCurriculum';
 import { DATA_SCIENCE_CURRICULUM } from './curricula/dataScienceCurriculum';
 import { AMPLIFIED_CONCEPTS } from './curricula/amplifiedConcepts';
+import { applyCurriculumExpansion, CURRICULUM_EXPANSION } from './curricula/curriculumExpansion';
+import { CURRICULUM_EXPANSION_2 } from './curricula/curriculumExpansion2';
+import { CURRICULUM_EXPANSION_3 } from './curricula/curriculumExpansion3';
+import { CURRICULUM_EXPANSION_4 } from './curricula/curriculumExpansion4';
+import { CURRICULUM_EXPANSION_5 } from './curricula/curriculumExpansion5';
+import {
+  CONCEPT_ENRICHMENT,
+  CONCEPT_ENRICHMENT_2,
+  CONCEPT_ENRICHMENT_3,
+  CONCEPT_ENRICHMENT_4,
+} from './curricula/conceptEnrichment';
 
 export const EXAM_TRACKS: ExamTrack[] = [
   {
@@ -170,7 +181,7 @@ const BASE_CURRICULUM_DATA: SubjectCurriculum[] = [
                     ],
                     interactiveWidget: 'sign_chart',
                     prerequisites: [
-                      { id: 'math-limits-deriv', title: 'Limit Definition of Derivative', subjectId: 'math' },
+                      { id: 'concept-limit-definition', title: 'Epsilon-Delta Definition of a Limit', subjectId: 'math' },
                     ],
                     relatedConcepts: [
                       { id: 'concept-concavity-second-deriv', title: 'Concavity & Second Derivative Test', subjectId: 'math' },
@@ -2288,4 +2299,52 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
   ENGLISH_CURRICULUM,
   DATA_SCIENCE_CURRICULUM,
 ];
+
+// Depth pass: append the additional topics/concepts that make each chapter
+// studyable end to end. Additive only — no shipped chapter, topic or concept
+// is removed or reordered. Must run after the amplified-concept merge above so
+// newly added topics also receive their amplified concepts.
+applyCurriculumExpansion(CURRICULUM_DATA, [...CURRICULUM_EXPANSION, ...CURRICULUM_EXPANSION_2, ...CURRICULUM_EXPANSION_3, ...CURRICULUM_EXPANSION_4, ...CURRICULUM_EXPANSION_5]);
+
+// Content-completeness pass: fill the worked-example / pitfall / mini-check
+// gaps on concepts that shipped summary-only. Only empty sections are filled;
+// populated arrays are never overwritten.
+for (const subject of CURRICULUM_DATA) {
+  for (const chapter of subject.chapters) {
+    for (const topic of chapter.topics) {
+      for (const subtopic of topic.subtopics) {
+        for (const concept of subtopic.concepts) {
+          const extra =
+            CONCEPT_ENRICHMENT[concept.id] ||
+            CONCEPT_ENRICHMENT_2[concept.id] ||
+            CONCEPT_ENRICHMENT_3[concept.id] ||
+            CONCEPT_ENRICHMENT_4[concept.id];
+          if (!extra) continue;
+          if (!concept.workedExamples || concept.workedExamples.length === 0) {
+            concept.workedExamples = extra.workedExamples;
+          }
+          if (!concept.commonPitfalls || concept.commonPitfalls.length === 0) {
+            concept.commonPitfalls = extra.commonPitfalls;
+          }
+          if (!concept.miniCheckQuestion) {
+            concept.miniCheckQuestion = extra.miniCheckQuestion;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Recompute topic concept counts once every merge has run, so the UI never
+// displays a stale count.
+for (const subject of CURRICULUM_DATA) {
+  for (const chapter of subject.chapters) {
+    for (const topic of chapter.topics) {
+      topic.conceptCount = topic.subtopics.reduce(
+        (acc, sub) => acc + sub.concepts.length,
+        0
+      );
+    }
+  }
+}
 

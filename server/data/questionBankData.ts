@@ -607,15 +607,42 @@ export const MASTER_QUESTION_BANK: QuestionBankItem[] = [...CORE_QUESTION_BANK];
 for (const subject of CURRICULUM_DATA) {
   for (const chapter of subject.chapters) {
     for (const topic of chapter.topics) {
+      // Pass the topic's real concepts so generated questions bind to them
+      // instead of inventing unreachable concept ids.
+      const topicConcepts = topic.subtopics.flatMap((subtopic) =>
+        subtopic.concepts.map((concept) => ({
+          id: concept.id,
+          subtopicId: subtopic.id,
+        }))
+      );
+
+      // Concept-level seed questions. The generator below produces *topic*
+      // archetypes, so a learner opening "Epsilon-Delta Definition" used to be
+      // handed a monotonicity question. These per-concept items give the
+      // concept's own mini-check and worked examples real practice coverage.
+      const conceptBank = QuestionGeneratorEngine.generateQuestionsForConcepts(
+        topicConcepts.map((entry) => ({
+          ...entry,
+          // Resolve the full concept, not just its id/subtopic.
+          concept: topic.subtopics
+            .flatMap((subtopic) => subtopic.concepts)
+            .find((candidate) => candidate.id === entry.id)!,
+        })),
+        subject.id as any,
+        chapter.id,
+        topic.id
+      );
+
       const topicGenerated = QuestionGeneratorEngine.generateQuestionsForTopic(
         topic.id,
         subject.id as any,
         chapter.id,
         topic.title,
-        100
+        100,
+        topicConcepts
       );
 
-      for (const q of topicGenerated) {
+      for (const q of [...conceptBank, ...topicGenerated]) {
         if (!MASTER_QUESTION_BANK.some((existing) => existing.id === q.id)) {
           MASTER_QUESTION_BANK.push(q);
         }

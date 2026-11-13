@@ -62,8 +62,19 @@ export class QuestionSelectionEngine {
         : [...MASTER_QUESTION_BANK];
     }
 
-    // Shuffle candidate pool to ensure non-deterministic, fresh variety
-    const shuffledPool = [...candidatePool].sort(() => Math.random() - 0.5);
+    // When a learner opens practice for one specific concept, lead with the
+    // items derived from that concept's own mini-check and worked examples.
+    // The topic-level generator produces subject archetypes that can drift from
+    // the concept being studied, so they should not crowd out the exact match.
+    const isConceptScoped = Boolean(config.conceptId);
+    const conceptNative = isConceptScoped
+      ? candidatePool.filter((q) => q.id.startsWith('q-concept-'))
+      : [];
+    const remainder = candidatePool.filter((q) => !conceptNative.includes(q));
+
+    // Shuffle each part so repeated sessions still vary
+    const shuffle = <T,>(items: T[]): T[] => [...items].sort(() => Math.random() - 0.5);
+    const shuffledPool = [...shuffle(conceptNative), ...shuffle(remainder)];
 
     // If Mistake Remediation Mode
     if (config.mode === 'mistake_remediation') {
