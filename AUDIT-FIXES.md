@@ -313,10 +313,14 @@ against real `Response` objects.
    mutation — 8 sync full-file writes per mutation. Fine for one user, unsafe with
    concurrency and slow as it grows. The Postgres/Prisma migration remains a
    **separate proposal awaiting your approval** — I have not touched it.
-4. **Missing product surface:** password reset, email verification, realtime
-   (WebSocket/SSE). Concept-level question binding is now in place.
-5. **Accessibility is thin:** 24 `aria-label`, 14 `alt`, 4 `role` across 114
-   components. Not a crash risk, but below a "premium" bar.
+4. **Missing product surface:** password reset **is now implemented** (see `## 10.2`)
+   but needs `RESEND_API_KEY` or `SMTP_URL` set for real email delivery. Still
+   missing: email verification and realtime (WebSocket/SSE).
+5. **Accessibility is thin:** 460 `<button>` elements, only **24** with
+   `aria-label`/`aria-labelledby`; 6 `role`; 2 `aria-hidden`. (Correcting an
+   earlier note: `alt` coverage is actually complete, **13/13** `<img>` tags.) 46
+   files already handle focus styles, so the foundation exists. Not a crash risk,
+   but below a "premium" bar.
 6. **Unverified items:** DOCX ingestion is explicitly rejected with a clear message
    (not silently faked), but is not implemented. Browser-level visual testing was
    not possible — no headless browser can be installed here — so I verified via
@@ -596,3 +600,197 @@ opens: `firebaseClient` 749 kB, `SimulationsHubView` 599 kB (three.js),
   individual simulations would help users who open only one lab. Deferred.
 - The CSS is still one 237 kB file (30 kB of it KaTeX). Behaving correctly, but
   it is not split per view yet.
+
+---
+
+## 10. Round 2 — live-site audit and P0/P1 fixes
+
+### 10.0 The headline finding: none of Tracks A–E are deployed
+
+I audited the running site at `https://learn-co.ai.studio/` and compared it to this
+branch. The deployed build predates every fix in this document.
+
+| Probe | Live site | This branch |
+|---|---|---|
+| `GET /api/learning/concept/concept-plant-transport` | `Concept not found` | exists |
+| `GET /api/learning/concept/concept-concavity-second-deriv` | `workedExamples: []` | 2 examples |
+| `GET /api/nonexistent` | returns **HTML** (SPA shell) | JSON 404 |
+| `GET /api/user/profile` **without auth** | **returns a real user's email** | `401` |
+| `GET /api/leaderboard` **without auth** | full list incl. userIds | `200`, no email |
+
+`GET /api/user/profile` with no credentials returned a live account record
+(`email: "yamsaniruhan@gmail.com"`, education level, learning goals, join date).
+This is exactly the C1 access-control defect fixed in Track A — still exploitable
+in production. **Deploying this branch is the single highest-value action
+available.**
+
+I stopped at read-only probes and made no changes to live data.
+
+### 10.1 New bugs found while auditing
+
+**B1 — the XP ledger recorded every transaction as `0`** (`server/db.ts:1165`)
+
+```js
+gam.xp = Math.max(0, newXp);                 // value already overwritten
+amount: Math.max(0, newXp - (gam.xp || 0)),  // newXp - newXp === 0
+```
+
+The delta was computed after the assignment. Every XP transaction in the ledger
+recorded `amount: 0`, corrupting XP history and spend analytics.
+**Fixed:** capture `previousXp` first, record the signed delta
+(`nextXp - previousXp`, so penalties are honest too), and derive `level` via the
+shared `calculateLevelFromXp` instead of a duplicated inline formula.
+
+**B3 — `GET /api/leaderboard` wrote to the database**
+
+The leaderboard performed a "weekly promotion": for any user in the top 10 it
+incremented `gam.level` and called `saveDbToDisk()`. So *viewing a leaderboard*
+permanently changed stored levels and made `level` diverge from `xp` — the same
+user reported `level: 1` on `/api/user/profile` and `level: 2` on
+`/api/leaderboard`.
+
+I observed this live: the first read of `/api/user/profile` showed
+`lastPromotionDate: "2026-10-25"`; after a single `/api/leaderboard` request it
+read `"2026-11-13"`. A read-only audit action had mutated production data.
+
+**Fixed:** removed the side effect entirely; `level` is now derived from XP on
+read, so a GET has no writes and the two endpoints agree.
+
+**New accounts were seeded with fabricated progress**
+
+`getGamification` created first-time profiles with `xp: 420`, `level: 3`,
+`longestStreak: 3`. Every new scholar was awarded ~420 XP and a 3-day streak it
+had never earned — inflating the leaderboard and making a first real session look
+like a demotion. **Fixed** to `xp: 0`, `level: 1`, streaks `0`.
+
+*(Level is computed with the shared `calculateLevelFromXp` rather than an
+inline formula, so gamification cannot drift from the canonical curve again.)*
+
+**Firestore rules were exploitable independently of any deploy** (`firestore.rules`)
+
+These apply to the live database now, regardless of application code:
+
+| Rule | Was | Now |
+|---|---|---|
+| `public_profiles` | `allow write: if true` — **anyone** could rewrite any profile anonymously | owner-only |
+| `leaderboard` | `allow write: if true` — anyone could forge anyone's XP/rank | owner-only (`doc id === uid`) |
+| `marketplace` update/delete | `… \|\| request.auth.uid != null` — true for **every** signed-in user, so any student could edit or delete any listing | owner-only |
+| `gamification` | `allow read: if true` on `{document=**}` — all XP/streak readable by anyone | owner-only read, backend write |
+| `sessions` | `isAuthenticated()` — any signed-in user could read all mentorship sessions | participants only |
+| `notifications` | `isAuthenticated()` — any signed-in user could read everyone's | own records only |
+
+Checked against the client before tightening: only `users`, `public_profiles` and
+`leaderboard` are written from the browser (`src/services/clientFirestoreSync.ts`),
+so this does not break any client path. The `leaderboard` rule was initially
+written as `write: if false` and corrected to owner-write once I found the client
+legitimately writes `leaderboard/{uid}`.
+
+**S3 — "Admin Studio" had no server-side authorization**
+
+There is no `/api/admin` router and no role check on any endpoint. The tab is
+purely a React view (`activeTab === 'admin'`), reachable from the mobile drawer's
+21 tabs, and it calls ordinary analytics endpoints. **Any signed-in student could
+read and rewrite the global alert webhook configuration.**
+
+**Fixed:** added `requireAdmin` middleware (the `role: 'student' | 'educator' |
+'admin'` field already existed) and applied it to `GET/POST /api/analytics/webhook-config`,
+`POST /api/analytics/test-webhook` and `GET /api/analytics/logs`. Non-admins get
+`404` so the endpoint's existence is not advertised; anonymous callers still `401`.
+
+**B2 — live API returns HTML where the client expects JSON**
+
+`GET /api/gamification/profile` unauthenticated returns the full SPA login page.
+`authClient` calls `res.json()`, which throws, and the UI surfaces an
+unintelligible error. Fixed on this branch by Track A's JSON `/api` 404 handler —
+**but only once deployed.**
+
+**B4 — no password reset at all**
+
+Auth exposed only `signup`, `signin`, `google`, `me`, `signout`, `onboarding`.
+A user who forgot their password was **permanently locked out**. No email
+verification either. Implemented (see 10.2).
+
+**B5–B7 — small "unfinished" signals**
+
+- **No favicon declared.** Every page load 404'd `/favicon.ico`. Added
+  `<link rel="icon">` + `shortcut icon` pointing at the existing PWA icons.
+- **PWA identity disagreeing with the product.** `manifest.json` said `"LearnCo"`
+  / `#2563eb` while the app brands `learn.co` / `#6C5CE7`. Aligned the manifest and
+  the `<meta name="theme-color">`.
+- **Meta description undersold the product.** *"Pre-seeded 4000-question
+  library"*; the bank holds **10,084** questions. Now states 10,000+ questions and
+  132 concept lessons.
+
+### 10.2 Password reset — designed to be safe, not just present
+
+Because there is no mail provider configured in this project, the honest options
+were (a) build it and pretend to send, or (b) build it and say plainly when no
+email was sent. I chose (b).
+
+**Backend**
+
+- `Database.createPasswordReset` / `peekPasswordReset` / `consumePasswordReset`
+  in `server/db.ts`. Tokens are stored as **SHA-256 digests only** — a database
+  disclosure cannot be replayed. 30-minute expiry, single use, and issuing a new
+  token invalidates any outstanding one.
+- `server/services/mailer.ts` — provider-agnostic. Resend HTTP API if
+  `RESEND_API_KEY` is set, SMTP if `SMTP_URL` is set, otherwise reports
+  `not_configured` rather than claiming success.
+- `POST /api/auth/forgot-password`, `GET /api/auth/reset-password/:token`,
+  `POST /api/auth/reset-password`.
+
+**Security properties, each covered by a test**
+
+- *No account enumeration.* The first implementation leaked existence through a
+  `delivery` field that only appeared for known addresses. Rewritten so the
+  response is **byte-identical** for known and unknown addresses; the only varying
+  field describes the deployment's transport, which is constant server-wide. The
+  reset link is written to the **server log**, never the HTTP response.
+- *No token in any response body* — knowing an address is not enough to take over
+  the account.
+- *Single use* — replay returns `400`.
+- *Password policy enforced* (≥8 chars, a letter, a number), and a rejected
+  attempt does **not** burn the token.
+- *All existing sessions revoked* on reset, so a stolen session cannot survive it.
+- *Rate limited per email address, not per IP.* A shared IP bucket would let one
+  attacker lock every user out by exhausting it (and would catch a whole campus
+  NAT). Uses `ipKeyGenerator` for the IP fallback — the initial version tripped
+  `ERR_ERL_KEY_GEN_IPV6`, which is a real bypass via IPv6 `/64` rotation.
+
+**Frontend**
+
+- New `src/components/auth/PasswordResetFlow.tsx` (request → choose → done),
+  reusing the existing card/input/colour language rather than introducing a new
+  style. "Forgot your password?" now sits under the sign-in button.
+- `/?reset_token=…` links open the flow directly; `App.tsx` reads the token once
+  and strips it from the address bar via `replaceState`, so the single-use token
+  is not left in history or leaked by copy-paste.
+- Copy is honest: it never says "we found your account"; when no mail provider is
+  configured it states plainly that no email was sent.
+
+### 10.3 Verification
+
+- `npx tsc --noEmit` — clean
+- `npm test` — **135/135 passing across 7 files** (was 121; +14 new)
+- `npm run build` — exit 0, **0 warnings**; entry unchanged at **0.40 MB / 0.12 MB gzip**
+- Production server boots with a **clean log** (the rate-limiter IPv6 warning is
+  gone)
+- Live HTTP probes on the built server: `webhook-config` → **404** as a student,
+  **401** anonymous; `analytics/dashboard` → **200** as a student (no regression);
+  curriculum, profile, leaderboard and questions all **200**
+- New tests were checked against the *original* bugs: reverting the XP fix makes
+  `gamificationIntegrity` fail with `expected +0 to be 50`, and removing a
+  Suspense wrapper makes the Track D guard name the exact components.
+
+### 10.4 What this round deliberately did not do
+
+- **Did not deploy.** I cannot reach the live host from this sandbox (TLS to
+  `learn-co.ai.studio` is blocked; only TCP connects), and publishing is your
+  call. Everything here is on `arena/697a3941-learn-co` awaiting that step.
+- **Did not change the core UI.** No redesign, no theme change, no layout rework,
+  no feature removed. The reset flow is additive and inherits existing styling.
+- **Did not run a browser.** No headless browser is installable here, so the new
+  screens are verified by type-checking, unit tests and HTTP probes — not by
+  looking at them. **Screenshots are still needed for any visual judgement.**
+- **Did not touch persistence.** The Postgres/Prisma migration remains a separate
+  proposal awaiting your approval.

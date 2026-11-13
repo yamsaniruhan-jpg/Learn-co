@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { Database, withUserLock } from '../db';
 import { AdaptiveAnalyticsEngine, invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
 import { SubjectId, ExamTrackId } from '../../src/types/curriculum';
-import { verifyFirebaseAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { verifyFirebaseAuth, requireAdmin, AuthenticatedRequest } from '../middleware/authMiddleware';
 
 export const analyticsRouter = Router();
 
@@ -210,7 +210,7 @@ analyticsRouter.get('/trends', (req: Request, res: Response) => {
  * GET /api/analytics/logs
  * Retrieves system, attempt, verification, and audit logs
  */
-analyticsRouter.get('/logs', (req: Request, res: Response) => {
+analyticsRouter.get('/logs', requireAdmin, (req: Request, res: Response) => {
   try {
     const { category, search, limit } = req.query;
     const maxLimit = limit ? parseInt(limit as string, 10) : 100;
@@ -239,7 +239,7 @@ analyticsRouter.post('/logs', (req: Request, res: Response) => {
 /**
  * GET /api/analytics/webhook-config
  */
-analyticsRouter.get('/webhook-config', (req: Request, res: Response) => {
+analyticsRouter.get('/webhook-config', requireAdmin, (req: Request, res: Response) => {
   try {
     const config = Database.getAlertWebhookConfig();
     res.json({ success: true, config });
@@ -251,7 +251,7 @@ analyticsRouter.get('/webhook-config', (req: Request, res: Response) => {
 /**
  * POST /api/analytics/webhook-config
  */
-analyticsRouter.post('/webhook-config', (req: Request, res: Response) => {
+analyticsRouter.post('/webhook-config', requireAdmin, (req: Request, res: Response) => {
   try {
     const { enabled, webhookUrl, minSeverity, channelName } = req.body;
     const updated = Database.setAlertWebhookConfig({ enabled, webhookUrl, minSeverity, channelName });
@@ -264,7 +264,7 @@ analyticsRouter.post('/webhook-config', (req: Request, res: Response) => {
 /**
  * POST /api/analytics/test-webhook
  */
-analyticsRouter.post('/test-webhook', (req: Request, res: Response) => {
+analyticsRouter.post('/test-webhook', requireAdmin, (req: Request, res: Response) => {
   try {
     const log = Database.logEvent(
       'SYSTEM',

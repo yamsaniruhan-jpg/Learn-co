@@ -87,6 +87,29 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [copilotContext, setCopilotContext] = useState<string>('');
+  // A reset link arrives as /?reset_token=... . Read it once on mount, then strip
+  // it from the address bar so the token is not left in history or copied into a
+  // share, and so a refresh does not replay a single-use token.
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('reset_token');
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (!resetToken) return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset_token');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    } catch {
+      /* non-fatal */
+    }
+  }, [resetToken]);
+
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [isContextPanelOpen, setIsContextPanelOpen] = useState<boolean>(false);
@@ -350,7 +373,10 @@ export default function App() {
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-2xl py-4">
             <Suspense fallback={<ViewLoadingFallback />}>
-              <AuthView onNavigateToTab={() => setActiveTab('dashboard')} />
+              <AuthView
+                onNavigateToTab={() => setActiveTab('dashboard')}
+                initialResetToken={resetToken}
+              />
             </Suspense>
           </div>
         </main>

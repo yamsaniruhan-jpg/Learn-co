@@ -109,6 +109,35 @@ export async function optionalAuth(req: AuthenticatedRequest, res: Response, nex
   next();
 }
 
+/**
+ * Gate for system-administrator-only endpoints.
+ *
+ * Must run AFTER `verifyFirebaseAuth`, which is what populates `req.userId`.
+ * The `role` field already exists on every profile (`'student' | 'educator' |
+ * 'admin'`) and was previously trusted only by the UI: the "Admin Studio" tab is
+ * just a React view, so any signed-in student could call the endpoints it uses
+ * directly. This closes that gap server-side.
+ */
+export async function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    const profile = Database.getProfile(userId);
+    if (!profile || profile.role !== 'admin') {
+      // 404 rather than 403 so the endpoint's existence is not advertised to
+      // non-admins; the request is still refused either way.
+      res.status(404).json({ error: 'Not found.' });
+      return;
+    }
+    next();
+  } catch {
+    res.status(500).json({ error: 'Authorization check failed.' });
+  }
+}
+
 export const requireAuth = verifyFirebaseAuth;
 
 export default verifyFirebaseAuth;

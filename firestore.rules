@@ -28,14 +28,23 @@ service cloud.firestore {
     }
 
     // Public scholar profiles & leaderboards
+    // Read stays public (profiles are shown on leaderboards). Write must be
+    // owner-only: `allow write: if true` let anyone rewrite any scholar's profile
+    // without authenticating at all.
     match /public_profiles/{userId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
+    // Leaderboard entries are keyed by the owner's uid (doc id === uid), and the
+    // client legitimately writes its OWN entry after each XP change. Owner-write
+    // keeps that working while stopping the previous `allow write: if true`, which
+    // let any anonymous visitor forge anybody's XP, level and rank.
     match /leaderboard/{entryId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isOwner(entryId);
+      allow delete: if isOwner(entryId);
     }
 
     // Creator resources
@@ -54,29 +63,46 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
-    // Mentorship sessions
+    // Mentorship sessions -- scoped to the participants, not every signed-in user.
     match /sessions/{sessionId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && (
+        resource.data.mentorId == request.auth.uid ||
+        resource.data.menteeId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        request.auth.uid in resource.data.participants
+      );
+      allow create: if isAuthenticated();
     }
 
-    // Notifications
+    // Notifications -- previously any signed-in user could read everyone's.
     match /notifications/{notifId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
     }
 
     // Gamification rules and badges
-    match /gamification/{document=**} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+    // XP/streak data is personal. Previously readable by anyone with
+    // `allow read: if true` on every document in the collection, and writable by
+    // any signed-in user (so anyone could grant themselves XP).
+    match /gamification/{userId}/{document=**} {
+      allow read: if isOwner(userId);
+      allow write: if false; // written by the backend / Admin SDK
+    }
+    match /gamification/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
     }
 
     // Marketplace courses & reviews
     match /marketplace/{courseId} {
       allow read: if true;
       allow create: if isAuthenticated();
+      // Owner check only. The previous clause `|| request.auth.uid != null` is
+      // true for every signed-in user, so any student could edit or delete any
+      // listing (it reduced the whole condition to "is logged in").
       allow update, delete: if isAuthenticated() && (
         resource.data.creatorUid == request.auth.uid ||
-        request.auth.uid != null
+        resource.data.creatorId == request.auth.uid
       );
 
       match /reviews/{reviewId} {

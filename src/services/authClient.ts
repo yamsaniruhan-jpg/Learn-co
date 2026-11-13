@@ -200,6 +200,63 @@ export class AuthClient {
     }
   }
 
+  /**
+   * Request a password-reset link.
+   *
+   * The API responds identically whether or not the address is registered, so the
+   * UI must not imply that a real account was found. `transport` describes how the
+   * deployment delivers mail: `"email"` means a provider is configured,
+   * `"operator-console"` means it is not and the operator has the link in the
+   * server log.
+   */
+  static async requestPasswordReset(email: string): Promise<{
+    success: boolean;
+    message: string;
+    transport: 'email' | 'operator-console';
+    expiresInMinutes: number;
+  }> {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || 'Could not send the reset link. Please try again.');
+    }
+    return data;
+  }
+
+  /** Check a reset link before showing the "choose a new password" form. */
+  static async validateResetToken(token: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/auth/reset-password/${encodeURIComponent(token)}`);
+      const data = await res.json().catch(() => ({}));
+      return res.ok && data?.valid === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Complete the reset. On success the user is signed in with a fresh session. */
+  static async resetPassword(token: string, password: string): Promise<void> {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || 'Could not reset your password.');
+    }
+    if (data?.token) {
+      this.setToken(data.token);
+    }
+    if (data?.user) {
+      this.setCurrentUser(data.user);
+    }
+  }
+
   static async saveOnboarding(data: {
     displayName: string;
     educationLevel: string;
