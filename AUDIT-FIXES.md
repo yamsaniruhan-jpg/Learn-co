@@ -1,8 +1,9 @@
-# LearnCo — Deep Audit: Fix Report (Track A + Track B)
+# LearnCo — Deep Audit: Fix Report (Tracks A, B, C)
 
 Branch: `arena/697a3941-learn-co` (from `main@07da94d`)
-Commits: `48bb6cf` · `fe2efa9` · `842d5c7`
-Scope completed: **security hardening (A)** and **real Creator Studio ingestion (B)**.
+Commits: `48bb6cf` · `fe2efa9` · `842d5c7` · `0d2d018`
+Scope completed: **security (A)**, **real Creator Studio ingestion (B)**,
+**curriculum depth (C)**.
 
 ---
 
@@ -78,6 +79,38 @@ created real users in the developer's working dataset.
 `import.meta` produced a bundler warning in the CJS build; `__dirname` produced a
 `ReferenceError` in the ESM dev server. The font-path helper had to satisfy both.
 
+### C10 — CRITICAL: 100% of the question bank was orphaned
+
+Every one of the **4,600 generated questions** carried a `conceptId` of the form
+`concept-<topic>-gen-<n>` that **no concept ever declared**. Verified directly:
+only 5 of 4,619 questions pointed at a real concept id. The consequence is that
+practice could never route back to theory, and a concept page could never offer
+its own practice — the join that makes a learning platform work did not exist.
+
+Cause: `QuestionGeneratorEngine.generateQuestionsForTopic()` was never given the
+topic's concepts and synthesised the id itself.
+
+### C11 — CRITICAL: 36 of 63 concepts had no worked examples, pitfalls or mini-check
+
+`ConceptDetailView` hides those tabs when the arrays are empty, so **more than
+half the concept library silently lost a third of its learning surface** while
+still counting toward curriculum totals. Learners saw a definition, an intuition
+and formulas — then nothing to practise or check understanding against.
+
+### C12 — HIGH: the curriculum was one topic deep per chapter
+
+44 chapters, 46 topics, 63 concepts. A chapter like "Differential Calculus"
+contained a single narrow topic on monotonicity — no limits, no continuity, no
+differentiation rules. Entire foundational sequences were absent: kinematics and
+Newton's laws (physics), atomic structure and equilibrium (chemistry), Python
+fundamentals (CS), membrane transport and photosynthesis (biology), and limits
+before derivatives (math). A chapter could not be studied end to end.
+
+### C13 — MEDIUM: a broken prerequisite reference
+
+`concept-deriv-inc-dec` declared a prerequisite `math-limits-deriv`, which no
+concept declared. Prerequisite links silently went nowhere.
+
 ---
 
 ## 2. Changes made
@@ -128,7 +161,46 @@ instead of being swallowed.
 **Test isolation (M8).** `LEARNCO_DB_FILE` env override; `vitest.config.ts` points
 each run at a throwaway temp file. The live dataset is never touched.
 
-**Serviceability (C3).** 68 tests across 3 files, plus `.github/workflows/ci.yml`
+
+**Curriculum depth and concept binding (Track C).**
+
+*Question bank joins to the curriculum.* `generateQuestionsForTopic()` now
+receives the topic's real concepts and round-robins questions across them, so
+every generated row resolves to a concept that exists. A new
+`generateQuestionsForConcepts()` derives practice items from each concept's own
+mini-check and worked examples — the topic generator produces subject archetypes,
+so a learner opening "Epsilon-Delta Definition" was being served a monotonicity
+question. `QuestionSelectionEngine` now leads with those concept-exact items when
+a session is scoped to one concept. Orphaned questions: **4,600 → 0**.
+
+*Coverage expansion.* 52 new topics across all seven subjects, appended to
+existing chapters — nothing removed or reordered. Every single-topic chapter is
+now multi-topic (**0 of 44**), following a prerequisite chain rather than an
+arbitrary list. Genuinely missing ground was added: limits/continuity,
+integration techniques, vector spaces, partial derivatives, random variables,
+counting, coordinate geometry, divisibility (math); Python fundamentals,
+recursion/DP, ML foundations, backpropagation, processes/threads, replication,
+greedy algorithms, HTTP API design (CS); kinematics, Newton's laws, rotation,
+oscillations, electrostatics, kinetic theory, sound/Doppler, atomic models,
+hydrostatics, gravitational fields (physics); atomic structure, equilibrium,
+thermochemistry, acid-base, isomerism, electrolysis, coordination nomenclature,
+colligative properties, polymers (chemistry); membrane transport,
+photosynthesis, enzyme kinetics, Mendelian genetics, mutation, selection,
+homeostasis, trophic energy, gel electrophoresis, plant transport (biology);
+context clues, evidence integration, comparative analysis (English); experiment
+design, trees/ensembles, drift monitoring (data science).
+
+*Content completeness.* All 36 summary-only concepts now carry a real worked
+example with a final answer, at least one genuine pitfall with a counterexample,
+and a diagnostic mini-check. Missing sections: **36 → 0**.
+
+*Integrity gate.* New `server/services/curriculumIntegrity.ts` plus
+`tests/curriculum.test.ts` (18 tests) validate duplicate/misplaced/incomplete
+concepts, dangling prerequisites, empty topics, stale `conceptCount` metadata,
+orphaned questions and duplicate question ids. **CI now fails if any of these
+regress** — the exact class of silent drift that produced C10 and C11.
+
+**Serviceability (C3).** 89 tests across 4 files, plus `.github/workflows/ci.yml`
 (lint → test → build → boot `dist/server.cjs` → assert `/api/health` and that
 anonymous `/api/user/profile` is 401).
 
@@ -140,12 +212,19 @@ Added
 - `server/services/documentExtraction.ts` — PDF/URL extraction + SSRF guards
 - `tests/auth.test.ts` (14) · `tests/api.test.ts` (27) · `tests/extraction.test.ts` (27)
 - `vitest.config.ts` · `.github/workflows/ci.yml`
+- `src/data/curricula/curriculumExpansion.ts` … `curriculumExpansion5.ts` — 52 new topics
+- `src/data/curricula/conceptEnrichment.ts` — worked examples / pitfalls / mini-checks for 36 concepts
+- `server/services/curriculumIntegrity.ts` — validation gate
+- `tests/curriculum.test.ts` (18 tests)
 
 Modified
 - `server/middleware/authMiddleware.ts` · `middleware/auth.js`
 - `server/routes/analyticsRoutes.ts` · `copilotRoutes.ts` · `authRoutes.ts` · `practiceRoutes.ts` · `creatorRoutes.ts`
 - `server/db.ts` (scrypt, `verifyPassword`, `needsPasswordRehash`, `releaseQuota`, DB path override)
 - `server.ts` (`createApp()`/`startServer()` split, error handler, copilot guard)
+- `server/services/questionGeneratorEngine.ts` (concept binding + concept-specific questions)
+- `server/services/questionSelectionEngine.ts` (prioritise concept-exact items)
+- `server/data/questionBankData.ts` · `src/data/curriculumData.ts`
 - `src/components/create/SourceIntakePanel.tsx` · `src/services/creatorClient.ts`
 - `package.json` / `package-lock.json` (`vitest`, `supertest`, `@types/supertest`, `pdfjs-dist`)
 
@@ -163,7 +242,7 @@ Modified
 - `tsc --noEmit` → exit 0.
 - `npm run lint` → exit 0.
 - `npm run build` → exit 0, **0 warnings, 0 errors**.
-- Client bundle 3.72 MB (`pdfjs-dist` is server-only and does **not** ship to the browser).
+- Client bundle 3.97 MB (`pdfjs-dist` is server-only and does **not** ship to the browser; the growth is the expanded curriculum content).
 
 ## 6. Functional testing results
 
@@ -182,7 +261,11 @@ Modified
 | 6 consecutive failed URL imports | quota remains **0/5 used** |
 | Malformed JSON body | **400** JSON, no stack trace, no `<html>` |
 | Empty practice attempt | **400 INVALID_ATTEMPT** |
-| Full suite | **68/68 passing** |
+| Full suite | **89/89 passing** |
+| Live curriculum API (dev + prod bundle) | 7 subjects, 44 chapters, **98 topics**, **132 concepts**, **0 single-topic chapters** |
+| New concept pages via `/api/learning/concept/:id` | 200 with worked example + pitfall + mini-check + formulas |
+| Generated questions resolving to a real concept | **10,084 / 10,084** (was 19 / 4,619) |
+| Concept-scoped practice session | Returns that concept's own questions first |
 
 Note on live URL fetches: outbound HTTPS from this sandbox fails with
 `UNABLE_TO_VERIFY_LEAF_SIGNATURE` (TLS interception in the environment, not the
@@ -192,27 +275,34 @@ against real `Response` objects.
 
 ## 7. Remaining issues (honest list)
 
+**Fixed in Track C, with an honest caveat**
+
+- Curriculum depth and concept binding are done: 63 → 132 concepts, 0 orphaned
+  questions, 0 concepts without practice, 0 single-topic chapters.
+- **Caveat worth knowing:** the topic-level generator still produces *subject
+  archetypes* rather than per-topic problems, so a question inside "Limits &
+  Continuity" may be about monotonicity. Concept-scoped practice now leads with
+  concept-exact items, but the topic-level pool is still generic. Replacing it
+  with genuinely topic-specific problems is real authoring work, not a code fix.
+- 265 of the 10,084 questions are currently concept-exact. That is enough to
+  cover every concept, but not yet enough for long practice runs per concept.
+
 **Not yet fixed — queued, in recommended order**
 
-1. **Learning Studio depth (Track C) — the biggest product gap.** 63 concepts
-   across 44 chapters, and exactly **one topic per chapter**. Content asymmetry is
-   severe: 4,619 question rows but only **855 unique texts** and 63 concepts, i.e.
-   questions are thin duplicates with no concept-level binding. This is the single
-   most important thing to fix for the platform to feel worth paying for.
-2. **Bundle size (Track D).** 3.72 MB single JS file, **0 `React.lazy`**. Route
+1. **Bundle size (Track D).** 3.97 MB single JS file, **0 `React.lazy`**. Route
    splitting is a mechanical, low-risk win.
-3. **Dead code (Track E).** 8 orphaned modules, 5 unmounted legacy routers (`ai`,
+2. **Dead code (Track E).** 8 orphaned modules, 5 unmounted legacy routers (`ai`,
    `copilot`, `creator`, `learning`, `mentorship`), 3 unused deps (`node-cron`,
    `nodemailer`, `uuid`).
-4. **Persistence.** `fs.writeFileSync` rewrites the entire 41 KB file on every
+3. **Persistence.** `fs.writeFileSync` rewrites the entire 41 KB file on every
    mutation — 8 sync full-file writes per mutation. Fine for one user, unsafe with
    concurrency and slow as it grows. The Postgres/Prisma migration remains a
    **separate proposal awaiting your approval** — I have not touched it.
-5. **Missing product surface:** password reset, email verification, realtime
-   (WebSocket/SSE), concept-level question binding.
-6. **Accessibility is thin:** 24 `aria-label`, 14 `alt`, 4 `role` across 114
+4. **Missing product surface:** password reset, email verification, realtime
+   (WebSocket/SSE). Concept-level question binding is now in place.
+5. **Accessibility is thin:** 24 `aria-label`, 14 `alt`, 4 `role` across 114
    components. Not a crash risk, but below a "premium" bar.
-7. **Unverified items:** DOCX ingestion is explicitly rejected with a clear message
+6. **Unverified items:** DOCX ingestion is explicitly rejected with a clear message
    (not silently faked), but is not implemented. Browser-level visual testing was
    not possible — no headless browser can be installed here — so I verified via
    live HTTP probes against the running server and the built bundle.
