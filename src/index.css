@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* Semantic utilities resolve the existing light/dark variables at the element. */
+@theme inline {
+  --color-brand: var(--color-primary);
+  --color-canvas: var(--color-bg-canvas);
+  --color-surface: var(--color-bg-surface);
+  --color-subtle: var(--color-bg-subtle);
+  --color-ink: var(--color-text-primary);
+  --color-ink-soft: var(--color-text-secondary);
+  --color-ink-muted: var(--color-text-muted);
+  --color-line: var(--color-border);
+  --color-line-strong: var(--color-border-strong);
+  --color-danger: var(--color-error);
+  --color-warning: var(--color-accent);
+}
+
 @layer base {
   :root {
     /* Required Design Palette Variables */

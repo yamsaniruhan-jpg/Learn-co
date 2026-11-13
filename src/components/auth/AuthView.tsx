@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PasswordResetFlow } from './PasswordResetFlow';
 import {
   LogIn,
   LogOut,
@@ -29,12 +30,15 @@ import { GoogleSignInDialog } from './GoogleSignInDialog';
 
 interface AuthViewProps {
   initialMode?: 'signin' | 'signup' | 'session';
+  /** Token from a /?reset_token=... link; opens the reset flow directly. */
+  initialResetToken?: string | null;
   onNavigateToTab?: (tab: string) => void;
 }
 
 export const AuthView: React.FC<AuthViewProps> = ({
   initialMode = 'signin',
   onNavigateToTab,
+  initialResetToken,
 }) => {
   const {
     user,
@@ -48,8 +52,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
     clearAuthError,
   } = useAuth();
 
-  const [activeMode, setActiveMode] = useState<'signin' | 'signup' | 'session'>(
-    isAuthenticated ? 'session' : initialMode === 'session' ? 'signin' : initialMode
+  const [activeMode, setActiveMode] = useState<'signin' | 'signup' | 'session' | 'reset'>(
+    // A valid-looking reset token takes priority over the default tab.
+    initialResetToken ? 'reset' : isAuthenticated ? 'session' : initialMode === 'session' ? 'signin' : initialMode
   );
 
   const [email, setEmail] = useState<string>('');
@@ -360,7 +365,34 @@ export const AuthView: React.FC<AuthViewProps> = ({
             >
               {isSubmitting ? 'Authenticating...' : 'Sign In to Learn.co'}
             </Button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode('reset');
+                  setLocalError(null);
+                  clearAuthError();
+                }}
+                className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+              >
+                Forgot your password?
+              </button>
+            </div>
           </form>
+        </Card>
+      )}
+
+      {/* PASSWORD RESET */}
+      {activeMode === 'reset' && (
+        <Card variant="elevated" padding="none" className="max-w-xl mx-auto">
+          <PasswordResetFlow
+            initialToken={initialResetToken}
+            onBackToSignIn={() => {
+              setActiveMode('signin');
+              setLocalError(null);
+            }}
+          />
         </Card>
       )}
 

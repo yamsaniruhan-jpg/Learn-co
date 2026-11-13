@@ -23,9 +23,12 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
-      // Firebase + KaTeX + Recharts + Three are unavoidably large; keep the
-      // warning threshold meaningful instead of noisy.
-      chunkSizeWarningLimit: 4500,
+      // The entry chunk is now ~0.40 MB (gzip ~0.12 MB) after route-level code
+      // splitting, so this threshold is meaningful again: a 500 kB warning would
+      // surface any future import that drags a heavy SDK back into first load.
+      // Individual lazy chunks (SimulationsHubView/three, firebaseClient) are
+      // legitimately larger and are fetched only when their feature is opened.
+      chunkSizeWarningLimit: 800,
     },
   };
 });

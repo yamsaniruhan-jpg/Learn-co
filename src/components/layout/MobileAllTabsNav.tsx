@@ -219,12 +219,37 @@ export const ALL_APP_FEATURES: NavFeature[] = [
   },
 ];
 
+// Unknown categories remain visible after the explicitly ordered ones.
+export const CATEGORY_ORDER = [
+  'Core', 'AI Tools', 'Organization', 'Analytics', 'Gamification',
+  'Resources', 'Collaboration', 'Guidance', 'System', 'Account',
+];
+
+export function groupNavFeatures<T extends { category: string }>(features: T[]) {
+  const byCategory = new Map<string, T[]>();
+  for (const feature of features) {
+    const category = feature.category || 'Other';
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category)!.push(feature);
+  }
+  return [...byCategory.keys()].sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  }).map((category) => ({ category, features: byCategory.get(category)! }));
+}
+
 export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   activeTab,
   setActiveTab,
   dailyAllowanceRemaining,
 }) => {
   const [isOpenAllDrawer, setIsOpenAllDrawer] = useState(false);
+
+  const groupedFeatures = groupNavFeatures(ALL_APP_FEATURES);
 
   const primaryBottomTabs = [
     ALL_APP_FEATURES.find((f) => f.id === 'learn')!,
@@ -245,7 +270,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
       {/* 1. Mobile Horizontal Scrollable Quick-Switch Strip */}
       <nav
         aria-label="All Features Quick Scroll"
-        className="md:hidden sticky top-16 z-25 bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-2 shadow-xs"
+        className="md:hidden sticky top-16 z-25 bg-surface border-b border-line overflow-x-auto no-scrollbar py-2 px-3 flex items-center gap-2 shadow-xs"
       >
         {ALL_APP_FEATURES.map((feat) => {
           const Icon = feat.icon;
@@ -341,65 +366,75 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
               </button>
             </div>
 
-            {/* Grid of All Features */}
-            <div className="p-4 overflow-y-auto space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ALL_APP_FEATURES.map((feat) => {
-                  const Icon = feat.icon;
-                  const isActive = activeTab === feat.id;
-                  return (
-                    <button
-                      key={`drawer-${feat.id}`}
-                      onClick={() => handleSelect(feat.id)}
-                      className={`flex items-start gap-3 p-3 rounded-2xl text-left transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 shadow-xs'
-                          : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
-                      }`}
-                    >
-                      <div
-                        className={`p-2.5 rounded-xl shrink-0 ${
+            {/* Features grouped by category (was one flat 21-item grid) */}
+            <div className="p-4 overflow-y-auto space-y-5">
+              {groupedFeatures.map(({ category, features }) => (
+                <section key={`cat-${category}`}>
+                  <h3 className="px-1 mb-2 text-[11px] font-black uppercase tracking-wider text-ink-soft select-none">
+                    {category}
+                    <span className="ml-1.5 font-bold text-[#A9A5C9] dark:text-[#6B6890]">
+                      {features.length}
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {features.map((feat) => {
+                    const Icon = feat.icon;
+                    const isActive = activeTab === feat.id;
+                    return (
+                      <button
+                        key={`drawer-${feat.id}`}
+                        onClick={() => handleSelect(feat.id)}
+                        className={`flex items-start gap-3 p-3 rounded-2xl text-left transition-all cursor-pointer ${
                           isActive
-                            ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span
-                            className={`text-sm font-bold truncate ${
-                              isActive
-                                ? 'text-indigo-700 dark:text-indigo-300'
-                                : 'text-slate-900 dark:text-white'
-                            }`}
-                          >
-                            {feat.label}
-                          </span>
-                          {feat.highlight && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
-                              Pro
-                            </span>
-                          )}
+                        <div
+                          className={`p-2.5 rounded-xl shrink-0 ${
+                            isActive
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
-                          {feat.description}
-                        </p>
-                      </div>
 
-                      <ChevronRight
-                        className={`w-4 h-4 shrink-0 mt-2 ${
-                          isActive
-                            ? 'text-indigo-600 dark:text-indigo-400'
-                            : 'text-slate-400 opacity-40'
-                        }`}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span
+                              className={`text-sm font-bold truncate ${
+                                isActive
+                                  ? 'text-indigo-700 dark:text-indigo-300'
+                                  : 'text-slate-900 dark:text-white'
+                              }`}
+                            >
+                              {feat.label}
+                            </span>
+                            {feat.highlight && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
+                                Pro
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                            {feat.description}
+                          </p>
+                        </div>
+
+                        <ChevronRight
+                          className={`w-4 h-4 shrink-0 mt-2 ${
+                            isActive
+                              ? 'text-indigo-600 dark:text-indigo-400'
+                              : 'text-slate-400 opacity-40'
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
         </div>

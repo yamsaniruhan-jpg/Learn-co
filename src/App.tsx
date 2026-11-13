@@ -1,28 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { RightContextPanel } from './components/layout/RightContextPanel';
 import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
-import { NotificationCenter } from './components/layout/NotificationCenter';
 import { AuthModal } from './components/auth/AuthModal';
 import { OnboardingWizard } from './components/auth/OnboardingWizard';
 
-import { DashboardView } from './components/dashboard/DashboardView';
-import { LearnView } from './components/learn/LearnView';
-import { CreatorStudioView } from './components/create/CreatorStudioView';
-import { MentorView } from './components/mentor/MentorView';
-import { CopilotView } from './components/copilot/CopilotView';
-import { PracticeView } from './components/practice/PracticeView';
-import { PlannerView } from './components/planner/PlannerView';
-import { GamificationView } from './components/gamification/GamificationView';
-import { IntelligenceView } from './components/intelligence/IntelligenceView';
-import { AdminStudioView } from './components/admin/AdminStudioView';
-import { DocsViewer } from './components/docs/DocsViewer';
-import { ProfileView } from './components/profile/ProfileView';
-import { AuthView } from './components/auth/AuthView';
-import { Leaderboard } from './components/leaderboard/Leaderboard';
-import { ConceptLibraryView } from './components/concepts/ConceptLibraryView';
-import { DigitalArchiveHub } from './components/learn/DigitalArchiveHub';
+// Heavy workspace views are code-split: each is fetched only when its tab is
+// first opened, so the initial payload stays small.
+import { lazyNamed } from './utils/lazyNamed';
+const DashboardView = lazyNamed(() => import('./components/dashboard/DashboardView'), 'DashboardView');
+const LearnView = lazyNamed(() => import('./components/learn/LearnView'), 'LearnView');
+const CreatorStudioView = lazyNamed(() => import('./components/create/CreatorStudioView'), 'CreatorStudioView');
+const MentorView = lazyNamed(() => import('./components/mentor/MentorView'), 'MentorView');
+const CopilotView = lazyNamed(() => import('./components/copilot/CopilotView'), 'CopilotView');
+const PracticeView = lazyNamed(() => import('./components/practice/PracticeView'), 'PracticeView');
+const PlannerView = lazyNamed(() => import('./components/planner/PlannerView'), 'PlannerView');
+const GamificationView = lazyNamed(() => import('./components/gamification/GamificationView'), 'GamificationView');
+const IntelligenceView = lazyNamed(() => import('./components/intelligence/IntelligenceView'), 'IntelligenceView');
+const AdminStudioView = lazyNamed(() => import('./components/admin/AdminStudioView'), 'AdminStudioView');
+const DocsViewer = lazyNamed(() => import('./components/docs/DocsViewer'), 'DocsViewer');
+const ProfileView = lazyNamed(() => import('./components/profile/ProfileView'), 'ProfileView');
+const AuthView = lazyNamed(() => import('./components/auth/AuthView'), 'AuthView');
+const Leaderboard = lazyNamed(() => import('./components/leaderboard/Leaderboard'), 'Leaderboard');
+const ConceptLibraryView = lazyNamed(() => import('./components/concepts/ConceptLibraryView'), 'ConceptLibraryView');
+const DigitalArchiveHub = lazyNamed(() => import('./components/learn/DigitalArchiveHub'), 'DigitalArchiveHub');
+const SimulationsHubView = lazyNamed(() => import('./components/simulations/SimulationsHubView'), 'SimulationsHubView');
+const UserGuideView = lazyNamed(() => import('./components/guide/UserGuideView'), 'UserGuideView');
+const GenFocusTimerView = lazyNamed(() => import('./components/focus/GenFocusTimerView'), 'GenFocusTimerView');
+const StudyRoomsView = lazyNamed(() => import('./components/common/StudyRoomsView'), 'StudyRoomsView');
+const VoiceExamView = lazyNamed(() => import('./components/common/VoiceExamView'), 'VoiceExamView');
+const ExamForecasterView = lazyNamed(() => import('./components/common/ExamForecasterView'), 'ExamForecasterView');
+const OfflineSyncView = lazyNamed(() => import('./components/common/OfflineSyncView'), 'OfflineSyncView');
+const FormulaInspectorModal = lazyNamed(() => import('./components/common/FormulaInspectorModal'), 'FormulaInspectorModal');
+const NotificationCenter = lazyNamed(() => import('./components/layout/NotificationCenter'), 'NotificationCenter');
+
+/**
+ * Shown while a lazily-loaded tab chunk is in flight. Deliberately minimal and
+ * layout-stable: it occupies the same content slot so the shell (navbar, sidebar)
+ * does not jump when the real view arrives.
+ */
+function ViewLoadingFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-3" role="status" aria-live="polite">
+      <Loader2 className="w-8 h-8 text-[#6C5CE7] animate-spin" aria-hidden="true" />
+      <p className="text-sm text-[#6B6890] dark:text-[#B4B0D5]">Loading workspace…</p>
+    </div>
+  );
+}
+
 import { MobileAllTabsNav } from './components/layout/MobileAllTabsNav';
 
 import { useAuth } from './context/AuthContext';
@@ -32,16 +58,9 @@ import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
-import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
-import { UserGuideView } from './components/guide/UserGuideView';
-import { SimulationsHubView } from './components/simulations/SimulationsHubView';
-import { StudyRoomsView } from './components/common/StudyRoomsView';
-import { VoiceExamView } from './components/common/VoiceExamView';
-import { ExamForecasterView } from './components/common/ExamForecasterView';
-import { OfflineSyncView } from './components/common/OfflineSyncView';
-import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
-import { FlashCheckModal } from './components/practice/FlashCheckModal';
-import { WalkthroughModal } from './components/common/WalkthroughModal';
+import type { FormulaInspectionData } from './components/common/FormulaInspectorModal';
+const FlashCheckModal = lazyNamed(() => import('./components/practice/FlashCheckModal'), 'FlashCheckModal');
+const WalkthroughModal = lazyNamed(() => import('./components/common/WalkthroughModal'), 'WalkthroughModal');
 import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
 import {
@@ -68,6 +87,29 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [copilotContext, setCopilotContext] = useState<string>('');
+  // A reset link arrives as /?reset_token=... . Read it once on mount, then strip
+  // it from the address bar so the token is not left in history or copied into a
+  // share, and so a refresh does not replay a single-use token.
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('reset_token');
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (!resetToken) return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset_token');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    } catch {
+      /* non-fatal */
+    }
+  }, [resetToken]);
+
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [isContextPanelOpen, setIsContextPanelOpen] = useState<boolean>(false);
@@ -330,7 +372,12 @@ export default function App() {
         </header>
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-2xl py-4">
-            <AuthView onNavigateToTab={() => setActiveTab('dashboard')} />
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <AuthView
+                onNavigateToTab={() => setActiveTab('dashboard')}
+                initialResetToken={resetToken}
+              />
+            </Suspense>
           </div>
         </main>
       </div>
@@ -384,6 +431,7 @@ export default function App() {
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
             >
+            <Suspense fallback={<ViewLoadingFallback />}>
             {arrivalReminder && (
               <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_rgba(45,42,74,0.06)] animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-start gap-3">
@@ -576,6 +624,7 @@ export default function App() {
               onNavigateToTab={(tab) => setActiveTab(tab)}
             />
           )}
+            </Suspense>
           </ErrorBoundary>
         </main>
         </ZenFocusCanvas>
@@ -604,6 +653,10 @@ export default function App() {
         }}
       />
 
+      {/* Lazily-loaded overlays. `null` is the correct fallback: these are all
+          hidden until their state flag flips, so there is nothing to show while
+          the chunk downloads, and a spinner here would flash on first open. */}
+      <Suspense fallback={null}>
       {/* Notification Center Drawer */}
       <NotificationCenter
         isOpen={isNotificationOpen}
@@ -668,6 +721,8 @@ export default function App() {
           localStorage.setItem('learnco_walkthrough_seen', 'true');
         }}
       />
+
+      </Suspense>
 
       {/* Floating Omni Copilot Widget */}
       {activeTab !== 'copilot' && !isZenMode && <OmniCopilot />}

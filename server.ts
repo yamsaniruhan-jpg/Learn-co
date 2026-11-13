@@ -27,7 +27,11 @@ import securityHeaders from "./server/middleware/securityHeaders";
 import { requireAuth } from "./server/middleware/authMiddleware";
 import aiRateLimiter from "./server/middleware/aiRateLimit";
 
-async function startServer() {
+/**
+ * Builds the fully-wired Express application without binding a port.
+ * Exported so integration tests can exercise the real route stack.
+ */
+export async function createApp() {
   const app = express();
   app.set("trust proxy", 1);
 
@@ -39,10 +43,6 @@ async function startServer() {
   process.on("uncaughtException", (err: any) => {
     console.error("[Server] Uncaught exception:", err?.message || err);
   });
-
-  const portArgIndex = process.argv.indexOf("--port");
-  const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? parseInt(process.argv[portArgIndex + 1], 10) : null;
-  const PORT = cliPort || parseInt(process.env.PORT || "3000", 10);
 
   // ORDER MATTERS — security first
   app.use(securityHeaders);
@@ -128,7 +128,7 @@ async function startServer() {
   app.use("/api/leaderboard", leaderboardRoutes);
   app.use("/api/ai", requireAuth, aiRateLimiter, aiRoutes);
   app.use("/api/creator", creatorRoutes);
-  app.use("/api/copilot", copilotRoutes);
+  app.use("/api/copilot", requireAuth, copilotRoutes);
   app.use("/api/mentorship", mentorshipRouter);
   app.use("/api/subscription", subscriptionRoutes);
   app.use("/api/gamification", gamificationRoutes);
@@ -142,7 +142,34 @@ async function startServer() {
   });
 
   // Vite middleware for development vs static build for production
-  if (process.env.NODE_ENV !== "production") {
+  // Centralised error handler. Must be registered after all routes so body-parser
+  // failures (malformed JSON), validation errors and thrown exceptions return
+  // predictable JSON instead of Express's default HTML stack trace, which leaked
+  // file paths and line numbers to clients.
+  app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = Number(err?.status || err?.statusCode) || 500;
+    const isClientError = status >= 400 && status < 500;
+
+    if (!isClientError) {
+      console.error(`[API Error] ${req.method} ${req.originalUrl}:`, err?.message || err);
+    }
+
+    // Avoid leaking internals for 5xx responses.
+    const message = isClientError
+      ? err?.message || "Invalid request."
+      : "An unexpected server error occurred.";
+
+    if (res.headersSent) return;
+    res.status(status).json({
+      success: false,
+      error: message,
+      ...(err?.code && isClientError ? { code: err.code } : {}),
+    });
+  });
+
+  if (process.env.NODE_ENV === "test") {
+    // API-only mode for integration tests: skip the SPA/static layer.
+  } else if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -158,6 +185,19 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  return app;
+}
+
+async function startServer() {
+  const app = await createApp();
+
+  const portArgIndex = process.argv.indexOf("--port");
+  const cliPort =
+    portArgIndex !== -1 && process.argv[portArgIndex + 1]
+      ? parseInt(process.argv[portArgIndex + 1], 10)
+      : null;
+  const PORT = cliPort || parseInt(process.env.PORT || "3000", 10);
 
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Learn.co Server running on http://0.0.0.0:${PORT}`);
@@ -178,5 +218,11 @@ async function startServer() {
   process.on("SIGINT", shutdown);
 }
 
-startServer();
+// Only boot when executed directly (not when imported by tests).
+const isDirectRun =
+  process.argv[1] && /server\.(ts|js|cjs|mts)$/.test(process.argv[1]) && !process.env.VITEST;
+
+if (isDirectRun) {
+  startServer();
+}
 

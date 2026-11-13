@@ -2,26 +2,13 @@ import { Router, Request, Response } from 'express';
 import { Database, withUserLock } from '../db';
 import { AdaptiveAnalyticsEngine, invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
 import { SubjectId, ExamTrackId } from '../../src/types/curriculum';
+import { verifyFirebaseAuth, requireAdmin, AuthenticatedRequest } from '../middleware/authMiddleware';
 
 export const analyticsRouter = Router();
 
-// Middleware to authenticate user from Bearer token
-function requireAuth(req: Request, res: Response, next: () => void) {
-  const authHeader = req.headers.authorization;
-  let token = 'token-alex-001';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7).trim();
-  }
-  const user = Database.getSessionUser(token) || Database.findUserById('user-alex-001');
-  if (!user) {
-    res.status(401).json({ success: false, error: 'Invalid or expired session token.' });
-    return;
-  }
-  (req as any).userId = user.id;
-  next();
-}
-
-analyticsRouter.use(requireAuth);
+// Authentication is delegated to the shared strict guard so analytics can never
+// be read (or written) anonymously. It previously defaulted to a seeded account.
+analyticsRouter.use(verifyFirebaseAuth);
 
 /**
  * GET /api/analytics/dashboard
@@ -223,7 +210,7 @@ analyticsRouter.get('/trends', (req: Request, res: Response) => {
  * GET /api/analytics/logs
  * Retrieves system, attempt, verification, and audit logs
  */
-analyticsRouter.get('/logs', (req: Request, res: Response) => {
+analyticsRouter.get('/logs', requireAdmin, (req: Request, res: Response) => {
   try {
     const { category, search, limit } = req.query;
     const maxLimit = limit ? parseInt(limit as string, 10) : 100;
@@ -252,7 +239,7 @@ analyticsRouter.post('/logs', (req: Request, res: Response) => {
 /**
  * GET /api/analytics/webhook-config
  */
-analyticsRouter.get('/webhook-config', (req: Request, res: Response) => {
+analyticsRouter.get('/webhook-config', requireAdmin, (req: Request, res: Response) => {
   try {
     const config = Database.getAlertWebhookConfig();
     res.json({ success: true, config });
@@ -264,7 +251,7 @@ analyticsRouter.get('/webhook-config', (req: Request, res: Response) => {
 /**
  * POST /api/analytics/webhook-config
  */
-analyticsRouter.post('/webhook-config', (req: Request, res: Response) => {
+analyticsRouter.post('/webhook-config', requireAdmin, (req: Request, res: Response) => {
   try {
     const { enabled, webhookUrl, minSeverity, channelName } = req.body;
     const updated = Database.setAlertWebhookConfig({ enabled, webhookUrl, minSeverity, channelName });
@@ -277,7 +264,7 @@ analyticsRouter.post('/webhook-config', (req: Request, res: Response) => {
 /**
  * POST /api/analytics/test-webhook
  */
-analyticsRouter.post('/test-webhook', (req: Request, res: Response) => {
+analyticsRouter.post('/test-webhook', requireAdmin, (req: Request, res: Response) => {
   try {
     const log = Database.logEvent(
       'SYSTEM',
@@ -300,7 +287,7 @@ analyticsRouter.post('/test-webhook', (req: Request, res: Response) => {
  */
 analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId || 'user-alex-001';
+    const userId = (req as AuthenticatedRequest).userId!;
     const focus = typeof req.body?.focus === 'string' ? req.body.focus.trim() : 'overall';
 
     const dashboard = AdaptiveAnalyticsEngine.getDashboard(userId);
@@ -382,7 +369,7 @@ analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => 
  */
 analyticsRouter.post('/trigger-spaced-repetition', (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId || 'user-alex-001';
+    const userId = (req as AuthenticatedRequest).userId!;
     const result = Database.triggerSpacedRepetitionReminders(userId);
     res.json({ success: true, data: result });
   } catch (error: any) {
