@@ -303,8 +303,8 @@ against real `Response` objects.
 
 **Not yet fixed — queued, in recommended order**
 
-1. **Bundle size (Track D).** 3.97 MB single JS file, **0 `React.lazy`**. Route
-   splitting is a mechanical, low-risk win.
+1. **Bundle size (Track D).** DONE — see `## 9. Track D` below. Entry chunk went
+   from **3.97 MB → 0.40 MB** (gzip **1.05 MB → 0.12 MB**), split into 66 chunks.
 2. **Dead code (Track E).** DONE — see `## 8. Track E` below. **Correction to an
    earlier claim in this report:** there are **no unmounted routers**. All **14**
    are mounted in `server.ts:124–137`. The earlier "5 unmounted legacy routers" note
@@ -444,8 +444,8 @@ includes side-effect imports.
 ### Honest caveats
 
 - Track E removes dead weight; it does **not** shrink the shipped bundle. The
-  bundle is still **3.97 MB** because the dead files were never bundled. The
-  size win belongs to Track D (route splitting, 0 `React.lazy` today).
+  bundle was **3.97 MB** because the dead files were never bundled — the size win
+  came from Track D (see `## 9`), not from removing dead code.
 - The legacy `routes/{subscription,gamification,marketplace}.js` and their
   services are still CommonJS in a TypeScript codebase. They work and are used,
   so removing them would be a rewrite — out of scope here. Porting them to
@@ -453,3 +453,146 @@ includes side-effect imports.
 - Reachability is static. It cannot see runtime dynamic `require()`. I
   cross-checked by running `tsc`, tests, a build and live HTTP probes, which
   would catch a missing module — but I make no claim beyond that.
+
+---
+
+## 9. Track D — bundle size & code splitting
+
+### The problem, measured rather than assumed
+
+`npm run build` produced **one JS file: 3.97 MB (1.05 MB gzipped)**. Every view,
+every modal and every heavy SDK (`firebase`, `three`, `katex`, `recharts`,
+`react-markdown`) was in that single chunk, so the browser had to download and
+parse all of it before the signed-out login screen could paint. There were
+**0** uses of `React.lazy`.
+
+The app has no router — it switches views with `activeTab === '...'` conditions
+(28 of them). That is *structurally ideal* for code splitting: each branch can
+load its own chunk and the navigation model does not change at all.
+
+### What was changed
+
+**1. A named-export lazy helper** (`src/utils/lazyNamed.ts`)
+
+The views are all named exports, but `React.lazy` wants a default export. Rather
+than touching 23 component files to add `export default`, I added one adapter:
+
+```ts
+const DashboardView = lazyNamed(() => import('./components/dashboard/DashboardView'), 'DashboardView');
+```
+
+`resolveNamedExport` is split out and exported on its own so the failure path is
+unit-testable — a component that silently resolved to `undefined` would render a
+blank tab instead of throwing, which is the exact bug that only shows up in a
+browser.
+
+**2. 23 workspace views + 4 overlays converted to lazy**
+
+`DashboardView`, `LearnView`, `CreatorStudioView`, `MentorView`, `CopilotView`,
+`PracticeView`, `PlannerView`, `GamificationView`, `IntelligenceView`,
+`AdminStudioView`, `DocsViewer`, `ProfileView`, `AuthView`, `Leaderboard`,
+`ConceptLibraryView`, `DigitalArchiveHub`, `SimulationsHubView`,
+`UserGuideView`, `GenFocusTimerView`, `StudyRoomsView`, `VoiceExamView`,
+`ExamForecasterView`, `OfflineSyncView` — plus the `FormulaInspectorModal`,
+`FlashCheckModal`, `WalkthroughModal` and `NotificationCenter` overlays.
+
+**3. Suspense boundaries — and a crash I nearly shipped**
+
+Lazy components **throw** if they render outside a `<Suspense>` boundary. I added:
+
+- one boundary around the main content region, with a layout-stable
+  `ViewLoadingFallback` (spinner + "Loading workspace…", `role="status"`);
+- one around the signed-out `AuthView`;
+- one around the overlay stack with `fallback={null}` — correct for modals, which
+  are hidden until their flag flips, so a spinner there would just flash.
+
+My first pass wrapped **only** the content region. Four modals (`NotificationCenter`,
+`FlashCheckModal`, `FormulaInspectorModal`, `WalkthroughModal`) and `AuthView` were
+still outside a boundary and would have crashed the app the moment a user opened
+the notification drawer or signed out. I found this by writing a test that walks
+`App.tsx` tracking Suspense nesting depth — then proved the test works by
+deliberately removing a wrapper and confirming it failed with exactly those four
+names. That check is now permanent (see below).
+
+**4. Firebase was in the first-load path by accident** (`src/context/AuthContext.tsx`)
+
+`AuthContext` *already* lazy-loaded Firebase for the Google/email sign-in flows
+(`await import('../services/firebaseClient')`), but a **static** import of
+`syncClientToFirestore` on line 13 dragged the entire Firebase SDK back into the
+initial chunk. Since that call is fire-and-forget (`...catch(() => {})`), I
+converted it to a dynamic import. Firebase now lives only in the
+`firebaseClient` chunk (748 kB, gzip 188 kB), fetched when it is actually needed.
+
+**5. KaTeX was in first load for a drawer nobody had opened**
+
+`NotificationCenter` → `FormattedMathText` → `katex` pulled the whole typesetting
+engine into the entry chunk, purely so notifications *could* render LaTeX. Making
+`NotificationCenter` lazy removed **42** katex references from the entry — now 0.
+
+**6. Restored a meaningful build warning threshold** (`vite.config.ts`)
+
+`chunkSizeWarningLimit` had been raised to 4500 to silence the 3.97 MB warning.
+That hid the problem it exists to report. Now that the entry is 0.40 MB the limit
+is **800 kB**, so any future import that drags a heavy SDK back into first load
+will warn again.
+
+### Result
+
+| Metric | Before | After | Change |
+|---|---|---|---|
+| Entry JS | 3.97 MB | **0.40 MB** | **−90%** |
+| Entry gzip | 1.05 MB | **0.12 MB** | **−89%** |
+| JS chunks | 1 | **66** | split per view/feature |
+| `React.lazy` usages | 0 | **27** | |
+| KaTeX in entry | yes | **no** | moved to on-demand chunk |
+| Firebase in entry | yes | **no** | moved to `firebaseClient` chunk |
+| Build warnings | 0 (masked by 4500 kB limit) | **0** (limit now 800 kB) | threshold meaningful |
+
+The largest remaining chunks are all *lazy* and fetched only when their feature
+opens: `firebaseClient` 749 kB, `SimulationsHubView` 599 kB (three.js),
+`PlannerView` 450 kB (recharts), `curriculumData` 420 kB.
+
+### Verification
+
+- `npx tsc --noEmit` — clean
+- `npm test` — **121/121 passing across 5 files** (up from 89; +32 new)
+- `npm run build` — exit 0, **0 warnings**, with the stricter threshold
+- **All 68 built assets** (`dist/assets/*.js` + `*.css`) fetched over HTTP from the
+  production server: **68/68 returned 200**. A lazy chunk that 404s is the classic
+  code-splitting deployment failure, so this was checked explicitly rather than
+  assumed.
+- Verified all 27 lazy chunks contain the named symbol `App.tsx` asks for.
+- `npm run dev` — boots clean, serves view modules on demand (200).
+- Production runtime probes with a real signed-up token: `/api/learning/curriculum`,
+  `/api/user/profile`, `/api/planner/overview`, `/api/practice/history`,
+  `/api/leaderboard` all **200**.
+
+### New regression tests (`tests/lazyViews.test.ts`, 32 tests)
+
+1. **Every named export resolves** — each of the 27 `lazyNamed` targets is
+   dynamically imported and asserted to export that exact function.
+2. **No lazy declaration escapes the test** — parses `App.tsx` and fails if a new
+   `lazyNamed(` appears that is not in the list, so this guard cannot rot.
+3. **Every lazy usage is inside a Suspense boundary** — tracks nesting depth.
+   Verified to fail correctly by temporarily removing a wrapper.
+4. **`resolveNamedExport` error path** — asserts a missing export throws a
+   descriptive error listing available exports, rather than returning `undefined`.
+
+### Honest caveats
+
+- **Total JS on disk grew slightly** (4.2 MB across 66 files vs 3.97 MB in one).
+  That is expected and the right trade: the browser fetches ~0.40 MB to become
+  interactive instead of 3.97 MB, and the rest streams in per feature. There is no
+  gain in total bytes, only in *time to first paint*.
+- **I could not measure real-world load time.** No headless browser is installable
+  in this sandbox, so the improvement is measured in bytes and chunk counts, not
+  in a Lighthouse score. The byte-level win is unambiguous; the perceptual win is
+  inferred, not observed.
+- **The 749 kB `firebaseClient` chunk is still large** for users who sign in with
+  Google. It is now off the critical path, but shrinking it further means importing
+  `firebase/auth` and `firebase/firestore` from separate entry points rather than
+  one module — worth doing, not done here.
+- **`SimulationsHubView` (three.js, 599 kB) is lazy but monolithic.** Splitting the
+  individual simulations would help users who open only one lab. Deferred.
+- The CSS is still one 237 kB file (30 kB of it KaTeX). Behaving correctly, but
+  it is not split per view yet.

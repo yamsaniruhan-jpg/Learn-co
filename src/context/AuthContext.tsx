@@ -10,7 +10,18 @@ import {
 } from '../types/auth';
 import { getCurrentXp } from '../utils/xpManager';
 import { loadUserStreak } from '../utils/streakManager';
-import { syncClientToFirestore } from '../services/clientFirestoreSync';
+
+/**
+ * Firestore mirroring is a best-effort side channel: the authoritative state lives
+ * on the Learn.co backend. It is therefore loaded on demand so that the whole
+ * Firebase SDK stays out of the initial bundle, and any failure is swallowed
+ * exactly as the previous fire-and-forget calls did (.catch(() => {})).
+ */
+function syncClientToFirestore(user: any, profile: any, gamification: any) {
+  return import('../services/clientFirestoreSync')
+    .then(({ syncClientToFirestore: sync }) => sync(user, profile, gamification))
+    .catch(() => {});
+}
 
 interface AuthContextType {
   user: any | null;
