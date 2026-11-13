@@ -65,6 +65,7 @@
     "@types/supertest": "^6.0.3",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "jsdom": "31.0.0",
     "supertest": "^7.3.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",

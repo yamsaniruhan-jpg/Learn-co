@@ -212,11 +212,11 @@ function assertPublicHost(hostname: string): void {
   // IPv6 loopback / unique-local / link-local.
   if (host.includes(':')) {
     if (
-      host === '::1' ||
-      host === '::' ||
+      host.startsWith('::') || // loopback, unspecified and IPv4-mapped/compatible forms
       host.startsWith('fc') ||
       host.startsWith('fd') ||
-      host.startsWith('fe80')
+      /^fe[89ab][0-9a-f]:/.test(host) || // link-local fe80::/10
+      host.startsWith('ff') // multicast
     ) {
       throw new ExtractionError('That URL points to a private address.', 'URL_BLOCKED');
     }
@@ -299,30 +299,49 @@ export async function extractUrlText(
   const combined = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   let response: globalThis.Response;
-  try {
-    response = await fetch(parsed.toString(), {
-      signal: combined,
-      redirect: 'follow',
-      headers: {
-        // Identify the crawler and ask for HTML; many sites 403 a blank UA.
-        'User-Agent': 'LearnCo-ResourceImporter/1.0 (+https://learn.co)',
-        Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
-      },
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (/abort|timeout/i.test(message)) {
+  let currentUrl = parsed;
+  for (let redirects = 0; ; redirects += 1) {
+    // Validate every redirect target before making the next request. Automatic
+    // redirects would contact an internal target before the final URL check.
+    if (currentUrl.protocol !== 'http:' && currentUrl.protocol !== 'https:') {
+      throw new ExtractionError('Only http and https links can be imported.', 'UNSUPPORTED_PROTOCOL');
+    }
+    assertPublicHost(currentUrl.hostname);
+    try {
+      response = await fetch(currentUrl.toString(), {
+        signal: combined,
+        redirect: 'manual',
+        headers: {
+          'User-Agent': 'LearnCo-ResourceImporter/1.0 (+https://learn.co)',
+          Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (/abort|timeout/i.test(message)) {
+        throw new ExtractionError(
+          'That page took too long to respond. Try again or paste the text instead.',
+          'URL_TIMEOUT',
+          504
+        );
+      }
       throw new ExtractionError(
-        'That page took too long to respond. Try again or paste the text instead.',
-        'URL_TIMEOUT',
-        504
+        'That page could not be reached. Check the link and try again.',
+        'URL_UNREACHABLE',
+        502
       );
     }
-    throw new ExtractionError(
-      'That page could not be reached. Check the link and try again.',
-      'URL_UNREACHABLE',
-      502
-    );
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get('location');
+    await response.body?.cancel();
+    if (!location || redirects >= 5) {
+      throw new ExtractionError('That page has an invalid or excessive redirect.', 'URL_BAD_REDIRECT', 502);
+    }
+    try {
+      currentUrl = new URL(location, currentUrl);
+    } catch {
+      throw new ExtractionError('That page has an invalid redirect.', 'URL_BAD_REDIRECT', 502);
+    }
   }
 
   if (!response.ok) {
@@ -333,8 +352,8 @@ export async function extractUrlText(
     );
   }
 
-  // Re-check the final URL: a redirect can land on an internal address.
-  assertPublicHost(new URL(response.url || parsed.toString()).hostname);
+  // Defense in depth for nonstandard fetch implementations.
+  assertPublicHost(new URL(response.url || currentUrl.toString()).hostname);
 
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
   const isTextual =
@@ -377,7 +396,7 @@ export async function extractUrlText(
   return {
     text: text.slice(0, MAX_EXTRACTED_CHARS),
     title,
-    finalUrl: response.url || parsed.toString(),
+    finalUrl: response.url || currentUrl.toString(),
     truncated: text.length > MAX_EXTRACTED_CHARS,
   };
 }

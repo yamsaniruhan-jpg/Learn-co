@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { Database } from '../db';
-import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, getEffectiveRole, AuthenticatedRequest } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.get('/profile', requireAuth, (req: AuthenticatedRequest, res: Response) =
       return;
     }
 
-    res.json({ profile, gamification });
+    res.json({ profile: { ...profile, role: getEffectiveRole(req) }, gamification });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch profile.' });
   }
@@ -60,7 +60,7 @@ router.put('/profile', requireAuth, (req: AuthenticatedRequest, res: Response) =
 
     res.json({
       success: true,
-      profile: updated,
+      profile: { ...updated, role: getEffectiveRole(req) },
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Failed to update profile.' });
@@ -136,7 +136,7 @@ router.post('/avatar', requireAuth, (req: AuthenticatedRequest, res: Response) =
     res.json({
       success: true,
       avatarUrl: updated.avatarUrl,
-      profile: updated,
+      profile: { ...updated, role: getEffectiveRole(req) },
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Failed to upload profile image.' });

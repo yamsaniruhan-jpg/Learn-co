@@ -62,9 +62,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
   onNavigateToCopilot,
 }) => {
   const [activeMainTab, setActiveMainTab] = useState<'my_mentorship' | 'discover' | 'sessions' | 'portal' | 'diagnostics' | 'mentor_access'>('my_mentorship');
-  const isOwnerOrAdmin =
-    user.role === 'admin' ||
-    (user.email || '').trim().toLowerCase() === 'yamsaniruhan@gmail.com';
+  const isOwnerOrAdmin = user.role === 'admin';
   const [isMentorRole, setIsMentorRole] = useState(
     user.role === 'educator' || user.role === 'admin'
   );

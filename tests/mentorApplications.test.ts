@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
+
+const { verifyIdToken } = vi.hoisted(() => ({ verifyIdToken: vi.fn() }));
+vi.mock('../server/services/firebaseAdmin', () => ({ adminAuth: { verifyIdToken }, adminDb: null }));
 import request from 'supertest';
 import type { Express } from 'express';
 
@@ -23,22 +26,17 @@ beforeAll(async () => {
   expect(studentRes.body.user.role).toBe('student');
   studentToken = studentRes.body.token;
 
-  // Sign up or sign in as platform owner
-  const ownerSignupRes = await request(app)
-    .post('/api/auth/signup')
-    .send({ email: OWNER_EMAIL, password: PASSWORD, fullName: 'Ruhan Yamsani' });
-
-  if (ownerSignupRes.status === 201) {
-    ownerToken = ownerSignupRes.body.token;
-    expect(ownerSignupRes.body.user.role).toBe('admin');
-  } else {
-    const ownerSigninRes = await request(app)
-      .post('/api/auth/signin')
-      .send({ email: OWNER_EMAIL, password: PASSWORD });
-    expect(ownerSigninRes.status).toBe(200);
-    ownerToken = ownerSigninRes.body.token;
-    expect(ownerSigninRes.body.user.role).toBe('admin');
-  }
+  // Owner access requires a server-verified Google identity.
+  verifyIdToken.mockResolvedValue({
+    uid: 'verified-owner', email: OWNER_EMAIL, email_verified: true,
+    firebase: { sign_in_provider: 'google.com' },
+  });
+  const ownerRes = await request(app).post('/api/auth/google').send({
+    email: OWNER_EMAIL, name: 'Platform Owner', idToken: 'owner-test-token', intent: 'auto',
+  });
+  expect(ownerRes.status).toBe(200);
+  expect(ownerRes.body.user.role).toBe('admin');
+  ownerToken = ownerRes.body.token;
 }, 60_000);
 
 describe('Mentor applications workflow & owner routing', () => {

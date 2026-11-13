@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+.learnco_db.json
+.learnco_db.json.tmp

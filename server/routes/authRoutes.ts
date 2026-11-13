@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { Database, hashPassword, verifyPassword } from '../db';
-import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, getEffectiveRole, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
@@ -10,18 +10,29 @@ import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
 
 const router = Router();
 
+// Limit password guessing per client IP. Multi-instance deployments should use
+// a shared rate-limit store; test mode skips this to keep independent suites isolated.
+const signinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: { error: 'Too many sign-in attempts. Please try again later.' },
+});
+
 // POST /api/auth/signup
 router.post('/signup', (req, res: Response) => {
   try {
     const { email, password, fullName, timezone, idToken } = req.body;
 
-    if (!email || !email.includes('@')) {
+    if (typeof email !== 'string' || email.length > 254 || !email.includes('@')) {
       res.status(400).json({ error: 'Please provide a valid email address.' });
       return;
     }
 
-    if (!password || password.length < 6) {
-      res.status(400).json({ error: 'Password must be at least 6 characters in length.' });
+    if (typeof password !== 'string' || password.length < 6 || password.length > 1024) {
+      res.status(400).json({ error: 'Password must be between 6 and 1024 characters in length.' });
       return;
     }
 
@@ -53,7 +64,7 @@ router.post('/signup', (req, res: Response) => {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
-        role: profile?.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
+        role: profile?.role || 'student',
       },
       profile,
       gamification,
@@ -65,12 +76,12 @@ router.post('/signup', (req, res: Response) => {
 });
 
 // POST /api/auth/signin
-router.post('/signin', (req, res: Response) => {
+router.post('/signin', signinLimiter, (req, res: Response) => {
   try {
     const { email, password, idToken } = req.body;
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required.' });
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password || email.length > 254 || password.length > 1024) {
+      res.status(400).json({ error: 'A valid email and password are required.' });
       return;
     }
 
@@ -118,13 +129,10 @@ router.post('/signin', (req, res: Response) => {
     user.updatedAt = new Date().toISOString();
 
     const token = Database.createSession(user.id);
-    const profile = Database.getProfile(user.id);
+    const storedProfile = Database.getProfile(user.id);
+    const profile = storedProfile && isOwnerEmail(user.email) ? { ...storedProfile, role: 'student' as const } : storedProfile;
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
-
-    if (profile && isOwnerEmail(user.email) && profile.role !== 'admin') {
-      profile.role = 'admin';
-    }
 
     if (settings && settings.privacy) {
       settings.privacy.leaderboardVisibility = true;
@@ -151,7 +159,7 @@ router.post('/signin', (req, res: Response) => {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
-        role: profile?.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
+        role: profile?.role || 'student',
       },
       profile,
       gamification,
@@ -167,7 +175,7 @@ router.post('/google', async (req, res: Response) => {
   try {
     const { email, name, avatarUrl, timezone, intent = 'auto', idToken } = req.body;
 
-    if (!email || !email.includes('@')) {
+    if (typeof email !== 'string' || email.length > 254 || !email.includes('@')) {
       res.status(400).json({ error: 'A valid email is required for Google Sign-In.' });
       return;
     }
@@ -223,9 +231,12 @@ router.post('/google', async (req, res: Response) => {
       profile = Database.getProfile(user.id);
     }
 
-    if (profile && isOwnerEmail(user.email) && profile.role !== 'admin') {
-      profile.role = 'admin';
-      Database.saveToDisk();
+    if (isOwnerEmail(user.email)) {
+      // Only the independently verified Google identity can create an owner
+      // session. Previous password and legacy sessions remain non-admin.
+      Database.revokeSession(token);
+      token = Database.createSession(user.id, true);
+      if (profile) profile = { ...profile, role: 'admin' };
     }
 
     const gamification = Database.getGamification(user.id);
@@ -249,7 +260,7 @@ router.post('/google', async (req, res: Response) => {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
-        role: profile?.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
+        role: profile?.role || 'student',
       },
       profile,
       gamification,
@@ -274,19 +285,17 @@ router.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    if (isOwnerEmail(user.email) && profile.role !== 'admin') {
-      profile.role = 'admin';
-      Database.saveToDisk();
-    }
+    const effectiveRole = getEffectiveRole(req);
+    const effectiveProfile = { ...profile, role: effectiveRole };
 
     res.json({
       user: {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
-        role: profile.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
+        role: effectiveRole,
       },
-      profile,
+      profile: effectiveProfile,
       gamification,
       settings,
     });
@@ -340,7 +349,7 @@ router.post('/onboarding', requireAuth, (req: AuthenticatedRequest, res: Respons
 
     res.json({
       success: true,
-      profile: updatedProfile,
+      profile: { ...updatedProfile, role: getEffectiveRole(req) },
       settings: Database.getSettings(userId),
     });
   } catch (err: any) {
@@ -486,8 +495,8 @@ router.post('/reset-password', resetLimiter, (req, res: Response) => {
       return;
     }
     // Mirrors the signup rule so a reset cannot be used to weaken the policy.
-    if (password.length < 8) {
-      res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    if (password.length < 8 || password.length > 1024) {
+      res.status(400).json({ error: 'Password must be at least 8 characters and at most 1024 characters.' });
       return;
     }
     if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {

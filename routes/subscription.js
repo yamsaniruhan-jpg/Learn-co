@@ -153,7 +153,14 @@ router.post('/checkout', verifyFirebaseAuth, async (req, res) => {
 
         return res.json({ url: session.url, sessionId: session.id });
       } catch (stripeErr) {
-        console.warn('Stripe checkout session error, activating sandbox instant upgrade:', stripeErr.message);
+        console.warn('Stripe checkout session error:', stripeErr.message);
+        if (process.env.NODE_ENV === 'production') {
+          return res.status(503).json({
+            error: 'Payment checkout is temporarily unavailable.',
+            code: 'BILLING_UNAVAILABLE',
+          });
+        }
+        console.warn('Activating sandbox instant upgrade in a non-production environment.');
       }
     }
 
@@ -249,7 +256,13 @@ router.post('/webhook', async (req, res) => {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
       console.error('Webhook signature verification failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+      return res.status(400).send('Webhook Error: Invalid signature.');
+    }
+  } else if (Buffer.isBuffer(event)) {
+    try {
+      event = JSON.parse(event.toString('utf8'));
+    } catch {
+      return res.status(400).json({ error: 'Invalid webhook payload.' });
     }
   }
 

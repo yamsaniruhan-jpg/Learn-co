@@ -20,7 +20,10 @@ service cloud.firestore {
     }
 
     function isPlatformOwner() {
-      return isAuthenticated() && request.auth.token.email == 'yamsaniruhan@gmail.com';
+      return isAuthenticated()
+        && request.auth.token.email == 'yamsaniruhan@gmail.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     function isValidPublicProfile(data, userId) {

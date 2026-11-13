@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Database } from '../db';
-import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, getEffectiveRole, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { MentorMatchEngine } from '../services/mentorMatchEngine';
 import { AdaptiveAnalyticsEngine } from '../services/adaptiveAnalyticsEngine';
 // Legacy CommonJS service (its folder is marked "type": "commonjs").
@@ -16,15 +16,12 @@ import {
   upsertSqlMentorProfile,
   MentorApplicationRecord,
 } from '../../src/db/mentorApplications.ts';
-import { PLATFORM_OWNER_EMAIL, isOwnerEmail, updateSqlUserRole } from '../../src/db/users.ts';
+import { PLATFORM_OWNER_EMAIL, updateSqlUserRole } from '../../src/db/users.ts';
 
 export const mentorshipRouter = Router();
 
 function isPlatformOwnerOrAdmin(req: AuthenticatedRequest): boolean {
-  const userId = req.userId;
-  const profile = userId ? Database.getProfile(userId) : null;
-  const email = (req.user?.email || profile?.email || '').trim().toLowerCase();
-  return isOwnerEmail(email) || profile?.role === 'admin' || req.user?.role === 'admin';
+  return getEffectiveRole(req) === 'admin';
 }
 
 // Public mentor directory endpoints are declared first; all routes below require auth.
@@ -69,7 +66,7 @@ mentorshipRouter.post('/mentors/profile', async (req: AuthenticatedRequest, res:
   try {
     const userId = req.userId!;
     const userProfile = Database.getProfile(userId);
-    const effectiveRole = isPlatformOwnerOrAdmin(req) ? 'admin' : userProfile?.role || 'student';
+    const effectiveRole = getEffectiveRole(req);
     if (effectiveRole !== 'educator' && effectiveRole !== 'admin') {
       return res.status(403).json({
         success: false,
