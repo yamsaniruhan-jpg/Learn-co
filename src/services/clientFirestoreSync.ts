@@ -146,7 +146,9 @@ export async function syncXpToFirestoreAndBackend(
     const currentAuthUser = auth?.currentUser;
     let storedUser: any = null;
     try {
-      const saved = localStorage.getItem('learnco_auth_user');
+      const saved =
+        localStorage.getItem('learnco_user') ||
+        localStorage.getItem('learnco_auth_user');
       if (saved) storedUser = JSON.parse(saved);
     } catch (_) {}
 

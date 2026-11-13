@@ -57,7 +57,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const userXp = gamification?.xp ?? 0;
   const levelInfo = calculateLevelFromXp(userXp);
-  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
+  const ownerEmail = (user?.email || profile?.email || '').trim().toLowerCase();
+  const isAdmin =
+    user?.role === 'admin' ||
+    profile?.role === 'admin' ||
+    ownerEmail === 'yamsaniruhan@gmail.com';
 
   const coreNav: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },

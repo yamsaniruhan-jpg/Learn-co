@@ -6,12 +6,10 @@ import {
   AlertCircle,
   ArrowRight,
   Sparkles,
-  User,
   Mail,
   Lock,
   ChevronRight,
   ExternalLink,
-  KeyRound,
   UserPlus,
   LogIn,
 } from 'lucide-react';
@@ -33,14 +31,13 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
 }) => {
   const { signInWithGoogle } = useAuth();
   const [intent, setIntent] = useState<'signin' | 'signup'>(initialIntent);
-  const [googleEmail, setGoogleEmail] = useState<string>('');
-  const [googleName, setGoogleName] = useState<string>('');
+  const [optionalEmailHint, setOptionalEmailHint] = useState<string>('');
+  const [requireExactEmail, setRequireExactEmail] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [accountNotFound, setAccountNotFound] = useState<boolean>(false);
   const [step, setStep] = useState<'prompt' | 'authorizing' | 'success'>('prompt');
 
-  // Suggest recently remembered Google email if available in localStorage
   const savedGoogleEmail = localStorage.getItem('learnco_last_google_email') || '';
   const savedGoogleName = localStorage.getItem('learnco_last_google_name') || '';
 
@@ -50,29 +47,16 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
       setAccountNotFound(false);
       setStep('prompt');
       setIntent(initialIntent);
-      if (savedGoogleEmail) {
-        setGoogleEmail(savedGoogleEmail);
-        setGoogleName(savedGoogleName || savedGoogleEmail.split('@')[0]);
-      } else {
-        setGoogleEmail('');
-        setGoogleName('');
-      }
+      setOptionalEmailHint(savedGoogleEmail);
+      setRequireExactEmail(false);
     }
-  }, [isOpen, initialIntent]);
+  }, [isOpen, initialIntent, savedGoogleEmail]);
 
   if (!isOpen) return null;
 
-  const handleAuthenticateWithAccount = async (
-    emailToUse: string,
-    nameToUse?: string,
-    forcedIntent?: 'signin' | 'signup'
-  ) => {
+  const handlePopupGoogleAuth = async (forcedIntent?: 'signin' | 'signup', enforcedEmail?: string) => {
     const activeIntent = forcedIntent || intent;
-    const trimmedEmail = emailToUse.trim().toLowerCase();
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      setError('Please enter a valid Google Account email (e.g. yourname@gmail.com).');
-      return;
-    }
+    const expectedEmail = enforcedEmail ? enforcedEmail.trim().toLowerCase() : undefined;
 
     setIsSubmitting(true);
     setError(null);
@@ -80,41 +64,26 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
     setStep('authorizing');
 
     try {
-      // Remember user's Google email for subsequent sign-in
-      localStorage.setItem('learnco_last_google_email', trimmedEmail);
-      if (nameToUse) {
-        localStorage.setItem('learnco_last_google_name', nameToUse);
-      }
-
-      const derivedName = nameToUse || trimmedEmail.split('@')[0].replace(/[._]/g, ' ');
-      const formattedName = derivedName
-        .split(' ')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-
-      const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(trimmedEmail)}`;
-
       await signInWithGoogle(
-        trimmedEmail,
-        formattedName,
-        avatarUrl,
+        expectedEmail,
+        undefined,
+        undefined,
         activeIntent
       );
 
       setStep('success');
       setTimeout(() => {
-        if (onSuccess) {
-          onSuccess();
-        }
+        if (onSuccess) onSuccess();
         onClose();
-      }, 600);
+      }, 500);
     } catch (err: any) {
       setStep('prompt');
-      if (err.notFound || err.message?.includes('No Learn.co account found')) {
+      if (err?.notFound || err?.message?.includes('No Learn.co account found')) {
         setAccountNotFound(true);
-        setError(err.message || 'No account found for this Google email. Would you like to create one?');
+        if (err?.email) setOptionalEmailHint(err.email);
+        setError(err.message || 'No Learn.co account found for this Google email. Create one now?');
       } else {
-        setError(err.message || 'Failed to authenticate with Google. Please try again.');
+        setError(err?.message || 'Failed to authenticate with Google. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -162,7 +131,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -178,7 +147,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
                 setError(null);
                 setAccountNotFound(false);
               }}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 intent === 'signin'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -194,7 +163,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
                 setError(null);
                 setAccountNotFound(false);
               }}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 intent === 'signup'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -210,9 +179,9 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
         <div className="p-6 space-y-5">
           {error && (
             <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span className="font-semibold">{error}</span>
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-relaxed">{error}</span>
               </div>
               {accountNotFound && (
                 <button
@@ -221,12 +190,14 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
                     setIntent('signup');
                     setAccountNotFound(false);
                     setError(null);
-                    handleAuthenticateWithAccount(googleEmail, googleName, 'signup');
+                    handlePopupGoogleAuth('signup');
                   }}
                   className="w-full mt-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>Create New Account with {googleEmail}</span>
+                  <span>
+                    Create New Account{optionalEmailHint ? ` with ${optionalEmailHint}` : ''}
+                  </span>
                 </button>
               )}
             </div>
@@ -236,13 +207,10 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
             <div className="py-8 text-center space-y-3 animate-in fade-in">
               <div className="w-12 h-12 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin mx-auto" />
               <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Verifying Google OAuth 2.0 Token...
+                Opening Google Account Chooser...
               </h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Authorizing credentials and generating secure session token for{' '}
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  {googleEmail}
-                </span>
+                Select your Google account in the popup window to verify your cryptographically signed identity token.
               </p>
             </div>
           ) : step === 'success' ? (
@@ -257,17 +225,11 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
             </div>
           ) : (
             <>
-              {/* Account selection / entry */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  Select or Enter Google Account
-                </label>
-
-                {/* If user previously entered an account, show it as a fast 1-click option */}
                 {savedGoogleEmail && (
                   <button
                     type="button"
-                    onClick={() => handleAuthenticateWithAccount(savedGoogleEmail, savedGoogleName)}
+                    onClick={() => handlePopupGoogleAuth(intent)}
                     className="w-full p-3 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/80 hover:border-indigo-400 dark:hover:border-indigo-600 transition-all flex items-center justify-between text-left group cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
@@ -279,55 +241,43 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
                           {savedGoogleName || savedGoogleEmail.split('@')[0]}
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {savedGoogleEmail}
+                          Recent: {savedGoogleEmail}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-bold">
-                      <span>{intent === 'signup' ? 'Sign Up' : 'Sign In'}</span>
+                      <span>{intent === 'signup' ? 'Sign Up' : 'Continue'}</span>
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </button>
                 )}
 
-                {/* Form to enter Google account */}
-                <div className="space-y-2.5 pt-1">
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      {savedGoogleEmail ? 'Or enter another Google email:' : 'Your Google Email Address:'}
-                    </span>
+                <div className="space-y-2 pt-1">
+                  <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={requireExactEmail}
+                      onChange={(e) => setRequireExactEmail(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Verify against a specific Google email address</span>
+                  </label>
+
+                  {requireExactEmail && (
                     <div className="relative">
                       <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="email"
-                        required
-                        value={googleEmail}
-                        onChange={(e) => setGoogleEmail(e.target.value)}
-                        placeholder="e.g. student@learn.co"
+                        value={optionalEmailHint}
+                        onChange={(e) => setOptionalEmailHint(e.target.value)}
+                        placeholder="your.email@gmail.com"
                         className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                       />
                     </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Your Full Name (optional):
-                    </span>
-                    <div className="relative">
-                      <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        value={googleName}
-                        onChange={(e) => setGoogleName(e.target.value)}
-                        placeholder="e.g. Ruhan Yamsani"
-                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              {/* Initial State Transparency for Sign Up */}
               {intent === 'signup' && (
                 <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-800 dark:text-amber-300 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold">
@@ -335,47 +285,40 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
                     <span>New Account Initialization</span>
                   </div>
                   <p className="leading-relaxed">
-                    Your account will be freshly initialized with:
+                    Your account starts cleanly with 0 XP (Level 1 Scholar), tracked daily streaks, and full personalized onboarding.
                   </p>
-                  <div className="grid grid-cols-2 gap-1 text-[10px] font-semibold pt-1">
-                    <span>• 0 XP (Level 1 Scholar)</span>
-                    <span>• 0 Days Active Streak</span>
-                    <span>• 0 Daily Questions Solved</span>
-                    <span>• Least / Base Leaderboard Rank</span>
-                  </div>
                 </div>
               )}
 
-              {/* Scope & Permission Transparency Notice */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 space-y-2">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Google OAuth 2.0 Scopes Requested</span>
+                  <span>Google OAuth 2.0 Verification</span>
                 </div>
                 <p className="leading-relaxed">
-                  No password required. Google will verify your identity and deliver a cryptographically signed OAuth ID token with:
+                  You can pick any Google account in the popup chooser. Google issues a signed ID token verified directly on our server.
                 </p>
-                <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-300 pl-1">
-                  <li><code className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">openid</code> & <code className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">email</code> (identity verification)</li>
-                  <li><code className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">profile</code> (display name & avatar)</li>
-                </ul>
               </div>
 
-              {/* Continue button */}
               <Button
                 type="button"
                 variant="primary"
                 size="md"
-                disabled={isSubmitting || !googleEmail}
-                onClick={() => handleAuthenticateWithAccount(googleEmail, googleName)}
+                disabled={isSubmitting || (requireExactEmail && !optionalEmailHint.trim())}
+                onClick={() =>
+                  handlePopupGoogleAuth(
+                    intent,
+                    requireExactEmail ? optionalEmailHint : undefined
+                  )
+                }
                 className="w-full"
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
                 {isSubmitting
-                  ? 'Verifying with Google...'
+                  ? 'Opening Google...'
                   : intent === 'signup'
-                  ? 'Verify Google & Create Account'
-                  : 'Verify Google & Sign In'}
+                  ? 'Continue with Google (Sign Up)'
+                  : 'Continue with Google (Sign In)'}
               </Button>
             </>
           )}
@@ -385,7 +328,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
         <div className="px-6 py-3 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Lock className="w-3 h-3 text-emerald-500" />
-            <span>Secure 256-bit OAuth Token Verification</span>
+            <span>Cryptographic Firebase ID Token Auth</span>
           </span>
           <span className="flex items-center gap-1 text-slate-500">
             <span>Learn.co Privacy</span>

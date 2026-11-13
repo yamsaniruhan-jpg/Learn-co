@@ -225,30 +225,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       let firebaseIdToken: string | undefined;
 
-      // Authenticate with Firebase Authentication first if password is provided
+      // Attempt Firebase Authentication sign-in to obtain ID token when available
       if (password) {
         try {
           if (auth && auth.app) {
-            try {
-              const cred = await signInWithEmailAndPassword(auth, email, password);
-              firebaseIdToken = await cred.user.getIdToken();
-            } catch (fbErr: any) {
-              // If user does not exist yet in Firebase, auto-register in Firebase Auth
-              if (
-                fbErr.code === 'auth/user-not-found' ||
-                fbErr.code === 'auth/invalid-credential'
-              ) {
-                try {
-                  const newCred = await createUserWithEmailAndPassword(auth, email, password);
-                  firebaseIdToken = await newCred.user.getIdToken();
-                } catch {
-                  // Fall back to backend auth
-                }
-              }
-            }
+            const cred = await signInWithEmailAndPassword(auth, email, password);
+            firebaseIdToken = await cred.user.getIdToken();
           }
         } catch (fbInitErr) {
-          console.warn('Firebase client sign-in fallback to backend auth', fbInitErr);
+          // Backend password verification remains authoritative if Firebase client auth fails
+          console.debug('Firebase client email sign-in skipped:', fbInitErr);
         }
       }
 
@@ -313,13 +299,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     setAuthError(null);
     try {
-      // 1. Use Firebase Auth if not already provided via idToken
+      // 1. Use Firebase Google Auth popup if not already provided via idToken
       let firebaseToken = idToken;
       if (!firebaseToken) {
-        const result = await signInWithPopup(auth, googleProvider);
+        if (!auth || !auth.app) {
+          throw new Error('Google authentication is unavailable in this environment. Please use Email & Password.');
+        }
+        let result;
+        try {
+          result = await signInWithPopup(auth, googleProvider);
+        } catch (popupErr: any) {
+          const code = popupErr?.code || '';
+          if (code === 'auth/popup-blocked') {
+            throw new Error('Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+          }
+          if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+            throw new Error('Google sign-in was cancelled before completing. Click the button again to choose your Google account.');
+          }
+          if (code === 'auth/unauthorized-domain') {
+            throw new Error('This preview domain is not yet authorized for Google popup login. Please sign in with Email & Password.');
+          }
+          throw popupErr;
+        }
         firebaseToken = await result.user.getIdToken();
         if (email && result.user.email?.trim().toLowerCase() !== email.trim().toLowerCase()) {
-          throw new Error('The Google account selected does not match the email entered.');
+          throw new Error(
+            `You signed into Google as ${result.user.email}, which does not match ${email}. Clear the email filter or select the matching account.`
+          );
         }
         email = result.user.email || email;
         name = result.user.displayName || name;
@@ -339,6 +345,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       syncLocalXpOnly(res.gamification?.xp ?? 0);
       setGamification(res.gamification);
       setSettings(res.settings);
+      if (res.user?.email) {
+        try {
+          localStorage.setItem('learnco_last_google_email', res.user.email);
+          if (res.profile?.displayName || res.user?.name) {
+            localStorage.setItem('learnco_last_google_name', res.profile?.displayName || res.user?.name);
+          }
+        } catch (_) {}
+      }
       syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       setAuthError(err.message || 'Google sign in failed.');

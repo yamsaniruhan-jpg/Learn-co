@@ -10,16 +10,22 @@ import {
   MentorshipFeedback,
   MentorshipPrivacySettings,
   AuthorizedLearnerInsights,
+  MentorApplicationRecord,
 } from '../types/mentorship';
 import { SubjectId } from '../types';
 
 export class MentorshipClient {
   private static getHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token') || 'token-alex-001';
-    return {
+    const token =
+      localStorage.getItem('learnco_auth_token') ||
+      localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   static async getMentors(params?: {
@@ -404,5 +410,96 @@ export class MentorshipClient {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to load mentor dashboard');
     return data;
+  }
+
+  static async submitMentorApplication(payload: {
+    fullName: string;
+    degree: string;
+    institution: string;
+    subjectId: SubjectId;
+    experienceYears: number;
+    capacity: number;
+    hourlyRate?: number;
+    bio: string;
+  }): Promise<{
+    application: MentorApplicationRecord;
+    routedToEmail: string;
+    emailDispatched: boolean;
+  }> {
+    const res = await fetch('/api/mentorship/applications', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to submit mentor application');
+    }
+    return {
+      application: data.application,
+      routedToEmail: data.routedToEmail,
+      emailDispatched: !!data.emailDispatched,
+    };
+  }
+
+  static async getMyMentorApplications(): Promise<{
+    applications: MentorApplicationRecord[];
+    routedToEmail: string;
+  }> {
+    const res = await fetch('/api/mentorship/applications/mine', {
+      headers: this.getHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to load your mentor applications');
+    }
+    return {
+      applications: data.applications || [],
+      routedToEmail: data.routedToEmail || 'yamsaniruhan@gmail.com',
+    };
+  }
+
+  static async getAllMentorApplications(): Promise<{
+    applications: MentorApplicationRecord[];
+    counts: { total: number; pending: number; approved: number; rejected: number };
+    routedToEmail: string;
+    storage?: string;
+  }> {
+    const res = await fetch('/api/mentorship/applications', {
+      headers: this.getHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to load mentor applications');
+    }
+    return {
+      applications: data.applications || [],
+      counts: data.counts || { total: 0, pending: 0, approved: 0, rejected: 0 },
+      routedToEmail: data.routedToEmail || 'yamsaniruhan@gmail.com',
+      storage: data.storage,
+    };
+  }
+
+  static async decideMentorApplication(
+    applicationId: string,
+    action: 'APPROVE' | 'REJECT',
+    note?: string
+  ): Promise<{
+    application: MentorApplicationRecord;
+    mentorProfile: MentorProfile | null;
+  }> {
+    const res = await fetch(`/api/mentorship/applications/${encodeURIComponent(applicationId)}/decision`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ action, note }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to process application decision');
+    }
+    return {
+      application: data.application,
+      mentorProfile: data.mentorProfile || null,
+    };
   }
 }

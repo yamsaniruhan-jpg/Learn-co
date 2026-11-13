@@ -62,67 +62,12 @@ export const MentorView: React.FC<MentorViewProps> = ({
   onNavigateToCopilot,
 }) => {
   const [activeMainTab, setActiveMainTab] = useState<'my_mentorship' | 'discover' | 'sessions' | 'portal' | 'diagnostics' | 'mentor_access'>('my_mentorship');
-  const [isMentorRole, setIsMentorRole] = useState(user.role === 'educator');
-
-  const handleGrantMentorAccess = async (mentorProfileData?: any) => {
-    try {
-      const newProfile: MentorProfile = {
-        id: `mentor-${user.id || user.userId || 'self'}`,
-        userId: user.userId || user.id || 'self',
-        name: mentorProfileData?.name || user.fullName || user.displayName || 'Accredited STEM Mentor',
-        avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id || 'mentor'}`,
-        headline: 'Accredited STEM Mentor & Research Fellow',
-        education: mentorProfileData?.education || 'M.Sc in Applied Mathematics, Stanford / MIT',
-        subjects: mentorProfileData?.subjects || ['math'],
-        areasOfExpertise: ['Socratic Guidance', 'Exam Mastery', 'Proof Derivations'],
-        teachingExperienceYears: mentorProfileData?.teachingExperienceYears || 4,
-        credentials: ['Verified Mentor', 'Alum Fellow'],
-        supportedTracks: ['Foundation', 'Olympiad', 'Advanced'],
-        availability: {
-          days: ['Monday', 'Wednesday', 'Friday'],
-          timeSlots: ['14:00 - 18:00 UTC'],
-          timezone: 'UTC',
-          cadence: 'weekly',
-        },
-        mentoringStyle: 'First-principles derivations with socratic questioning.',
-        languages: ['English'],
-        isVerified: true,
-        acceptingNewMentees: true,
-        maxMentees: 5,
-        activeMenteesCount: 0,
-        rating: 5.0,
-        reviewCount: 1,
-        sessionsCompleted: 12,
-        responseRatePercent: 98,
-        format: ['one_on_one', 'weekly_checkin'],
-        pricingType: 'free_community',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        bio: mentorProfileData?.bio || 'Dedicated to socratic first-principles teaching.',
-      };
-
-      setPortalData((prev) => ({
-        ...prev,
-        mentorProfile: newProfile,
-      }));
-      setMentors((prev) => [newProfile, ...prev.filter((m) => m.id !== newProfile.id)]);
-      setIsMentorRole(true);
-      user.role = 'educator';
-    } catch (err) {
-      console.error('Failed to grant mentor access', err);
-    }
-  };
-
-  const handleRevokeMentorAccess = async () => {
-    setIsMentorRole(false);
-    user.role = 'student';
-    setPortalData((prev) => ({
-      ...prev,
-      mentorProfile: null,
-    }));
-    setMentors((prev) => prev.filter((m) => m.userId !== (user.userId || user.id)));
-    localStorage.removeItem(`learnco_mentor_app_${user.userId}`);
-  };
+  const isOwnerOrAdmin =
+    user.role === 'admin' ||
+    (user.email || '').trim().toLowerCase() === 'yamsaniruhan@gmail.com';
+  const [isMentorRole, setIsMentorRole] = useState(
+    user.role === 'educator' || user.role === 'admin'
+  );
 
   // Core Data State
   const [mentors, setMentors] = useState<MentorProfile[]>([]);
@@ -209,6 +154,14 @@ export const MentorView: React.FC<MentorViewProps> = ({
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    setIsMentorRole(
+      user.role === 'educator' ||
+        user.role === 'admin' ||
+        Boolean(portalData.mentorProfile)
+    );
+  }, [user.role, portalData.mentorProfile]);
 
   // Load sub-entities when selected relationship changes
   useEffect(() => {
@@ -486,10 +439,16 @@ export const MentorView: React.FC<MentorViewProps> = ({
         >
           <Lock className="w-4 h-4" />
           <span>Mentor Access & Approvals</span>
-          {!isMentorRole && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
-              Request
+          {isOwnerOrAdmin ? (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+              Owner Queue
             </span>
+          ) : (
+            !isMentorRole && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+                Apply
+              </span>
+            )
           )}
         </button>
       </div>
@@ -846,8 +805,8 @@ export const MentorView: React.FC<MentorViewProps> = ({
         <MentorAccessPanel
           user={user}
           isMentor={isMentorRole}
-          onGrantMentorAccess={handleGrantMentorAccess}
-          onRevokeMentorAccess={handleRevokeMentorAccess}
+          isOwnerOrAdmin={isOwnerOrAdmin}
+          onApplicationsChanged={loadInitialData}
           onOpenPortal={() => setActiveMainTab('portal')}
         />
       )}

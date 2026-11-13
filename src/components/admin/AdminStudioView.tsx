@@ -43,6 +43,7 @@ import { Dialog } from '../ui/Dialog';
 import { DifficultyBadge } from '../ui/GamificationIndicators';
 import { FormattedMathText, cleanLatexToNormalText } from '../common/FormattedMathText';
 import { AnalyticsClient } from '../../services/analyticsClient';
+import { OwnerMentorApplicationsQueue } from '../mentor/OwnerMentorApplicationsQueue';
 
 type TextDisplayMode = 'formatted' | 'normal_text' | 'raw_latex';
 
@@ -58,7 +59,7 @@ interface AuditLogItem {
 }
 
 export const AdminStudioView: React.FC = () => {
-  const [studioTab, setStudioTab] = useState<'questions' | 'audit_logs'>('questions');
+  const [studioTab, setStudioTab] = useState<'questions' | 'mentor_applications' | 'audit_logs'>('questions');
   const [questions, setQuestions] = useState<Question[]>(SEED_QUESTIONS);
   const [statusFilter, setStatusFilter] = useState<'all' | VerificationStatus>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
@@ -393,6 +394,16 @@ export const AdminStudioView: React.FC = () => {
               }`}
             >
               Questions Queue
+            </button>
+            <button
+              onClick={() => setStudioTab('mentor_applications')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                studioTab === 'mentor_applications'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              Mentor Applications
             </button>
             <button
               onClick={() => setStudioTab('audit_logs')}
@@ -740,7 +751,12 @@ export const AdminStudioView: React.FC = () => {
         </div>
       )}
 
-      {/* VIEW TAB 2: SYSTEM, ATTEMPT & AUDIT LOGS */}
+      {/* VIEW TAB 2: MENTOR APPLICATIONS (POSTGRESQL OWNER QUEUE) */}
+      {studioTab === 'mentor_applications' && (
+        <OwnerMentorApplicationsQueue />
+      )}
+
+      {/* VIEW TAB 3: SYSTEM, ATTEMPT & AUDIT LOGS */}
       {studioTab === 'audit_logs' && (
         <div className="space-y-4">
           {/* Logs Control & Export Toolbar */}

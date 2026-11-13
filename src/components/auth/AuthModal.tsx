@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { GoogleSignInDialog } from './GoogleSignInDialog';
+import { PasswordResetFlow } from './PasswordResetFlow';
 import { Button } from '../ui/Button';
 
 interface AuthModalProps {
@@ -28,8 +29,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   initialMode = 'signin',
 }) => {
-  const { signInWithEmail, signUpWithEmail, authError, clearAuthError } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
+  const { signInWithEmail, signUpWithEmail, authError, clearAuthError, refreshUserData } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>(initialMode);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [fullName, setFullName] = useState<string>('');
@@ -122,6 +123,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {/* Modal Body */}
+          {mode === 'reset' ? (
+            <PasswordResetFlow
+              onBackToSignIn={() => {
+                setMode('signin');
+                setLocalError(null);
+                clearAuthError();
+              }}
+              onResetComplete={() => {
+                void refreshUserData();
+                onClose();
+              }}
+            />
+          ) : (
           <div className="p-6 space-y-5">
             {/* Tab switch */}
             <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
@@ -286,8 +300,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               >
                 {isSubmitting ? 'Verifying...' : mode === 'signin' ? 'Sign In to Your Account' : 'Create My Account'}
               </Button>
+
+              {mode === 'signin' && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('reset');
+                      setLocalError(null);
+                      clearAuthError();
+                    }}
+                    className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+              )}
             </form>
           </div>
+          )}
         </div>
       </div>
 
@@ -295,7 +326,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       <GoogleSignInDialog
         isOpen={isGoogleDialogOpen}
         onClose={() => setIsGoogleDialogOpen(false)}
-        initialIntent={mode}
+        initialIntent={mode === 'signup' ? 'signup' : 'signin'}
         onSuccess={() => onClose()}
       />
     </>

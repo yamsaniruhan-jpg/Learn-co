@@ -145,6 +145,32 @@
       },
       "required": ["name", "status", "subjects"]
     },
+    "MentorApplication": {
+      "title": "MentorApplication",
+      "description": "Formal mentor accreditation applications submitted by learners and routed to platform owner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "applicantUid": { "type": "string" },
+        "applicantEmail": { "type": "string" },
+        "fullName": { "type": "string" },
+        "degree": { "type": "string" },
+        "institution": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "experienceYears": { "type": "number" },
+        "capacity": { "type": "number" },
+        "hourlyRate": { "type": "number" },
+        "bio": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "routedToEmail": { "type": "string" },
+        "reviewerEmail": { "type": "string" },
+        "reviewerNote": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["applicantUid", "applicantEmail", "fullName", "degree", "institution", "subjectId", "status", "routedToEmail"]
+    },
     "MentorshipSession": {
       "title": "MentorshipSession",
       "description": "Scheduled 1-on-1 mentorship bookings between learners and mentors",
@@ -244,6 +270,10 @@
     "/mentors/{mentorId}": {
       "schema": "Mentor",
       "description": "Mentor profile with subjects, specialties, and ratings"
+    },
+    "/mentor_applications/{applicationId}": {
+      "schema": "MentorApplication",
+      "description": "Formal mentor applications routed directly to yamsaniruhan@gmail.com"
     },
     "/sessions/{sessionId}": {
       "schema": "MentorshipSession",

@@ -256,7 +256,11 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 }) => {
   const { user, profile } = useAuth();
   const [isOpenAllDrawer, setIsOpenAllDrawer] = useState(false);
-  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
+  const ownerEmail = (user?.email || profile?.email || '').trim().toLowerCase();
+  const isAdmin =
+    user?.role === 'admin' ||
+    profile?.role === 'admin' ||
+    ownerEmail === 'yamsaniruhan@gmail.com';
 
   const visibleFeatures = ALL_APP_FEATURES.filter((feat) => feat.id !== 'admin' || isAdmin);
   const groupedFeatures = groupNavFeatures(visibleFeatures);

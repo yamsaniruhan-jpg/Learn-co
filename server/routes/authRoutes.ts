@@ -6,6 +6,7 @@ import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
 import { sendMail, isMailerConfigured, buildPasswordResetMessage } from '../services/mailer';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
+import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
 
 const router = Router();
 
@@ -35,8 +36,15 @@ router.post('/signup', (req, res: Response) => {
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
 
-    // Sync to Firestore & persist leaderboard entry
+    // Sync to Firestore, Cloud SQL PostgreSQL, & leaderboard
     void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
+    void getOrCreateSqlUser({
+      uid: user.id,
+      email: user.email,
+      fullName: profile?.fullName,
+      role: profile?.role,
+      authProvider: user.authProvider,
+    }).catch((error) => console.warn('[CloudSQL] User sync on signup failed:', error));
 
     res.status(201).json({
       token,
@@ -45,6 +53,7 @@ router.post('/signup', (req, res: Response) => {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
+        role: profile?.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
       },
       profile,
       gamification,
@@ -113,6 +122,10 @@ router.post('/signin', (req, res: Response) => {
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
 
+    if (profile && isOwnerEmail(user.email) && profile.role !== 'admin') {
+      profile.role = 'admin';
+    }
+
     if (settings && settings.privacy) {
       settings.privacy.leaderboardVisibility = true;
     }
@@ -123,6 +136,13 @@ router.post('/signin', (req, res: Response) => {
       void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
       void FirestoreSyncService.syncLeaderboardEntry(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Leaderboard sync failed:', error));
     }
+    void getOrCreateSqlUser({
+      uid: user.id,
+      email: user.email,
+      fullName: profile?.fullName,
+      role: profile?.role,
+      authProvider: user.authProvider,
+    }).catch((error) => console.warn('[CloudSQL] User sync on signin failed:', error));
 
     res.json({
       token,
@@ -131,6 +151,7 @@ router.post('/signin', (req, res: Response) => {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
+        role: profile?.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
       },
       profile,
       gamification,
@@ -202,12 +223,24 @@ router.post('/google', async (req, res: Response) => {
       profile = Database.getProfile(user.id);
     }
 
+    if (profile && isOwnerEmail(user.email) && profile.role !== 'admin') {
+      profile.role = 'admin';
+      Database.saveToDisk();
+    }
+
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
 
     if (profile && gamification) {
       void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
     }
+    void getOrCreateSqlUser({
+      uid: user.id,
+      email: user.email,
+      fullName: profile?.fullName,
+      role: profile?.role,
+      authProvider: user.authProvider,
+    }).catch((error) => console.warn('[CloudSQL] User sync on google auth failed:', error));
 
     res.json({
       token,
@@ -216,6 +249,7 @@ router.post('/google', async (req, res: Response) => {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
+        role: profile?.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
       },
       profile,
       gamification,
@@ -240,11 +274,17 @@ router.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
+    if (isOwnerEmail(user.email) && profile.role !== 'admin') {
+      profile.role = 'admin';
+      Database.saveToDisk();
+    }
+
     res.json({
       user: {
         id: user.id,
         email: user.email,
         authProvider: user.authProvider,
+        role: profile.role || (isOwnerEmail(user.email) ? 'admin' : 'student'),
       },
       profile,
       gamification,

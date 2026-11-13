@@ -257,3 +257,27 @@ export interface AuthorizedLearnerInsights {
   }>;
   activeGoals?: MentorshipGoal[];
 }
+
+export type MentorApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface MentorApplicationRecord {
+  id: string;
+  applicantUid: string;
+  applicantEmail: string;
+  fullName: string;
+  degree: string;
+  institution: string;
+  subjectId: string;
+  experienceYears: number;
+  capacity: number;
+  hourlyRate: number;
+  bio: string;
+  status: MentorApplicationStatus;
+  routedToEmail: string;
+  reviewerEmail?: string | null;
+  reviewerNote?: string | null;
+  reviewedAt?: string | null;
+  submittedAt: string;
+  updatedAt: string;
+}
+

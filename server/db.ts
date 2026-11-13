@@ -111,6 +111,7 @@ export interface DatabaseState {
   copilotConversations: Record<string, CopilotConversation>;
   copilotMessages: Record<string, CopilotMessage[]>; // keyed by conversationId
   mentorProfiles: Record<string, MentorProfile>;
+  mentorApplications: Record<string, any>;
   mentorshipRequests: Record<string, MentorshipRequest>;
   mentorshipRelationships: Record<string, MentorshipRelationship>;
   mentorshipGoals: Record<string, MentorshipGoal>;
@@ -151,6 +152,7 @@ let memoryDb: DatabaseState = {
   copilotConversations: {},
   copilotMessages: {},
   mentorProfiles: {},
+  mentorApplications: {},
   mentorshipRequests: {},
   mentorshipRelationships: {},
   mentorshipGoals: {},
@@ -339,7 +341,7 @@ export function loadDbFromDisk() {
         if (parsed.passwordResets) memoryDb.passwordResets = { ...memoryDb.passwordResets, ...parsed.passwordResets };
         // Restore all persisted state, not just profiles and a subset of resources.
         for (const key of ['attemptsById', 'creatorResourceVersions', 'creatorJobs',
-          'copilotConversations', 'copilotMessages', 'mentorProfiles', 'mentorshipRequests',
+          'copilotConversations', 'copilotMessages', 'mentorProfiles', 'mentorApplications', 'mentorshipRequests',
           'mentorshipRelationships', 'mentorshipGoals', 'mentorshipTasks', 'mentorshipSessions',
           'mentorshipMessages', 'studyScheduleSettings', 'studyPlanVersions', 'studyActiveSessions'] as const) {
           if (parsed[key] && typeof parsed[key] === 'object' && !Array.isArray(parsed[key])) {
@@ -868,7 +870,7 @@ export class Database {
       learningGoals: [],
       preferredStudyTimeMinutes: 30,
       studyTimeMinutesThisWeek: 0,
-      role: 'student',
+      role: emailNorm === 'yamsaniruhan@gmail.com' ? 'admin' : 'student',
       onboardingStatus: 'NOT_STARTED',
       timezone,
       joinedDate: now.split('T')[0],
@@ -1921,12 +1923,44 @@ export class Database {
       existing.updatedAt = now;
     }
 
-    // Upgrade role in userProfile if not already educator
+    // Upgrade role in userProfile if not already educator or admin
     if (userProfile && userProfile.role === 'student') {
       userProfile.role = 'educator';
     }
 
+    saveDbToDisk();
     return existing;
+  }
+
+  static saveMentorApplication(record: any): any {
+    if (!memoryDb.mentorApplications) memoryDb.mentorApplications = {};
+    memoryDb.mentorApplications[record.id] = record;
+    saveDbToDisk();
+    return record;
+  }
+
+  static listMentorApplicationsLocal(): any[] {
+    if (!memoryDb.mentorApplications) return [];
+    return Object.values(memoryDb.mentorApplications).sort(
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+  }
+
+  static listMentorApplicationsForApplicantLocal(userId: string, email?: string): any[] {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    return this.listMentorApplicationsLocal().filter(
+      (app) => app.applicantUid === userId || (cleanEmail && app.applicantEmail?.toLowerCase() === cleanEmail)
+    );
+  }
+
+  static getMentorApplicationLocal(id: string): any | null {
+    return memoryDb.mentorApplications?.[id] || null;
+  }
+
+  static addNotification(notification: any): void {
+    if (!memoryDb.notifications) memoryDb.notifications = [];
+    memoryDb.notifications.unshift(notification);
+    saveDbToDisk();
   }
 
   // ==================== MENTORSHIP REQUESTS ====================

@@ -328,7 +328,11 @@ export default function App() {
     setPracticeLaunchContext(null);
   }, []);
 
-  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
+  const ownerEmail = (user?.email || profile?.email || '').trim().toLowerCase();
+  const isAdmin =
+    user?.role === 'admin' ||
+    profile?.role === 'admin' ||
+    ownerEmail === 'yamsaniruhan@gmail.com';
   const averageMasteryPercent =
     attempts.length > 0 && masteries.length > 0
       ? Math.round(masteries.reduce((sum, m) => sum + m.masteryScore, 0) / masteries.length)
@@ -337,15 +341,16 @@ export default function App() {
   // Convert auth profile to legacy UserProfile view format
   const effectiveLegacyUser: UserProfile = {
     id: user?.id || 'guest-learner',
+    userId: user?.id || profile?.userId || 'guest-learner',
     fullName:
       profile?.displayName ||
       profile?.fullName ||
       (user?.email ? user.email.split('@')[0] : 'Guest Scholar'),
-    email: user?.email || 'guest@learn.co',
+    email: user?.email || profile?.email || 'guest@learn.co',
     avatarUrl:
       profile?.avatarUrl ||
       `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user?.email || 'guest-scholar')}`,
-    role: (user?.role || 'student') as any,
+    role: (isAdmin ? 'admin' : profile?.role || user?.role || 'student') as any,
     joinedDate: profile?.joinedDate || new Date().toISOString().split('T')[0],
     xp: gamification?.xp ?? 0,
     level: gamification?.level ?? 1,
