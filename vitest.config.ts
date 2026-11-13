@@ -5,7 +5,8 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    // `.tsx` is included so React components can be rendered in tests.
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     // The server holds a JSON-backed in-memory store; run files sequentially so
     // they don't race on the same data file.
     fileParallelism: false,
