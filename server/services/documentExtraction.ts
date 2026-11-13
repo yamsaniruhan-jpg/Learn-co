@@ -16,7 +16,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument } from 'pdfjs-dist/build/pdf.mjs';
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB decoded
 const MAX_URL_BYTES = 5 * 1024 * 1024; // 5 MB HTML
