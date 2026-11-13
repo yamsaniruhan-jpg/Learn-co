@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Database, hashPassword } from '../db';
+import { Database, hashPassword, verifyPassword, needsPasswordRehash } from '../db';
 import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
@@ -109,10 +109,13 @@ router.post('/signin', (req, res: Response) => {
 
     // Existing user: verify password
     if (user.authProvider === 'email' && user.passwordHash) {
-      const hashed = hashPassword(password);
-      if (user.passwordHash !== hashed) {
+      if (!verifyPassword(password, user.passwordHash)) {
         res.status(401).json({ error: 'Incorrect password for this account. Please try again.' });
         return;
+      }
+      // Transparently upgrade legacy hashes to the current scrypt format.
+      if (needsPasswordRehash(user.passwordHash)) {
+        user.passwordHash = hashPassword(password);
       }
     } else if (!user.passwordHash && password) {
       // If user signed in previously via OAuth or has empty password hash, store the password now

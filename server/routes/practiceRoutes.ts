@@ -42,6 +42,23 @@ router.post('/submit-attempt', requireAuth, async (req: AuthenticatedRequest, re
       hintsUsedCount,
     } = req.body;
 
+    // Reject incomplete submissions. Previously an empty body was accepted and
+    // persisted an attempt with `questionId: undefined`, silently corrupting
+    // mastery, accuracy and exam-readiness calculations.
+    const invalidFields: string[] = [];
+    if (!questionId || typeof questionId !== 'string') invalidFields.push('questionId');
+    if (!subjectId || typeof subjectId !== 'string') invalidFields.push('subjectId');
+    if (typeof isCorrect !== 'boolean') invalidFields.push('isCorrect');
+
+    if (invalidFields.length > 0) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid attempt payload. Missing or invalid: ${invalidFields.join(', ')}.`,
+        code: 'INVALID_ATTEMPT',
+      });
+      return;
+    }
+
     if (!attemptId) {
       attemptId = `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     }

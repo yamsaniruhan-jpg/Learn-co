@@ -128,7 +128,11 @@ export interface DatabaseState {
   notifications: any[];
 }
 
-const DB_FILE_PATH = path.join(process.cwd(), '.learnco_db.json');
+// The data file path is overridable so tests (and alt deployments) never write
+// into the developer's live dataset. Defaults to the historical location.
+const DB_FILE_PATH = process.env.LEARNCO_DB_FILE
+  ? path.resolve(process.env.LEARNCO_DB_FILE)
+  : path.join(process.cwd(), '.learnco_db.json');
 
 // Memory store initialized with defaults
 let memoryDb: DatabaseState = {
@@ -208,11 +212,64 @@ export async function withUserLock<T>(userId: string, task: () => Promise<T>, ti
 }
 
 /**
- * Hash password with SHA-256 and salt
+ * Password hashing.
+ *
+ * Uses scrypt with a unique random salt per user. The previous implementation
+ * used a single hardcoded salt shared by every account with fast HMAC-SHA256,
+ * which meant identical passwords produced identical hashes and the whole
+ * dataset could be brute-forced cheaply.
+ *
+ * Format: `scrypt$<saltHex>$<derivedKeyHex>`
  */
-export function hashPassword(password: string): string {
+
+const SCRYPT_KEYLEN = 64;
+const SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
+function scryptHash(password: string, salt: Buffer): string {
+  return crypto.scryptSync(password, salt, SCRYPT_KEYLEN, SCRYPT_OPTIONS).toString('hex');
+}
+
+/** Legacy HMAC-SHA256 hash, retained only to verify and migrate old accounts. */
+function legacyHashPassword(password: string): string {
   const salt = 'learnco_salt_2026';
   return crypto.createHmac('sha256', salt).update(password).digest('hex');
+}
+
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16);
+  return `scrypt$${salt.toString('hex')}$${scryptHash(password, salt)}`;
+}
+
+/**
+ * Verify a password against a stored hash, supporting both the current scrypt
+ * format and the legacy HMAC format so existing accounts keep working.
+ */
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash) return false;
+
+  if (storedHash.startsWith('scrypt$')) {
+    const [, saltHex, expectedHex] = storedHash.split('$');
+    if (!saltHex || !expectedHex) return false;
+    try {
+      const actual = Buffer.from(scryptHash(password, Buffer.from(saltHex, 'hex')), 'hex');
+      const expected = Buffer.from(expectedHex, 'hex');
+      if (actual.length !== expected.length) return false;
+      return crypto.timingSafeEqual(actual, expected);
+    } catch {
+      return false;
+    }
+  }
+
+  // Legacy format — constant-time comparison to avoid timing leaks.
+  const legacyActual = Buffer.from(legacyHashPassword(password), 'hex');
+  const legacyExpected = Buffer.from(storedHash, 'hex');
+  if (legacyActual.length !== legacyExpected.length) return false;
+  return crypto.timingSafeEqual(legacyActual, legacyExpected);
+}
+
+/** True when a stored hash predates the scrypt format and should be upgraded. */
+export function needsPasswordRehash(storedHash: string): boolean {
+  return !!storedHash && !storedHash.startsWith('scrypt$');
 }
 
 /**

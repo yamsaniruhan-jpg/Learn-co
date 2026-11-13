@@ -17,6 +17,13 @@ import { adminDb } from '../services/firebaseAdmin';
 const router = Router();
 
 // Middleware to resolve user ID (supports logged-in users and demo/guest learners)
+/**
+ * Returns the authenticated user id, or an empty string when unauthenticated.
+ *
+ * This previously defaulted to a seeded account, which allowed anonymous
+ * callers to read and write another user's copilot conversations. The router
+ * now applies `requireAuth` so this should always be populated.
+ */
 function resolveUserId(req: Request): string {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -24,7 +31,7 @@ function resolveUserId(req: Request): string {
     const sessionUser = Database.getSessionUser(token);
     if (sessionUser) return sessionUser.id;
   }
-  return 'user-alex-001';
+  return '';
 }
 
 // GET /api/copilot/quota

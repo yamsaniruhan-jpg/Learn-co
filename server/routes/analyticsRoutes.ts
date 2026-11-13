@@ -2,26 +2,13 @@ import { Router, Request, Response } from 'express';
 import { Database, withUserLock } from '../db';
 import { AdaptiveAnalyticsEngine, invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
 import { SubjectId, ExamTrackId } from '../../src/types/curriculum';
+import { verifyFirebaseAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 
 export const analyticsRouter = Router();
 
-// Middleware to authenticate user from Bearer token
-function requireAuth(req: Request, res: Response, next: () => void) {
-  const authHeader = req.headers.authorization;
-  let token = 'token-alex-001';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7).trim();
-  }
-  const user = Database.getSessionUser(token) || Database.findUserById('user-alex-001');
-  if (!user) {
-    res.status(401).json({ success: false, error: 'Invalid or expired session token.' });
-    return;
-  }
-  (req as any).userId = user.id;
-  next();
-}
-
-analyticsRouter.use(requireAuth);
+// Authentication is delegated to the shared strict guard so analytics can never
+// be read (or written) anonymously. It previously defaulted to a seeded account.
+analyticsRouter.use(verifyFirebaseAuth);
 
 /**
  * GET /api/analytics/dashboard
@@ -300,7 +287,7 @@ analyticsRouter.post('/test-webhook', (req: Request, res: Response) => {
  */
 analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId || 'user-alex-001';
+    const userId = (req as AuthenticatedRequest).userId!;
     const focus = typeof req.body?.focus === 'string' ? req.body.focus.trim() : 'overall';
 
     const dashboard = AdaptiveAnalyticsEngine.getDashboard(userId);
@@ -382,7 +369,7 @@ analyticsRouter.post('/ai-diagnostic-summary', (req: Request, res: Response) => 
  */
 analyticsRouter.post('/trigger-spaced-repetition', (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId || 'user-alex-001';
+    const userId = (req as AuthenticatedRequest).userId!;
     const result = Database.triggerSpacedRepetitionReminders(userId);
     res.json({ success: true, data: result });
   } catch (error: any) {
