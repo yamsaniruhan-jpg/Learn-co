@@ -1,3 +1,4 @@
+import { logSqlFailure } from './errors.ts';
 import { desc, eq } from 'drizzle-orm';
 import { db, isSqlConfigured } from './index.ts';
 import { mentorApplications, mentors } from './schema.ts';
@@ -106,8 +107,8 @@ export async function createSqlMentorApplication(
 
     return inserted ? mapRowToRecord(inserted) : null;
   } catch (error) {
-    console.error('[CloudSQL] Failed to create mentor application:', error);
-    throw new Error('Failed to store mentor application in PostgreSQL.', { cause: error });
+    logSqlFailure('Failed to create mentor application', error);
+    throw new Error('Failed to store mentor application in PostgreSQL.');
   }
 }
 
@@ -124,8 +125,8 @@ export async function listSqlMentorApplications(): Promise<MentorApplicationReco
 
     return rows.map(mapRowToRecord);
   } catch (error) {
-    console.error('[CloudSQL] Failed to list mentor applications:', error);
-    throw new Error('Failed to load mentor applications from PostgreSQL.', { cause: error });
+    logSqlFailure('Failed to list mentor applications', error);
+    throw new Error('Failed to load mentor applications from PostgreSQL.');
   }
 }
 
@@ -145,8 +146,8 @@ export async function listSqlMentorApplicationsByApplicant(
 
     return rows.map(mapRowToRecord);
   } catch (error) {
-    console.error('[CloudSQL] Failed to list user mentor applications:', error);
-    throw new Error('Failed to load your mentor applications.', { cause: error });
+    logSqlFailure('Failed to list user mentor applications', error);
+    throw new Error('Failed to load your mentor applications.');
   }
 }
 
@@ -165,8 +166,8 @@ export async function getSqlMentorApplication(
 
     return row ? mapRowToRecord(row) : null;
   } catch (error) {
-    console.error('[CloudSQL] Failed to fetch mentor application:', error);
-    throw new Error('Failed to retrieve mentor application.', { cause: error });
+    logSqlFailure('Failed to fetch mentor application', error);
+    throw new Error('Failed to retrieve mentor application.');
   }
 }
 
@@ -196,8 +197,8 @@ export async function decideSqlMentorApplication(
 
     return updated ? mapRowToRecord(updated) : null;
   } catch (error) {
-    console.error('[CloudSQL] Failed to update mentor application status:', error);
-    throw new Error('Failed to record decision for mentor application.', { cause: error });
+    logSqlFailure('Failed to update mentor application status', error);
+    throw new Error('Failed to record decision for mentor application.');
   }
 }
 
@@ -261,7 +262,7 @@ export async function upsertSqlMentorProfile(input: {
 
     return row || null;
   } catch (error) {
-    console.error('[CloudSQL] Failed to upsert mentor profile:', error);
-    throw new Error('Failed to save accredited mentor profile in PostgreSQL.', { cause: error });
+    logSqlFailure('Failed to upsert mentor profile', error);
+    throw new Error('Failed to save accredited mentor profile in PostgreSQL.');
   }
 }

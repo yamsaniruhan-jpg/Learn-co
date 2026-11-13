@@ -69,7 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] transition-colors shadow-[0_1px_3px_rgba(45,42,74,0.05)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-x-3 gap-y-1">
         {/* Left: Brand Logo */}
         <div className="flex items-center gap-6">
           <div
@@ -95,7 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right: Gamification Status, Quota, Notifications, Theme, and Profile */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex min-w-0 flex-wrap 2xl:flex-nowrap items-center justify-end gap-2 sm:gap-2.5">
           {/* Mobile Search Icon Trigger */}
           <button
             onClick={onOpenSearch}
@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenFlashCheck && (
             <button
               onClick={onOpenFlashCheck}
-              className="hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
+              className="hidden 2xl:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
               title="Start 60-second Spaced Retention Flash Check (+15 XP)"
             >
               <Zap className="w-4 h-4 fill-[#FFB84D] text-[#FFB84D]" />
@@ -131,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Zen Focus Timer Button */}
           <button
             onClick={() => setActiveTab('focus')}
-            className={`hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
+            className={`hidden 2xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'focus'
                 ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
                 : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
@@ -145,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick User Guide Button */}
           <button
             onClick={() => setActiveTab('user-guide')}
-            className={`hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
+            className={`hidden 2xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'user-guide' || activeTab === 'guide'
                 ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
                 : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'

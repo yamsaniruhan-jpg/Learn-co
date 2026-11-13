@@ -232,6 +232,8 @@ describe('URL extraction', () => {
       'http://192.168.1.1/router',
       'http://172.16.4.4/x',
       'http://[::1]/x',
+      'http://[::ffff:127.0.0.1]/x',
+      'http://[fe90::1]/x',
       'http://metadata.google.internal/computeMetadata/v1/',
       'file:///etc/passwd',
       'ftp://example.com/file',
@@ -269,6 +271,33 @@ describe('URL extraction', () => {
       await expect(extractUrlText('https://example.com/redirect')).rejects.toMatchObject({
         code: 'URL_BLOCKED',
       });
+    });
+
+    it('does not contact a private redirect target', async () => {
+      const fetchSpy = vi.fn(async (_url: string, _options: RequestInit) => new Response(null, {
+        status: 302, headers: { location: 'http://127.0.0.1:8080/private' },
+      }));
+      vi.stubGlobal('fetch', fetchSpy);
+      await expect(extractUrlText('https://example.com/redirect')).rejects.toMatchObject({ code: 'URL_BLOCKED' });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls[0][1]).toMatchObject({ redirect: 'manual' });
+    });
+
+    it('follows safe relative redirects with a bounded hop count', async () => {
+      const fetchSpy = vi.fn()
+        .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: '/notes' } }))
+        .mockResolvedValueOnce(new Response('A sufficiently long text about mathematics and science for the import.', {
+          status: 200, headers: { 'content-type': 'text/plain' },
+        }));
+      vi.stubGlobal('fetch', fetchSpy);
+      const result = await extractUrlText('https://example.com/start');
+      expect(result.finalUrl).toBe('https://example.com/notes');
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+      const loopingFetch = vi.fn(async () => new Response(null, { status: 302, headers: { location: '/loop' } }));
+      vi.stubGlobal('fetch', loopingFetch);
+      await expect(extractUrlText('https://example.com/start')).rejects.toMatchObject({ code: 'URL_BAD_REDIRECT' });
+      expect(loopingFetch).toHaveBeenCalledTimes(6);
     });
 
     it('rejects malformed URLs', async () => {

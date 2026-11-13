@@ -328,11 +328,7 @@ export default function App() {
     setPracticeLaunchContext(null);
   }, []);
 
-  const ownerEmail = (user?.email || profile?.email || '').trim().toLowerCase();
-  const isAdmin =
-    user?.role === 'admin' ||
-    profile?.role === 'admin' ||
-    ownerEmail === 'yamsaniruhan@gmail.com';
+  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
   const averageMasteryPercent =
     attempts.length > 0 && masteries.length > 0
       ? Math.round(masteries.reduce((sum, m) => sum + m.masteryScore, 0) / masteries.length)

@@ -8,6 +8,12 @@ import { UserProfile, UserGamification, LeaderboardEntry, calculateLevelFromXp }
  * Ensures every signed-in account is stored in Firebase Console (users, public_profiles, and leaderboard).
  * Guarantees that any account in Firebase Console — even with 0 XP — appears on the leaderboard forever.
  */
+export function hasMatchingFirebaseIdentity(firebaseEmail?: string | null, backendEmail?: string | null): boolean {
+  const a = (firebaseEmail || '').trim().toLowerCase();
+  const b = (backendEmail || '').trim().toLowerCase();
+  return Boolean(a && b && a === b);
+}
+
 export async function syncClientToFirestore(
   user: any,
   profile: UserProfile | null,
@@ -16,21 +22,22 @@ export async function syncClientToFirestore(
   try {
     const currentAuthUser = auth?.currentUser;
     const backendUid = user?.id || currentAuthUser?.uid;
-    const firestoreUid = currentAuthUser?.uid;
+    const firebaseMatches = hasMatchingFirebaseIdentity(currentAuthUser?.email, user?.email || profile?.email);
+    const firestoreUid = firebaseMatches ? currentAuthUser?.uid : undefined;
     if (!backendUid && !firestoreUid) return;
 
     const uid = backendUid || firestoreUid!;
-    const email = currentAuthUser?.email || user?.email || profile?.email || '';
+    const email = user?.email || profile?.email || (firebaseMatches ? currentAuthUser?.email : '') || '';
     const displayName =
       profile?.displayName ||
       profile?.fullName ||
       user?.name ||
-      currentAuthUser?.displayName ||
+      (firebaseMatches ? currentAuthUser?.displayName : '') ||
       (email ? email.split('@')[0] : 'Scholar');
 
     const avatarUrl =
       profile?.avatarUrl ||
-      currentAuthUser?.photoURL ||
+      (firebaseMatches ? currentAuthUser?.photoURL : '') ||
       `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || uid)}`;
 
     const now = new Date().toISOString();
@@ -152,15 +159,16 @@ export async function syncXpToFirestoreAndBackend(
       if (saved) storedUser = JSON.parse(saved);
     } catch (_) {}
 
-    const firestoreUid = currentAuthUser?.uid;
+    const firebaseMatches = hasMatchingFirebaseIdentity(currentAuthUser?.email, storedUser?.email);
+    const firestoreUid = firebaseMatches ? currentAuthUser?.uid : undefined;
     const uid = storedUser?.id || firestoreUid;
     if (!uid && !firestoreUid) return;
 
-    const email = currentAuthUser?.email || storedUser?.email || '';
+    const email = storedUser?.email || (firebaseMatches ? currentAuthUser?.email : '') || '';
     const displayName = (
       storedUser?.name ||
       storedUser?.displayName ||
-      currentAuthUser?.displayName ||
+      (firebaseMatches ? currentAuthUser?.displayName : '') ||
       (email ? email.split('@')[0] : 'Scholar')
     ).slice(0, 120);
 

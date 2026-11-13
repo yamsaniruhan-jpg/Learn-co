@@ -181,7 +181,9 @@ export class AuthClient {
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Session expired.');
+      const error = new Error(data.error || 'Session verification failed.') as Error & { status?: number };
+      error.status = res.status;
+      throw error;
     }
 
     return data;

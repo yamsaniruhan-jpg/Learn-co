@@ -256,11 +256,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 }) => {
   const { user, profile } = useAuth();
   const [isOpenAllDrawer, setIsOpenAllDrawer] = useState(false);
-  const ownerEmail = (user?.email || profile?.email || '').trim().toLowerCase();
-  const isAdmin =
-    user?.role === 'admin' ||
-    profile?.role === 'admin' ||
-    ownerEmail === 'yamsaniruhan@gmail.com';
+  const isAdmin = user?.role === 'admin' || profile?.role === 'admin';
 
   const visibleFeatures = ALL_APP_FEATURES.filter((feat) => feat.id !== 'admin' || isAdmin);
   const groupedFeatures = groupNavFeatures(visibleFeatures);
@@ -282,7 +278,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   return (
     <>
       {/* Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
-      <nav aria-label="Mobile feature navigation" className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-2 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
+      <nav aria-label="Mobile feature navigation" className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-1 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
         {primaryBottomTabs.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -290,7 +286,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
-              className={`relative flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors min-h-[44px] cursor-pointer ${
+              className={`relative flex flex-1 min-w-0 flex-col items-center justify-center py-1.5 px-0 rounded-xl text-[10px] font-bold transition-colors min-h-[44px] cursor-pointer ${
                 isActive
                   ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
                   : 'text-[#6B6890] dark:text-[#B4B0D5]'
@@ -310,7 +306,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
         {/* The 'All Tabs & Features' Trigger */}
         <button
           onClick={() => setIsOpenAllDrawer(true)}
-          className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors min-h-[44px] cursor-pointer ${
+          className={`flex flex-1 min-w-0 flex-col items-center justify-center py-1.5 px-0 rounded-xl text-[10px] font-bold transition-colors min-h-[44px] cursor-pointer ${
             isOpenAllDrawer
               ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
               : 'text-[#6B6890] dark:text-[#B4B0D5]'

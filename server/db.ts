@@ -102,7 +102,7 @@ export interface DatabaseState {
   questionAttempts: QuestionAttemptRecord[];
   attemptsById: Record<string, QuestionAttemptRecord>;
   mistakes: MistakeRecord[];
-  sessions: Record<string, { userId: string; createdAt: string; expiresAt: string }>;
+  sessions: Record<string, { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean }>;
   passwordResets: Record<string, { userId: string; expiresAt: string; usedAt?: string; createdAt: string }>;
   creatorSources: Record<string, CreatorSource>;
   creatorResources: Record<string, CreatorResource>;
@@ -788,11 +788,11 @@ export class Database {
     return { userId: user.id };
   }
 
-  static createSession(userId: string): string {
+  static createSession(userId: string, verifiedOwner = false): string {
     const token = generateToken();
     const createdAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-    memoryDb.sessions[token] = { userId, createdAt, expiresAt };
+    memoryDb.sessions[token] = { userId, createdAt, expiresAt, ...(verifiedOwner ? { verifiedOwner: true } : {}) };
     saveDbToDisk();
     return token;
   }
@@ -815,6 +815,10 @@ export class Database {
     }
 
     return memoryDb.users[session.userId] || null;
+  }
+
+  static isVerifiedOwnerSession(token: string): boolean {
+    return Boolean(this.getSessionUser(token) && memoryDb.sessions[token.trim()]?.verifiedOwner);
   }
 
   static revokeSession(token: string): boolean {
@@ -870,7 +874,7 @@ export class Database {
       learningGoals: [],
       preferredStudyTimeMinutes: 30,
       studyTimeMinutesThisWeek: 0,
-      role: emailNorm === 'yamsaniruhan@gmail.com' ? 'admin' : 'student',
+      role: 'student',
       onboardingStatus: 'NOT_STARTED',
       timezone,
       joinedDate: now.split('T')[0],
@@ -956,6 +960,7 @@ export class Database {
     if (updates.onboardingStatus !== undefined) safeUpdates.onboardingStatus = updates.onboardingStatus;
 
     Object.assign(profile, safeUpdates);
+    saveDbToDisk();
     return profile;
   }
 
@@ -990,6 +995,7 @@ export class Database {
     if (updates.privacy) Object.assign(current.privacy, updates.privacy);
     if (updates.learningPreferences) Object.assign(current.learningPreferences, updates.learningPreferences);
 
+    saveDbToDisk();
     return current;
   }
 

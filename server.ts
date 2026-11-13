@@ -61,6 +61,9 @@ export async function createApp() {
     })
   );
 
+  // Stripe verifies the signature against the original bytes, before JSON parsing.
+  app.use("/api/subscription/webhook", express.raw({ type: "application/json", limit: "1mb" }));
+
   // Body parsers with payload limits
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));

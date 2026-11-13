@@ -1,3 +1,4 @@
+import { logSqlFailure } from './errors.ts';
 import { eq } from 'drizzle-orm';
 import { db, isSqlConfigured } from './index.ts';
 import { users } from './schema.ts';
@@ -30,9 +31,7 @@ export async function getOrCreateSqlUser(input: UpsertSqlUserInput) {
   }
 
   const normalizedEmail = normalizeEmail(input.email);
-  const resolvedRole = isOwnerEmail(normalizedEmail)
-    ? 'admin'
-    : input.role || 'student';
+  const resolvedRole = input.role || 'student';
 
   try {
     const [row] = await db
@@ -50,7 +49,7 @@ export async function getOrCreateSqlUser(input: UpsertSqlUserInput) {
         set: {
           email: normalizedEmail,
           ...(input.fullName ? { fullName: input.fullName } : {}),
-          ...(isOwnerEmail(normalizedEmail) ? { role: 'admin' } : input.role ? { role: input.role } : {}),
+          ...(input.role ? { role: input.role } : {}),
           updatedAt: new Date(),
         },
       })
@@ -58,8 +57,8 @@ export async function getOrCreateSqlUser(input: UpsertSqlUserInput) {
 
     return row || null;
   } catch (error) {
-    console.error('[CloudSQL] User upsert failed:', error);
-    throw new Error('Failed to synchronize user account with database.', { cause: error });
+    logSqlFailure('User upsert failed', error);
+    throw new Error('Failed to synchronize user account with database.');
   }
 }
 
@@ -76,7 +75,7 @@ export async function updateSqlUserRole(uid: string, role: string) {
       .returning();
     return row || null;
   } catch (error) {
-    console.error('[CloudSQL] Update user role failed:', error);
-    throw new Error('Failed to update user role in database.', { cause: error });
+    logSqlFailure('Update user role failed', error);
+    throw new Error('Failed to update user role in database.');
   }
 }
