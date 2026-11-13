@@ -228,6 +228,20 @@ Modified
 - `src/components/create/SourceIntakePanel.tsx` · `src/services/creatorClient.ts`
 - `package.json` / `package-lock.json` (`vitest`, `supertest`, `@types/supertest`, `pdfjs-dist`)
 
+Removed (Track E — 35 files, 2,780 lines, all verified unreachable)
+- `app.js` — a second, never-loaded Express app
+- `routes/{ai,copilot,creator,learning,mentorship}.js` · `controllers/*.js`
+- `services/{copilotService,geminiService}.js` · `middleware/{security,validate,aiRateLimit}.js`
+- `client/{firebase,registerSW}.js` · `components/` (8 duplicate JSX components)
+- `src/components/{GamificationBar,Leaderboard,Marketplace,ProgressDashboard,SafeInput,XPToast,AIUsageIndicator}.jsx`
+- `src/components/common/{Breadcrumbs,SafeInput}.tsx` · `src/services/{apiClient,masteryEngine}.ts`
+- `public/sw.js` (no `serviceWorker.register` call anywhere)
+- 4 runtime deps: `@google/generative-ai`, `node-cron`, `nodemailer`, `uuid` (+3 `@types`)
+
+**Kept on purpose:** `middleware/auth.js`, `routes/{subscription,gamification,marketplace}.js`,
+`services/{gamification,marketplace,mentorship,progress}Service.js` — all 8 are
+imported by live code and were confirmed working by HTTP probes.
+
 ---
 
 ## 4. Server startup status — PASS
@@ -291,9 +305,10 @@ against real `Response` objects.
 
 1. **Bundle size (Track D).** 3.97 MB single JS file, **0 `React.lazy`**. Route
    splitting is a mechanical, low-risk win.
-2. **Dead code (Track E).** 8 orphaned modules, 5 unmounted legacy routers (`ai`,
-   `copilot`, `creator`, `learning`, `mentorship`), 3 unused deps (`node-cron`,
-   `nodemailer`, `uuid`).
+2. **Dead code (Track E).** DONE — see `## 8. Track E` below. **Correction to an
+   earlier claim in this report:** there are **no unmounted routers**. All **14**
+   are mounted in `server.ts:124–137`. The earlier "5 unmounted legacy routers" note
+   was wrong and is retracted.
 3. **Persistence.** `fs.writeFileSync` rewrites the entire 41 KB file on every
    mutation — 8 sync full-file writes per mutation. Fine for one user, unsafe with
    concurrency and slow as it grows. The Postgres/Prisma migration remains a
@@ -309,3 +324,132 @@ against real `Response` objects.
 
 **What I deliberately did not do:** no redesign, no feature removal, no mock data
 added, no schema changes, and no architectural migration without your approval.
+
+---
+
+## 8. Track E — dead code removal
+
+### Correction first
+
+An earlier draft of this report claimed **"5 unmounted legacy routers"**. That was
+**wrong**. Every router is mounted — there are **14** mounts at `server.ts:124-137`:
+
+```
+/api/auth         /api/user         /api/practice     /api/learning
+/api/leaderboard  /api/ai           /api/creator      /api/copilot
+/api/mentorship   /api/subscription /api/gamification /api/marketplace
+/api/planner      /api/analytics
+```
+
+Retracted. Nothing was ever unmounted; the legacy routers I originally suspected
+are in fact **live** (see below). (An earlier note also said "13" — also wrong;
+the count is 14. Both errors are corrected here.)
+
+### The trap I hit (worth recording)
+
+I built a reachability graph from real entry points (`server.ts`, `src/main.tsx`)
+and treated unreferenced files as dead. Then I deleted the legacy tree and
+`npx tsc --noEmit` immediately failed with six `TS2307 Cannot find module` errors.
+**Live code imports the top-level `services/`, `routes/` and `middleware/`.** I
+restored everything from `git checkout HEAD -- ...` (tree clean, tsc green) and
+rebuilt the graph correctly.
+
+Root cause of the false negative: `tsconfig` uses `moduleResolution: bundler`,
+so `'../../services/progressService'` resolves `services/progressService.js` — a
+file my first pass had resolved to a *different* candidate. A path-based graph is
+only trustworthy if the resolver matches the bundler exactly. The corrected
+script resolves `.ts/.tsx/.js/.jsx/.cjs/.json` then `index.*`, and matches full
+relative paths without dropping segments.
+
+Lesson applied for the rest of this track: **move files aside, run `tsc`, and only
+then delete.** No file was deleted on the strength of the graph alone.
+
+### What the corrected graph found
+
+196 reachable modules. Exactly **8 files** under the legacy top-level dirs are
+genuinely live and were kept:
+
+| Kept (live) | Why it must stay |
+|---|---|
+| `middleware/auth.js` | mounted at `server.ts:22`; the Track A hardening lives here — confirmed intact (`verifyIdToken`, 140 lines, unchanged) |
+| `routes/subscription.js` | mounted `server.ts:19`; Stripe tiers/checkout/webhook |
+| `routes/gamification.js` | mounted `server.ts:20` |
+| `routes/marketplace.js` | mounted `server.ts:21` |
+| `services/gamificationService.js` | required by `routes/gamification.js` |
+| `services/marketplaceService.js` | required by `routes/marketplace.js` |
+| `services/mentorshipService.js` | required by `server/routes/mentorshipRoutes.ts` |
+| `services/progressService.js` | required by `server/routes/learningRoutes.ts` |
+
+The other **27 files** (2,780 lines) were confirmed unreachable and removed:
+
+- **Legacy parallel backend:** `app.js` — a complete second Express app
+  (`app.js`) that mounted 8 routers and was never loaded by anything.
+- **Dead routers:** `routes/{ai,copilot,creator,learning,mentorship}.js`
+- **Dead controllers:** `controllers/{aiController,copilotController}.js`
+- **Dead services:** `services/{copilotService,geminiService}.js`
+- **Dead middleware:** `middleware/{security,validate,aiRateLimit}.js` — shadowed
+  by the TypeScript `server/middleware/*` equivalents
+- **Dead client helpers:** `client/{firebase,registerSW}.js` (`src/client/registerSW`
+  is the live one)
+- **8 duplicate components in `components/`** — byte-identical to `src/components/`
+  twins apart from a header comment
+- **7 superseded `src/components/*.jsx`** — `src/components/Leaderboard.tsx` etc.
+  are what the app actually renders
+- **4 orphaned `src/` modules:** `services/apiClient.ts` (149 lines),
+  `services/masteryEngine.ts` (61), `components/common/Breadcrumbs.tsx`,
+  `components/common/SafeInput.tsx`
+- **`public/sw.js`** — a service worker nothing registers
+  (`serviceWorker.register` appears nowhere in `src/` or `index.html`)
+
+### Dependencies
+
+Verified by grepping **actual imports**, not by reading `package.json`. Four
+packages had zero importers and were removed, along with 3 `@types` stubs:
+
+`@google/generative-ai` (only the deleted `services/geminiService.js` used it),
+`node-cron`, `nodemailer`, `uuid`, and their `@types/*`.
+
+**One correction during this step:** I also removed `dotenv` and the test suite
+broke (`Failed to load url dotenv/config`). `server.ts:1` has
+`import "dotenv/config"` — a bare side-effect import my regex did not match.
+Restored it. `dotenv` is genuinely required: `server.ts` documents and reads real
+env vars (`GEMINI_API_KEY`, `FIREBASE_*, GOOGLE_APPLICATION_CREDENTIALS`,
+`LEARNCO_DB_FILE`) and `.env.example` is in the repo.
+
+This is exactly why "unused dependency" claims need an import-level check that
+includes side-effect imports.
+
+### Result
+
+| Metric | Before | After |
+|---|---|---|
+| Files deleted | — | **35** |
+| Lines removed | — | **2,780** (net −2,772) |
+| Runtime dependencies | 37 | **32** |
+| Dead duplicate backends | 2 | **1** |
+
+### Verification after removal
+
+- `npx tsc --noEmit` — clean, exit 0
+- `npm test` — **89/89 passing, 4 files**
+- `npm run build` — exit 0, **0 warnings**
+- `npm run dev` — boots clean, no errors in terminal
+- Production runtime probes on the built `dist/server.cjs`: 13 endpoints
+  **200 with auth**, and `/api/user/profile`, `/api/gamification/profile`,
+  `/api/copilot/conversations` correctly **401 without** a token — proving
+  `middleware/auth.js` is still doing its job after the cleanup.
+- `middleware/auth.js` verified unmodified (`git status` clean for that path) so
+  Track A's hardening survives.
+
+### Honest caveats
+
+- Track E removes dead weight; it does **not** shrink the shipped bundle. The
+  bundle is still **3.97 MB** because the dead files were never bundled. The
+  size win belongs to Track D (route splitting, 0 `React.lazy` today).
+- The legacy `routes/{subscription,gamification,marketplace}.js` and their
+  services are still CommonJS in a TypeScript codebase. They work and are used,
+  so removing them would be a rewrite — out of scope here. Porting them to
+  `server/routes/*.ts` is a sensible future cleanup.
+- Reachability is static. It cannot see runtime dynamic `require()`. I
+  cross-checked by running `tsc`, tests, a build and live HTTP probes, which
+  would catch a missing module — but I make no claim beyond that.
