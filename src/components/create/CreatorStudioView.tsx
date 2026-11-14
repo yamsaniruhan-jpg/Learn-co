@@ -33,6 +33,7 @@ interface CreatorStudioViewProps {
 export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   onNavigateToPractice,
 }) => {
+  const [storageStatus, setStorageStatus] = useState('');
   const [activeTab, setActiveTab] = useState<'synthesizer' | 'library' | 'sources'>('synthesizer');
 
   // Resources state
@@ -246,6 +247,12 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
+      {storageStatus && (
+        <div role="status" className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
+          {storageStatus} Firebase copies are retained separately when a local source is deleted.
+          <button type="button" onClick={() => setStorageStatus('')} className="ml-3 underline">Dismiss</button>
+        </div>
+      )}
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div
@@ -376,6 +383,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
           ) : (
             <SourceIntakePanel
               onGenerate={handleGenerate}
+              onStorageStatus={setStorageStatus}
               isGenerating={isGenerating}
               isGenerationLimitReached={isGenerationLimitReached}
               prefillSource={prefillSource}

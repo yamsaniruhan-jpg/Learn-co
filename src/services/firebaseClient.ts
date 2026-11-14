@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
+import { getStorage, ref, uploadBytesResumable, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 const rawConfig = firebaseConfigData as any;
@@ -41,12 +41,15 @@ export const db = dbInstance;
 export const storage = storageInstance;
 export const googleProvider = new GoogleAuthProvider();
 
-export async function uploadUserFile(userId: string, file: File): Promise<string> {
+// Store the original under the authenticated Firebase UID; do not create a public
+// download-token URL. A bounded upload keeps an unavailable bucket from blocking intake.
+export async function uploadUserFile(userId: string, sourceId: string, file: File): Promise<void> {
+  if (!auth.currentUser || auth.currentUser.uid !== userId) throw new Error('Firebase session changed.');
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const storageRef = ref(storage, `users/${userId}/sources/${Date.now()}_${safeName}`);
-  const snapshot = await uploadBytes(storageRef, file);
-  const downloadUrl = await getDownloadURL(snapshot.ref);
-  return downloadUrl;
+  const storageRef = ref(storage, `users/${userId}/sources/${sourceId}/${safeName}`);
+  const task = uploadBytesResumable(storageRef, file);
+  const timer = setTimeout(() => task.cancel(), 15000);
+  try { await task; } finally { clearTimeout(timer); }
 }
 
 export { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut };

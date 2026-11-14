@@ -26,9 +26,13 @@ import {
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { uploadUserFile, auth } from '../../services/firebaseClient';
+import { hasMatchingFirebaseIdentity } from '../../services/clientFirestoreSync';
+import { useAuth } from '../../context/AuthContext';
+import { CreatorClient } from '../../services/creatorClient';
 
 interface SourceIntakePanelProps {
   onGenerate: (params: GenerateResourceRequest) => Promise<void>;
+  onStorageStatus: (status: string) => void;
   isGenerating: boolean;
   isGenerationLimitReached: boolean;
   prefillSource?: {
@@ -41,10 +45,12 @@ interface SourceIntakePanelProps {
 
 export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   onGenerate,
+  onStorageStatus,
   isGenerating,
   isGenerationLimitReached,
   prefillSource,
 }) => {
+  const { user } = useAuth();
   const [sourceType, setSourceType] = useState<SourceType>(
     prefillSource?.sourceType || 'text'
   );
@@ -53,11 +59,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     prefillSource?.extractedText || ''
   );
   const [urlInput, setUrlInput] = useState<string>('');
-  const [uploadedFile, setUploadedFile] = useState<{
-    name: string;
-    size: number;
-    base64Data?: string;
-  } | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [savedSourceId, setSavedSourceId] = useState<string | null>(null);
+  const [intakeError, setIntakeError] = useState('');
 
   const [subjectId, setSubjectId] = useState<SubjectId>('math');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
@@ -141,41 +145,26 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
 
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
-  const handleFileChange = async (file: File) => {
+  const handleFileChange = (file: File) => {
     if (!file) return;
-    setIsUploading(true);
-    try {
-      const userId = auth.currentUser?.uid;
-      if (!userId) throw new Error('Firebase user not signed in; using local reader.');
-      const downloadUrl = await uploadUserFile(userId, file);
-      setUploadedFile({
-        name: file.name,
-        size: file.size,
-        base64Data: downloadUrl,
-      });
-      setUrlInput(downloadUrl);
-      if (!title) {
-        setTitle(file.name.replace(/\.[^/.]+$/, ''));
-      }
-    } catch (err) {
-      console.warn('Firebase Storage upload failed, falling back to local reader:', err);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setUploadedFile({
-          name: file.name,
-          size: file.size,
-          base64Data: base64,
-        });
-        if (!title) {
-          setTitle(file.name.replace(/\.[^/.]+$/, ''));
-        }
-      };
-      reader.readAsDataURL(file);
-    } finally {
-      setIsUploading(false);
+    setIntakeError('');
+    onStorageStatus('');
+    setSavedSourceId(null);
+    if (!file.name.toLowerCase().endsWith('.pdf') || file.size === 0 || file.size > 7 * 1024 * 1024) {
+      setUploadedFile(null);
+      setIntakeError('Choose a non-empty PDF up to 7 MB.');
+      return;
     }
+    setUploadedFile(file);
+    if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
+
+  const readFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read PDF.'));
+    reader.onerror = () => reject(new Error('Could not read PDF.'));
+    reader.readAsDataURL(file);
+  });
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -198,18 +187,46 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    let sourceText = textContent;
-    let sourceUrl = urlInput;
-
+    setIntakeError('');
+    let sourceId = prefillSource?.sourceType === sourceType ? prefillSource?.sourceId : undefined;
     if (sourceType === 'pdf' && uploadedFile) {
-      sourceText = `PDF Document: ${uploadedFile.name} (Uploaded content buffer)`;
+      setIsUploading(true);
+      try {
+        sourceId = savedSourceId || undefined;
+        if (!sourceId) {
+          const source = await CreatorClient.createSource({
+            title: title.trim() || uploadedFile.name,
+            sourceType: 'pdf', fileName: uploadedFile.name, fileSize: uploadedFile.size,
+            fileBase64: await readFile(uploadedFile),
+          });
+          sourceId = source.id;
+          setSavedSourceId(source.id);
+          onStorageStatus('PDF saved to server storage.');
+          const firebaseUser = auth.currentUser;
+          if (firebaseUser?.emailVerified && hasMatchingFirebaseIdentity(firebaseUser.email, user?.email)) {
+            try {
+              await uploadUserFile(firebaseUser.uid, source.id, uploadedFile);
+              onStorageStatus('PDF saved to server storage and Firebase Storage.');
+            } catch {
+              onStorageStatus('PDF saved to server storage; Firebase Storage upload failed. Your Firebase copy was not saved.');
+            }
+          } else {
+            onStorageStatus('PDF saved to server storage; Firebase copy not saved. Sign in with a matching, verified Firebase account to enable upload.');
+          }
+        }
+      } catch (err: any) {
+        setIntakeError(err?.message || 'Could not save PDF.');
+        return;
+      } finally {
+        setIsUploading(false);
+      }
     }
 
     const payload: GenerateResourceRequest = {
-      sourceId: prefillSource?.sourceId,
+      sourceId,
       sourceType,
-      sourceText,
-      sourceUrl,
+      sourceText: sourceType === 'text' ? textContent : undefined,
+      sourceUrl: sourceType === 'url' ? urlInput : undefined,
       resourceType: selectedResourceType,
       title: title.trim() || `Mastery ${selectedResourceType.replace(/_/g, ' ')}`,
       subjectId,
@@ -306,7 +323,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt"
+              accept=".pdf,application/pdf"
               onChange={(e) => e.target.files && handleFileChange(e.target.files[0])}
               className="hidden"
             />
@@ -328,7 +345,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                   Drop your PDF lecture slides or research paper here
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  or click to browse from device (PDF, DOCX, TXT up to 10MB)
+                  or click to browse from device (PDF up to 7 MB)
                 </p>
               </div>
             ) : (
@@ -348,7 +365,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setUploadedFile(null)}
+                  onClick={() => { setUploadedFile(null); setSavedSourceId(null); onStorageStatus(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                   className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400"
                 >
                   <X className="w-4 h-4" />
@@ -374,6 +391,8 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
             </p>
           </div>
         )}
+
+        {intakeError && <p role="alert" className="text-xs text-red-600">{intakeError}</p>}
 
         {/* Resource Title & Domain Config */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -555,8 +574,8 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
           type="submit"
           variant="primary"
           size="lg"
-          disabled={isGenerating || isGenerationLimitReached || (sourceType === 'text' && !textContent.trim()) || (sourceType === 'url' && !urlInput.trim())}
-          leftIcon={isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : isGenerationLimitReached ? <X className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+          disabled={isGenerating || isUploading || isGenerationLimitReached || (sourceType === 'pdf' && !uploadedFile && !(prefillSource?.sourceType === 'pdf' && prefillSource?.sourceId)) || (sourceType === 'text' && !textContent.trim()) || (sourceType === 'url' && !urlInput.trim())}
+          leftIcon={(isGenerating || isUploading) ? <Loader2 className="w-4 h-4 animate-spin" /> : isGenerationLimitReached ? <X className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
           className={isGenerationLimitReached ? "bg-red-500 text-white cursor-not-allowed" : "bg-white text-indigo-950 hover:bg-indigo-50 font-bold px-6 shadow-sm"}
         >
           {isGenerating ? 'Synthesizing...' : isGenerationLimitReached ? 'Daily Limit Reached' : 'Synthesize Resource'}

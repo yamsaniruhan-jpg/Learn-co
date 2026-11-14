@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Database } from '../db';
+import { Database, flushDb } from '../db';
 import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { GoogleGenAI, Type } from '@google/genai';
 import {
@@ -184,6 +184,13 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
       url,
     });
 
+    // A successful intake must reach the configured local store before responding.
+    try {
+      await flushDb();
+    } catch {
+      Database.deleteSource(userId, newSource.id);
+      throw new Error('Could not save the source to server storage. Please try again.');
+    }
     sourceCreated = true;
     res.status(201).json({ success: true, source: newSource });
   } catch (err: any) {
