@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { initializeApp, getApps, getApp, applicationDefault, App } from 'firebase-admin/app';
+import { initializeApp, getApps, getApp, applicationDefault, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -53,16 +53,15 @@ let app: App | null = null;
 if (isFirebaseAdminConfigured) {
   try {
     if (getApps().length === 0) {
-      try {
-        app = initializeApp({ credential: applicationDefault(), projectId });
-      } catch {
-        app = initializeApp({ projectId });
-      }
+      // Invalid explicit credentials must not silently fall back to another account.
+      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
+      const credential = serviceAccount ? cert(JSON.parse(serviceAccount)) : applicationDefault();
+      app = initializeApp({ credential, projectId });
     } else {
       app = getApp();
     }
   } catch (err: any) {
-    console.warn('[FirebaseAdmin] Initialisation skipped:', err?.message || err);
+    console.warn('[FirebaseAdmin] Initialisation skipped. Check Firebase Admin credential configuration.');
     app = null;
   }
 }

@@ -5,8 +5,8 @@ import { UserProfile, UserGamification, LeaderboardEntry, calculateLevelFromXp }
 /**
  * Client-side Firestore sync service.
  * Operates with active Firebase Auth user credentials and adheres strictly to firestore.rules.
- * Ensures every signed-in account is stored in Firebase Console (users, public_profiles, and leaderboard).
- * Guarantees that any account in Firebase Console — even with 0 XP — appears on the leaderboard forever.
+ * Best-effort sync for matching Firebase identities; network, credentials and
+ * security rules can prevent writes, so this is not a durable backup.
  */
 export function hasMatchingFirebaseIdentity(firebaseEmail?: string | null, backendEmail?: string | null): boolean {
   const a = (firebaseEmail || '').trim().toLowerCase();

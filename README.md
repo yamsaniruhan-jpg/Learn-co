@@ -275,3 +275,11 @@ Learn Smarter. Create Better. Achieve More.
 🌐 Website: "https://learn-co.ai.studio/" (https://learn-co.ai.studio/)
 
 An AI-powered learning companion built to support the way we learn.
+
+### Authentication and source storage operations
+
+- The app's email/password sessions use the server's account store. Firebase Authentication and Firestore synchronization are separate integrations; email/password login can succeed locally even if Firebase is unavailable. Google sign-in requires a working Firebase client configuration and Firebase Admin credentials on the server.
+- Creator Studio accepts text-layer PDFs up to 7 MB. On synthesis, the original PDF (encoded in the server JSON store) and extracted text are saved before generation. Set `LEARNCO_DB_FILE` to a **private, persistent writable path outside the public directory**; the default is `.learnco_db.json`. Container-local storage can disappear on redeploy, and the JSON store is not a multi-instance database. Maintain appropriate private backups.
+- Firebase Storage is a separate, best-effort PDF copy. It requires a signed-in Firebase user whose verified email matches the app account, an initialized bucket, and correctly deployed owner-only Storage rules. Check the on-screen status; a successful local save does not imply a Firebase upload. Storage objects are under `users/{firebaseUid}/sources/{sourceId}/`; deleting a local source does **not** delete its Firebase copy. No rules or bucket configuration are deployed automatically.
+- Firebase Admin can use Application Default Credentials or a JSON service account in `FIREBASE_SERVICE_ACCOUNT_JSON` (also accepted: `FIREBASE_SERVICE_ACCOUNT`). Keep credentials in the deployment secret manager or environment, never in the repository. Live Firebase Auth, Firestore and Storage access must be verified in the actual project.
+- CI uses Bun 1.4.4 and `bun install --frozen-lockfile`. If a lockfile fails to load, record the exact error, OS and `bun --version`; do not assume an older Bun version reads the text lockfile correctly. The project also supports `npm ci` with the committed npm lockfile.
