@@ -26,6 +26,8 @@ import {
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 
+import { useAuth } from '../../context/AuthContext';
+
 interface CreatorStudioViewProps {
   onNavigateToPractice?: () => void;
 }
@@ -33,7 +35,9 @@ interface CreatorStudioViewProps {
 export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   onNavigateToPractice,
 }) => {
+  const { isAuthenticated } = useAuth();
   const [storageStatus, setStorageStatus] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [activeTab, setActiveTab] = useState<'synthesizer' | 'library' | 'sources'>('synthesizer');
 
   // Resources state
@@ -75,9 +79,24 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const refreshSourcesAndQuota = async () => {
+    try {
+      const [srcList, q] = await Promise.all([
+        CreatorClient.getSources(),
+        CreatorClient.getQuota(),
+      ]);
+      setSources(srcList);
+      setQuota(q);
+      setIsGenerationLimitReached(q.artifacts.isLimitReached);
+    } catch {
+      // Ignore background refresh failures
+    }
+  };
+
   // Load initial resources and sources
   const loadData = async () => {
     setIsLoadingResources(true);
+    setLoadError('');
     try {
       const [resList, srcList, q] = await Promise.all([
         CreatorClient.getResources(),
@@ -95,6 +114,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       }
     } catch (err: any) {
       console.warn('Failed loading creator studio data:', err);
+      setLoadError(err?.message || 'Unable to load your Creator Studio workspace.');
     } finally {
       setIsLoadingResources(false);
     }
@@ -102,7 +122,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isAuthenticated]);
 
   // Fetch full resource details + versions when selecting
   const handleSelectResource = async (res: CreatorResource) => {
@@ -247,6 +267,14 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
+      {loadError && (
+        <div role="alert" className="p-4 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-700 dark:text-rose-300 flex items-center justify-between gap-3">
+          <span>{loadError}</span>
+          <Button type="button" variant="outline" size="sm" onClick={loadData}>
+            Retry
+          </Button>
+        </div>
+      )}
       {storageStatus && (
         <div role="status" className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
           {storageStatus} Firebase copies are retained separately when a local source is deleted.
@@ -279,11 +307,16 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       {/* Top Creator Studio Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Volume 4 • AI Pedagogical Synthesis</span>
             </span>
+            {quota && (
+              <Badge variant="outline" size="sm">
+                Daily Uploads: {quota.sources.used}/{quota.sources.limit} • Artifacts: {quota.artifacts.used}/{quota.artifacts.limit}
+              </Badge>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
             Creator Studio
@@ -384,6 +417,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             <SourceIntakePanel
               onGenerate={handleGenerate}
               onStorageStatus={setStorageStatus}
+              onSourceSaved={refreshSourcesAndQuota}
               isGenerating={isGenerating}
               isGenerationLimitReached={isGenerationLimitReached}
               prefillSource={prefillSource}

@@ -4,6 +4,7 @@ import { requireAuth, getEffectiveRole, AuthenticatedRequest } from '../middlewa
 import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
+import { verifyFirebaseIdTokenSafely } from '../services/verifyFirebaseToken';
 import { sendMail, isMailerConfigured, buildPasswordResetMessage } from '../services/mailer';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
@@ -189,14 +190,16 @@ router.post('/google', async (req, res: Response) => {
       return;
     }
     let verifiedEmail: string;
+    let decodedUid: string | undefined;
     try {
-      const decoded = await adminAuth.verifyIdToken(idToken, true);
+      const decoded = await verifyFirebaseIdTokenSafely(adminAuth, idToken, true);
       if (!decoded.email || !decoded.email_verified || decoded.firebase?.sign_in_provider !== 'google.com' ||
           decoded.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
         res.status(401).json({ error: 'Google token does not match a verified Google account.' });
         return;
       }
       verifiedEmail = decoded.email.trim().toLowerCase();
+      decodedUid = decoded.uid;
     } catch {
       res.status(401).json({ error: 'Invalid or expired Google ID token.' });
       return;

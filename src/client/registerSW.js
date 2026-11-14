@@ -1,8 +1,15 @@
 // src/client/registerSW.js
+import { registerSW } from 'virtual:pwa-register';
+
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.error('SW registration failed:', err));
+  registerSW({
+    immediate: true,
+    onRegisteredSW(swUrl) {
+      console.log('SW registered:', swUrl);
+    },
+    onRegisterError(err) {
+      console.error('SW registration failed:', err);
+    },
   });
 }
+

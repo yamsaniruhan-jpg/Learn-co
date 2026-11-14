@@ -70,6 +70,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^4.1.11"
   }
 }

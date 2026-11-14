@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   const dataFileGlob = process.env.LEARNCO_DB_FILE
@@ -18,7 +19,112 @@ export default defineConfig(() => {
   return {
     // `@tailwindcss/vite` v4 returns an array of plugins, so it must be spread
     // flat instead of nested inside the plugins array.
-    plugins: [react(), ...tailwindcss()],
+    plugins: [
+      {
+        name: 'deny-learnco-db',
+        configureServer(server) {
+          const customBase = process.env.LEARNCO_DB_FILE
+            ? path.basename(path.resolve(process.env.LEARNCO_DB_FILE))
+            : null;
+          server.middlewares.use((req, res, next) => {
+            const rawPath = (req.url || '').split('?')[0];
+            let decoded = rawPath;
+            try {
+              decoded = decodeURIComponent(rawPath);
+            } catch {
+              // ignore malformed encoding
+            }
+            if (
+              decoded.includes('.learnco_db.json') ||
+              (customBase && decoded.includes(customBase))
+            ) {
+              res.statusCode = 403;
+              res.end('Forbidden');
+              return;
+            }
+            next();
+          });
+        },
+      },
+      react(),
+      ...tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        injectRegister: false,
+        manifestFilename: 'manifest.json',
+        includeAssets: ['favicon.jpg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'],
+        manifest: {
+          id: '/',
+          name: 'Learn.co - AI Learning Companion',
+          short_name: 'LearnCo',
+          description: 'An AI-powered learning companion built to support the way we learn.',
+          theme_color: '#6C5CE7',
+          background_color: '#F7F5FF',
+          display: 'standalone',
+          start_url: '/',
+          scope: '/',
+          icons: [
+            {
+              src: '/icons/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icons/icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icons/icon-maskable-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          navigateFallback: null,
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
+    ],
     resolve: {
       // `@` points at the project root (matches the tsconfig `paths` mapping).
       alias: {

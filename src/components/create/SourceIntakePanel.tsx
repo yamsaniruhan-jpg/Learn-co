@@ -33,6 +33,7 @@ import { CreatorClient } from '../../services/creatorClient';
 interface SourceIntakePanelProps {
   onGenerate: (params: GenerateResourceRequest) => Promise<void>;
   onStorageStatus: (status: string) => void;
+  onSourceSaved?: () => void;
   isGenerating: boolean;
   isGenerationLimitReached: boolean;
   prefillSource?: {
@@ -46,6 +47,7 @@ interface SourceIntakePanelProps {
 export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   onGenerate,
   onStorageStatus,
+  onSourceSaved,
   isGenerating,
   isGenerationLimitReached,
   prefillSource,
@@ -145,14 +147,25 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
 
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
+  const isSupportedFile = (file: File) => {
+    const lower = file.name.toLowerCase();
+    return (
+      lower.endsWith('.pdf') ||
+      lower.endsWith('.txt') ||
+      lower.endsWith('.md') ||
+      lower.endsWith('.markdown') ||
+      lower.endsWith('.csv')
+    );
+  };
+
   const handleFileChange = (file: File) => {
     if (!file) return;
     setIntakeError('');
     onStorageStatus('');
     setSavedSourceId(null);
-    if (!file.name.toLowerCase().endsWith('.pdf') || file.size === 0 || file.size > 7 * 1024 * 1024) {
+    if (!isSupportedFile(file) || file.size === 0 || file.size > 7 * 1024 * 1024) {
       setUploadedFile(null);
-      setIntakeError('Choose a non-empty PDF up to 7 MB.');
+      setIntakeError('Choose a non-empty PDF, TXT, MD, or CSV file up to 7 MB.');
       return;
     }
     setUploadedFile(file);
@@ -161,9 +174,16 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
 
   const readFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read PDF.'));
-    reader.onerror = () => reject(new Error('Could not read PDF.'));
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read file.'));
+    reader.onerror = () => reject(new Error('Could not read file.'));
     reader.readAsDataURL(file);
+  });
+
+  const readTextFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read text file.'));
+    reader.onerror = () => reject(new Error('Could not read text file.'));
+    reader.readAsText(file);
   });
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -184,41 +204,63 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     }
   };
 
+  const uploadSelectedFile = async (): Promise<string | undefined> => {
+    if (!uploadedFile) return undefined;
+    if (savedSourceId) return savedSourceId;
+
+    setIsUploading(true);
+    setIntakeError('');
+    try {
+      const isPdf = uploadedFile.name.toLowerCase().endsWith('.pdf');
+      const source = isPdf
+        ? await CreatorClient.createSource({
+            title: title.trim() || uploadedFile.name,
+            sourceType: 'pdf',
+            fileName: uploadedFile.name,
+            fileSize: uploadedFile.size,
+            fileBase64: await readFile(uploadedFile),
+          })
+        : await CreatorClient.createSource({
+            title: title.trim() || uploadedFile.name,
+            sourceType: 'text',
+            fileName: uploadedFile.name,
+            fileSize: uploadedFile.size,
+            content: await readTextFile(uploadedFile),
+          });
+
+      setSavedSourceId(source.id);
+      if (onSourceSaved) {
+        onSourceSaved();
+      }
+      onStorageStatus(`${isPdf ? 'PDF' : 'Document'} saved to server storage.`);
+      const firebaseUser = auth.currentUser;
+      if (firebaseUser?.emailVerified && hasMatchingFirebaseIdentity(firebaseUser.email, user?.email)) {
+        try {
+          await uploadUserFile(firebaseUser.uid, source.id, uploadedFile);
+          onStorageStatus(`${isPdf ? 'PDF' : 'Document'} saved to server storage and Firebase Storage.`);
+        } catch {
+          onStorageStatus(`${isPdf ? 'PDF' : 'Document'} saved to server storage; Firebase Storage upload failed. Your Firebase copy was not saved.`);
+        }
+      } else {
+        onStorageStatus(`${isPdf ? 'PDF' : 'Document'} saved to server storage; Firebase copy not saved. Sign in with a matching, verified Firebase account to enable upload.`);
+      }
+      return source.id;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setIntakeError('');
     let sourceId = prefillSource?.sourceType === sourceType ? prefillSource?.sourceId : undefined;
     if (sourceType === 'pdf' && uploadedFile) {
-      setIsUploading(true);
       try {
-        sourceId = savedSourceId || undefined;
-        if (!sourceId) {
-          const source = await CreatorClient.createSource({
-            title: title.trim() || uploadedFile.name,
-            sourceType: 'pdf', fileName: uploadedFile.name, fileSize: uploadedFile.size,
-            fileBase64: await readFile(uploadedFile),
-          });
-          sourceId = source.id;
-          setSavedSourceId(source.id);
-          onStorageStatus('PDF saved to server storage.');
-          const firebaseUser = auth.currentUser;
-          if (firebaseUser?.emailVerified && hasMatchingFirebaseIdentity(firebaseUser.email, user?.email)) {
-            try {
-              await uploadUserFile(firebaseUser.uid, source.id, uploadedFile);
-              onStorageStatus('PDF saved to server storage and Firebase Storage.');
-            } catch {
-              onStorageStatus('PDF saved to server storage; Firebase Storage upload failed. Your Firebase copy was not saved.');
-            }
-          } else {
-            onStorageStatus('PDF saved to server storage; Firebase copy not saved. Sign in with a matching, verified Firebase account to enable upload.');
-          }
-        }
+        sourceId = await uploadSelectedFile();
       } catch (err: any) {
-        setIntakeError(err?.message || 'Could not save PDF.');
+        setIntakeError(err?.message || 'Could not save uploaded file.');
         return;
-      } finally {
-        setIsUploading(false);
       }
     }
 
@@ -323,7 +365,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,application/pdf"
+              accept=".pdf,.txt,.md,.markdown,.csv,application/pdf,text/plain,text/markdown,text/csv"
               onChange={(e) => e.target.files && handleFileChange(e.target.files[0])}
               className="hidden"
             />
@@ -342,34 +384,62 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
               >
                 <UploadCloud className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Drop your PDF lecture slides or research paper here
+                  Drop your PDF, TXT, Markdown, or CSV lecture notes here
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  or click to browse from device (PDF up to 7 MB)
+                  or click to browse from device (up to 7 MB)
                 </p>
               </div>
             ) : (
-              <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-indigo-600 text-white rounded-lg">
+              <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 bg-indigo-600 text-white rounded-lg shrink-0">
                     <File className="w-5 h-5" />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                      {uploadedFile.name}
-                    </h4>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        {uploadedFile.name}
+                      </h4>
+                      {savedSourceId && (
+                        <Badge variant="success" size="sm">
+                          Saved to Sources
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-500">
-                      {(uploadedFile.size / 1024).toFixed(1)} KB • Ready for synthesis
+                      {(uploadedFile.size / 1024).toFixed(1)} KB • {savedSourceId ? 'Uploaded & ready for synthesis' : 'Ready to upload & synthesize'}
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setUploadedFile(null); setSavedSourceId(null); onStorageStatus(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {!savedSourceId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploading || isGenerating}
+                      onClick={async () => {
+                        try {
+                          await uploadSelectedFile();
+                        } catch (err: any) {
+                          setIntakeError(err?.message || 'Could not upload file.');
+                        }
+                      }}
+                      className="text-xs font-bold"
+                    >
+                      {isUploading ? 'Uploading...' : 'Upload to Sources'}
+                    </Button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setUploadedFile(null); setSavedSourceId(null); onStorageStatus(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400"
+                    aria-label="Remove selected file"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>

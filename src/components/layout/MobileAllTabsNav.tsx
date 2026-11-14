@@ -27,6 +27,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
 interface MobileAllTabsNavProps {
   activeTab: string;
@@ -331,24 +332,27 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 
           <div className="bg-[#FFFFFF] dark:bg-[#2A2647] rounded-t-3xl border-t border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_-8px_30px_rgba(45,42,74,0.2)] max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
             {/* Drawer Header */}
-            <div className="p-4 sm:p-5 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">
-              <div>
+            <div className="p-4 sm:p-5 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display flex items-center gap-2">
-                  <Menu className="w-5 h-5 text-[#6C5CE7] dark:text-[#8577ED]" />
-                  <span>All Learn.co Tabs & Features</span>
+                  <Menu className="w-5 h-5 text-[#6C5CE7] dark:text-[#8577ED] shrink-0" />
+                  <span className="truncate">All Learn.co Tabs &amp; Features</span>
                 </h3>
-                <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-medium">
+                <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-medium truncate">
                   Switch instantly to any area of the STEM platform
                 </p>
               </div>
 
-              <button
-                onClick={() => setIsOpenAllDrawer(false)}
-                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] cursor-pointer"
-                aria-label="Close all tabs drawer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <PWAInstallButton />
+                <button
+                  onClick={() => setIsOpenAllDrawer(false)}
+                  className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] cursor-pointer"
+                  aria-label="Close all tabs drawer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Feature sections retain the role-filtered list. */}

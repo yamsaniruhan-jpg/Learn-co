@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Database } from '../db';
 import { UserAccount, UserRole } from '../../src/types/auth';
 import { adminAuth } from '../services/firebaseAdmin';
+import { verifyFirebaseIdTokenSafely } from '../services/verifyFirebaseToken';
 import { isOwnerEmail } from '../../src/db/users';
 
 export interface AuthenticatedRequest extends Request {
@@ -40,8 +41,8 @@ async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<Auth
   if (adminAuth && typeof adminAuth.verifyIdToken === 'function') {
     try {
       let decodedToken = await adminAuth.verifyIdToken(token, false);
-      // Privileged owner identity must also pass Firebase revocation checking.
-      if (isOwnerEmail(decodedToken.email)) decodedToken = await adminAuth.verifyIdToken(token, true);
+      // Privileged owner identity must also pass Firebase revocation checking when available.
+      if (isOwnerEmail(decodedToken.email)) decodedToken = await verifyFirebaseIdTokenSafely(adminAuth, token, true);
       const uid = decodedToken.uid;
       const resolvedUser = Database.findUserById(uid) || {
         id: uid,

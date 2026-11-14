@@ -12,6 +12,15 @@ router.get('/search', optionalAuth, async (req, res) => {
   }
 });
 
+router.get('/enrollments', verifyFirebaseAuth, async (req, res) => {
+  try {
+    const enrolledCourseIds = await marketplace.getUserEnrollments(req.user.uid);
+    res.json({ enrolledCourseIds });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load enrollments.' });
+  }
+});
+
 router.post('/publish/:courseId', verifyFirebaseAuth, async (req, res) => {
   try {
     const courseId = await marketplace.publishCourse(req.user.uid, req.params.courseId, req.body);
@@ -32,10 +41,19 @@ router.post('/enroll/:courseId', verifyFirebaseAuth, async (req, res) => {
 
 router.post('/review/:courseId', verifyFirebaseAuth, async (req, res) => {
   try {
-    const { rating, comment } = req.body;
-    if (rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be 1-5.' });
-    await marketplace.submitReview(req.user.uid, req.user.name, req.params.courseId, rating, comment);
-    res.json({ success: true });
+    const rating = Number(req.body?.rating);
+    const comment = String(req.body?.comment || '').trim();
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be 1-5.' });
+    }
+    const review = await marketplace.submitReview(
+      req.user.uid,
+      req.user.name || req.user.email?.split('@')[0] || 'Scholar',
+      req.params.courseId,
+      rating,
+      comment
+    );
+    res.json({ success: true, review });
   } catch (error) {
     res.status(500).json({ error: 'Review failed.' });
   }
@@ -43,20 +61,8 @@ router.post('/review/:courseId', verifyFirebaseAuth, async (req, res) => {
 
 router.get('/reviews/:courseId', async (req, res) => {
   try {
-    const admin = require('../server/services/firebaseAdminCompat.cjs');
-    // Returns null when Firestore is not configured for this environment.
-    const db = admin.firestore();
-
-    if (!db) {
-      return res.json({ reviews: [] });
-    }
-
-    const snap = await db
-      .collection('marketplace').doc(req.params.courseId)
-      .collection('reviews')
-      .orderBy('createdAt', 'desc')
-      .limit(20).get();
-    res.json({ reviews: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
+    const reviews = await marketplace.getCourseReviews(req.params.courseId);
+    res.json({ reviews });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch reviews.' });
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Compass,
   Users,
@@ -17,6 +17,7 @@ import {
   Plus,
   Play,
   Clock,
+  RefreshCw,
 } from 'lucide-react';
 import { UserProfile, ConceptMastery, QuestionAttempt, SubjectId } from '../../types';
 import {
@@ -100,9 +101,12 @@ export const MentorView: React.FC<MentorViewProps> = ({
     upcomingSessions: [],
   });
 
-  // Filter State
+  // Filter & Live Sync State
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<SubjectId | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   // Modal State
   const [selectedMentorForProfile, setSelectedMentorForProfile] = useState<MentorProfile | null>(null);
@@ -116,9 +120,17 @@ export const MentorView: React.FC<MentorViewProps> = ({
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportedUser, setReportedUser] = useState<{ id: string; name: string } | null>(null);
 
-  // Load initial data
-  const loadInitialData = async () => {
-    setIsLoading(true);
+  const notifyAction = (message: string, type: 'error' | 'success' = 'success') => {
+    setActionFeedback({ type, message });
+    setTimeout(() => setActionFeedback(null), 4500);
+  };
+
+  const syncOverviewData = useCallback(async (silent = false) => {
+    if (silent) {
+      setIsSyncing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const [mentorRes, recs, rels, reqs, port] = await Promise.all([
         MentorshipClient.getMentors({ limit: 12 }),
@@ -138,20 +150,52 @@ export const MentorView: React.FC<MentorViewProps> = ({
       setRelationships(rels);
       setRequests(reqs);
       setPortalData(port);
+      setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
-      if (rels.length > 0) {
-        setSelectedRelationship(rels[0]);
-      }
-    } catch (err) {
+      setSelectedRelationship((prev) => {
+        if (prev && rels.some((r) => r.id === prev.id)) {
+          return rels.find((r) => r.id === prev.id) || prev;
+        }
+        return rels.length > 0 ? rels[0] : null;
+      });
+    } catch (err: any) {
       console.error('Failed to load mentorship data:', err);
+      if (!silent) {
+        notifyAction(err?.message || 'Unable to reach live mentorship service.', 'error');
+      }
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
-  };
+  }, []);
+
+  const syncRelationshipDetails = useCallback(async (relationshipId: string) => {
+    try {
+      const [g, t, s, m, ins] = await Promise.all([
+        MentorshipClient.getGoals(relationshipId),
+        MentorshipClient.getTasks(relationshipId),
+        MentorshipClient.getSessions(relationshipId),
+        MentorshipClient.getMessages(relationshipId),
+        MentorshipClient.getAuthorizedInsights(relationshipId).catch(() => null),
+      ]);
+      setGoals(g);
+      setTasks(t);
+      setSessions(s);
+      setMessages(m);
+      setInsights(ins);
+      setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.error('Failed to load relationship sub-entities:', err);
+    }
+  }, []);
+
+  const loadInitialData = useCallback(async () => {
+    await syncOverviewData(false);
+  }, [syncOverviewData]);
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    syncOverviewData(false);
+  }, [syncOverviewData]);
 
   useEffect(() => {
     setIsMentorRole(
@@ -172,72 +216,121 @@ export const MentorView: React.FC<MentorViewProps> = ({
       return;
     }
 
-    const loadRelationshipDetails = async () => {
-      try {
-        const [g, t, s, m, ins] = await Promise.all([
-          MentorshipClient.getGoals(selectedRelationship.id),
-          MentorshipClient.getTasks(selectedRelationship.id),
-          MentorshipClient.getSessions(selectedRelationship.id),
-          MentorshipClient.getMessages(selectedRelationship.id),
-          MentorshipClient.getAuthorizedInsights(selectedRelationship.id).catch(() => null),
-        ]);
-        setGoals(g);
-        setTasks(t);
-        setSessions(s);
-        setMessages(m);
-        setInsights(ins);
-      } catch (err) {
-        console.error('Failed to load relationship sub-entities:', err);
+    syncRelationshipDetails(selectedRelationship.id);
+  }, [selectedRelationship?.id, syncRelationshipDetails]);
+
+  // Live background synchronization (active chat/sessions + directory/requests + window focus)
+  useEffect(() => {
+    const overviewTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncOverviewData(true);
+      }
+    }, 20000);
+
+    const detailsTimer = selectedRelationship?.id
+      ? window.setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            syncRelationshipDetails(selectedRelationship.id);
+          }
+        }, 8000)
+      : undefined;
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncOverviewData(true);
+        if (selectedRelationship?.id) {
+          syncRelationshipDetails(selectedRelationship.id);
+        }
       }
     };
 
-    loadRelationshipDetails();
-  }, [selectedRelationship?.id]);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      window.clearInterval(overviewTimer);
+      if (detailsTimer) window.clearInterval(detailsTimer);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [selectedRelationship?.id, syncOverviewData, syncRelationshipDetails]);
 
   // Handlers
   const handleSendMessage = async (content: string, attachedResource?: any) => {
     if (!selectedRelationship) return;
-    const newMsg = await MentorshipClient.sendMessage(selectedRelationship.id, content, attachedResource);
-    setMessages((prev) => [...prev, newMsg]);
+    try {
+      const newMsg = await MentorshipClient.sendMessage(selectedRelationship.id, content, attachedResource);
+      setMessages((prev) => [...prev, newMsg]);
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to send mentorship message.', 'error');
+      throw err;
+    }
   };
 
   const handleCreateGoal = async (goalData: any) => {
     if (!selectedRelationship) return;
-    const newGoal = await MentorshipClient.createGoal(selectedRelationship.id, goalData);
-    setGoals((prev) => [...prev, newGoal]);
+    try {
+      const newGoal = await MentorshipClient.createGoal(selectedRelationship.id, goalData);
+      setGoals((prev) => [...prev, newGoal]);
+      notifyAction('Mentorship milestone created.');
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to create goal.', 'error');
+    }
   };
 
   const handleUpdateGoal = async (goalId: string, updates: Partial<MentorshipGoal>) => {
-    const updated = await MentorshipClient.updateGoal(goalId, updates);
-    setGoals((prev) => prev.map((g) => (g.id === goalId ? updated : g)));
+    try {
+      const updated = await MentorshipClient.updateGoal(goalId, updates);
+      setGoals((prev) => prev.map((g) => (g.id === goalId ? updated : g)));
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to update goal.', 'error');
+    }
   };
 
   const handleCreateTask = async (taskData: any) => {
     if (!selectedRelationship) return;
-    const newTask = await MentorshipClient.createTask(selectedRelationship.id, taskData);
-    setTasks((prev) => [...prev, newTask]);
+    try {
+      const newTask = await MentorshipClient.createTask(selectedRelationship.id, taskData);
+      setTasks((prev) => [...prev, newTask]);
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to create task.', 'error');
+    }
   };
 
   const handleUpdateTask = async (taskId: string, updates: Partial<MentorshipTask>) => {
-    const updated = await MentorshipClient.updateTask(taskId, updates);
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    try {
+      const updated = await MentorshipClient.updateTask(taskId, updates);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to update task.', 'error');
+    }
   };
 
   const handleScheduleSession = async (sessionData: any) => {
-    const newSession = await MentorshipClient.scheduleSession(sessionData);
-    setSessions((prev) => [...prev, newSession]);
+    try {
+      const newSession = await MentorshipClient.scheduleSession(sessionData);
+      setSessions((prev) => [...prev, newSession]);
+      notifyAction('Study session scheduled.');
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to schedule session.', 'error');
+    }
   };
 
   const handleUpdateSession = async (sessionId: string, updates: Partial<MentorshipSession>) => {
-    const updated = await MentorshipClient.updateSession(sessionId, updates);
-    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
-    if (activeSessionForRoom?.id === sessionId) {
-      setActiveSessionForRoom(updated);
+    try {
+      const updated = await MentorshipClient.updateSession(sessionId, updates);
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
+      if (activeSessionForRoom?.id === sessionId) {
+        setActiveSessionForRoom(updated);
+      }
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to update session.', 'error');
     }
   };
 
   const handleSubmitFeedback = async (feedbackData: any) => {
     await MentorshipClient.submitFeedback(feedbackData);
+    notifyAction('Session feedback recorded.');
   };
 
   const handleSubmitRequest = async (requestData: any) => {
@@ -246,24 +339,37 @@ export const MentorView: React.FC<MentorViewProps> = ({
       ...prev,
       sent: [req, ...prev.sent],
     }));
+    notifyAction('Mentorship request submitted live.');
+    syncOverviewData(true);
   };
 
   const handleCancelRequest = async (requestId: string) => {
-    await MentorshipClient.cancelRequest(requestId);
-    setRequests((prev) => ({
-      ...prev,
-      sent: prev.sent.filter((r) => r.id !== requestId),
-    }));
+    try {
+      await MentorshipClient.cancelRequest(requestId);
+      setRequests((prev) => ({
+        ...prev,
+        sent: prev.sent.filter((r) => r.id !== requestId),
+      }));
+      notifyAction('Mentorship request withdrawn.');
+    } catch (err: any) {
+      notifyAction(err?.message || 'Failed to withdraw request.', 'error');
+    }
   };
 
   const handleRespondRequest = async (requestId: string, action: 'ACCEPT' | 'DECLINE', note?: string) => {
-    const result = await MentorshipClient.respondToRequest(requestId, action, note);
-    setPortalData((prev) => ({
-      ...prev,
-      pendingRequests: prev.pendingRequests.filter((r) => r.id !== requestId),
-    }));
-    if (result.relationship) {
-      setRelationships((prev) => [result.relationship!, ...prev]);
+    try {
+      const result = await MentorshipClient.respondToRequest(requestId, action, note);
+      setPortalData((prev) => ({
+        ...prev,
+        pendingRequests: prev.pendingRequests.filter((r) => r.id !== requestId),
+      }));
+      if (result.relationship) {
+        setRelationships((prev) => [result.relationship!, ...prev]);
+      }
+      notifyAction(action === 'ACCEPT' ? 'Mentorship request accepted.' : 'Mentorship request declined.');
+      syncOverviewData(true);
+    } catch (err: any) {
+      notifyAction(err?.message || 'Could not process mentorship decision.', 'error');
     }
   };
 
@@ -271,6 +377,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
     if (!selectedRelationship) return;
     const updated = await MentorshipClient.updatePrivacySettings(selectedRelationship.id, settings);
     setSelectedRelationship((prev) => (prev ? { ...prev, privacySettings: updated } : null));
+    notifyAction('Privacy controls updated.');
   };
 
   const handleTogglePause = async () => {
@@ -327,13 +434,31 @@ export const MentorView: React.FC<MentorViewProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
+      {actionFeedback && (
+        <div
+          role="status"
+          className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 ${
+            actionFeedback.type === 'error'
+              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+              : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+          }`}
+        >
+          <span>{actionFeedback.message}</span>
+          <button type="button" onClick={() => setActionFeedback(null)} className="underline">Dismiss</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1">
               <Compass className="w-3.5 h-3.5" />
               <span>Accredited STEM Mentorship Network</span>
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Live Sync{lastSyncedAt ? ` • ${lastSyncedAt}` : ''}</span>
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
@@ -344,13 +469,26 @@ export const MentorView: React.FC<MentorViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {relationships.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/20">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>{relationships.length} Active Mentor(s)</span>
             </div>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isSyncing || isLoading}
+            onClick={() => {
+              syncOverviewData(true);
+              if (selectedRelationship?.id) syncRelationshipDetails(selectedRelationship.id);
+            }}
+            leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />}
+          >
+            Refresh Live
+          </Button>
         </div>
       </div>
 

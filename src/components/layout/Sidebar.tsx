@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateLevelFromXp } from '../../types/auth';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
 interface SidebarProps {
   activeTab: string;
@@ -224,6 +225,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>L{levelInfo.level}</span>
         </div>
       )}
+
+      {/* PWA Install Button */}
+      <div className="mb-3">
+        <PWAInstallButton compact={isCollapsed} />
+      </div>
 
       {/* Collapse Toggle Footer */}
       <div className="pt-3 border-t border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">

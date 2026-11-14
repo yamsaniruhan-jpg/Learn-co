@@ -22,6 +22,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateFirebaseProfile,
   signOut as fbSignOut,
 } from '../services/firebaseClient';
 
@@ -260,12 +261,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Complete backend flow with Firebase ID Token
       const res = await AuthClient.signIn(email, password, firebaseIdToken);
       await clearMismatchedFirebaseIdentity(res.user?.email);
+
+      // If this account existed only in the local DB, also provision its Firebase Auth account so it is connected to the Firebase console
+      if (!firebaseSignedIn && password && auth?.app && typeof createUserWithEmailAndPassword === 'function') {
+        try {
+          const createdCred = await createUserWithEmailAndPassword(auth, email, password);
+          if (createdCred?.user) {
+            firebaseSignedIn = true;
+            const preferredName = res.profile?.displayName || res.profile?.fullName;
+            if (preferredName && typeof updateFirebaseProfile === 'function') {
+              await updateFirebaseProfile(createdCred.user, { displayName: preferredName }).catch(() => {});
+            }
+          }
+        } catch {
+          // Safe to ignore if email/password provider is disabled or account exists with another provider
+        }
+      }
+
       setUser(res.user);
       setProfile(res.profile);
       syncLocalXpOnly(res.gamification?.xp ?? 0);
       setGamification(res.gamification);
       setSettings(res.settings);
-      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       if (firebaseSignedIn) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-in error */ }
@@ -287,13 +305,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (auth && auth.app) {
             try {
               const cred = await createUserWithEmailAndPassword(auth, email, password);
-              firebaseSignedIn = true;
-              firebaseIdToken = await cred.user.getIdToken();
-            } catch (fbErr: any) {
-              if (fbErr.code === 'auth/email-already-in-use') {
-                const cred = await signInWithEmailAndPassword(auth, email, password);
+              if (cred?.user) {
                 firebaseSignedIn = true;
+                if (fullName && typeof updateFirebaseProfile === 'function') {
+                  await updateFirebaseProfile(cred.user, { displayName: fullName }).catch(() => {});
+                }
                 firebaseIdToken = await cred.user.getIdToken();
+              }
+            } catch (fbErr: any) {
+              if (fbErr?.code === 'auth/email-already-in-use') {
+                const cred = await signInWithEmailAndPassword(auth, email, password);
+                if (cred?.user) {
+                  firebaseSignedIn = true;
+                  firebaseIdToken = await cred.user.getIdToken();
+                }
               }
             }
           }
@@ -310,7 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       syncLocalXpOnly(res.gamification?.xp ?? 0);
       setGamification(res.gamification);
       setSettings(res.settings);
-      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       if (firebaseSignedIn) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-up error */ }
@@ -350,6 +375,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (code === 'auth/unauthorized-domain') {
             throw new Error('This preview domain is not yet authorized for Google popup login. Please sign in with Email & Password.');
           }
+          if (code === 'auth/internal-error' || code === 'auth/operation-not-allowed') {
+            throw new Error('Google Sign-In is not enabled in the Firebase Console. Please enable Google authentication in your Firebase project settings, or sign in with Email & Password.');
+          }
           throw popupErr;
         }
         firebaseSignedIn = true;
@@ -386,7 +414,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (_) {}
       }
-      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       if (firebaseSignedIn) {
         try { await fbSignOut(auth); } catch { /* retain the original Google sign-in error */ }
@@ -439,6 +467,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (updates: Partial<UserProfile>): Promise<UserProfile> => {
     const res = await AuthClient.updateProfile(updates);
     setProfile(res.profile);
+    if (
+      auth?.currentUser &&
+      hasMatchingFirebaseIdentity(auth.currentUser.email, user?.email || res.profile?.email) &&
+      (updates.displayName || updates.fullName) &&
+      typeof updateFirebaseProfile === 'function'
+    ) {
+      await updateFirebaseProfile(auth.currentUser, {
+        displayName: updates.displayName || updates.fullName,
+      }).catch(() => {});
+    }
+    if (user) {
+      await syncClientToFirestore(user, res.profile, gamification).catch(() => {});
+    }
     return res.profile;
   };
 
@@ -451,6 +492,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const uploadAvatar = async (imageData: string): Promise<string> => {
     const res = await AuthClient.uploadAvatar(imageData);
     setProfile(res.profile);
+    if (user) {
+      await syncClientToFirestore(user, res.profile, gamification).catch(() => {});
+    }
     return res.avatarUrl;
   };
 
@@ -458,6 +502,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await AuthClient.saveOnboarding(data);
     setProfile(res.profile);
     if (res.settings) setSettings(res.settings);
+    if (user) {
+      await syncClientToFirestore(user, res.profile, gamification).catch(() => {});
+    }
   };
 
   const updateGamificationState = (newGam: Partial<UserGamification>) => {

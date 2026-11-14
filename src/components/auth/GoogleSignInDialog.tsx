@@ -19,18 +19,18 @@ import { Button } from '../ui/Button';
 interface GoogleSignInDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  initialIntent?: 'signin' | 'signup';
+  initialIntent?: 'signin' | 'signup' | 'auto';
   onSuccess?: () => void;
 }
 
 export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
   isOpen,
   onClose,
-  initialIntent = 'signin',
+  initialIntent = 'auto',
   onSuccess,
 }) => {
   const { signInWithGoogle } = useAuth();
-  const [intent, setIntent] = useState<'signin' | 'signup'>(initialIntent);
+  const [intent, setIntent] = useState<'signin' | 'signup' | 'auto'>(initialIntent);
   const [optionalEmailHint, setOptionalEmailHint] = useState<string>('');
   const [requireExactEmail, setRequireExactEmail] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -54,7 +54,7 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
 
   if (!isOpen) return null;
 
-  const handlePopupGoogleAuth = async (forcedIntent?: 'signin' | 'signup', enforcedEmail?: string) => {
+  const handlePopupGoogleAuth = async (forcedIntent?: 'signin' | 'signup' | 'auto', enforcedEmail?: string) => {
     const activeIntent = forcedIntent || intent;
     const expectedEmail = enforcedEmail ? enforcedEmail.trim().toLowerCase() : undefined;
 

@@ -1,20 +1,29 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, Auth } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile as updateFirebaseProfile,
+  signOut,
+  Auth,
+} from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
-const rawConfig = firebaseConfigData as any;
-const apiKey = rawConfig.apiKey || (import.meta as any).env?.VITE_FIREBASE_API_KEY || '';
+const rawConfig = (firebaseConfigData || {}) as Record<string, string | undefined>;
+const env = (import.meta as any).env || {};
 
 const firebaseConfig = {
-  apiKey,
-  authDomain: rawConfig.authDomain || 'robust-virtue-62t1j.firebaseapp.com',
-  projectId: rawConfig.projectId || 'robust-virtue-62t1j',
-  storageBucket: rawConfig.storageBucket || 'robust-virtue-62t1j.firebasestorage.app',
-  messagingSenderId: rawConfig.messagingSenderId || '645462810395',
-  appId: rawConfig.appId || '1:645462810395:web:ae491364913d7a04157dbe',
-  measurementId: rawConfig.measurementId || '',
+  apiKey: rawConfig.apiKey || env.VITE_FIREBASE_API_KEY || '',
+  authDomain: rawConfig.authDomain || env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: rawConfig.projectId || env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: rawConfig.storageBucket || env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: rawConfig.messagingSenderId || env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: rawConfig.appId || env.VITE_FIREBASE_APP_ID || '',
+  measurementId: rawConfig.measurementId || env.VITE_FIREBASE_MEASUREMENT_ID || '',
 };
 
 let appInstance: FirebaseApp;
@@ -40,6 +49,7 @@ export const auth = authInstance;
 export const db = dbInstance;
 export const storage = storageInstance;
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Store the original under the authenticated Firebase UID; do not create a public
 // download-token URL. A bounded upload keeps an unavailable bucket from blocking intake.
@@ -52,4 +62,10 @@ export async function uploadUserFile(userId: string, sourceId: string, file: Fil
   try { await task; } finally { clearTimeout(timer); }
 }
 
-export { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut };
+export {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateFirebaseProfile,
+  signOut,
+};

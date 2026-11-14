@@ -28,12 +28,13 @@ export async function syncClientToFirestore(
 
     const uid = backendUid || firestoreUid!;
     const email = user?.email || profile?.email || (firebaseMatches ? currentAuthUser?.email : '') || '';
-    const displayName =
+    const displayName = (
       profile?.displayName ||
       profile?.fullName ||
       user?.name ||
       (firebaseMatches ? currentAuthUser?.displayName : '') ||
-      (email ? email.split('@')[0] : 'Scholar');
+      (email ? email.split('@')[0] : 'Scholar')
+    ).trim().slice(0, 120) || 'Scholar';
 
     const avatarUrl =
       profile?.avatarUrl ||
@@ -41,14 +42,16 @@ export async function syncClientToFirestore(
       `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || uid)}`;
 
     const now = new Date().toISOString();
-    const xpVal = typeof gamification?.xp === 'number' ? Math.max(0, gamification.xp) : 0;
-    const levelVal =
+    const xpVal = Math.min(10000000, typeof gamification?.xp === 'number' ? Math.max(0, Math.round(gamification.xp)) : 0);
+    const levelVal = Math.min(
+      1000,
       typeof gamification?.level === 'number' && gamification.level >= 1
-        ? gamification.level
-        : calculateLevelFromXp(xpVal).level;
-    const streakVal = typeof gamification?.currentStreak === 'number' ? Math.max(0, gamification.currentStreak) : 0;
+        ? Math.round(gamification.level)
+        : calculateLevelFromXp(xpVal).level
+    );
+    const streakVal = Math.min(10000, typeof gamification?.currentStreak === 'number' ? Math.max(0, Math.round(gamification.currentStreak)) : 0);
 
-    // 1. Direct Firestore writes only when Firebase Auth user is signed in (matches firestore.rules isOwner)
+    // 1. Direct Firestore writes when Firebase Auth user is signed in (matches firestore.rules isOwner)
     if (db && firestoreUid) {
       // Sync User Document to 'users' collection
       try {
@@ -57,17 +60,24 @@ export async function syncClientToFirestore(
           userDocRef,
           {
             id: firestoreUid,
+            backendUserId: uid,
             email,
             displayName,
+            fullName: profile?.fullName || displayName,
+            avatarUrl,
             authProvider: user?.authProvider || 'firebase',
             xp: xpVal,
             level: levelVal,
+            targetExam: profile?.targetExam || 'STEM Mastery',
+            educationLevel: profile?.educationLevel || 'Undergraduate',
+            onboardingStatus: profile?.onboardingStatus || 'COMPLETED',
+            lastLoginAt: now,
             updatedAt: now,
           },
           { merge: true }
         );
-      } catch (e) {
-        console.debug('[ClientFirestoreSync] Note on users collection sync:', e);
+      } catch (e: any) {
+        console.warn('[ClientFirestoreSync] users collection sync warning:', e?.message || e);
       }
 
       // Sync Public Profile Document to 'public_profiles' collection
@@ -77,7 +87,7 @@ export async function syncClientToFirestore(
           profileDocRef,
           {
             userId: firestoreUid,
-            displayName: displayName.slice(0, 120) || 'Scholar',
+            displayName,
             avatarUrl,
             targetExam: profile?.targetExam || 'STEM Mastery',
             targetScore: profile?.targetScore || '100%',
@@ -88,8 +98,8 @@ export async function syncClientToFirestore(
           },
           { merge: true }
         );
-      } catch (e) {
-        console.debug('[ClientFirestoreSync] Note on public_profiles collection sync:', e);
+      } catch (e: any) {
+        console.warn('[ClientFirestoreSync] public_profiles collection sync warning:', e?.message || e);
       }
 
       // Sync Leaderboard Document to 'leaderboard' collection
@@ -99,7 +109,7 @@ export async function syncClientToFirestore(
           leaderboardDocRef,
           {
             userId: firestoreUid,
-            displayName: displayName.slice(0, 120) || 'Scholar',
+            displayName,
             avatarUrl,
             xp: xpVal,
             level: levelVal,
@@ -109,14 +119,14 @@ export async function syncClientToFirestore(
           },
           { merge: true }
         );
-      } catch (e) {
-        console.debug('[ClientFirestoreSync] Note on leaderboard collection sync:', e);
+      } catch (e: any) {
+        console.warn('[ClientFirestoreSync] leaderboard collection sync warning:', e?.message || e);
       }
     }
 
     // 2. Dual-write to backend dataset when authenticated to ensure permanent persistence across server restarts
     try {
-      const token = localStorage.getItem('learnco_auth_token');
+      const token = localStorage.getItem('learnco_auth_token') || localStorage.getItem('auth_token');
       if (token) {
         await fetch('/api/leaderboard/sync', {
           method: 'POST',
@@ -137,7 +147,7 @@ export async function syncClientToFirestore(
       }
     } catch (_) {}
   } catch (err: any) {
-    console.debug('[ClientFirestoreSync] Global sync note:', err?.message || err);
+    console.warn('[ClientFirestoreSync] Global sync note:', err?.message || err);
   }
 }
 
