@@ -20,6 +20,7 @@ import {
   RefreshCw,
   KeyRound,
   ShieldAlert,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../ui/Card';
@@ -264,6 +265,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
             <span className="font-semibold">{localError || authError}</span>
           </div>
+          {typeof window !== 'undefined' &&
+            window.self !== window.top &&
+            /google|popup|frame|tab|unauthorized/i.test(localError || authError || '') && (
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-200 hover:bg-rose-100/70 dark:hover:bg-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open App in New Tab for Google Sign-In</span>
+              </a>
+            )}
           {accountNotFoundPrompt && activeMode === 'signin' && (
             <button
               type="button"

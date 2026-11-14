@@ -23,6 +23,7 @@ export const securityHeaders = helmet({
         "https://securetoken.googleapis.com",
         "https://www.googleapis.com",
         "https://accounts.google.com",
+        "https://www.gstatic.com",
         "https://robust-virtue-62t1j.firebaseapp.com",
         "https://*.firebaseapp.com",
         "wss://firestore.googleapis.com",
@@ -34,6 +35,7 @@ export const securityHeaders = helmet({
       frameSrc: [
         "'self'",
         "https://accounts.google.com",
+        "https://apis.google.com",
         "https://robust-virtue-62t1j.firebaseapp.com",
         "https://*.firebaseapp.com",
       ],

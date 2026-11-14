@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   CreatorResourceType,
   SourceType,
@@ -79,6 +79,15 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   // Drag & drop state
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const synthesisTypes: Array<{
     type: CreatorResourceType;
@@ -172,19 +181,36 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
 
-  const readFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read file.'));
-    reader.onerror = () => reject(new Error('Could not read file.'));
-    reader.readAsDataURL(file);
-  });
+  const readFile = async (file: File): Promise<string> => {
+    if (typeof file.arrayBuffer === 'function') {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      const mime = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
+      return `data:${mime};base64,${btoa(binary)}`;
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read file.'));
+      reader.onerror = () => reject(new Error('Could not read file.'));
+      reader.readAsDataURL(file);
+    });
+  };
 
-  const readTextFile = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read text file.'));
-    reader.onerror = () => reject(new Error('Could not read text file.'));
-    reader.readAsText(file);
-  });
+  const readTextFile = async (file: File): Promise<string> => {
+    if (typeof file.text === 'function') {
+      return file.text();
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read text file.'));
+      reader.onerror = () => reject(new Error('Could not read text file.'));
+      reader.readAsText(file);
+    });
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -252,35 +278,45 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isUploading || isGenerating) return;
+    isSubmittingRef.current = true;
 
-    setIntakeError('');
-    let sourceId = prefillSource?.sourceType === sourceType ? prefillSource?.sourceId : undefined;
-    if (sourceType === 'pdf' && uploadedFile) {
-      try {
-        sourceId = await uploadSelectedFile();
-      } catch (err: any) {
-        setIntakeError(err?.message || 'Could not save uploaded file.');
-        return;
+    try {
+      setIntakeError('');
+      let sourceId = prefillSource?.sourceType === sourceType ? prefillSource?.sourceId : undefined;
+      if (sourceType === 'pdf' && uploadedFile) {
+        try {
+          sourceId = await uploadSelectedFile();
+        } catch (err: any) {
+          if (isMountedRef.current) {
+            setIntakeError(err?.message || 'Could not save uploaded file.');
+          }
+          return;
+        }
       }
+
+      if (!isMountedRef.current) return;
+
+      const payload: GenerateResourceRequest = {
+        sourceId,
+        sourceType,
+        sourceText: sourceType === 'text' ? textContent : undefined,
+        sourceUrl: sourceType === 'url' ? urlInput : undefined,
+        resourceType: selectedResourceType,
+        title: title.trim() || `Mastery ${selectedResourceType.replace(/_/g, ' ')}`,
+        subjectId,
+        difficulty,
+        options: {
+          depthLevel,
+          includeFormulas,
+          includeBloomTaxonomy,
+        },
+      };
+
+      await onGenerate(payload);
+    } finally {
+      isSubmittingRef.current = false;
     }
-
-    const payload: GenerateResourceRequest = {
-      sourceId,
-      sourceType,
-      sourceText: sourceType === 'text' ? textContent : undefined,
-      sourceUrl: sourceType === 'url' ? urlInput : undefined,
-      resourceType: selectedResourceType,
-      title: title.trim() || `Mastery ${selectedResourceType.replace(/_/g, ' ')}`,
-      subjectId,
-      difficulty,
-      options: {
-        depthLevel,
-        includeFormulas,
-        includeBloomTaxonomy,
-      },
-    };
-
-    await onGenerate(payload);
   };
 
   return (

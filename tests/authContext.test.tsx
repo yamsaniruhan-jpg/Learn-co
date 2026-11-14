@@ -15,6 +15,7 @@ vi.mock('../src/services/clientFirestoreSync', () => ({
 }));
 vi.mock('../src/services/firebaseClient', () => ({
   auth: mocks.auth, googleProvider: {}, signInWithPopup: vi.fn(),
+  signInWithRedirect: vi.fn(), getRedirectResult: vi.fn(async () => null),
   signInWithEmailAndPassword: mocks.firebaseSignIn, createUserWithEmailAndPassword: vi.fn(), signOut: mocks.firebaseSignOut,
 }));
 import { AuthProvider, useAuth } from '../src/context/AuthContext';

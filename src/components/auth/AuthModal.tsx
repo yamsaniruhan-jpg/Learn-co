@@ -12,6 +12,7 @@ import {
   EyeOff,
   GraduationCap,
   UserPlus,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { GoogleSignInDialog } from './GoogleSignInDialog';
@@ -243,6 +244,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{localError || authError}</span>
                 </div>
+                {typeof window !== 'undefined' &&
+                  window.self !== window.top &&
+                  /google|popup|frame|tab|unauthorized/i.test(localError || authError || '') && (
+                    <a
+                      href={window.location.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 w-full py-1.5 px-3 rounded-lg bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-200 hover:bg-rose-100/70 dark:hover:bg-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open App in New Tab for Google Sign-In</span>
+                    </a>
+                  )}
                 {accountNotFoundPrompt && mode === 'signin' && (
                   <button
                     type="button"

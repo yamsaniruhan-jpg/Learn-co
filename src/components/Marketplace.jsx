@@ -58,11 +58,14 @@ export default function Marketplace() {
     try {
       const params = new URLSearchParams({ query, subject, difficulty, sort });
       const res = await apiCall(`/marketplace/search?${params}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Marketplace request failed (${res.status})`);
+      }
       setCourses(data.courses || []);
     } catch (error) {
       console.error('Search error:', error);
-      showToast('Could not load marketplace courses.', 'error');
+      showToast(error?.message || 'Could not load marketplace courses.', 'error');
     } finally {
       setLoading(false);
     }
