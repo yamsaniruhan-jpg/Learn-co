@@ -307,19 +307,28 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
     if (!textToSend || isStreaming) return;
 
     setInputPrompt('');
+    setStatusNotice(null);
+    setIsStreaming(true);
 
     // Ensure we have an active conversation
     let currentConvId = activeConversationId;
     if (!currentConvId) {
-      const newConv = await CopilotClient.createConversation({
-        title: textToSend.slice(0, 40),
-        mode: activeMode,
-        learnerLevel: learnerLevel,
-      });
-      currentConvId = newConv.id;
-      setActiveConversationId(newConv.id);
-      setActiveConversation(newConv);
-      setConversations((prev) => [newConv, ...prev]);
+      try {
+        const newConv = await CopilotClient.createConversation({
+          title: textToSend.slice(0, 40),
+          mode: activeMode,
+          learnerLevel: learnerLevel,
+        });
+        currentConvId = newConv.id;
+        setActiveConversationId(newConv.id);
+        setActiveConversation(newConv);
+        setConversations((prev) => [newConv, ...prev]);
+      } catch {
+        setInputPrompt(textToSend);
+        setIsStreaming(false);
+        setStatusNotice({ type: 'error', message: 'Could not start a conversation. Check your connection and try again.' });
+        return;
+      }
     }
 
     // Append user message immediately
@@ -399,8 +408,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             // Refresh conversation title & snippet in list
             loadConversations();
           },
-          onError: (errMsg) => {
-            console.error('Streaming error received:', errMsg);
+          onError: () => {
+            setStatusNotice({ type: 'error', message: 'The response could not be completed. Check the conversation before retrying.' });
             setIsStreaming(false);
           },
         },
@@ -408,7 +417,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       );
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        console.error('Failed in Copilot stream:', err);
+        setStatusNotice({ type: 'error', message: 'The response could not be completed. Check the conversation before retrying.' });
       }
       setIsStreaming(false);
     }
@@ -561,6 +570,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
         {/* Inline Status Notice Banner */}
         {statusNotice && (
           <div
+            role={statusNotice.type === 'error' ? 'alert' : 'status'}
             className={`px-4 py-2 border-b flex items-center justify-between text-xs shrink-0 ${
               statusNotice.type === 'error'
                 ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200'

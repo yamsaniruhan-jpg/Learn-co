@@ -1,28 +1,33 @@
 import { useState, useEffect } from 'react';
+import { calculateLevelFromXp } from '../types/auth';
+import { syncLocalXpOnly } from './xpManager';
 
 export interface PendingOfflineAttempt {
   id: string;
+  userId?: string; // Older unowned entries are retained but never auto-synced.
+  conceptId?: string;
+  hintsUsedCount?: number;
   questionId: string;
   subjectId: string;
   topic: string;
-  userAnswer: string;
+  userAnswer: string | number | string[];
   isCorrect: boolean;
   timeSpentSeconds: number;
   timestamp: string;
 }
 
 const STORAGE_KEY_PENDING_ATTEMPTS = 'learnco_offline_pending_attempts';
-const STORAGE_KEY_CACHED_CURRICULUM = 'learnco_offline_cached_curriculum';
 
 export class OfflineStorageManager {
   /**
    * Save an attempt made while offline
    */
-  static saveOfflineAttempt(attempt: Omit<PendingOfflineAttempt, 'id' | 'timestamp'>): void {
+  private static syncing: Promise<number> | null = null;
+
+  static saveOfflineAttempt(attempt: Omit<PendingOfflineAttempt, 'timestamp'>): void {
     const list = this.getPendingAttempts();
     const newEntry: PendingOfflineAttempt = {
       ...attempt,
-      id: `offline-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: new Date().toISOString(),
     };
     list.push(newEntry);
@@ -36,7 +41,8 @@ export class OfflineStorageManager {
   static getPendingAttempts(): PendingOfflineAttempt[] {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PENDING_ATTEMPTS);
-      return saved ? JSON.parse(saved) : [];
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -45,47 +51,71 @@ export class OfflineStorageManager {
   /**
    * Sync pending offline attempts back to the server
    */
-  static async syncPendingAttemptsToServer(): Promise<number> {
+  static syncPendingAttemptsToServer(): Promise<number> {
+    if (this.syncing) return this.syncing;
+    const task = this.performSync();
+    this.syncing = task;
+    task.finally(() => { if (this.syncing === task) this.syncing = null; }).catch(() => {});
+    return task;
+  }
+
+  private static async performSync(): Promise<number> {
     const attempts = this.getPendingAttempts();
-    if (attempts.length === 0) return 0;
-
     const token = localStorage.getItem('learnco_auth_token');
-    if (!token) return 0;
+    let userId: string | undefined;
+    try { userId = JSON.parse(localStorage.getItem('learnco_user') || 'null')?.id; } catch { /* No trusted account context. */ }
+    if (!token || !userId) return 0;
+    // Bind the local account label to the server session, including during a
+    // sign-in transition or when browser storage is stale.
+    try {
+      const session = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (!session.ok || (await session.json())?.user?.id !== userId || localStorage.getItem('learnco_auth_token') !== token) return 0;
+    } catch { return 0; }
 
-    let syncedCount = 0;
-    const remainingAttempts: PendingOfflineAttempt[] = [];
-
+    const syncedIds = new Set<string>();
     for (const item of attempts) {
+      // Unowned legacy items cannot be safely attributed to an account.
+      if (item.userId !== userId || !item.id) continue;
+      if (localStorage.getItem('learnco_auth_token') !== token) break;
       try {
-        const res = await fetch('/api/copilot/practice/submit', {
+        const res = await fetch('/api/practice/submit-attempt', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            questionId: item.questionId,
-            subjectId: item.subjectId,
-            topic: item.topic,
-            userAnswer: item.userAnswer,
-            isCorrect: item.isCorrect,
-            timeSpentSeconds: item.timeSpentSeconds,
+            attemptId: item.id, questionId: item.questionId, subjectId: item.subjectId,
+            topicId: item.topic, conceptId: item.conceptId, selectedAnswer: item.userAnswer,
+            isCorrect: item.isCorrect, timeSpentSeconds: item.timeSpentSeconds,
+            hintsUsedCount: item.hintsUsedCount,
           }),
         });
-
         if (res.ok) {
-          syncedCount++;
-        } else {
-          remainingAttempts.push(item);
+          const result = await res.json().catch(() => null);
+          // An HTML shell, proxy response or malformed 200 is not an
+          // acknowledgement. Keep the stable ID for an idempotent retry.
+          if (result?.success !== true || result.attempt?.id !== item.id ||
+              typeof result.isCorrect !== 'boolean' ||
+              (result.verification !== 'bank' && result.verification !== 'unverified') ||
+              typeof result.newTotalXp !== 'number' || !Number.isFinite(result.newTotalXp)) continue;
+          syncedIds.add(item.id);
+          // A successful retry may award server XP. Update the display only if
+          // the same account and session are still active after the response.
+          let currentId: string | undefined;
+          try { currentId = JSON.parse(localStorage.getItem('learnco_user') || 'null')?.id; } catch { /* No account context. */ }
+          if (localStorage.getItem('learnco_auth_token') === token && currentId === userId) {
+            const totalXp = syncLocalXpOnly(result.newTotalXp, userId);
+            window.dispatchEvent(new CustomEvent('learnco_xp_awarded', {
+              detail: { amount: 0, reason: 'Offline sync', totalXp, level: calculateLevelFromXp(totalXp).level },
+            }));
+          }
         }
-      } catch {
-        remainingAttempts.push(item);
-      }
+      } catch { /* Keep the item for a later retry. */ }
     }
 
-    localStorage.setItem(STORAGE_KEY_PENDING_ATTEMPTS, JSON.stringify(remainingAttempts));
+    // Re-read to preserve entries queued while the requests were in flight.
+    const remaining = this.getPendingAttempts().filter(item => !(item.userId === userId && syncedIds.has(item.id)));
+    localStorage.setItem(STORAGE_KEY_PENDING_ATTEMPTS, JSON.stringify(remaining));
     window.dispatchEvent(new CustomEvent('learnco_offline_queue_updated'));
-    return syncedCount;
+    return syncedIds.size;
   }
 
   /**
@@ -119,7 +149,7 @@ export function useNetworkStatus(): {
 
     const handleOnline = async () => {
       setIsOnline(true);
-      await OfflineStorageManager.syncPendingAttemptsToServer();
+      try { await OfflineStorageManager.syncPendingAttemptsToServer(); } catch { /* Keep pending data for retry. */ }
       refreshCount();
     };
 

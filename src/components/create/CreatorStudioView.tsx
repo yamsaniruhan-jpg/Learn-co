@@ -6,6 +6,8 @@ import {
   GenerateResourceRequest,
 } from '../../types/creator';
 import { CreatorClient } from '../../services/creatorClient';
+import { AuthClient } from '../../services/authClient';
+import { creatorPracticeTransferKey } from '../../utils/creatorPracticeTransfer';
 import { SourceIntakePanel } from './SourceIntakePanel';
 import { ResourceViewer } from './ResourceViewer';
 import { ResourceLibrary } from './ResourceLibrary';
@@ -155,7 +157,9 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         },
       ]);
       setActiveTab('synthesizer');
-      showToast(`Successfully synthesized "${newResource.title}"!`);
+      showToast(newResource.tags?.includes('template-generated')
+        ? 'AI is unavailable. A template-based draft was created; please review it carefully.'
+        : `Successfully synthesized "${newResource.title}"!`);
 
       // Refresh sources in background
       CreatorClient.getSources().then(setSources).catch(() => {});
@@ -241,10 +245,16 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   // Add resource to Practice Arena
   const handleAddToPractice = async (res: CreatorResource) => {
     try {
+      const accountId = AuthClient.getCurrentUser()?.id;
+      const token = AuthClient.getToken();
+      if (!accountId || !token) throw new Error('Sign in to transfer this resource to practice.');
       const result = await CreatorClient.addToPractice(res.id);
+      if (AuthClient.getCurrentUser()?.id !== accountId || AuthClient.getToken() !== token) {
+        throw new Error('Your session changed before the transfer completed. Please try again.');
+      }
       if (result.questions && result.questions.length > 0) {
         localStorage.setItem(
-          'learnco_creator_practice_session',
+          creatorPracticeTransferKey(accountId),
           JSON.stringify({
             resourceId: res.id,
             resourceTitle: res.title,
@@ -257,7 +267,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       showToast(result.message || 'Transferred to Practice Arena! Redirecting...');
       if (onNavigateToPractice) {
         setTimeout(() => {
-          onNavigateToPractice();
+          if (AuthClient.getCurrentUser()?.id === accountId && AuthClient.getToken() === token) onNavigateToPractice();
         }, 500);
       }
     } catch (err: any) {

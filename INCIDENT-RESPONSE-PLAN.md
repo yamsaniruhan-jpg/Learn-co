@@ -1,0 +1,73 @@
+# LearnCo tracked-data incident: backup and response plan
+
+**Status: investigation selected; containment and other consequential actions not authorized for execution.** The owner selected investigation before choosing targeted or broad revocation, and selected Firestore with a staging-first approach for future storage work. No sessions or credentials have been changed, no backup has been taken, no Git history has been rewritten, and no live system or cloud resource has been modified. The owner previously requested that `.learnco_db.json` and `server/db.ts` be restored; neither will be removed or altered without a separate, explicit decision. See `FIRESTORE-STAGING-PLAN.md` for the proposed staging design and outstanding choices.
+
+## 1. What we know and what remains unknown
+
+- The GitHub repository `yamsaniruhan-jpg/Learn-co` was confirmed **public** through repository metadata. `.learnco_db.json` is tracked despite its `.gitignore` entry. A metadata-only GitHub query reports four commits touching that path on the default-branch history; this checkout is shallow, so its local history is not a complete inventory. GitHub reported zero forks at the time of the query, but that does not rule out past forks, clones, downloads, caches, backups or other exposure.
+- Prior metadata-only inspection found account records, password hashes and bearer-session records in the tracked file. Their actual exposure, current validity and relationship to any live deployment are **unknown**. Treat the historical contents as potentially compromised; do not reproduce credentials, hashes, tokens, account identifiers or the file contents in tickets, chat, logs or reports.
+- The earlier audit observed that a development server could expose the file; a repository fix now blocks tested paths, but the running deployment's version, access logs and configuration have not been verified. Git history cleanup alone cannot invalidate already copied credentials.
+- The app has a process-local JSON store. `LEARNCO_DB_FILE` selects its path; otherwise the app uses `.learnco_db.json` in the working directory. Persistence can be asynchronous and is not transactional across instances. Actual production data stores, replicas, backups, service accounts and deployed versions are not known. Do not assume Cloud SQL is required or disable it.
+- Local bearer sessions are stored in the JSON database with a 30-day expiration. Sign-out revokes one local token; password reset revokes the user's existing local sessions and issues a new one. These code paths are not proof that any production store has been changed. The app also accepts Firebase ID tokens; normal token verification does not check revocation, and successful non-owner verifications can be cached in each process for up to five minutes. Provider-side refresh-token revocation alone therefore must not be assumed to invalidate every already-issued ID token immediately.
+
+## 2. Decisions required before execution
+
+Obtain explicit, recorded owner approval for each applicable item, with the environment and time window named:
+
+1. **Incident scope and containment:** identify the actual deployment(s), data owners and responders. Approve any temporary maintenance/read-only period, access restriction or other operational containment. Do not alter availability without approval.
+2. **Backup location and retention:** designate an owner-controlled encrypted location outside Git, public web roots, build artifacts and this workspace; specify access, retention, legal hold and who may authorize restoration/deletion. Confirm a secure way to check restoration in an isolated environment without exposing personal data.
+3. **Session and account action:** choose targeted revocation after identifying affected accounts or a broader forced sign-out, including which environments and authentication providers are covered. Approve affected local-account password resets and a verified recovery channel. Users may be signed out and may temporarily lose access. Do not request or collect their passwords, bearer tokens or reset links in chat.
+4. **Repository remediation:** separately approve untracking the current file, preserving application data externally, and (if desired) a coordinated history rewrite or provider-assisted purge. History rewriting changes commit IDs, disrupts branches/PRs/clones and may not remove forks, caches or backups. The active Arena branch name is fixed; any rewrite of other refs requires a separately coordinated repository-owner procedure outside this session's branch restrictions. Do not run force pushes, branch changes, history rewriting or deletion under this plan's preparation approval.
+5. **Cloud/provider changes and communication:** authorize any Firebase/provider token revocation, deployment/rules changes, incident notifications and legal/privacy review separately. Confirm actual access by secure means; no cloud credentials should be placed in the repository or chat.
+
+## 3. Proposed response sequence
+
+### A. Triage and preserve evidence
+
+- Assign an incident owner and record times, scope, decisions and access in a restricted incident record. Limit raw evidence to responders with a need to know. Preserve relevant access/deployment/audit logs under appropriate retention and legal guidance; search using protected tools and report only aggregate results. Lack of logs or zero forks is not evidence of no exposure.
+- Inventory all relevant Git refs, pull requests, release/build artifacts, CI logs and caches, deployment images, volumes, configured JSON file locations and any actual database/Firebase mirrors and backups. Identify whether the tracked snapshot or its credentials were ever loaded into each deployment. Do not fetch, export or copy sensitive records into the repository to perform this inventory.
+- Investigate whether the vulnerable Creator-to-Practice endpoint was deployed: prior code added creator questions to a process-global searchable bank and could classify their submissions as bank-verified. Determine possible access and affected content using authorized logs and aggregate reporting; scope is unknown. The branch fix does not retroactively remove exposure, reconcile historical awards or change a running deployment.
+- Evaluate the risk of public historical exposure and whether urgent temporary restrictions are warranted. Coordinate with the owner before changing service or repository visibility. If existing development or production hosts could still serve the data, restrict access through the approved operational channel and independently verify without returning the file contents.
+
+### B. Back up and validate before modifying data
+
+- Identify the authoritative data source per environment; an old Git snapshot is not necessarily the latest production database. Record the source, timestamp, software version, owner, backup encryption/access and retention policy in the restricted incident record. Include configured stores only after inventory, not by assumption.
+- For the JSON store, schedule a write freeze/maintenance window or an approved consistent snapshot mechanism; account for all app instances and in-flight asynchronous writes. Take an encrypted, access-controlled snapshot of the authoritative file and relevant configuration metadata, never secrets in plaintext logs. For other stores, use their approved consistent backup/export mechanism. Protect the backup as compromised-sensitive evidence, not as a normal public artifact.
+- Verify backup integrity and restore **a copy** in an isolated, non-public environment with external integrations disabled. Confirm representative aggregate counts and required user, profile and learning records without disclosing personal values. Test application startup and representative data retrieval using synthetic credentials. Document the restore point and verification result. Do not treat this as proof of a production restore until the owner tests the actual procedure.
+- **Critical rollback rule:** restoring an old snapshot must not reintroduce revoked bearer sessions, reset tokens, compromised passwords or vulnerable configuration. Design and test a restore procedure that excludes/invalidates old sessions and reset records and preserves the post-incident credential state; if those controls cannot be verified, do not restore the snapshot into production. A backup is not a reason to retain usable credentials.
+
+### C. Contain credentials and recover accounts
+
+- Determine affected accounts in the private incident environment. For each approved scope, implement and test a revocation mechanism against an isolated copy first, with idempotency, complete disk flush, error reporting, restart verification and no token logging. Coordinate all running instances; the current process-local in-memory model means editing a file beneath a running server or revoking in just one process is not sufficient and could be overwritten. Verify the selected authoritative store and mirrors independently.
+- Use **synthetic canary accounts and tokens created for the test** to verify that pre-revocation local tokens fail after the change and after restart, new authorized sessions work, and unaffected accounts behave as approved. Do not use or print tokens found in the exposed file. Decide whether a forced global sign-out or affected-account revocation is necessary based on the inventory and owner approval.
+- Treat potentially exposed password hashes as compromised. Verify ownership and recovery channels before forcing affected users to reset credentials, use short-lived single-use recovery links, and test email delivery without exposing links. Existing fallback behavior logs reset links when mail is unavailable; do not rely on unrestricted logs for recovery. Investigate legacy hash format and shared/reused passwords with appropriate caution; never try to crack hashes as part of this plan. A local password reset does not by itself revoke Firebase/provider sessions.
+- Where Firebase is actually used, assess separately whether provider refresh-token revocation and application changes to enforce revocation checks across all instances are needed. Account for cached and already-issued ID tokens, provider availability and outage behavior. Test in staging with synthetic accounts and confirm the maximum residual validity before claiming full revocation. Coordinate Google/Firebase recovery independently of local password accounts.
+- Verify legitimate owner/admin recovery using a genuinely verified identity, while checking any preexisting account takeover. Local mocked tests are not evidence of live Google/Firebase behavior. Preserve an independently controlled emergency admin recovery route before revoking privileged access.
+
+### D. Remove future exposure, then address history
+
+- After verified backup and a separately approved rollout, use a data path outside served/build directories with restrictive filesystem and backup permissions. Verify deployment configuration, ignore rules, CI artifacts and developer workflows do not reintroduce the file. Do not delete the working data file merely because it is ignored. Verify application continuity and recovery against the chosen data location.
+- Only with explicit approval, remove the sensitive file from tracking **without destroying the working data**, and review the resulting changes on the current branch. This stops future versions from being committed, but does not sanitize previous commits.
+- If the owner approves a history rewrite, use a documented provider-supported procedure in a separate, appropriately controlled administrative environment: inventory every affected ref, coordinate protected branches and open work, create an encrypted restricted pre-rewrite backup, rewrite all relevant history, involve GitHub support for cached references where applicable, and coordinate fresh clones or other remediation for collaborators. Do not claim historical copies, forks, third-party caches or old backups have been erased. Maintain a way to recover code without re-exposing sensitive data; re-scan rewritten refs and build artifacts without printing secrets. Force pushes and branch/history changes are not authorized by approval to prepare this document.
+
+### E. Validate, communicate and close
+
+- Verify local and provider revocation with synthetic accounts across every instance and after restart; test sign-in, recovery, role checks, preserved learning data, backup restore controls and application health. Check that file paths and representative inaccessible routes are no longer publicly served. Retest actual deployed security rules and logs in staging/production as separately authorized.
+- Provide affected users and operators with a factual, minimally identifying notice, recovery steps, support contact and expected disruption. Have privacy/legal counsel assess notification obligations and deadlines for relevant jurisdictions; this document is not legal advice. Record unknowns and evidence retention decisions.
+- Close only when the owner accepts the residual risk and verifies data recovery, session/credential containment, deployment controls, history remediation scope, monitoring and user communications. If any item is unverified, keep it open.
+
+## 4. Suggested approval record
+
+| Decision | Owner's choice / evidence | Status |
+| --- | --- | --- |
+| Production environments, incident owner and maintenance window | To be provided | Pending |
+| Encrypted backup location, retention and restore tester | To be provided | Pending |
+| Targeted versus broad local session revocation and account resets | To be selected | Pending |
+| Firebase/provider scope and revocation-check rollout | To be confirmed | Pending |
+| Untracking the current file while preserving working data | Explicit approval required | Pending |
+| History rewrite, force pushes and GitHub support coordination | Separate explicit approval required | Pending |
+| User notifications and privacy/legal review | To be assigned | Pending |
+
+## 5. Evidence and boundaries
+
+Repository inspection, metadata-only GitHub queries and earlier isolated tests inform this plan. No live service, provider settings, actual production database, logs, backups or customer sessions have been inspected here. The reported prior database counts are historical observations, not a current affected-user count. The audit and this plan do not establish compromise, lack of compromise or incident completion. See `AUDIT-CURRENT.md` and `AUDIT-CLOUD-SECURITY.md` for broader findings and limitations.

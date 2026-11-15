@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getToken: vi.fn(), getMe: vi.fn(), removeToken: vi.fn(), signIn: vi.fn(),
+  getToken: vi.fn(), getMe: vi.fn(), removeToken: vi.fn(), signIn: vi.fn(), setCurrentUser: vi.fn(),
   auth: { app: {}, currentUser: null as null | { email: string } },
   firebaseSignIn: vi.fn(), firebaseSignOut: vi.fn(async () => {}),
 }));
@@ -26,7 +26,9 @@ let root: ReturnType<typeof createRoot>;
 
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  localStorage.clear();
   mocks.getToken.mockReset(); mocks.getMe.mockReset(); mocks.removeToken.mockReset(); mocks.signIn.mockReset();
+  mocks.setCurrentUser.mockReset();
   mocks.firebaseSignIn.mockReset(); mocks.firebaseSignOut.mockClear(); mocks.auth.currentUser = null;
   container = document.createElement('div'); document.body.appendChild(container);
   root = createRoot(container);
@@ -34,6 +36,20 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 describe('session refresh failures', () => {
+  it('retains the verified account’s device activity when refreshing server XP', async () => {
+    localStorage.setItem('learnco_auth_token', 'stored-session');
+    localStorage.setItem('learnco_user', JSON.stringify({id: 'old-account'}));
+    localStorage.setItem('learnco_xp_v2:account:alice:activity', '40');
+    localStorage.setItem('learnco_xp_v2:account:old-account:activity', '900');
+    mocks.getToken.mockReturnValue('stored-session');
+    mocks.getMe.mockResolvedValue({ user: {id: 'alice'}, profile: null, settings: null, gamification: {userId: 'alice', xp: 20, level: 1} });
+    await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
+    expect(mocks.setCurrentUser).toHaveBeenCalledWith({id: 'alice'});
+    expect(snapshot.gamification?.xp).toBe(60);
+    expect(localStorage.getItem('learnco_xp_v2:account:alice:server')).toBe('20');
+    expect(localStorage.getItem('learnco_xp_v2:account:old-account:server')).toBeNull();
+  });
+
   it('preserves a stored token during a temporary server failure', async () => {
     mocks.getToken.mockReturnValue('stored-session');
     mocks.getMe.mockRejectedValue(Object.assign(new Error('service unavailable'), { status: 503 }));

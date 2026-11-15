@@ -28,7 +28,12 @@ describe('Firestore identity isolation', () => {
     mocks.auth.currentUser = { uid: 'firebase-a', email: 'ALICE@example.test' };
     vi.stubGlobal('localStorage', { getItem: () => null });
     await syncClientToFirestore({ id: 'local-a', email: 'alice@example.test' }, null, null);
-    expect(mocks.setDoc).toHaveBeenCalledTimes(3);
+    expect(mocks.setDoc).toHaveBeenCalledTimes(2);
+    expect(mocks.setDoc.mock.calls.every((call: any) => call[0].collection !== 'leaderboard')).toBe(true);
+    for (const call of mocks.setDoc.mock.calls as any[]) {
+      expect(call[1]).not.toHaveProperty('xp');
+      expect(call[1]).not.toHaveProperty('level');
+    }
   });
 
   it('does not send XP to an unrelated Firebase identity', async () => {

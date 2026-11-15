@@ -14,7 +14,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { AuthClient } from '../../services/authClient';
 import { SEED_BADGES } from '../../data/seedData';
 import { calculateLevelFromXp } from '../../types/auth';
 import { Card } from '../ui/Card';
@@ -25,7 +24,7 @@ import { Avatar } from '../ui/Avatar';
 import { Leaderboard } from '../leaderboard/Leaderboard';
 
 export const GamificationView: React.FC = () => {
-  const { profile, gamification } = useAuth();
+  const { gamification } = useAuth();
 
   const xp = gamification?.xp ?? 0;
   const currentStreak = gamification?.currentStreak ?? 0;
@@ -41,69 +40,14 @@ export const GamificationView: React.FC = () => {
       ? 'Silver Scholar'
       : 'Bronze Scholar';
 
-  const evaluatedBadges = React.useMemo(() => {
-    let attempts: any[] = [];
-    let creatorCount = 0;
-    try {
-      const rawAttempts = localStorage.getItem('learnco_attempts');
-      if (rawAttempts) attempts = JSON.parse(rawAttempts);
-      const rawCreator = localStorage.getItem('learnco_creator_resources');
-      if (rawCreator) {
-        const parsed = JSON.parse(rawCreator);
-        if (Array.isArray(parsed)) creatorCount = parsed.length;
-      }
-    } catch {
-      // ignore storage errors
-    }
-
-    const mathAttempts = attempts.filter((a) => a.subjectId === 'math');
-    const mathAccuracy =
-      mathAttempts.length >= 3
-        ? (mathAttempts.filter((a) => a.isCorrect).length / mathAttempts.length) * 100
-        : 0;
-
-    let maxConsecutiveCorrectNoHint = 0;
-    let runningPerfect = 0;
-    for (const att of attempts) {
-      if (att.isCorrect && !att.usedHint) {
-        runningPerfect++;
-        if (runningPerfect > maxConsecutiveCorrectNoHint) maxConsecutiveCorrectNoHint = runningPerfect;
-      } else {
-        runningPerfect = 0;
-      }
-    }
-
-    return SEED_BADGES.map((badge) => {
-      let unlocked = badge.unlocked;
-      switch (badge.id) {
-        case 'badge-streak-3':
-          unlocked = longestStreak >= 3 || currentStreak >= 3;
-          break;
-        case 'badge-streak-7':
-          unlocked = longestStreak >= 7 || currentStreak >= 7;
-          break;
-        case 'badge-mastery-calc':
-          unlocked = mathAccuracy > 80;
-          break;
-        case 'badge-creator-first':
-          unlocked = creatorCount > 0 || xp >= 40;
-          break;
-        case 'badge-copilot-scholar':
-          unlocked = xp >= 200;
-          break;
-        case 'badge-ladder-perfect':
-          unlocked = maxConsecutiveCorrectNoHint >= 5;
-          break;
-        default:
-          break;
-      }
-      return {
-        ...badge,
-        unlocked,
-        unlockedAt: unlocked ? badge.unlockedAt || 'Earned' : undefined,
-      };
-    });
-  }, [xp, currentStreak, longestStreak]);
+  const evaluatedBadges = React.useMemo(() => SEED_BADGES.map((badge) => {
+    // Only streaks have a corresponding recorded metric. XP or generic math
+    // attempts cannot establish creator, copilot, calculus or ladder milestones.
+    const unlocked = badge.id === 'badge-streak-3' ? longestStreak >= 3 || currentStreak >= 3
+      : badge.id === 'badge-streak-7' ? longestStreak >= 7 || currentStreak >= 7
+      : false;
+    return { ...badge, unlocked, unlockedAt: unlocked ? 'Earned' : undefined };
+  }), [currentStreak, longestStreak]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
@@ -113,14 +57,14 @@ export const GamificationView: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <span className="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
               <Award className="w-3.5 h-3.5" />
-              <span>Authoritative XP Economy & Progression</span>
+              <span>XP & Progression</span>
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
             Scholar Progression & Leaderboard
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Earn verified experience points through diagnostic practice (+5 XP), maintain daily streaks, and rank in your cohort.
+            This device shows local activity points plus server practice XP. The leaderboard uses server scores; older awards may be unverified.
           </p>
         </div>
 
@@ -168,7 +112,7 @@ export const GamificationView: React.FC = () => {
               {levelInfo.xpRemainingToNextLevel} XP needed to reach Level {levelInfo.level + 1}
             </h3>
             <p className="text-xs text-slate-500">
-              Solve {Math.ceil(levelInfo.xpRemainingToNextLevel / 5)} more practice questions (+5 XP each) to rank up.
+              Eligible correct bank answers can earn 5 server XP once per question per day. Other activity points stay on this device.
             </p>
           </div>
 
@@ -231,6 +175,7 @@ export const GamificationView: React.FC = () => {
             </span>
           </div>
 
+          <p className="text-xs text-slate-500 dark:text-slate-400">Streak badges use this device's activity streak. Other badge criteria are not tracked yet and remain locked.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {evaluatedBadges.map((badge) => (
               <Card

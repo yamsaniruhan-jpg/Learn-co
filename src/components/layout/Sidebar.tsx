@@ -136,6 +136,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
               }}
               title={isCollapsed ? item.label : undefined}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
               className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all select-none group cursor-pointer ${
                 isActive
                   ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'

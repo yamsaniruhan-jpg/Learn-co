@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * Copilot Response Cache & AI Token Economy Engine
  * Drastically reduces AI costs and API latency by caching common STEM concepts,
@@ -35,22 +37,19 @@ export class CopilotCacheEngine {
   private static cacheHits = 0;
   private static totalTokensSaved = 0;
 
-  /**
-   * Generates a normalized cache key based on prompt, mode, and learner level
+  /** Bind cached results to the exact user, model input and retrieved context.
+   * Hashing keeps private source text and identifiers out of cache keys.
    */
-  static generateKey(
-    prompt: string,
-    mode: string = 'socratic_hint',
-    learnerLevel: string = 'intermediate',
-    modelPreference?: string
-  ): string {
-    const normalizedPrompt = prompt
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s\$\+\-\*\/\=\^\(\)]/g, '')
-      .replace(/\s+/g, ' ');
-
-    return `${mode}:${learnerLevel}:${modelPreference || 'auto'}:${normalizedPrompt}`;
+  static generateKey(input: {
+    userId: string;
+    prompt: string;
+    systemInstruction: string;
+    mode: string;
+    learnerLevel: string;
+    modelPreference?: string;
+    citations: unknown[];
+  }): string {
+    return `v2:${createHash('sha256').update(JSON.stringify(input)).digest('hex')}`;
   }
 
   /**
@@ -99,7 +98,8 @@ export class CopilotCacheEngine {
     }
   ): void {
     // Avoid caching very short, error, or fallback replies
-    if (!data.reply || data.reply.length < 20 || data.modelUsed.includes('engine') || data.modelUsed.includes('fallback')) return;
+    if (!data.reply || data.reply.length < 20 || data.modelUsed.includes('engine') || data.modelUsed.includes('fallback') ||
+        data.modelUsed.includes('unavailable') || data.toolCalls.length > 0 || data.artifact) return;
 
     // Enforce LRU eviction if cache reaches capacity
     if (this.cache.size >= this.MAX_ENTRIES) {

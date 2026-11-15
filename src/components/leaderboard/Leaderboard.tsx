@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Trophy,
   Crown,
@@ -27,14 +27,12 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
 import { LeaderboardEntry, TimeframeFilter } from '../../types/auth';
-import { fetchFirestoreLeaderboardEntries, subscribeToFirestoreLeaderboard } from '../../services/clientFirestoreSync';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import { Progress } from '../ui/Progress';
 import { EmptyState } from '../ui/EmptyState';
-import { loadUserStreak } from '../../utils/streakManager';
 import {
   LEADERBOARD_STAGES,
   LeaderboardStage,
@@ -103,7 +101,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   subtitle,
   className = '',
 }) => {
-  const { user, profile, gamification } = useAuth();
+  const { user, gamification } = useAuth();
 
   // Internal state if uncontrolled
   const [internalTimeframe, setInternalTimeframe] = useState<TimeframeFilter>(initialTimeframe);
@@ -122,35 +120,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const leaderboardRequest = useRef(0);
 
   // Weekly Countdown state
   const countdown = useMemo(() => getWeeklyResetCountdown(), []);
 
-  // Compute effective user streak with rock-solid fallback:
-  // If user has a 3-day streak in localStorage or gamification, NEVER show 0!
-  const effectiveUserStreak = useMemo(() => {
-    let streakVal = gamification?.currentStreak ?? 0;
-    if (typeof window !== 'undefined') {
-      try {
-        const localData = loadUserStreak(user?.id || 'guest');
-        if (localData && localData.currentStreak > streakVal) {
-          streakVal = localData.currentStreak;
-        }
-        const defaultLocalData = loadUserStreak('default_user');
-        if (defaultLocalData && defaultLocalData.currentStreak > streakVal) {
-          streakVal = defaultLocalData.currentStreak;
-        }
-        const storedStr = localStorage.getItem('learnco_user_streak');
-        if (storedStr) {
-          const num = parseInt(storedStr, 10);
-          if (!isNaN(num) && num > streakVal) {
-            streakVal = num;
-          }
-        }
-      } catch (_) {}
-    }
-    return Math.max(0, streakVal);
-  }, [gamification?.currentStreak, user?.id]);
+  // A local streak may include sign-ins and must not replace a leaderboard entry.
+  const effectiveUserStreak = Math.max(0, gamification?.currentStreak ?? 0);
 
   const handleTimeframeChange = (tf: TimeframeFilter) => {
     setInternalTimeframe(tf);
@@ -165,9 +141,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const loadFromCacheOrFallback = () => {
     setIsOffline(true);
     try {
-      const cached = localStorage.getItem(`learnco_leaderboard_${activeTimeframe}_${activeSubject}`)
-        || localStorage.getItem('learnco_leaderboard_weekly_all')
-        || localStorage.getItem('learnco_leaderboard_all_time_all');
+      const cached = localStorage.getItem(`learnco_leaderboard_server_v2_${activeTimeframe}_${activeSubject}`);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -181,54 +155,30 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
   const fetchLeaderboard = async (isManualRefresh = false) => {
     if (propEntries && !isManualRefresh) return;
+    const requestId = ++leaderboardRequest.current;
 
     if (isManualRefresh) setIsRefreshing(true);
     else setIsLoading(true);
 
     setError(null);
     try {
-      const [backendRes, firestoreRes] = await Promise.allSettled([
-        AuthClient.getLeaderboard(activeTimeframe, activeSubject),
-        fetchFirestoreLeaderboardEntries(),
-      ]);
-
-      const backendList: LeaderboardEntry[] =
-        backendRes.status === 'fulfilled' && Array.isArray(backendRes.value) ? backendRes.value : [];
-      const firestoreList: LeaderboardEntry[] =
-        firestoreRes.status === 'fulfilled' && Array.isArray(firestoreRes.value) ? firestoreRes.value : [];
-
-      // Merge entries by userId: every account stored in Firebase console or backend database is included
-      const mergedMap = new Map<string, LeaderboardEntry>();
-      for (const entry of firestoreList) {
-        mergedMap.set(entry.userId, entry);
-      }
-      for (const entry of backendList) {
-        const existing = mergedMap.get(entry.userId);
-        mergedMap.set(entry.userId, {
-          ...(existing || {}),
-          ...entry,
-          xp: Math.max(typeof entry.xp === 'number' ? entry.xp : 0, typeof existing?.xp === 'number' ? existing.xp : 0),
-          level: Math.max(entry.level || 1, existing?.level || 1),
-        });
-      }
-
-      const mergedList = Array.from(mergedMap.values());
-      if (mergedList.length > 0) {
-        setServerEntries(mergedList);
-        setIsOffline(false);
-        try {
-          localStorage.setItem(`learnco_leaderboard_${activeTimeframe}_${activeSubject}`, JSON.stringify(mergedList));
-          localStorage.setItem('learnco_leaderboard_weekly_all', JSON.stringify(mergedList));
-        } catch (_) {}
-      } else {
-        loadFromCacheOrFallback();
-      }
+      const backendList = await AuthClient.getLeaderboard(activeTimeframe, activeSubject);
+      if (requestId !== leaderboardRequest.current) return;
+      if (!Array.isArray(backendList)) throw new Error('Invalid leaderboard response');
+      setServerEntries(backendList);
+      setIsOffline(false);
+      try {
+        localStorage.setItem(`learnco_leaderboard_server_v2_${activeTimeframe}_${activeSubject}`, JSON.stringify(backendList));
+      } catch (_) {}
     } catch (err: any) {
+      if (requestId !== leaderboardRequest.current) return;
       console.warn('Leaderboard offline mode activated:', err?.message);
       loadFromCacheOrFallback();
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (requestId === leaderboardRequest.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -237,30 +187,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
     fetchLeaderboard();
 
-    // Subscribe to live Firebase Console Firestore updates so new accounts & XP gains reflect immediately
-    const unsubscribe = subscribeToFirestoreLeaderboard((liveEntries) => {
-      if (liveEntries && liveEntries.length > 0) {
-        setServerEntries((prev) => {
-          const map = new Map<string, LeaderboardEntry>();
-          for (const item of prev) {
-            map.set(item.userId, item);
-          }
-          for (const item of liveEntries) {
-            const existing = map.get(item.userId);
-            map.set(item.userId, {
-              ...(existing || {}),
-              ...item,
-            });
-          }
-          return Array.from(map.values());
-        });
-        setIsOffline(false);
-      }
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   }, [propEntries, activeTimeframe, activeSubject]);
 
   // Combined raw entries with unified streak and stages
@@ -280,62 +206,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
     const baseList: LeaderboardEntry[] = Array.from(scholarMap.values());
 
-    const currentUserId = user?.id || 'current-user-local';
-    const currentUserXp = gamification?.xp ?? (user ? 0 : 450);
-    const currentUserLevel = gamification?.level ?? 1;
-    const currentUserEmail = user?.email || profile?.email || '';
-
-    // Authentic display name: Never default to 'You (Learner)'
-    const currentUserName =
-      profile?.displayName ||
-      profile?.fullName ||
-      user?.name ||
-      (currentUserEmail ? currentUserEmail.split('@')[0] : '');
-
-    // Check if current user is already present in the list
-    const existingIndex = baseList.findIndex(
-      (e) =>
-        e.isCurrentUser ||
-        e.userId === currentUserId ||
-        (currentUserEmail && e.email && e.email.toLowerCase() === currentUserEmail.toLowerCase()) ||
-        (currentUserName && e.displayName.toLowerCase() === currentUserName.toLowerCase())
-    );
-
-    if (existingIndex >= 0) {
-      const existing = baseList[existingIndex];
-      const preservedName =
-        (currentUserName && !currentUserName.includes('You (Learner)') ? currentUserName : '') ||
-        (existing.displayName && !existing.displayName.includes('You (Learner)') ? existing.displayName : '') ||
-        profile?.displayName ||
-        profile?.fullName ||
-        (currentUserEmail ? currentUserEmail.split('@')[0] : 'Scholar');
-
-      baseList[existingIndex] = {
-        ...existing,
-        email: currentUserEmail || existing.email || '',
-        displayName: preservedName,
-        avatarUrl: profile?.avatarUrl || existing.avatarUrl,
-        xp: Math.max(typeof existing.xp === 'number' ? existing.xp : 0, currentUserXp),
-        streak: effectiveUserStreak,
-        streakDays: effectiveUserStreak,
-        level: Math.max(existing.level, currentUserLevel),
-        isCurrentUser: true,
-      };
-    } else if (currentUserName || currentUserEmail) {
-      baseList.push({
-        userId: currentUserId,
-        email: currentUserEmail,
-        displayName: currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Scholar'),
-        avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUserEmail || currentUserName)}`,
-        xp: currentUserXp,
-        rank: baseList.length + 1,
-        streak: effectiveUserStreak,
-        streakDays: effectiveUserStreak,
-        level: currentUserLevel,
-        isCurrentUser: true,
-        tier: 'Bronze I',
-        tierBadgeIcon: 'trophy',
-      });
+    // Preserve server-provided XP and identity; local activity points and
+    // client-writable Firebase documents are not leaderboard authority.
+    if (user?.id) {
+      const existing = baseList.find(entry => entry.userId === user.id);
+      if (existing) existing.isCurrentUser = true;
     }
 
     // Re-sort by XP descending
@@ -343,9 +218,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
     // Reassign ranks, ensure both streak and streakDays are populated, and attach computed stages
     return baseList.map((entry, idx) => {
-      const s = entry.isCurrentUser
-        ? effectiveUserStreak
-        : (entry.streak ?? entry.streakDays ?? 1);
+      const s = entry.streak ?? entry.streakDays ?? 0;
       const stageInfo = calculateStageFromXp(entry.xp);
 
       return {
@@ -358,15 +231,15 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         stageName: stageInfo.stage.name,
       } as LeaderboardEntry & { stageId: string; stageName: string };
     });
-  }, [propEntries, serverEntries, profile, user, gamification, effectiveUserStreak]);
+  }, [propEntries, serverEntries, user?.id]);
 
   // Current user's entry and stage details
   const currentUserEntry = useMemo(() => {
-    return rawEntries.find((e) => e.isCurrentUser || e.userId === user?.id) || rawEntries[0];
+    return rawEntries.find((e) => e.isCurrentUser || e.userId === user?.id);
   }, [rawEntries, user?.id]);
 
   const userStageDetails = useMemo(() => {
-    const xp = currentUserEntry?.xp ?? 450;
+    const xp = currentUserEntry?.xp ?? 0;
     return calculateStageFromXp(xp);
   }, [currentUserEntry?.xp]);
 
@@ -450,7 +323,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
               {title || 'Cohort Standings & Leagues'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              {subtitle || '10 ordered leagues with 3 divisions each. Top 10 advance weekly in tiers 1–6; Top 3 advance in elite tiers 7–10.'}
+              {subtitle || 'Compare recorded server XP across subjects and time periods.'}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Historical scores may include older unverified awards. New local activity points do not count toward the server leaderboard.
             </p>
           </div>
 
@@ -501,7 +377,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 </span>
               </h3>
               <p className="text-xs text-[#E3DFF5] font-medium">
-                Weekly Cutoff: Top {userStageDetails.stage.promotionTopCount} advance to next division on Sunday!
+                Illustrative cutoff: top {userStageDetails.stage.promotionTopCount}. Automatic weekly promotions are not implemented.
               </p>
             </div>
           </div>

@@ -10,7 +10,7 @@ import { OnboardingWizard } from './components/auth/OnboardingWizard';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { LearnView } from './components/learn/LearnView';
 import { CopilotView } from './components/copilot/CopilotView';
-import { PracticeView, PracticeNavigationContext } from './components/practice/PracticeView';
+import type { PracticeNavigationContext } from './components/practice/PracticeView';
 import { GamificationView } from './components/gamification/GamificationView';
 import { ProfileView } from './components/profile/ProfileView';
 import { AuthView } from './components/auth/AuthView';
@@ -18,8 +18,7 @@ import { Leaderboard } from './components/leaderboard/Leaderboard';
 import { MobileAllTabsNav } from './components/layout/MobileAllTabsNav';
 
 import { useAuth } from './context/AuthContext';
-import { ConceptMastery, QuestionAttempt, SubjectId, UserProfile, NotificationItem } from './types';
-import { SEED_NOTIFICATIONS } from './data/seedData';
+import { SubjectId, UserProfile, NotificationItem } from './types';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -33,7 +32,8 @@ import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import { WalkthroughModal } from './components/common/WalkthroughModal';
 import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
-import { readStoredArray } from './utils/storageSafety';
+import { useLocalPractice } from './utils/localPractice';
+import { useLocalNotifications } from './utils/localNotifications';
 import {
   Sparkles,
   ShieldCheck,
@@ -54,6 +54,9 @@ const IntelligenceView = lazy(() =>
 );
 const CreatorStudioView = lazy(() =>
   import('./components/create/CreatorStudioView').then((m) => ({ default: m.CreatorStudioView }))
+);
+const PracticeView = lazy(() =>
+  import('./components/practice/PracticeView').then((m) => ({ default: m.PracticeView }))
 );
 const AdminStudioView = lazy(() =>
   import('./components/admin/AdminStudioView').then((m) => ({ default: m.AdminStudioView }))
@@ -135,49 +138,13 @@ export default function App() {
     }
   }, [settings?.theme]);
 
-  // Corrupt or stale local storage must not blank the entire app on startup.
-  const [masteries, setMasteries] = useState<ConceptMastery[]>(() =>
-    readStoredArray<QuestionAttempt>('learnco_attempts').length > 0
-      ? readStoredArray<ConceptMastery>('learnco_masteries') : [],
-  );
-  const [attempts, setAttempts] = useState<QuestionAttempt[]>(() =>
-    readStoredArray<QuestionAttempt>('learnco_attempts'),
-  );
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    try {
-      if (!localStorage.getItem('learnco_notifications')) return SEED_NOTIFICATIONS;
-    } catch { return SEED_NOTIFICATIONS; }
-    return readStoredArray<NotificationItem>('learnco_notifications');
-  });
-
-  useEffect(() => {
-    localStorage.setItem('learnco_masteries', JSON.stringify(masteries));
-  }, [masteries]);
-
-  useEffect(() => {
-    localStorage.setItem('learnco_attempts', JSON.stringify(attempts));
-  }, [attempts]);
-
-  useEffect(() => {
-    localStorage.setItem('learnco_notifications', JSON.stringify(notifications));
-  }, [notifications]);
-
-  // Keep App-level attempts and masteries live-synced when PracticeArena or OfflineSync records activity
-  useEffect(() => {
-    const syncLocalPracticeState = () => {
-      try {
-        const savedAttempts = JSON.parse(localStorage.getItem('learnco_attempts') || '[]');
-        const savedMasteries = JSON.parse(localStorage.getItem('learnco_masteries') || '[]');
-        setAttempts(Array.isArray(savedAttempts) ? savedAttempts : []);
-        setMasteries(Array.isArray(savedMasteries) ? savedMasteries : []);
-      } catch (_) {}
-    };
-    window.addEventListener('learnco_attempts_updated', syncLocalPracticeState);
-    return () => window.removeEventListener('learnco_attempts_updated', syncLocalPracticeState);
-  }, []);
+  const practiceAccountId = isAuthenticated && typeof user?.id === 'string' ? user.id : null;
+  const { attempts, masteries } = useLocalPractice(practiceAccountId);
+  const [notifications, setNotifications] = useLocalNotifications(practiceAccountId);
 
   // Smart Study Reminder upon arrival (Deterministic, Zero AI cost)
   const [arrivalReminder, setArrivalReminder] = useState<{
+    accountId: string;
     id: string;
     title: string;
     message: string;
@@ -186,9 +153,11 @@ export default function App() {
   } | null>(null);
 
   useEffect(() => {
-    const alreadyRemindedSession = sessionStorage.getItem('learnco_arrival_reminded');
+    if (!practiceAccountId) return;
+    const reminderKey = `learnco_arrival_reminded_v2:account:${encodeURIComponent(practiceAccountId)}`;
+    const alreadyRemindedSession = sessionStorage.getItem(reminderKey);
     if (!alreadyRemindedSession) {
-      sessionStorage.setItem('learnco_arrival_reminded', 'true');
+      sessionStorage.setItem(reminderKey, 'true');
       const hour = new Date().getHours();
       const currentStreak = gamification?.currentStreak ?? 0;
       const solvedToday = gamification?.dailyQuestionsSolvedToday ?? 0;
@@ -201,12 +170,12 @@ export default function App() {
 
       if (solvedToday === 0 && currentStreak > 0) {
         title = `🔥 Protect Your ${currentStreak}-Day Streak!`;
-        message = `You haven't practiced yet today. Solve 1 quick question to safeguard your streak and earn +10 XP.`;
+        message = `You haven't practiced yet today. Try a question to build your practice habit.`;
         actionUrl = 'practice';
         actionLabel = 'Solve 1 Problem';
       } else if (missedCount > 0) {
         title = '📓 Mistake Notebook: Spaced Review Ready';
-        message = `You have ${missedCount} concept problem${missedCount > 1 ? 's' : ''} queued for Ebbinghaus retention review.`;
+        message = `You have ${missedCount} incorrect practice attempt${missedCount > 1 ? 's' : ''} recorded on this device. Review the concepts you found difficult.`;
         actionUrl = 'intelligence';
         actionLabel = 'Review Mistakes';
       } else if (hour < 12) {
@@ -227,6 +196,7 @@ export default function App() {
       }
 
       setArrivalReminder({
+        accountId: practiceAccountId,
         id: `arrival-remind-${Date.now()}`,
         title,
         message,
@@ -248,7 +218,7 @@ export default function App() {
         ...prev,
       ]);
     }
-  }, [attempts, gamification?.currentStreak, gamification?.dailyQuestionsSolvedToday]);
+  }, [practiceAccountId, attempts, gamification?.currentStreak, gamification?.dailyQuestionsSolvedToday, setNotifications]);
 
   const [profileInitialTab, setProfileInitialTab] = useState<'analytics' | 'settings' | 'mistakes' | 'xp_trail'>('analytics');
   const [profileInitialSection, setProfileInitialSection] = useState<'account' | 'appearance' | 'learning' | 'notifications' | 'privacy'>('account');
@@ -358,7 +328,7 @@ export default function App() {
     targetScore: profile?.targetScore || 'Top 1% Percentile',
     examDate: profile?.examDate || '2026-11-15',
     subjects: profile?.subjects || ['math', 'cs'],
-    studyTimeMinutesThisWeek: profile?.preferredStudyTimeMinutes ? profile.preferredStudyTimeMinutes * 5 : 0,
+    studyTimeMinutesThisWeek: profile?.studyTimeMinutesThisWeek ?? 0,
   };
 
   // Loading state
@@ -446,7 +416,7 @@ export default function App() {
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
             >
-            {arrivalReminder && !isWalkthroughOpen && (
+            {arrivalReminder && arrivalReminder.accountId === practiceAccountId && !isWalkthroughOpen && (
               <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_rgba(45,42,74,0.06)] animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-start gap-3">
                   <div className="p-2.5 rounded-xl bg-[#6C5CE7] text-white shrink-0 mt-0.5 shadow-xs">
@@ -528,6 +498,7 @@ export default function App() {
 
               {activeTab === 'practice' && (
                 <PracticeView
+                  key={practiceAccountId || 'signed-out'}
                   onOpenCopilotWithContext={handleOpenCopilotWithContext}
                   initialPracticeContext={practiceLaunchContext}
                   onConsumePracticeContext={handleConsumePracticeContext}
@@ -543,7 +514,7 @@ export default function App() {
               )}
 
               {activeTab === 'create' && (
-                <CreatorStudioView onNavigateToPractice={() => setActiveTab('practice')} />
+                <CreatorStudioView key={practiceAccountId || 'signed-out'} onNavigateToPractice={() => setActiveTab('practice')} />
               )}
 
               {activeTab === 'mentor' && (
@@ -729,7 +700,7 @@ export default function App() {
               id: `notif-fc-${Date.now()}`,
               type: 'achievement',
               title: `⚡ Flash Check Completed (+${xpEarned} XP)`,
-              message: 'Spaced repetition retention intervals have been updated.',
+              message: 'Sample flash check completed. Activity points are stored on this device; review intervals were not updated.',
               timestamp: 'Just now',
               isRead: false,
               actionUrl: 'practice',

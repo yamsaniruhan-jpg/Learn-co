@@ -145,7 +145,7 @@ router.post('/chat', chatValidation, handleValidation, async (req: Request, res:
         res.json({ reply });
         return;
       } catch (aiErr) {
-        console.warn('Gemini chat unavailable, serving pedagogical first-principles response.', aiErr);
+        console.warn('Gemini chat unavailable; serving a labelled generic prompt.');
       }
     }
 
@@ -161,44 +161,18 @@ router.post('/chat', chatValidation, handleValidation, async (req: Request, res:
       fallbackReply = `### Step-by-Step Analytical Derivation\n\n1. **Step 1 — State & Domain Definition**: Define the objective function $f(\\mathbf{x})$ over its admissible convex domain $\\Omega$.\n2. **Step 2 — Differential Operator**: Compute the total gradient vector $\\nabla f(\\mathbf{x})$.\n3. **Step 3 — Stationarity Condition**: Enforce the first-order necessary condition $\\nabla f(\\mathbf{x}^*) = \\mathbf{0}$ to isolate critical points.\n4. **Step 4 — Curvature & Stability Test**: Compute the Hessian matrix $\\mathbf{H}(\\mathbf{x}^*)$ and verify $\\mathbf{H} \\succ 0$ (all eigenvalues $\\lambda_i > 0$) for strict local minimality.`;
     }
 
-    res.json({ reply: fallbackReply });
+    res.json({ reply: `**AI is unavailable.** The following is generic guidance, not an AI-generated or verified answer.\n\n${fallbackReply}`, fallback: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'AI request failed.' });
   }
 });
 
 // POST /api/ai/generate-resource
-router.post('/generate-resource', async (req: Request, res: Response) => {
-  try {
-    const { content, type, title } = req.body;
-    const id = `res-${Date.now()}`;
-    const createdAt = new Date().toISOString();
-
-    const resource = {
-      id,
-      title: title || 'Synthesized STEM Concept',
-      sourceType: 'text',
-      resourceType: type || 'flashcards',
-      createdAt,
-      content: {
-        flashcards: [
-          {
-            question: 'What is the First Derivative Criterion for monotonicity?',
-            answer: 'If f\'(x) > 0 on (a, b), then f is strictly increasing. If f\'(x) < 0, f is strictly decreasing.',
-          },
-          {
-            question: 'Why does learning rate η cause divergence if too large?',
-            answer: 'Large step sizes overshoot the convex bowl minima, oscillating outward into regions of steeper gradients.',
-          },
-        ],
-        summary: `### Executive Conceptual Synthesis: ${title || 'Core STEM Topic'}\n\n* **Primary Principle**: Fundamental invariants dictate system state stability.\n* **Actionable Next Step**: Resolve 5 practice questions in the Practice Arena to consolidate memory retention.`,
-      },
-    };
-
-    res.json({ resource });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Resource generation failed.' });
-  }
+router.post('/generate-resource', (_req: Request, res: Response) => {
+  // This legacy endpoint used to return the same unrelated flashcards for every
+  // source. Creator Studio's authenticated /api/creator/generate is the real
+  // generation path; do not present fabricated content as a generated resource.
+  res.status(503).json({ error: 'This legacy generator is unavailable. Use Creator Studio to generate a resource.', code: 'GENERATOR_UNAVAILABLE' });
 });
 
 // POST /api/ai/voice-exam-eval
@@ -238,7 +212,7 @@ router.post('/voice-exam-eval', async (req: Request, res: Response) => {
       }
     }
 
-    // Deterministic fallback evaluation (zero tokens, accurate keyword & structure heuristics)
+    // Keyword-and-length heuristic: it does not verify the correctness of an answer.
     const combinedText = `${thesis} ${derivation} ${constraints}`.toLowerCase();
     const rubricWords = (rubric || '').toLowerCase().split(/[\s,.;]+/).filter((w: string) => w.length > 3);
     const matchedWords = rubricWords.filter((w: string) => combinedText.includes(w));
@@ -253,7 +227,7 @@ router.post('/voice-exam-eval', async (req: Request, res: Response) => {
     res.json({
       score,
       strength: matchedWords.length > 0
-        ? `Accurately identified key concept anchors: ${matchedWords.slice(0, 3).join(', ')}.`
+        ? `Mentioned rubric terms: ${matchedWords.slice(0, 3).join(', ')}.`
         : 'Good effort in structuring the oral response.',
       missing: coverage < 0.6
         ? `Incorporate formal aspects from the ground-truth rubric: "${rubric}".`
@@ -287,7 +261,8 @@ router.post('/generate-content', async (req: Request, res: Response) => {
     res.json({
       success: true,
       topic: topic || 'Core Principle',
-      content: `### Synthesized Study Material: ${topic || 'Key Concept'}\n\n* **Core Idea**: Understanding ${subject} requires identifying core invariants and boundary conditions.\n* **Key Takeaway**: Apply active recall and spaced practice to lock in retention.`,
+      fallback: true,
+      content: `**AI is unavailable.** The following is generic guidance, not a verified topic summary.\n\n### Study Guidance: ${topic || 'Key Concept'}\n\n* **Core Idea**: Understanding ${subject} requires identifying core invariants and boundary conditions.\n* **Key Takeaway**: Apply active recall and spaced practice to lock in retention.`,
       generatedAt: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -319,7 +294,8 @@ router.post('/copilot/chat', chatValidation, handleValidation, async (req: Reque
     }
 
     res.json({
-      reply: `### Socratic Diagnostic Hint\n\nRegarding: "${prompt.slice(0, 100)}"\n\n1. What is the fundamental conservation law or invariant at play?\n2. What does setting the rate of change to zero ($\Delta = 0$) yield?`,
+      fallback: true,
+      reply: `**AI is unavailable.** The following is generic guidance, not an AI-generated or verified answer.\n\n### Socratic Diagnostic Hint\n\nRegarding: "${prompt.slice(0, 100)}"\n\n1. What is the fundamental conservation law or invariant at play?\n2. What does setting the rate of change to zero ($\Delta = 0$) yield?`,
       mode,
       context,
     });
@@ -349,14 +325,7 @@ router.post('/quiz/generate', async (req: Request, res: Response) => {
       }
     }
 
-    const questions = Array.from({ length: Math.min(count, 5) }).map((_, i) => ({
-      id: `gen-quiz-${Date.now()}-${i + 1}`,
-      questionText: `Generated practice question #${i + 1} on ${topic} (${difficulty} level)`,
-      options: ['Option A: Convergent', 'Option B: Divergent', 'Option C: Undetermined', 'Option D: Zero'],
-      correctAnswer: 'Option A: Convergent',
-      explanation: `Under standard criteria for ${topic}, the series satisfies the test condition.`,
-    }));
-    res.json({ success: true, subject, topic, questions });
+    res.status(503).json({ error: 'AI quiz generation is temporarily unavailable. Please try again later.', code: 'AI_UNAVAILABLE' });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Quiz generation failed.' });
   }

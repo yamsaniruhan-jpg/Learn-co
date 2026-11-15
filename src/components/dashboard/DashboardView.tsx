@@ -19,6 +19,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { UserProfile, ConceptMastery, QuestionAttempt, SubjectId } from '../../types';
+import { calculateLevelFromXp } from '../../types/auth';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
@@ -26,7 +27,7 @@ import { Badge } from '../ui/Badge';
 import { XPIndicator, StreakIndicator, MasteryIndicator } from '../ui/GamificationIndicators';
 import { SEED_SUBJECTS } from '../../data/seedData';
 import { Leaderboard } from '../leaderboard/Leaderboard';
-import { loadUserStreak, getWeeklyStreakPills, StreakData } from '../../utils/streakManager';
+import { loadUserStreak, getWeeklyStreakPills, getRecentStudyMinutes, StreakData } from '../../utils/streakManager';
 import { PlannerClient } from '../../services/plannerClient';
 import { StudyTask } from '../../types/planner';
 
@@ -81,6 +82,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [user.id]);
 
   const weeklyPills = getWeeklyStreakPills(streakData);
+  const recentStudyMinutes = getRecentStudyMinutes(streakData);
+  const xpProgress = calculateLevelFromXp(user.xp);
   const activeStreakCount = streakData.currentStreak ?? user.currentStreak ?? 0;
   const longestStreakCount = Math.max(streakData.longestStreak ?? 0, user.longestStreak ?? 0);
 
@@ -106,10 +109,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     : [];
 
   const mentorNote = !hasStartedPractice
-    ? 'Complete your first calibrated practice drill to unlock personalized retention diagnostics and weak-area remediation recommendations.'
+    ? 'Complete a practice drill to start building a device-local estimate of your strengths and areas to review.'
     : weakConcepts.length > 0
-    ? `Your overall verified mastery is ${averageMastery}%. Prioritize remediating "${weakConcepts[0].conceptTitle}" (${weakConcepts[0].masteryScore}%) before retention decays further.`
-    : `Strong momentum at ${averageMastery}% average mastery across ${attempts.length} verified attempts. Challenge yourself with higher-difficulty problems in the Practice Arena.`;
+    ? `Your device-local practice estimate is ${averageMastery}%. Consider reviewing "${weakConcepts[0].conceptTitle}" (${weakConcepts[0].masteryScore}%).`
+    : `Your device-local practice estimate is ${averageMastery}% across ${attempts.length} recorded attempts. Challenge yourself with more practice.`;
 
   const quickPrompts = [
     { title: 'Derive First Derivative Test', category: 'Math', tab: 'copilot', prompt: 'Derive the first derivative test for local extrema from first principles.' },
@@ -140,7 +143,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </h1>
             <p className="text-sm sm:text-base text-[#F1EFFF]/90 leading-relaxed font-medium">
               {activeStreakCount > 0
-                ? `Your ${activeStreakCount}-day study streak is active. Complete today's calibrated diagnostic ladder to reinforce your retention curve.`
+                ? `Your ${activeStreakCount}-day device-local activity streak is active. Try a practice session to keep learning.`
                 : `Ready to begin your journey? Complete your first diagnostic practice session today to ignite your study streak.`}
             </p>
 
@@ -151,7 +154,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {weeklyPills.map((pill) => (
                   <div
                     key={pill.dateKey}
-                    title={`${pill.dayName} (${pill.dateKey}): ${pill.isCompleted ? 'Completed' : 'Pending'}`}
+                    title={`${pill.dayName} (${pill.dateKey}): ${pill.isCompleted ? 'Active' : 'No activity'}`}
                     className={`flex flex-col items-center justify-center w-8 h-8 rounded-xl text-[10px] font-black border transition-all ${
                       pill.isCompleted
                         ? 'bg-[#FFB84D] text-[#2D2A4A] border-[#e09d3b] shadow-xs'
@@ -184,7 +187,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 type="button"
                 onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
                 className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
-                title="60-second Spaced Retention Flash Check (+15 XP)"
+                title="60-second sample flash check (device-local activity points)"
               >
                 <Zap className="w-4 h-4 fill-current text-slate-950" />
                 <span>60s Flash Check</span>
@@ -206,7 +209,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="mt-8 pt-6 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <div className="flex items-center justify-between text-xs text-indigo-200/70 mb-0.5">
-              <span>Study Streak</span>
+              <span title="Includes sign-ins and recorded activity">Activity Streak</span>
               <span className="text-[10px] text-amber-300 font-bold">Best: {longestStreakCount}d</span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-0.5">
@@ -227,7 +230,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-xl font-black text-emerald-400">{averageMastery}%</span>
               <span className="text-xs text-indigo-200">
-                {hasStartedPractice ? 'empirically verified' : 'not started yet'}
+                {hasStartedPractice ? 'device-local estimate' : 'not started yet'}
               </span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
@@ -239,27 +242,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div>
-            <span className="text-xs text-indigo-200/70 block">Weekly Study Time</span>
+            <span className="text-xs text-indigo-200/70 block">Study Time · Last 7 Days</span>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-black text-white">{user.studyTimeMinutesThisWeek}m</span>
-              <span className="text-xs text-indigo-200">of 240m goal</span>
+              <span className="text-xl font-black text-white">{recentStudyMinutes}m</span>
+              <span className="text-xs text-indigo-200">of 240m · this device</span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
               <div
                 className="bg-cyan-400 h-1.5 rounded-full"
-                style={{ width: `${Math.min(100, (user.studyTimeMinutesThisWeek / 240) * 100)}%` }}
+                style={{ width: `${Math.min(100, (recentStudyMinutes / 240) * 100)}%` }}
               />
             </div>
           </div>
 
           <div>
-            <span className="text-xs text-indigo-200/70 block">Total Experience</span>
+            <span className="text-xs text-indigo-200/70 block" title="Server practice XP plus this device's activity points. Leaderboard XP excludes local points.">Experience · local &amp; practice</span>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-xl font-black text-amber-300">{user.xp.toLocaleString()}</span>
               <span className="text-xs text-indigo-200">XP</span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
-              <div className="bg-amber-400 h-1.5 rounded-full w-3/4" />
+              <div
+                className="bg-amber-400 h-1.5 rounded-full"
+                style={{ width: `${xpProgress.progressPercent}%` }}
+                role="progressbar"
+                aria-label="Progress to next level"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={xpProgress.progressPercent}
+              />
             </div>
           </div>
         </div>
@@ -368,7 +379,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       Cognitive Weak Areas Identified ({weakConcepts.length})
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
-                      {weakConcepts[0].conceptTitle} currently has low retention. Targeted drill recommended before decay occurs.
+                      {weakConcepts[0].conceptTitle} has a low device-local practice estimate. Consider a targeted drill.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {weakConcepts.map((w) => (
@@ -409,7 +420,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       Mastery Profile: Ready to Calibrate
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
-                      You haven't attempted any questions yet. Start your first practice session to calculate baseline mastery and map knowledge retention.
+                      You haven't attempted any questions on this device yet. Start a practice session to build a local estimate.
                     </p>
                   </div>
                 </div>

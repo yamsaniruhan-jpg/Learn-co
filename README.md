@@ -8,6 +8,12 @@ Instead of switching between multiple tools, learners can use Learn-Co to explor
 
 🌐 Live Website: "https://learn-co.ai.studio/" (https://learn-co.ai.studio/)
 
+## Local development
+
+Use Node.js 24.12 or newer (the CI baseline is Node 24; `.nvmrc` selects it). Some Firebase dependencies require at least Node 24.12. Install with `npm ci`, then run `npm run dev`. For local checks use `npm test`, `npm run lint`, and `npm run build`; `npm start` serves the production build. Tests use an isolated temporary data file. For manual local runs, set `LEARNCO_DB_FILE` to a separate writable file if you do not intend to use the repository's existing data.
+
+Live authentication, AI, billing and cloud storage require separately configured services; a local build or test run does not verify those integrations. See `AUDIT-CURRENT.md` for current limitations and launch blockers.
+
 ---
 
 📌 About the Project

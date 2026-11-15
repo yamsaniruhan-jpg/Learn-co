@@ -1,5 +1,5 @@
 // src/components/Marketplace.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiCall } from '../client/firebase';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -31,6 +31,8 @@ const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
 export default function Marketplace() {
   const { isAuthenticated } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [catalogSource, setCatalogSource] = useState(null);
+  const searchRequest = useRef(0);
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('');
   const [difficulty, setDifficulty] = useState('');
@@ -54,22 +56,27 @@ export default function Marketplace() {
   };
 
   const search = async () => {
+    const requestId = ++searchRequest.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ query, subject, difficulty, sort });
       const res = await apiCall(`/marketplace/search?${params}`);
+      if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      setCourses(data.courses || []);
+      if (requestId === searchRequest.current) { setCourses(data.courses || []); setCatalogSource(data.catalogSource || null); }
     } catch (error) {
-      console.error('Search error:', error);
-      showToast('Could not load marketplace courses.', 'error');
+      if (requestId === searchRequest.current) {
+        console.error('Search error:', error);
+        showToast('Could not load marketplace courses.', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === searchRequest.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     search();
+    return () => { searchRequest.current++; };
   }, [subject, difficulty, sort]);
 
   useEffect(() => {
@@ -130,7 +137,9 @@ export default function Marketplace() {
             prev && prev.id === courseId ? { ...prev, enrolledCount: (prev.enrolledCount || 0) + 1 } : prev
           );
         }
-        showToast(data.alreadyEnrolled ? 'You are already enrolled in this course.' : 'Successfully enrolled in course!');
+        showToast(data.persistence === 'memory'
+          ? 'Enrollment is stored only for this server session and may disappear after restart.'
+          : data.alreadyEnrolled ? 'You are already enrolled in this course.' : 'Successfully enrolled in course!');
       } else {
         showToast(data.error || 'Failed to enroll in course.', 'error');
       }
@@ -161,7 +170,9 @@ export default function Marketplace() {
       const data = await res.json();
       if (res.ok && data.success) {
         setReviewComment('');
-        showToast('Review submitted!');
+        showToast(data.review?.persistence === 'memory'
+          ? 'Review is stored only for this server session and may disappear after restart.'
+          : 'Review submitted!');
         const revRes = await apiCall(`/marketplace/reviews/${selectedCourse.id}`);
         if (revRes.ok) {
           const revData = await revRes.json();
@@ -209,6 +220,11 @@ export default function Marketplace() {
         </div>
       </div>
 
+      {catalogSource === 'sample' && (
+        <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          Showing sample courses while the live catalog is unavailable. Names, ratings and enrollment counts are illustrative, not verified marketplace activity.
+        </div>
+      )}
       {/* Search Bar & Filters */}
       <div className="bg-white dark:bg-[#2A2647] p-4 sm:p-6 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">

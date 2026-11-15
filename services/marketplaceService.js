@@ -5,21 +5,9 @@ let db = null;
 function getDb() {
   if (!db) {
     try {
-      let config = null;
-      try {
-        config = require('../firebase-applet-config.json');
-      } catch {}
-
-      if (config && config.firestoreDatabaseId && admin.apps.length) {
-        try {
-          const { getFirestore } = require('firebase-admin/firestore');
-          db = getFirestore(admin.app(), config.firestoreDatabaseId);
-        } catch {
-          db = admin.firestore();
-        }
-      } else if (admin.apps.length) {
-        db = admin.firestore();
-      }
+      // The compatibility layer selects FIRESTORE_DATABASE_ID (if set) and
+      // handles missing credentials. Never silently fall back to another DB.
+      db = admin.firestore();
     } catch {
       db = null;
     }
@@ -172,15 +160,25 @@ function applyLocalStats(course) {
  */
 async function publishCourse(uid, courseId, courseData) {
   const firestore = getDb();
-  if (!firestore) return courseId;
+  if (!firestore) {
+    const error = new Error('Course publishing is unavailable. Please try again later.');
+    error.statusCode = 503;
+    throw error;
+  }
 
   const marketplaceRef = firestore.collection('marketplace').doc(courseId);
-
-  try {
-    await marketplaceRef.set({
-      title: courseData.title,
-      description: courseData.description,
-      subject: courseData.subject,
+  const userCourseRef = firestore.collection('users').doc(uid).collection('courses').doc(courseId);
+  await firestore.runTransaction(async (transaction) => {
+    const existing = await transaction.get(marketplaceRef);
+    if (existing.exists && existing.data().creatorUid !== uid) {
+      const error = new Error('You cannot publish another creator’s course.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const details = {
+      title: courseData.title.trim(),
+      description: courseData.description.trim(),
+      subject: courseData.subject.trim().toLowerCase(),
       tags: courseData.tags || [],
       creatorUid: uid,
       creatorName: courseData.creatorName || 'Anonymous Scholar',
@@ -189,23 +187,21 @@ async function publishCourse(uid, courseId, courseData) {
       totalModules: courseData.totalModules || 0,
       estimatedHours: courseData.estimatedHours || 0,
       difficulty: courseData.difficulty || 'beginner',
-      rating: courseData.rating || 0,
-      ratingCount: courseData.ratingCount || 0,
-      enrolledCount: courseData.enrolledCount || 0,
       price: courseData.price || 0,
       status: 'published',
-      publishedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (!existing.exists) {
+      details.rating = 0;
+      details.ratingCount = 0;
+      details.enrolledCount = 0;
+      details.publishedAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+    transaction.set(marketplaceRef, details, { merge: true });
+    transaction.set(userCourseRef, {
+      status: 'published', publishedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-
-    await firestore.collection('users').doc(uid).collection('courses').doc(courseId).set({
-      status: 'published',
-      publishedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-  } catch (err) {
-    console.warn('Publish course Firestore warning:', err.message);
-  }
-
+  });
   return courseId;
 }
 
@@ -215,6 +211,9 @@ async function publishCourse(uid, courseId, courseData) {
 async function searchCourses({ query, subject, difficulty, sort, limit } = {}) {
   const firestore = getDb();
   let courses = [];
+  let fetchedFromFirestore = false;
+  const requestedLimit = Number(limit);
+  const pageSize = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 12;
 
   if (firestore) {
     try {
@@ -239,22 +238,23 @@ async function searchCourses({ query, subject, difficulty, sort, limit } = {}) {
           q = q.orderBy('publishedAt', 'desc');
       }
 
-      const pageSize = limit || 12;
       q = q.limit(pageSize);
 
       const snap = await q.get();
-      courses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      courses = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(c => c.status === 'published');
+      fetchedFromFirestore = true;
     } catch (err) {
       try {
-        const snap = await firestore.collection('marketplace').limit(limit || 12).get();
-        courses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const snap = await firestore.collection('marketplace').where('status', '==', 'published').limit(pageSize).get();
+        courses = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(c => c.status === 'published');
+        fetchedFromFirestore = true;
       } catch {
         courses = [];
       }
     }
   }
 
-  if (courses.length === 0) {
+  if (!fetchedFromFirestore) {
     courses = SEED_COURSES.map(applyLocalStats);
   }
 
@@ -291,7 +291,7 @@ async function searchCourses({ query, subject, difficulty, sort, limit } = {}) {
     filtered = [...filtered].sort((a, b) => (b.rating || 0) - (a.rating || 0));
   }
 
-  return filtered;
+  return { courses: filtered.slice(0, pageSize), catalogSource: fetchedFromFirestore ? 'firebase' : 'sample' };
 }
 
 /**
@@ -315,22 +315,49 @@ async function getUserEnrollments(uid) {
  * Enroll in a course
  */
 async function enrollCourse(uid, courseId) {
+  const firestore = getDb();
+  let course = SEED_COURSES.find(c => c.id === courseId);
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('marketplace').doc(courseId).get();
+      if (snapshot.exists) course = snapshot.data();
+    } catch {
+      const error = new Error('Course availability could not be verified. Please try again.');
+      error.statusCode = 503;
+      throw error;
+    }
+  }
+  if (!course || course.status !== 'published') {
+    const error = new Error('Course not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+  // Payment processing is not wired to marketplace enrollment yet.
+  if (typeof course.price !== 'number' || !Number.isFinite(course.price) || course.price < 0) {
+    const error = new Error('Course price could not be verified.');
+    error.statusCode = 503;
+    throw error;
+  }
+  if (course.price > 0) {
+    const error = new Error('Paid course enrollment is not available yet.');
+    error.statusCode = 402;
+    throw error;
+  }
   if (!localEnrollments.has(uid)) {
     localEnrollments.set(uid, new Set());
   }
   const userSet = localEnrollments.get(uid);
-  if (userSet.has(courseId)) {
-    return { alreadyEnrolled: true };
+  if (userSet.has(courseId) && !firestore) {
+    return { alreadyEnrolled: true, persistence: 'memory' };
   }
 
-  const firestore = getDb();
   if (firestore) {
     try {
       const enrollmentRef = firestore.collection('users').doc(uid).collection('enrollments').doc(courseId);
-      const existing = await enrollmentRef.get().catch(() => null);
+      const existing = await enrollmentRef.get();
       if (existing && existing.exists) {
         userSet.add(courseId);
-        return { alreadyEnrolled: true };
+        return { alreadyEnrolled: true, persistence: 'firebase' };
       }
 
       await enrollmentRef.set({
@@ -342,8 +369,10 @@ async function enrollCourse(uid, courseId) {
       await firestore.collection('marketplace').doc(courseId).update({
         enrolledCount: admin.firestore.FieldValue.increment(1),
       }).catch(() => {});
-    } catch (err) {
-      console.warn('Firestore enrollment mirror skipped:', err.message);
+    } catch {
+      const error = new Error('Enrollment could not be saved. Please try again.');
+      error.statusCode = 503;
+      throw error;
     }
   }
 
@@ -351,7 +380,7 @@ async function enrollCourse(uid, courseId) {
   const prev = localCourseCounters.get(courseId) || { enrolledDelta: 0 };
   localCourseCounters.set(courseId, { ...prev, enrolledDelta: (prev.enrolledDelta || 0) + 1 });
 
-  return { success: true };
+  return { success: true, persistence: firestore ? 'firebase' : 'memory' };
 }
 
 /**
@@ -394,7 +423,7 @@ async function submitReview(uid, userName, courseId, rating, comment) {
       const existingSnap = await firestore.collection('marketplace')
         .doc(courseId).collection('reviews')
         .where('userId', '==', uid)
-        .limit(1).get().catch(() => ({ empty: true }));
+        .limit(1).get();
 
       if (!existingSnap.empty) {
         await existingSnap.docs[0].ref.update({
@@ -412,8 +441,10 @@ async function submitReview(uid, userName, courseId, rating, comment) {
         });
       }
       await recalculateRating(courseId);
-    } catch (err) {
-      console.warn('Firestore review sync skipped:', err.message);
+    } catch {
+      const error = new Error('Review could not be saved. Please try again.');
+      error.statusCode = 503;
+      throw error;
     }
   }
 
@@ -436,7 +467,7 @@ async function submitReview(uid, userName, courseId, rating, comment) {
   const prev = localCourseCounters.get(courseId) || { enrolledDelta: 0 };
   localCourseCounters.set(courseId, { ...prev, rating: avg, ratingCount: totalCount });
 
-  return cleanReview;
+  return { ...cleanReview, persistence: firestore ? 'firebase' : 'memory' };
 }
 
 async function recalculateRating(courseId) {

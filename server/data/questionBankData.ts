@@ -250,9 +250,9 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     difficulty: 'medium',
     questionType: 'numerical',
     questionText: 'Given the convex loss $L(\\theta) = 4\\theta^2 - 16\\theta + 10$ and learning rate $\\eta = 0.1$, after starting at $\\theta_0 = 0$, what is the exact value of $\\theta_2$ after TWO gradient descent iterations?',
-    correctAnswer: 2.88,
+    correctAnswer: 1.92,
     numericalTolerance: 0.01,
-    explanation: 'Gradient $\\nabla L(\\theta) = 8\\theta - 16$.\nIteration 1: $\\nabla L(0) = -16 \\implies \\theta_1 = 0 - 0.1(-16) = 1.6$.\nIteration 2: $\\nabla L(1.6) = 8(1.6) - 16 = 12.8 - 16 = -3.2 \\implies \\theta_2 = 1.6 - 0.1(-3.2) = 1.6 + 0.32 = 1.92$. (If starting at $\\theta_0=0$, $\\theta_1=1.6, \\theta_2=1.92$).',
+    explanation: 'Gradient $\\nabla L(\\theta) = 8\\theta - 16$.\nIteration 1: $\\nabla L(0) = -16 \\implies \\theta_1 = 0 - 0.1(-16) = 1.6$.\nIteration 2: $\\nabla L(1.6) = 8(1.6) - 16 = 12.8 - 16 = -3.2 \\implies \\theta_2 = 1.6 - 0.1(-3.2) = 1.92$.',
     stepByStepSolution: [
       'Differentiate: $\\nabla L(\\theta) = 8\\theta - 16$',
       'Step 1: $\\theta_1 = 0 - 0.1(8(0) - 16) = 0 + 1.6 = 1.6$',
@@ -313,14 +313,14 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     conceptId: 'concept-grad-descent',
     difficulty: 'hard',
     questionType: 'true_false',
-    questionText: 'True or False: For an $L$-smooth strictly convex function, standard gradient descent is guaranteed to converge monotonically to the global minimum for any constant learning rate $\\eta$ satisfying $0 < \\eta < \\frac{2}{L}$.',
+    questionText: 'True or False: For an $L$-smooth strictly convex function on $\\mathbb{R}^n$ that attains a global minimum, standard gradient descent has monotonically non-increasing objective values that converge to the minimum for any constant learning rate $\\eta$ satisfying $0 < \\eta < \\frac{2}{L}$.',
     options: ['True', 'False'],
     correctAnswer: 'True',
     explanation: 'By the Descent Lemma for $L$-Lipschitz gradients, $f(x_{t+1}) \\le f(x_t) - \\eta (1 - \\frac{L\\eta}{2}) \\|\\nabla f(x_t)\\|^2$. For $\\eta < 2/L$, $(1 - \\frac{L\\eta}{2}) > 0$, guaranteeing strict monotonic decrease of loss until $\\nabla f(x) = 0$.',
     stepByStepSolution: [
       'Recall Lipschitz smoothness condition: $\\|\\nabla f(x) - \\nabla f(y)\\| \\le L\\|x - y\\|$.',
       'Descent lemma bound: $f(x - \\eta \\nabla f(x)) \\le f(x) - \\eta(1 - L\\eta/2)\\|\\nabla f(x)\\|^2$.',
-      'When $0 < \\eta < 2/L$, the coefficient is positive, proving monotonic convergence.',
+      'When $0 < \\eta < 2/L$, the coefficient is positive, so objective values do not increase. Convexity, smoothness, and an attained minimum imply convergence to the minimum value.',
     ],
     hints: [
       'Recall the classical Lipschitz gradient descent lemma from convex analysis.',
@@ -328,7 +328,7 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     tags: ['Convex Optimization', 'Proof', 'True False'],
     source: 'Learn.co CS Editorial',
     verificationStatus: 'verified',
-    version: 1,
+    version: 2,
   },
 
   // ==========================================
@@ -368,8 +368,8 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     conceptId: 'concept-energy-cons',
     difficulty: 'easy_medium',
     questionType: 'numerical',
-    questionText: 'A particle of mass $0.5\\text{ kg}$ is moving with initial velocity $4\\text{ m/s}$. A net work of $9\\text{ J}$ is done on it. What is its final velocity in $\\text{m/s}$?',
-    correctAnswer: 5.29,
+    questionText: 'A particle of mass $0.5\\text{ kg}$ is moving with initial speed $4\\text{ m/s}$. A net work of $9\\text{ J}$ is done on it. What is its final speed in $\\text{m/s}$?',
+    correctAnswer: 7.21,
     numericalTolerance: 0.1,
     explanation: 'Work-Energy theorem: $W_{net} = \\frac{1}{2}m v_f^2 - \\frac{1}{2}m v_i^2 \\implies 9 = \\frac{1}{2}(0.5)v_f^2 - \\frac{1}{2}(0.5)(16) \\implies 9 = 0.25 v_f^2 - 4 \\implies 0.25 v_f^2 = 13 \\implies v_f^2 = 52 \\implies v_f \\approx 7.21\\text{ m/s}$. (Checking calculation: $0.25(52) = 13$, so $v_f = \\sqrt{52} \\approx 7.21$).',
     stepByStepSolution: [
@@ -381,7 +381,7 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     tags: ['Physics', 'Work Energy', 'Numerical'],
     source: 'Learn.co Physics Bank',
     verificationStatus: 'verified',
-    version: 1,
+    version: 2,
   },
   {
     id: 'q-phys-we-03',
@@ -553,7 +553,7 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     conceptId: 'concept-central-dogma',
     difficulty: 'easy',
     questionType: 'single_choice',
-    questionText: 'Which enzyme is primarily responsible for synthesizing mRNA from a DNA template strand during transcription?',
+    questionText: 'In eukaryotic cells, which enzyme is primarily responsible for synthesizing mRNA from a DNA template strand during transcription?',
     options: [
       'RNA Polymerase II',
       'DNA Polymerase III',
@@ -570,7 +570,7 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
     tags: ['Molecular Biology', 'Transcription', 'Central Dogma'],
     source: 'Learn.co Bio Bank',
     verificationStatus: 'verified',
-    version: 1,
+    version: 2,
   },
   {
     id: 'q-bio-dna-02',

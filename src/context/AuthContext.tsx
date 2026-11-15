@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [gamification, setGamification] = useState<UserGamification | null>(() => {
-    const initXp = getCurrentXp(0);
+    const initXp = getCurrentXp(0, null);
     const lvl = calculateLevelFromXp(initXp);
     const streakState = loadUserStreak('guest');
     return {
@@ -97,11 +97,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setProfile(null);
         setSettings(null);
-        const currentLocalXp = getCurrentXp(0);
+        const currentLocalXp = getCurrentXp(0, null);
         const lvl = calculateLevelFromXp(currentLocalXp);
         const streakState = loadUserStreak('guest');
         setGamification((prev) => ({
-          userId: prev?.userId || 'guest',
+          userId: 'guest',
           xp: currentLocalXp,
           level: lvl.level,
           currentStreak: streakState.currentStreak,
@@ -129,10 +129,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthError(null);
       setUser(res.user);
       setProfile(res.profile);
-      syncLocalXpOnly(res.gamification?.xp ?? 0);
+      AuthClient.setCurrentUser(res.user);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user.id);
       const userStreak = loadUserStreak(res.user.id || 'default_user');
       setGamification({
         ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
         currentStreak: userStreak.currentStreak,
         longestStreak: userStreak.longestStreak,
       });
@@ -149,15 +152,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       console.warn('Session expired or rejected.');
       AuthClient.removeToken();
-      syncLocalXpOnly(0);
+      const guestXp = getCurrentXp(0, null);
       setUser(null);
       setProfile(null);
       setSettings(null);
       const streakState = loadUserStreak('guest');
       setGamification({
         userId: 'guest',
-        xp: 0,
-        level: 1,
+        xp: guestXp,
+        level: calculateLevelFromXp(guestXp).level,
         currentStreak: streakState.currentStreak,
         longestStreak: streakState.longestStreak,
         lastActiveDate: streakState.lastActiveDate,
@@ -218,9 +221,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             xp: currentXp,
             level: lvl.level,
           };
-          if (user) {
-            syncClientToFirestore(user, profile, updatedGam).catch(() => {});
-          }
           return updatedGam;
         });
       }
@@ -280,8 +280,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(res.user);
       setProfile(res.profile);
-      syncLocalXpOnly(res.gamification?.xp ?? 0);
-      setGamification(res.gamification);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+      setGamification(res.gamification ? {
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+      } : res.gamification);
       setSettings(res.settings);
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
@@ -332,8 +336,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await clearMismatchedFirebaseIdentity(res.user?.email);
       setUser(res.user);
       setProfile(res.profile);
-      syncLocalXpOnly(res.gamification?.xp ?? 0);
-      setGamification(res.gamification);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+      setGamification(res.gamification ? {
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+      } : res.gamification);
       setSettings(res.settings);
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
@@ -403,8 +411,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await clearMismatchedFirebaseIdentity(res.user?.email);
       setUser(res.user);
       setProfile(res.profile);
-      syncLocalXpOnly(res.gamification?.xp ?? 0);
-      setGamification(res.gamification);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+      setGamification(res.gamification ? {
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+      } : res.gamification);
       setSettings(res.settings);
       if (res.user?.email) {
         try {
@@ -436,15 +448,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       await AuthClient.signOut();
     } finally {
-      syncLocalXpOnly(0);
+      const guestXp = getCurrentXp(0, null);
       setUser(null);
       setProfile(null);
       setSettings(null);
       const streakState = loadUserStreak('guest');
       setGamification({
         userId: 'guest',
-        xp: 0,
-        level: 1,
+        xp: guestXp,
+        level: calculateLevelFromXp(guestXp).level,
         currentStreak: streakState.currentStreak,
         longestStreak: streakState.longestStreak,
         lastActiveDate: streakState.lastActiveDate,

@@ -284,6 +284,21 @@ export function recordDailyActivity(
   return updatedStreakData;
 }
 
+/** Sum activity actually recorded on this device over the last seven local days. */
+export function getRecentStudyMinutes(streakData: StreakData, now: Date = new Date()): number {
+  const dates = new Set<string>();
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - offset);
+    dates.add(formatDateToDateKey(date));
+  }
+  return Object.entries(streakData.dailyActivities || {}).reduce((total, [date, activity]) => {
+    const minutes = activity?.minutesStudied;
+    return dates.has(date) && typeof minutes === 'number' && Number.isFinite(minutes)
+      ? total + Math.max(0, minutes) : total;
+  }, 0);
+}
+
 /**
  * Returns streak summary for the last 7 calendar days to render visual streak day pills
  */

@@ -47,9 +47,16 @@ service cloud.firestore {
     // User private data
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId)
-        && (!('role' in request.resource.data) || request.resource.data.role != 'admin');
-      allow delete: if isOwner(userId);
+      // Billing and privilege fields are written by trusted server code only.
+      // Allow an existing document with protected fields to receive an ordinary
+      // profile merge, but prevent clients from adding, editing or removing them.
+      allow create: if isOwner(userId)
+        && !request.resource.data.keys().hasAny(['role', 'subscription', 'subscriptionExpiresAt', 'stripeCustomerId', 'stripeSubscriptionId', 'cancelledAt']);
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'subscription', 'subscriptionExpiresAt', 'stripeCustomerId', 'stripeSubscriptionId', 'cancelledAt']);
+      // Client deletion could erase server-owned billing state. Account deletion
+      // requires a server-managed process, not a direct document delete.
+      allow delete: if false;
 
       match /progress/{courseId} {
         allow read, write: if isOwner(userId) && isValidId(courseId);
@@ -71,11 +78,10 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
-    // Public cohort leaderboard (owner-only bounded writes)
+    // Leaderboard scores must only be written by trusted server code (Admin SDK).
     match /leaderboard/{entryId} {
       allow read: if true;
-      allow create, update: if isOwner(entryId) && isValidLeaderboardEntry(request.resource.data, entryId);
-      allow delete: if isOwner(entryId);
+      allow write: if false;
     }
 
     // Creator resources

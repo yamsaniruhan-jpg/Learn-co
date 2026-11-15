@@ -40,8 +40,10 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
           ? `Synced ${synced} queued attempt${synced === 1 ? '' : 's'} to server.`
           : pendingOfflineCount === 0
           ? 'All local practice attempts are already synchronized.'
-          : 'Sign in required to push queued attempts to your account.'
+          : 'No attempts synced. Check your connection and sign in to the account that created them. Older unassigned entries are retained.'
       );
+    } catch {
+      setSyncNotice('Sync could not finish. Your device storage may be unavailable; please try again.');
     } finally {
       setIsSyncing(false);
     }
@@ -59,7 +61,7 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
             PWA Offline Synchronization
           </h1>
           <p className="text-sm text-slate-300 max-w-xl">
-            Learn.co caches curriculum modules and queues offline practice attempts locally so you can study seamlessly and synchronize upon reconnection.
+            The app shell can be cached after the service worker activates. Attempts from an already-open practice session can be queued on this device; signing in again and loading questions requires a network connection.
           </p>
         </div>
         <Button
@@ -89,7 +91,7 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {isOnline ? 'Connected to Learn.co backend APIs.' : 'Offline mode active; attempts are queued locally.'}
+              {isOnline ? 'Browser reports an available network connection.' : 'Offline mode active; attempts are queued locally.'}
             </p>
           </div>
 
@@ -108,7 +110,7 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {swStatus === 'ACTIVE'
-                ? 'Offline shell cache and asset bundling verified.'
+                ? 'Service worker registered; offline availability depends on cached assets.'
                 : 'Service worker activates automatically in production PWA contexts.'}
             </p>
           </div>
@@ -122,15 +124,15 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {pendingOfflineCount === 0
-                ? 'All local practice attempts are synchronized to server.'
-                : `${pendingOfflineCount} offline attempt${pendingOfflineCount === 1 ? '' : 's'} awaiting synchronization.`}
+                ? 'No pending attempts on this device.'
+                : `${pendingOfflineCount} offline attempt${pendingOfflineCount === 1 ? '' : 's'} on this device, including other accounts or unassigned entries.`}
             </p>
           </div>
         </div>
 
         <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {syncNotice || 'Automatic background sync runs on network reconnection.'}
+          <span role="status" aria-live="polite" className="text-xs text-slate-500 dark:text-slate-400">
+            {syncNotice || 'The open workspace retries eligible attempts on network reconnection; it does not sync while closed.'}
           </span>
           <Button
             variant="outline"

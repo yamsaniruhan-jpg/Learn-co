@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QuestionBankItem, PracticeSessionConfig } from '../../types/curriculum';
+import { calculateLevelFromXp } from '../../types/auth';
 import { AuthClient } from '../../services/authClient';
 import { LearningClient } from '../../services/learningClient';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +8,9 @@ import { sounds } from '../../utils/sound';
 import { recordDailyActivity } from '../../utils/streakManager';
 import { OfflineStorageManager } from '../../utils/offlineStorage';
 import { syncLocalXpOnly } from '../../utils/xpManager';
+import { gradeQuestionAnswer } from '../../utils/gradeAnswer';
+import { practiceStorageKey } from '../../utils/localPractice';
+import { readStoredArray } from '../../utils/storageSafety';
 import confetti from 'canvas-confetti';
 import { FormattedMathText } from '../common/FormattedMathText';
 import {
@@ -56,6 +60,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
   const { updateGamificationState } = useAuth();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, any>>({});
+  const [confidence, setConfidence] = useState<Record<string, 'unsure' | 'somewhat' | 'confident'>>({});
   const [numericalInput, setNumericalInput] = useState<string>('');
   const [multiSelectAnswers, setMultiSelectAnswers] = useState<string[]>([]);
   
@@ -161,35 +166,48 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
   };
 
   const persistLocalAttemptAndMastery = (
+    accountId: string,
     q: QuestionBankItem,
     rawAnswer: any,
     isCorrect: boolean,
     timeSpent: number,
-    hintsCount: number
+    hintsCount: number,
+    xpAwarded: number,
+    verification: 'bank' | 'unverified' | 'provisional'
   ) => {
     try {
-      const savedAttempts = JSON.parse(localStorage.getItem('learnco_attempts') || '[]');
+      const savedAttempts = readStoredArray<any>(practiceStorageKey(accountId, 'attempts'));
       const nextAttempts = [
         {
           id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           questionId: q.id,
           conceptId: q.conceptId || q.topicId,
           subjectId: q.subjectId,
+          topicId: q.topicId,
           questionText: q.questionText,
+          userAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : String(rawAnswer),
           selectedAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : String(rawAnswer),
           correctAnswer: Array.isArray(q.correctAnswer)
             ? q.correctAnswer.join(', ')
             : String(q.correctAnswer),
+          correctAnswerText: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : String(q.correctAnswer),
+          explanation: q.explanation,
           isCorrect,
+          xpAwarded,
+          verification,
+          ...(confidence[q.id] ? { confidence: confidence[q.id] } : {}),
+          timeSpentSeconds: timeSpent,
           solvingTimeSeconds: timeSpent,
+          hintsRevealed: hintsCount,
           hintsRevealedCount: hintsCount,
+          timestamp: new Date().toISOString(),
           submittedAt: new Date().toISOString(),
         },
         ...savedAttempts,
       ].slice(0, 200);
-      localStorage.setItem('learnco_attempts', JSON.stringify(nextAttempts));
+      localStorage.setItem(practiceStorageKey(accountId, 'attempts'), JSON.stringify(nextAttempts));
 
-      const savedMasteries = JSON.parse(localStorage.getItem('learnco_masteries') || '[]');
+      const savedMasteries = readStoredArray<any>(practiceStorageKey(accountId, 'masteries'));
       const cid = q.conceptId || q.topicId || `${q.subjectId}-concept`;
       const existingIdx = savedMasteries.findIndex((m: any) => m.conceptId === cid);
       if (existingIdx >= 0) {
@@ -225,8 +243,8 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           lastPracticedAt: new Date().toISOString(),
         });
       }
-      localStorage.setItem('learnco_masteries', JSON.stringify(savedMasteries));
-      window.dispatchEvent(new CustomEvent('learnco_attempts_updated'));
+      localStorage.setItem(practiceStorageKey(accountId, 'masteries'), JSON.stringify(savedMasteries));
+      window.dispatchEvent(new CustomEvent('learnco_attempts_updated', { detail: { accountId } }));
     } catch (_) {}
   };
 
@@ -239,32 +257,12 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
     setSubmitError(null);
     setIsSubmitting(true);
     try {
-      // Evaluate locally first for fallback & representation
-      let isCorrect = false;
-
-      if (currentQuestion.questionType === 'multiple_choice') {
-        const correctArray = Array.isArray(currentQuestion.correctAnswer)
-          ? currentQuestion.correctAnswer
-          : [currentQuestion.correctAnswer];
-        const userArray = Array.isArray(rawAnswer) ? rawAnswer : [rawAnswer];
-        isCorrect =
-          correctArray.length === userArray.length &&
-          correctArray.every((a) => userArray.includes(a as any));
-      } else if (currentQuestion.questionType === 'numerical') {
-        const userNum = parseFloat(rawAnswer);
-        const correctNum = typeof currentQuestion.correctAnswer === 'number'
-          ? currentQuestion.correctAnswer
-          : parseFloat(currentQuestion.correctAnswer as string);
-        const tol = currentQuestion.numericalTolerance ?? 0.05;
-        isCorrect = !isNaN(userNum) && Math.abs(userNum - correctNum) <= tol;
-      } else {
-        isCorrect =
-          rawAnswer.toString().trim().toLowerCase() ===
-          currentQuestion.correctAnswer.toString().trim().toLowerCase();
-      }
+      // Provisional feedback uses the same grading rules as the server bank.
+      const isCorrect = gradeQuestionAnswer(currentQuestion, rawAnswer);
 
       const effectiveUserId = AuthClient.getCurrentUser()?.id || 'guest';
       const token = AuthClient.getToken();
+      const attemptId = `att-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
       const timeSpent = timeSpentPerQuestion[questionId] || 15;
       const hintsCount = hintsRevealed[questionId] || 0;
 
@@ -281,8 +279,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            attemptId,
             questionId: currentQuestion.id,
-            selectedAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : rawAnswer.toString(),
+            selectedAnswer: rawAnswer,
             isCorrect,
             timeSpentSeconds: timeSpent,
             conceptId: currentQuestion.conceptId,
@@ -293,6 +292,11 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         });
 
         const data = await submitRes.json().catch(() => ({}));
+        // Do not apply a delayed result to a newly signed-in account.
+        if (AuthClient.getToken() !== token || AuthClient.getCurrentUser()?.id !== effectiveUserId) {
+          setSubmitError('Your session changed while this attempt was being submitted. Check your practice history.');
+          return;
+        }
 
         if (!submitRes.ok) {
           // Do not fake success on client/auth/quota errors (400, 401, 403, 429)
@@ -303,8 +307,17 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           throw new Error(data.error || `Server error (${submitRes.status})`);
         }
 
-        const serverCorrect = typeof data.isCorrect === 'boolean' ? data.isCorrect : isCorrect;
-        const xpEarned = typeof data.xpEarned === 'number' ? data.xpEarned : (serverCorrect ? 5 : 0);
+        // A proxy or malformed success is not proof that this attempt was saved.
+        // Queue the same stable ID for an idempotent retry rather than inventing XP.
+        if (data.success !== true || data.attempt?.id !== attemptId ||
+            typeof data.isCorrect !== 'boolean' ||
+            (data.verification !== 'bank' && data.verification !== 'unverified') ||
+            typeof data.xpEarned !== 'number' || !Number.isFinite(data.xpEarned) || data.xpEarned < 0 ||
+            typeof data.newTotalXp !== 'number' || !Number.isFinite(data.newTotalXp) || data.newTotalXp < 0) {
+          throw new Error('Invalid server acknowledgement');
+        }
+        const serverCorrect = data.isCorrect as boolean;
+        const xpEarned = data.xpEarned as number;
 
         const updatedStreak = recordDailyActivity(effectiveUserId, {
           questionsSolved: 1,
@@ -312,16 +325,15 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           minutesStudied: Math.ceil(timeSpent / 60),
         });
 
-        persistLocalAttemptAndMastery(currentQuestion, rawAnswer, serverCorrect, timeSpent, hintsCount);
+        persistLocalAttemptAndMastery(effectiveUserId, currentQuestion, rawAnswer, serverCorrect, timeSpent, hintsCount, xpEarned, data.verification === 'bank' ? 'bank' : 'unverified');
 
-        if (typeof data.newTotalXp === 'number') {
-          syncLocalXpOnly(data.newTotalXp);
-        }
+        const displayXp = typeof data.newTotalXp === 'number'
+          ? syncLocalXpOnly(data.newTotalXp, effectiveUserId)
+          : undefined;
         updateGamificationState({
-          ...(typeof data.newTotalXp === 'number' ? { xp: data.newTotalXp } : {}),
-          ...(typeof data.newLevel === 'number' ? { level: data.newLevel } : {}),
-          ...(typeof data.dailySolvedToday === 'number'
-            ? { dailyQuestionsSolvedToday: data.dailySolvedToday }
+          ...(displayXp !== undefined ? { xp: displayXp, level: calculateLevelFromXp(displayXp).level } : {}),
+          ...(typeof data.dailyQuestionsSolvedToday === 'number'
+            ? { dailyQuestionsSolvedToday: data.dailyQuestionsSolvedToday }
             : {}),
           currentStreak: data.currentStreak || updatedStreak.currentStreak,
         });
@@ -336,6 +348,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           [questionId]: {
             isCorrect: serverCorrect,
             xpEarned,
+            verification: data.verification,
             dailyQuotaRemaining: data.dailyQuotaRemaining,
             newStreak: data.currentStreak || updatedStreak.currentStreak,
           },
@@ -354,23 +367,37 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         }
       } catch (_networkErr) {
         // Offline / unreachable server fallback: queue attempt for later sync
-        OfflineStorageManager.saveOfflineAttempt({
-          questionId: currentQuestion.id,
-          subjectId: currentQuestion.subjectId,
-          topic: currentQuestion.topicId,
-          userAnswer: Array.isArray(rawAnswer) ? rawAnswer.join(', ') : rawAnswer.toString(),
-          isCorrect,
-          timeSpentSeconds: timeSpent,
-        });
+        if (effectiveUserId === 'guest' || AuthClient.getToken() !== token || AuthClient.getCurrentUser()?.id !== effectiveUserId) {
+          setSubmitError('Your session changed before this attempt could be saved. Please sign in and try again.');
+          return;
+        }
+        try {
+          OfflineStorageManager.saveOfflineAttempt({
+            id: attemptId,
+            userId: effectiveUserId,
+            conceptId: currentQuestion.conceptId,
+            hintsUsedCount: hintsCount,
+            questionId: currentQuestion.id,
+            subjectId: currentQuestion.subjectId,
+            topic: currentQuestion.topicId,
+            userAnswer: rawAnswer,
+            isCorrect,
+            timeSpentSeconds: timeSpent,
+          });
+        } catch {
+          setSubmitError('Could not save this attempt on your device. Please try again.');
+          return;
+        }
 
-        const fallbackXp = isCorrect ? 5 : 0;
+        // Offline correctness is provisional; XP is awarded only on server sync.
+        const fallbackXp = 0;
         const updatedStreak = recordDailyActivity(effectiveUserId, {
           questionsSolved: 1,
           xpEarned: fallbackXp,
           minutesStudied: Math.ceil(timeSpent / 60),
         });
 
-        persistLocalAttemptAndMastery(currentQuestion, rawAnswer, isCorrect, timeSpent, hintsCount);
+        persistLocalAttemptAndMastery(effectiveUserId, currentQuestion, rawAnswer, isCorrect, timeSpent, hintsCount, fallbackXp, 'provisional');
 
         try {
           window.dispatchEvent(new Event('learnco_streak_updated'));
@@ -782,6 +809,26 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           )}
         </div>
 
+        <fieldset disabled={isCurrentSubmitted || isSubmitting} className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-2 disabled:opacity-70">
+          <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-slate-100">How confident are you? (optional)</legend>
+          <p className="text-xs text-slate-600 dark:text-slate-400">Choose before submitting. Stored only on this device, not sent to the server. It does not affect your score.</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-800 dark:text-slate-200">
+            {([
+              ['none', 'Prefer not to say'], ['unsure', 'Unsure'], ['somewhat', 'Somewhat sure'], ['confident', 'Confident'],
+            ] as const).map(([value, label]) => (
+              <label key={value} className="inline-flex items-center gap-2 cursor-pointer">
+                <input type="radio" name={`confidence-${questionId}`} value={value} checked={(confidence[questionId] || 'none') === value}
+                  onChange={() => setConfidence(prev => {
+                    const next = { ...prev };
+                    if (value === 'none') delete next[questionId]; else next[questionId] = value;
+                    return next;
+                  })} />
+                {label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         {/* ========================================================================= */}
         {/* POST-SUBMISSION STEP-BY-STEP SOLUTION REVEAL                              */}
         {/* ========================================================================= */}
@@ -793,21 +840,27 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                 : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800'
             }`}
           >
+            {currentFeedback?.verification === 'unverified' && (
+              <p role="status" className="text-xs text-amber-900 dark:text-amber-200">
+                This question is not in the server question bank. Its answer is self-checked and earns no server XP.
+              </p>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {currentFeedback?.isCorrect ? (
                   <>
                     <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                     <span className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
-                      Correct! +{currentFeedback?.xpEarned ?? 5} XP Awarded
-                      {currentFeedback?.queuedOffline ? ' (Queued for Sync)' : ''}
+                      {currentFeedback?.queuedOffline
+                        ? 'Correct (provisional) — queued for server verification'
+                        : `Correct! +${currentFeedback?.xpEarned ?? 0} XP Awarded`}
                     </span>
                   </>
                 ) : (
                   <>
                     <XCircle className="w-5 h-5 text-rose-500" />
                     <span className="font-bold text-sm text-rose-900 dark:text-rose-200">
-                      Incorrect (Logged to Mistake Notebook)
+                      {currentFeedback?.queuedOffline ? 'Incorrect (provisional) — queued for server verification' : 'Incorrect (logged to practice history)'}
                     </span>
                   </>
                 )}

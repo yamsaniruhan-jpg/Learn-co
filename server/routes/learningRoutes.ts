@@ -5,6 +5,7 @@ import { XpEngine } from '../xpEngine';
 import { QuestionSelectionEngine } from '../services/questionSelectionEngine';
 import { CURRICULUM_DATA, EXAM_TRACKS } from '../../src/data/curriculumData';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
+import { convertCreatorQuiz } from '../services/creatorQuizConversion';
 import { PracticeSessionConfig, QuestionBankItem } from '../../src/types/curriculum';
 import { GoogleGenAI } from '@google/genai';
 // Legacy CommonJS service (its folder is marked "type": "commonjs").
@@ -217,55 +218,25 @@ router.post('/import-creator-quiz', requireAuth, (req: AuthenticatedRequest, res
       return;
     }
 
-    if (resource.resourceType !== 'quiz' || !resource.content.quiz) {
-      res.status(400).json({ error: 'Resource is not a quiz or has no questions.' });
+    let convertedQuestions: QuestionBankItem[];
+    try {
+      convertedQuestions = convertCreatorQuiz(resource);
+    } catch (error: any) {
+      res.status(422).json({ error: error.message });
       return;
     }
 
-    const convertedQuestions: QuestionBankItem[] = resource.content.quiz.map(
-      (qItem: any, idx: number) => {
-        const correctOption =
-          qItem.options && qItem.correctIndex !== undefined
-            ? qItem.options[qItem.correctIndex] || qItem.options[0]
-            : 'A';
-
-        return {
-          id: `q-creator-${resource.id}-${idx}`,
-          subjectId: resource.subjectId || 'math',
-          examTracks: ['all'],
-          chapterId: 'creator-synthesized-ch',
-          topicId: resource.title,
-          conceptId: `concept-creator-${resource.id}`,
-          difficulty: resource.difficulty || 'medium',
-          questionType: 'single_choice',
-          questionText: qItem.question,
-          options: qItem.options || ['Option A', 'Option B', 'Option C', 'Option D'],
-          correctAnswer: correctOption,
-          explanation: qItem.explanation || 'Solution synthesized from uploaded notes.',
-          stepByStepSolution: [qItem.explanation || 'Direct application of definition.'],
-          hints: ['Think about the core principle highlighted in your notes.'],
-          tags: resource.tags || ['creator-import'],
-          source: `Creator Studio: ${resource.title}`,
-          verificationStatus: 'creator_imported',
-          version: 1,
-        };
-      }
-    );
-
     // Store imported quiz questions scoped to the authenticated user
-    const existing = userImportedQuestions.get(userId) || [];
-    for (const cq of convertedQuestions) {
-      if (!existing.find((item) => item.id === cq.id)) {
-        existing.push(cq);
-      }
-    }
-    userImportedQuestions.set(userId, existing);
+    // Replace the previous snapshot for this resource, including removed items.
+    const prefix = `creator-${resource.id}-`;
+    const existing = (userImportedQuestions.get(userId) || []).filter(item => !item.id.startsWith(prefix));
+    userImportedQuestions.set(userId, [...existing, ...convertedQuestions]);
 
     res.json({
       success: true,
       importedCount: convertedQuestions.length,
       questions: convertedQuestions,
-      message: `Successfully imported ${convertedQuestions.length} questions into your practice question bank!`,
+      message: `Imported ${convertedQuestions.length} unverified questions into your temporary private question list; they do not earn server XP.`,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to import creator quiz.' });

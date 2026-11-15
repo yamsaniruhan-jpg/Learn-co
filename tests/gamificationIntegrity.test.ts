@@ -17,6 +17,7 @@ import type { Express } from 'express';
  */
 
 let app: Express;
+let db: typeof import('../server/db').Database;
 
 const uniqueEmail = () => `gam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.co`;
 const PASSWORD = 'Str0ngPass!23';
@@ -37,6 +38,7 @@ beforeAll(async () => {
   process.env.LEARNCO_DB_FILE = `/tmp/learnco-gam-${process.pid}.json`;
   const mod = await import('../server.js');
   app = await mod.createApp();
+  db = (await import('../server/db')).Database;
 }, 60_000);
 
 describe('new account baseline', () => {
@@ -54,11 +56,10 @@ describe('new account baseline', () => {
 
 describe('XP ledger', () => {
   it('records the real delta for each award', async () => {
-    const { token } = await newUser();
+    const { token, userId } = await newUser();
 
-    // Award 50 XP from a 0 baseline.
-    const first = await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 50 });
-    expect(first.status).toBe(200);
+    // Exercise the server-side ledger function, not a client-controlled XP endpoint.
+    db.updateUserXp(userId, 50);
 
     const profile = await request(app).get('/api/user/profile').set(auth(token));
     expect(profile.body.gamification.xp).toBe(50);
@@ -75,9 +76,8 @@ describe('XP ledger', () => {
 
   it('keeps level consistent with XP across endpoints', async () => {
     const { token, userId } = await newUser();
-    // The endpoint bounds each client sync to at most 50 XP.
-    await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 50 });
-    await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 100 });
+    db.updateUserXp(userId, 50);
+    db.updateUserXp(userId, 100);
 
     // 100 XP => floor(sqrt(100/25)) + 1 = 3
     const profile = await request(app).get('/api/user/profile').set(auth(token));
@@ -93,10 +93,9 @@ describe('XP ledger', () => {
 
 describe('leaderboard reads have no side effects', () => {
   it('does not change stored level when the leaderboard is viewed repeatedly', async () => {
-    const { token } = await newUser();
-    // The endpoint bounds each client sync to at most 50 XP.
-    await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 50 });
-    await request(app).post('/api/leaderboard/xp').set(auth(token)).send({ xp: 100 });
+    const { token, userId } = await newUser();
+    db.updateUserXp(userId, 50);
+    db.updateUserXp(userId, 100);
 
     const before = await request(app).get('/api/user/profile').set(auth(token));
     expect(before.body.gamification.level).toBe(3);
