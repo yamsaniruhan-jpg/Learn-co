@@ -184,11 +184,17 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
 
   const handleClick = async () => {
     setDownloadedFile(null);
-    if (isInstallable) {
-      const accepted = await install();
-      if (accepted) return;
+    const isMobileDevice = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod|mobile/.test(navigator.userAgent.toLowerCase());
+    if (isMobileDevice) {
+      if (isInstallable) {
+        const accepted = await install();
+        if (accepted) return;
+      }
+      setShowInstallGuide(true);
+    } else {
+      triggerDesktopDownload(detectedOS);
+      setShowInstallGuide(true);
     }
-    setShowInstallGuide(true);
   };
 
   const handleCopyUrl = () => {

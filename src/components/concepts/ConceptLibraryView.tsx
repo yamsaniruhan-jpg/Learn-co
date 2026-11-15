@@ -29,12 +29,17 @@ import {
   ListOrdered,
   Lightbulb,
   Award,
+  BarChart3,
+  Layers,
+  Microscope,
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { cleanLatexToNormalText } from '../common/FormattedMathText';
+import { FormattedMathText, cleanLatexToNormalText } from '../common/FormattedMathText';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
+import { CURRICULUM_DATA } from '../../data/curriculumData';
+import { ConceptDetail, SubjectId } from '../../types/curriculum';
 
 export interface ConceptBookChapter {
   id: string;
@@ -66,7 +71,7 @@ export interface ConceptBook {
   title: string;
   subtitle: string;
   author: string;
-  subject: 'math' | 'cs' | 'physics' | 'chemistry';
+  subject: SubjectId;
   subjectLabel: string;
   edition: string;
   pagesOrChaptersCount: number;
@@ -80,7 +85,7 @@ export interface ConceptBook {
 export interface AIDeepDiveDocument {
   id: string;
   title: string;
-  subject: 'math' | 'cs' | 'physics' | 'chemistry';
+  subject: SubjectId;
   category: string;
   readTime: string;
   abstract: string;
@@ -173,6 +178,107 @@ const STEM_BOOKS: ConceptBook[] = [
             heading: '2.2 Taylor Series Expansions with Lagrange Remainder',
             content: 'Any infinitely differentiable function f(x) can be approximated around x = a by its polynomial series. The Lagrange remainder term R_n(x) quantifies the exact truncation error.',
             formula: "f(x) = ∑_{k=0}^{n} [f^(k)(a) / k!] · (x - a)^k + R_n(x)",
+          },
+        ],
+      },
+      {
+        id: 'calc-ch-3',
+        chapterNumber: 3,
+        title: 'AP Calculus BC: Integration by Parts, Partial Fractions & Volumes',
+        readingTimeMinutes: 16,
+        summary: 'Master advanced antiderivative techniques (LIATE by parts, non-repeated linear partial fractions, inverse trig) and 3D slice volumes (washers, shells, and known cross-sections).',
+        sections: [
+          {
+            heading: '3.1 Integration by Parts & Partial Fraction Decomposition',
+            content: 'Reversing the product rule gives ∫ u dv = u·v - ∫ v du (choose u via LIATE). Proper rational functions P(x)/Q(x) with distinct linear roots decompose cleanly into ∑ A_i / (x - r_i), integrating directly into logarithmic terms.',
+            formula: '∫ u dv = u·v − ∫ v du   |   V_washer = π ∫_a^b [R(x)² − r(x)²] dx',
+            keyPoints: [
+              'Always perform polynomial long division before partial fractions if deg(numerator) ≥ deg(denominator).',
+              'For cross-sectional solids with known area A(x), integrate ∫_a^b A(x) dx WITHOUT an extra factor of π.',
+              'Rectifiable smooth curve length equals ∫_a^b √(1 + [f\'(x)]²) dx.',
+            ],
+          },
+        ],
+        workedExample: {
+          problem: 'Evaluate ∫₀¹ 3 / [(x + 1)(x + 2)] dx using partial fractions.',
+          solutionSteps: [
+            '1. Set 3 / [(x + 1)(x + 2)] = A/(x + 1) + B/(x + 2), so 3 = A(x + 2) + B(x + 1).',
+            '2. Substitute x = -1 → A = 3; substitute x = -2 → B = -3.',
+            '3. Integrate: [3 ln|x + 1| - 3 ln|x + 2|]₀¹ = 3 ln|(x + 1)/(x + 2)|₀¹.',
+            '4. Evaluate bounds: 3 ln(2/3) - 3 ln(1/2) = 3 ln(4/3).',
+          ],
+          finalAnswer: 'Exact value: 3 ln(4/3)',
+        },
+        quizCheck: {
+          question: 'A solid has base bounded by y = √x, y = 0, and x = 4, with square cross-sections perpendicular to the x-axis. What is its volume?',
+          options: ['8', '8π', '16', '4π'],
+          correctIndex: 0,
+          explanation: 'Square side is s(x) = √x, so slice area is A(x) = s(x)² = x. Volume = ∫₀⁴ x dx = [x²/2]₀⁴ = 8 (no factor of π).',
+        },
+      },
+      {
+        id: 'calc-ch-4',
+        chapterNumber: 4,
+        title: "AP Calculus BC: Differential Equations, Slope Fields & Euler's Method",
+        readingTimeMinutes: 15,
+        summary: "Analyze qualitative trajectories on slope fields, step numerical initial-value approximations with Euler's method, solve separable ODEs, and model bounded logistic populations.",
+        sections: [
+          {
+            heading: '4.1 Logistic Growth & Euler Numerical Stepping',
+            content: "Starting from (x₀, y₀), Euler's method iterates y_{n+1} = y_n + F(x_n, y_n)·Δx. Autonomous logistic systems dP/dt = kP(1 - P/L) stabilize at carrying capacity L and attain peak growth speed at P = L/2.",
+            formula: 'dP/dt = kP(1 − P/L)   |   Peak Growth Rate at P = L/2',
+            keyPoints: [
+              'If solution curves are strictly concave up (d²y/dx² > 0), Euler tangent steps always underestimate.',
+              'Convert ln|y| = g(x) + C₁ carefully into y = C e^{g(x)} and match square-root signs to y(x₀).',
+            ],
+          },
+        ],
+        quizCheck: {
+          question: 'A population obeys dP/dt = 0.004 P (650 - P) with P(0) = 80. At what population is growth fastest?',
+          options: ['P = 325', 'P = 650', 'P = 162.5', 'P = 80'],
+          correctIndex: 0,
+          explanation: 'Carrying capacity is L = 650, so dP/dt is maximized at the inflection level P = L/2 = 325.',
+        },
+      },
+      {
+        id: 'calc-ch-5',
+        chapterNumber: 5,
+        title: 'AP Calculus BC: Infinite Series, Convergence Tests & Power Series',
+        readingTimeMinutes: 18,
+        summary: 'Diagnose convergence via Integral, Limit Comparison, Ratio, and Alternating Series tests; determine exact intervals of convergence including endpoints; bound Maclaurin remainders.',
+        sections: [
+          {
+            heading: '5.1 Ratio Test, Interval Endpoints & Error Bounds',
+            content: 'Compute R via lim |a_{n+1}/a_n| < 1, then test x = c - R and x = c + R individually using p-series, comparison, or Alternating Series tests. Alternating remainder satisfies |S - S_n| ≤ b_{n+1}.',
+            formula: 'L = lim_{n→∞} |a_{n+1} / a_n| < 1   |   |R_n(x)| ≤ [M · |x − c|^{n+1}] / (n + 1)!',
+            keyPoints: [
+              'The nth-term test ONLY proves divergence when lim a_n ≠ 0; lim a_n = 0 never proves convergence.',
+              'Read higher derivatives cleanly from Maclaurin series via c_n = f^(n)(0) / n!.',
+            ],
+          },
+        ],
+        quizCheck: {
+          question: 'If the Maclaurin series of f(x) begins 1 - 3x² + 5x⁴ - ···, what is f^(4)(0)?',
+          options: ['120', '5', '20', '24'],
+          correctIndex: 0,
+          explanation: 'The x⁴ coefficient equals f^(4)(0)/4! = 5, so f^(4)(0) = 5 × 24 = 120.',
+        },
+      },
+      {
+        id: 'calc-ch-6',
+        chapterNumber: 6,
+        title: 'AP Calculus BC: Parametric, Planar Vector & Polar Calculus',
+        readingTimeMinutes: 15,
+        summary: 'Compute dy/dx and d²y/dx² along parametric curves, separate 2D vector displacement from speed-integrated distance, and evaluate polar tangents and sector areas.',
+        sections: [
+          {
+            heading: '6.1 Parametric Curvature & Polar Sector Integrals',
+            content: 'Parametric concavity divides d/dt(dy/dx) once more by dx/dt. Total particle distance integrates scalar speed √(x\'(t)² + y\'(t)²). Polar area sweeps fan sectors ½ ∫_α^β (r_out² - r_in²) dθ.',
+            formula: 'd²y/dx² = [d/dt(dy/dx)] / (dx/dt)   |   A_polar = ½ ∫_α^β r(θ)² dθ',
+            keyPoints: [
+              'Never compute d²y/dx² as y\'\'(t)/x\'\'(t).',
+              'Solve r(θ) = 0 carefully to avoid double-tracing petals or circles like r = cos θ.',
+            ],
           },
         ],
       },
@@ -289,6 +395,102 @@ const STEM_BOOKS: ConceptBook[] = [
       },
     ],
   },
+  {
+    id: 'book-bio-01',
+    title: 'Molecular Biology, Immunology & Cell Physiology',
+    subtitle: 'Central Dogma Regulation, MHC Adaptive Immunity & Endocrine Cascades',
+    author: 'N. Campbell & B. Alberts (Curated Edition)',
+    subject: 'biology',
+    subjectLabel: 'Biology',
+    edition: '12th Molecular Synthesis Edition',
+    pagesOrChaptersCount: 4,
+    difficulty: 'Intermediate',
+    color: 'from-rose-600 to-pink-700',
+    icon: Microscope,
+    description: 'Comprehensive guide covering chemiosmosis, CRISPR/PCR mechanics, MHC-I/II antigen presentation, and GPCR glycemic feedback.',
+    chapters: [
+      {
+        id: 'bio-ch-1',
+        chapterNumber: 1,
+        title: 'Antigen Presentation (MHC-I/II) & Clonal Immunological Memory',
+        readingTimeMinutes: 12,
+        summary: 'Contrast CD8+ cytotoxic clearing of intracellular infections via MHC-I against CD4+ helper mobilization and IgG memory via MHC-II.',
+        sections: [
+          {
+            heading: '1.1 Rule of 8 Co-Receptor Pairing',
+            content: 'Nucleated host cells sample endogenous cytosolic peptides onto MHC Class I for CD8+ cytotoxic T cells (1 × 8 = 8). Professional antigen-presenting cells display phagocytosed exogenous peptides onto MHC Class II for CD4+ helper T cells (2 × 4 = 8).',
+            formula: 'MHC-I ↔ CD8+ Cytotoxic T Cells   |   MHC-II ↔ CD4+ Helper T Cells',
+          },
+        ],
+        quizCheck: {
+          question: 'Which cell population displays endogenous cytosolic peptides on MHC Class I?',
+          options: ['Nearly all nucleated somatic cells', 'Mature erythrocytes only', 'Only dendritic cells', 'Platelets only'],
+          correctIndex: 0,
+          explanation: 'Nearly all nucleated body cells express MHC-I so cytotoxic T cells can detect viral hijacking or malignancy.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'book-ds-01',
+    title: 'Statistical Learning, Bayesian Updating & Dimensionality',
+    subtitle: 'Conjugate Posteriors, Bias-Variance, Spectral PCA & Time Series',
+    author: 'G. James, D. Witten & A. Gelman (Curated Edition)',
+    subject: 'data_science',
+    subjectLabel: 'Data Science',
+    edition: '3rd Applied Inference Edition',
+    pagesOrChaptersCount: 4,
+    difficulty: 'Advanced',
+    color: 'from-cyan-600 to-sky-700',
+    icon: BarChart3,
+    description: 'Bridges NHST vs. Bayesian Beta-Binomial updating, ROC/PR curves under class imbalance, PCA eigenvectors, and walk-forward time-series validation.',
+    chapters: [
+      {
+        id: 'ds-ch-1',
+        chapterNumber: 1,
+        title: 'Beta-Binomial Conjugate Updating & PCA Variance Retention',
+        readingTimeMinutes: 13,
+        summary: 'Compute closed-form conjugate posterior means from pseudo-counts and preserve causality across temporal cross-validation splits.',
+        sections: [
+          {
+            heading: '1.1 Closed-Form Conjugate Posteriors',
+            content: 'Starting from prior Beta(α, β) and observing k successes in n trials yields posterior Beta(α + k, β + n - k) with posterior mean (α + k)/(α + β + n).',
+            formula: 'E[θ | k, n] = (α + k) / (α + β + n)   |   EVR_k = ∑_{i=1}^k λ_i / Tr(Σ)',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'book-eng-01',
+    title: 'Analytical Rhetoric, Research Synthesis & Literary Stylistics',
+    subtitle: 'Toulmin Warrants, Steel-Manning, Free Indirect Discourse & Syntax',
+    author: 'W. Booth & C. Brooks (Curated Rhetoric Edition)',
+    subject: 'english',
+    subjectLabel: 'English & Rhetoric',
+    edition: '5th Rhetoric & Composition Edition',
+    pagesOrChaptersCount: 4,
+    difficulty: 'Intermediate',
+    color: 'from-violet-600 to-purple-800',
+    icon: BookMarked,
+    description: 'Develops forensic argumentation, primary-source triangulation, close third-person focalization, and periodic vs. cumulative syntactic control.',
+    chapters: [
+      {
+        id: 'eng-ch-1',
+        chapterNumber: 1,
+        title: 'Concessive Steel-Manning & Free Indirect Discourse',
+        readingTimeMinutes: 11,
+        summary: 'Build bulletproof scholarly arguments by engaging the strongest opposing formulation and analyzing subtle shifts in narrative focalization.',
+        sections: [
+          {
+            heading: '1.1 Detecting Free Indirect Discourse',
+            content: 'Free indirect discourse retains third-person pronouns and past tense while absorbing a character\'s own biased idioms, exclamations, and rhetorical questions without quotation marks.',
+            formula: 'Third-person grammar + Subjective character idiom − Reporting tag = Free Indirect Discourse',
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 const AI_GENERATED_DOCUMENTS: AIDeepDiveDocument[] = [
@@ -392,6 +594,93 @@ const AI_GENERATED_DOCUMENTS: AIDeepDiveDocument[] = [
     realWorldApplication: 'Heat engines, refrigerators, information theory (Shannon entropy), and chemical equilibrium Gibbs free energy (ΔG = ΔH - TΔS).',
     recommendedPractice: 'Derive the entropy change for the isothermal expansion of an ideal gas.',
   },
+  {
+    id: 'doc-ai-04',
+    title: 'AP Calculus BC Mastery: Series Convergence & Lagrange Error Bounds',
+    subject: 'math',
+    category: 'AP Calculus BC & Real Analysis',
+    readTime: '10 min read',
+    abstract: 'A complete diagnostic decision tree uniting Ratio, Integral, Limit Comparison, and Alternating Series tests with power-series endpoint verification and remainder bounds.',
+    intuition: 'Series convergence tests are specialized filters: first confirm terms go to zero, then inspect structure—factorials/powers invoke Ratio Test, rational algebraic powers invoke Limit Comparison against 1/n^p, and alternating signs trigger Leibniz decreasing-magnitude checks.',
+    rigorAndFormulas: [
+      {
+        title: 'Lagrange & Alternating Remainder Bounds',
+        latexOrEquation: '|S - S_N| ≤ b_{N+1}  (Alternating)   |   |R_N(x)| ≤ M · |x - c|^{N+1} / (N + 1)!',
+        explanation: 'Use the Alternating remainder whenever signs alternate monotonically toward zero; otherwise bound |f^(N+1)(t)| on the interval.',
+      },
+      {
+        title: 'Logistic Growth Equilibrium & Inflection',
+        latexOrEquation: 'dP/dt = kP(1 - P/L)  ⟹  Peak growth rate at P = L/2,  lim_{t→∞} P(t) = L',
+        explanation: 'Carrying capacity L acts as a stable horizontal asymptote regardless of whether P₀ starts above or below L.',
+      },
+    ],
+    stepByStepDerivation: [
+      '1. Check lim_{n→∞} a_n: if nonzero or DNE, the series diverges immediately.',
+      '2. Apply Ratio Test for x^n or n!: solve L(x) < 1 to obtain open interval (c - R, c + R).',
+      '3. Plug both endpoints x = c ± R individually into the original series and classify with p-series, comparison, or AST.',
+      '4. Construct new Taylor series cleanly via substitution, termwise differentiation, or termwise integration.',
+    ],
+    commonPitfalls: [
+      'Concluding convergence merely because lim a_n = 0 (fails on harmonic series ∑ 1/n).',
+      'Omitting endpoint checks at x = c ± R or dropping n! when solving f^(n)(0) = n! · c_n.',
+    ],
+    realWorldApplication: 'Numerical ODE solvers in aerospace trajectory integration, scientific calculator trig evaluation, and signal-processing filter approximations.',
+    recommendedPractice: 'Test endpoints on ∑ (x - 3)^n / (n · 2^n) and bound ∫₀^{0.5} cos(x²) dx with two terms.',
+  },
+  {
+    id: 'doc-ai-05',
+    title: 'Adaptive Immunology & Second-Messenger Signal Amplification',
+    subject: 'biology',
+    category: 'Immunology & Cell Signaling',
+    readTime: '8 min read',
+    abstract: 'Integrating MHC Class I/II antigen display with clonal selection and hormone-triggered GPCR enzymatic amplification.',
+    intuition: 'Adaptive immunity divides labor cleanly between internal surveillance (every nucleated cell flashes MHC-I) and external threat briefing (professional APCs flash MHC-II to CD4+ coordinators).',
+    rigorAndFormulas: [
+      {
+        title: 'Rule of 8 & cAMP Cascade',
+        latexOrEquation: 'MHC-I × CD8+ = 8   |   MHC-II × CD4+ = 8   |   GPCR → Gα-GTP → AC → cAMP → PKA',
+        explanation: 'Signal cascades turn tiny extracellular hormone concentrations into large metabolic enzyme responses.',
+      },
+    ],
+    stepByStepDerivation: [
+      '1. Phagocyte processes exogenous antigen and loads peptide fragments onto MHC Class II.',
+      '2. CD4+ T-cell receptor + CD4 binds MHC-II, releasing cytokines that activate matching B-cell clones.',
+      '3. Activated B cells differentiate into plasma cells (IgM → class-switched IgG) and long-lived memory B cells.',
+    ],
+    commonPitfalls: [
+      'Confusing MHC-I (all nucleated cells) with MHC-II (dendritic cells, macrophages, B cells).',
+      'Assuming skeletal muscle exports glucose via glucagon (it lacks glucose-6-phosphatase).',
+    ],
+    realWorldApplication: 'mRNA vaccine design, monoclonal antibody therapeutics, and cholera/pertussis G-protein toxicology.',
+    recommendedPractice: 'Trace how cholera toxin locks Gαs in its GTP-bound state.',
+  },
+  {
+    id: 'doc-ai-06',
+    title: 'Bayesian Conjugate Updating & Spectral PCA Geometry',
+    subject: 'data_science',
+    category: 'Statistical Modeling & ML',
+    readTime: '8 min read',
+    abstract: 'Connecting closed-form Beta-Binomial updating, frequentist vs. credible intervals, and standardized covariance eigendecomposition.',
+    intuition: 'Bayesian updating treats prior parameters as starter pseudo-counts that real data smoothly updates, while PCA rotates standardized coordinate axes to align with maximum feature variance.',
+    rigorAndFormulas: [
+      {
+        title: 'Beta-Binomial Update & PCA Variance',
+        latexOrEquation: 'E[θ | k, n] = (α + k)/(α + β + n)   |   Σ = (1/(n-1)) X^T X',
+        explanation: 'Always fit standardization and PCA solely on training folds to prevent validation leakage.',
+      },
+    ],
+    stepByStepDerivation: [
+      '1. Standardize training features to zero mean and unit variance.',
+      '2. Compute sample covariance matrix Σ and sort eigenvectors by descending eigenvalues λ_i.',
+      '3. Select k components meeting target cumulative explained variance ratio ∑ λ_i / Tr(Σ).',
+    ],
+    commonPitfalls: [
+      'Running PCA on unscaled columns with mixed units (meters vs. dollars).',
+      'Using random shuffled K-fold validation instead of walk-forward splits on time series.',
+    ],
+    realWorldApplication: 'Bayesian A/B experimentation platforms, genomics dimensionality reduction, and financial ARIMA forecasting.',
+    recommendedPractice: 'Compute posterior Beta mean after 8/10 successes starting from Beta(3, 7).',
+  },
 ];
 
 interface ConceptLibraryViewProps {
@@ -404,14 +693,16 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
   onNavigateToPractice,
 }) => {
   const { gamification } = useAuth();
-  const [activeTab, setActiveTab] = useState<'books' | 'ai-docs' | 'cheatsheets'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'ai-docs' | 'syllabus'>('books');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  
+
   // Selected items for modal/reader
   const [selectedBook, setSelectedBook] = useState<ConceptBook | null>(null);
   const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
   const [selectedAIDoc, setSelectedAIDoc] = useState<AIDeepDiveDocument | null>(null);
+  const [selectedConcept, setSelectedConcept] = useState<ConceptDetail | null>(null);
+  const [syllabusQuizAnswer, setSyllabusQuizAnswer] = useState<number | null>(null);
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
   const [bookmarkedItems, setBookmarkedItems] = useState<Record<string, boolean>>({});
@@ -448,6 +739,43 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
     });
   }, [selectedSubject, searchQuery]);
 
+  const filteredSyllabusConcepts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return CURRICULUM_DATA.filter((subj) => selectedSubject === 'all' || subj.id === selectedSubject).map((subj) => ({
+      subject: subj,
+      chapters: subj.chapters
+        .map((chapter) => {
+          const concepts = chapter.topics.flatMap((topic) =>
+            topic.subtopics.flatMap((subtopic) => subtopic.concepts)
+          ).filter((concept) => {
+            if (!q) return true;
+            return (
+              concept.title.toLowerCase().includes(q) ||
+              concept.summary.toLowerCase().includes(q) ||
+              chapter.title.toLowerCase().includes(q)
+            );
+          });
+          return { chapter, concepts };
+        })
+        .filter((entry) => entry.concepts.length > 0),
+    })).filter((entry) => entry.chapters.length > 0);
+  }, [selectedSubject, searchQuery]);
+
+  const totalCurriculumConcepts = useMemo(
+    () =>
+      CURRICULUM_DATA.reduce(
+        (acc, subj) =>
+          acc +
+          subj.chapters.reduce(
+            (chAcc, ch) =>
+              chAcc + ch.topics.reduce((tAcc, t) => tAcc + t.conceptCount, 0),
+            0
+          ),
+        0
+      ),
+    []
+  );
+
   const activeChapter = selectedBook ? selectedBook.chapters[selectedChapterIndex] : null;
 
   return (
@@ -464,7 +792,7 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
               Master Foundational & Advanced Concepts
             </h1>
             <p className="text-sm sm:text-base text-[#F1EFFF]/90 leading-relaxed font-medium">
-              Read curated STEM textbooks, explore AI-generated deep-dive concept synthesis documents, and practice step-by-step mathematical proofs.
+              Read curated STEM & AP Calculus AB/BC textbooks, explore synthesis guides, and browse {totalCurriculumConcepts} structured curriculum concepts across all 7 disciplines.
             </p>
           </div>
 
@@ -476,7 +804,7 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
             <div>
               <span className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-bold block">Available Resources</span>
               <span className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
-                {STEM_BOOKS.length} Textbooks • {AI_GENERATED_DOCUMENTS.length} AI Synthesis Guides
+                {STEM_BOOKS.length} Textbooks • {AI_GENERATED_DOCUMENTS.length} Guides • {totalCurriculumConcepts} Concepts
               </span>
             </div>
           </div>
@@ -486,14 +814,15 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
       {/* Main Navigation Bar & Search Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         {/* Tab switchers */}
-        <div className="flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
+        <div className="flex flex-wrap p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 gap-1">
           <button
             onClick={() => {
               setActiveTab('books');
               setSelectedBook(null);
               setSelectedAIDoc(null);
+              setSelectedConcept(null);
             }}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'books'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -508,8 +837,9 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
               setActiveTab('ai-docs');
               setSelectedBook(null);
               setSelectedAIDoc(null);
+              setSelectedConcept(null);
             }}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'ai-docs'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -517,6 +847,22 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
           >
             <Sparkles className="w-4 h-4" />
             <span>AI Concept Synthesis</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('syllabus');
+              setSelectedBook(null);
+              setSelectedAIDoc(null);
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'syllabus'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Curriculum Concepts ({totalCurriculumConcepts})</span>
           </button>
         </div>
 
@@ -530,11 +876,14 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
               aria-label="Filter concepts by subject category"
               className="px-3.5 py-2 text-xs sm:text-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer"
             >
-              <option value="all">All Disciplines</option>
-              <option value="math">Mathematics</option>
+              <option value="all">All Disciplines (7 Subjects)</option>
+              <option value="math">Mathematics &amp; AP Calculus</option>
               <option value="cs">Computer Science</option>
               <option value="physics">Physics</option>
               <option value="chemistry">Chemistry</option>
+              <option value="biology">Biology</option>
+              <option value="data_science">Data Science &amp; AI</option>
+              <option value="english">English &amp; Rhetoric</option>
             </select>
           </div>
 
@@ -545,7 +894,7 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search concepts, formulas..."
+              placeholder="Search concepts, AP Calculus, formulas..."
               className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
             />
           </div>
@@ -556,10 +905,13 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {[
           { id: 'all', label: 'All Disciplines', icon: Library },
-          { id: 'math', label: 'Mathematics & Calculus', icon: Calculator },
-          { id: 'cs', label: 'Algorithms & Systems', icon: Binary },
-          { id: 'physics', label: 'Physics & Mechanics', icon: Atom },
-          { id: 'chemistry', label: 'Chemistry & Molecular', icon: FlaskConical },
+          { id: 'math', label: 'Math & AP Calculus', icon: Calculator },
+          { id: 'cs', label: 'Computer Science', icon: Binary },
+          { id: 'physics', label: 'Physics', icon: Atom },
+          { id: 'chemistry', label: 'Chemistry', icon: FlaskConical },
+          { id: 'biology', label: 'Biology', icon: Microscope },
+          { id: 'data_science', label: 'Data Science', icon: BarChart3 },
+          { id: 'english', label: 'English & Rhetoric', icon: BookMarked },
         ].map((subject) => {
           const Icon = subject.icon;
           const isSelected = selectedSubject === subject.id;
@@ -1076,6 +1428,7 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
         </div>
       ) : (
         /* ===================== LIST 2: AI CONCEPT SYNTHESIS GUIDES ===================== */
+        activeTab === 'ai-docs' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAIDocs.map((doc) => (
             <Card
@@ -1120,6 +1473,198 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
             </Card>
           ))}
         </div>
+        ) : selectedConcept ? (
+          /* ===================== VIEW 3A: LIVE CURRICULUM CONCEPT DETAIL ===================== */
+          <div className="space-y-5 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setSelectedConcept(null);
+                  setSyllabusQuizAnswer(null);
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Back to Curriculum Concepts</span>
+              </button>
+              {onNavigateToPractice && (
+                <Button
+                  size="sm"
+                  variant="xp"
+                  leftIcon={<Play className="w-3.5 h-3.5 fill-current" />}
+                  onClick={onNavigateToPractice}
+                >
+                  Practice This Subject
+                </Button>
+              )}
+            </div>
+
+            <Card variant="elevated" padding="lg" className="space-y-6">
+              <div className="space-y-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="primary" size="sm">{selectedConcept.subjectId.toUpperCase()}</Badge>
+                  <Badge variant="outline" size="sm">{selectedConcept.difficulty.replace('_', ' ')}</Badge>
+                  <span className="text-xs text-slate-400">+{selectedConcept.xpReward} XP • {selectedConcept.estimatedMinutes} min</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 font-display">
+                  {selectedConcept.title}
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{selectedConcept.summary}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Formal Definition</span>
+                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                    <FormattedMathText text={selectedConcept.formalDefinition} />
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Intuition</span>
+                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                    <FormattedMathText text={selectedConcept.intuitiveExplanation} />
+                  </div>
+                </div>
+              </div>
+
+              {selectedConcept.keyFormulas.length > 0 && (
+                <div className="space-y-2.5">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Key Formulas</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {selectedConcept.keyFormulas.map((formula, idx) => (
+                      <div key={idx} className="p-3.5 rounded-2xl bg-slate-900 text-emerald-300 space-y-1">
+                        <div className="text-[11px] font-bold text-slate-300">{formula.label}</div>
+                        <div className="font-mono text-xs sm:text-sm overflow-x-auto">
+                          {cleanLatexToNormalText(formula.latex)}
+                        </div>
+                        <div className="text-[11px] text-slate-400">{cleanLatexToNormalText(formula.explanation)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedConcept.workedExamples.length > 0 && (
+                <div className="p-4 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 space-y-3">
+                  <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                    Worked Example: {selectedConcept.workedExamples[0].title}
+                  </h3>
+                  <div className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <FormattedMathText text={selectedConcept.workedExamples[0].problemStatement} />
+                  </div>
+                  <div className="space-y-1.5 pl-3 border-l-2 border-emerald-400">
+                    {selectedConcept.workedExamples[0].stepByStepSolution.map((step, sIdx) => (
+                      <div key={sIdx} className="text-xs text-slate-700 dark:text-slate-300">
+                        <FormattedMathText text={step} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    Answer: <FormattedMathText text={selectedConcept.workedExamples[0].finalAnswer} />
+                  </div>
+                </div>
+              )}
+
+              {selectedConcept.miniCheckQuestion && (
+                <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-slate-800/60 border border-indigo-200 dark:border-indigo-800 space-y-3">
+                  <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Quick Mastery Check</div>
+                  <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <FormattedMathText text={selectedConcept.miniCheckQuestion.prompt} />
+                  </div>
+                  <div className="space-y-2">
+                    {selectedConcept.miniCheckQuestion.options.map((opt, oIdx) => {
+                      const answered = syllabusQuizAnswer !== null;
+                      const isCorrect = oIdx === selectedConcept.miniCheckQuestion!.correctIndex;
+                      const isPicked = syllabusQuizAnswer === oIdx;
+                      return (
+                        <button
+                          key={oIdx}
+                          onClick={() => setSyllabusQuizAnswer(oIdx)}
+                          className={`w-full p-2.5 rounded-xl text-left text-xs border cursor-pointer flex items-center justify-between ${
+                            answered
+                              ? isCorrect
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 font-bold text-emerald-900 dark:text-emerald-200'
+                                : isPicked
+                                ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-500 text-rose-900 dark:text-rose-200'
+                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-60'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <FormattedMathText text={opt} />
+                          {answered && isCorrect && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {syllabusQuizAnswer !== null && (
+                    <div className="text-xs text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <FormattedMathText text={selectedConcept.miniCheckQuestion.explanation} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          </div>
+        ) : (
+          /* ===================== VIEW 3B: LIVE CURRICULUM SYLLABUS BROWSER ===================== */
+          <div className="space-y-6">
+            {filteredSyllabusConcepts.map(({ subject, chapters }) => (
+              <div key={subject.id} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 font-display">
+                      {subject.name}
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{subject.tagline}</p>
+                  </div>
+                  <Badge variant="primary" size="sm">
+                    {chapters.length} Chapters
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {chapters.map(({ chapter, concepts }) => (
+                    <Card key={chapter.id} variant="elevated" padding="md" className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                            Chapter {chapter.sequenceOrder}
+                          </span>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                            {chapter.title}
+                          </h3>
+                        </div>
+                        <Badge variant="outline" size="sm">{concepts.length} concepts</Badge>
+                      </div>
+                      <div className="space-y-1.5">
+                        {concepts.map((concept) => (
+                          <button
+                            key={concept.id}
+                            onClick={() => {
+                              setSelectedConcept(concept);
+                              setSyllabusQuizAnswer(null);
+                            }}
+                            className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200/70 dark:border-slate-700 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {concept.title}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                {cleanLatexToNormalText(concept.summary)}
+                              </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

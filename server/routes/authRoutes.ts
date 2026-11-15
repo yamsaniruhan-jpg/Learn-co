@@ -5,7 +5,7 @@ import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
 import { verifyFirebaseIdTokenSafely } from '../services/verifyFirebaseToken';
-import { sendMail, isMailerConfigured, buildPasswordResetMessage } from '../services/mailer';
+import { sendMail, isMailerConfigured, getMailerStatus, buildPasswordResetMessage } from '../services/mailer';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
 
@@ -396,6 +396,14 @@ const resetLimiter = rateLimit({
 function isValidEmail(email: string): boolean {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
+
+/**
+ * GET /api/auth/mail-status
+ * Truthfully reports whether an outbound email relay (Resend or SMTP) is configured.
+ */
+router.get('/mail-status', (_req, res: Response) => {
+  res.json({ success: true, ...getMailerStatus() });
+});
 
 /**
  * POST /api/auth/forgot-password

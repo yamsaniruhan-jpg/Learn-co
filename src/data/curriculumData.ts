@@ -7,6 +7,8 @@ import { CURRICULUM_EXPANSION_2 } from './curricula/curriculumExpansion2';
 import { CURRICULUM_EXPANSION_3 } from './curricula/curriculumExpansion3';
 import { CURRICULUM_EXPANSION_4 } from './curricula/curriculumExpansion4';
 import { CURRICULUM_EXPANSION_5 } from './curricula/curriculumExpansion5';
+import { CURRICULUM_EXPANSION_6 } from './curricula/curriculumExpansion6';
+import { OLYMPIAD_EXPANSION_7 } from './curricula/olympiadExpansion7';
 import {
   CONCEPT_ENRICHMENT,
   CONCEPT_ENRICHMENT_2,
@@ -2304,7 +2306,7 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
 // studyable end to end. Additive only — no shipped chapter, topic or concept
 // is removed or reordered. Must run after the amplified-concept merge above so
 // newly added topics also receive their amplified concepts.
-applyCurriculumExpansion(CURRICULUM_DATA, [...CURRICULUM_EXPANSION, ...CURRICULUM_EXPANSION_2, ...CURRICULUM_EXPANSION_3, ...CURRICULUM_EXPANSION_4, ...CURRICULUM_EXPANSION_5]);
+applyCurriculumExpansion(CURRICULUM_DATA, [...CURRICULUM_EXPANSION, ...CURRICULUM_EXPANSION_2, ...CURRICULUM_EXPANSION_3, ...CURRICULUM_EXPANSION_4, ...CURRICULUM_EXPANSION_5, ...CURRICULUM_EXPANSION_6, ...OLYMPIAD_EXPANSION_7]);
 
 // Content-completeness pass: fill the worked-example / pitfall / mini-check
 // gaps on concepts that shipped summary-only. Only empty sections are filled;

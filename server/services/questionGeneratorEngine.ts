@@ -162,7 +162,136 @@ export class QuestionGeneratorEngine {
 
     const k = index; // multiplier seed
 
-    if (subjectId === 'math') {
+    if (subjectId === 'math' && (chapterId.startsWith('math-ch-ap-calc') || topicId.startsWith('math-topic-ap-'))) {
+      const a = (k % 5) + 2;
+      const b = (k % 4) + 1;
+      const L = ((k % 6) + 4) * 100;
+
+      if (questionType === 'numerical') {
+        if (topicId.includes('series') || topicId.includes('power')) {
+          const r = (k % 4) + 2;
+          questionText = `[AP BC Variation #${k}] What is the radius of convergence $R$ of the power series $\\sum_{n=1}^{\\infty} \\frac{(x - ${a})^n}{n \\cdot ${r}^n}$?`;
+          correctAnswer = `${r}`;
+          explanation = `By the Ratio Test, $\\lim_{n\\to\\infty} \\frac{n}{n+1} \\frac{|x-${a}|}{${r}} = \\frac{|x-${a}|}{${r}} < 1 \\iff |x - ${a}| < ${r}$, so $R = ${r}$.`;
+          stepByStepSolution = [
+            `Form ratio $|a_{n+1}/a_n| = \\frac{n}{n+1}\\frac{|x-${a}|}{${r}}$.`,
+            `Take limit $n \\to \\infty$: $\\frac{|x-${a}|}{${r}} < 1 \\implies R = ${r}$.`,
+          ];
+        } else if (topicId.includes('slope') || topicId.includes('separable')) {
+          const y0 = b;
+          const h = 0.5;
+          const m0 = a * 0 + y0;
+          const y1 = y0 + m0 * h;
+          const m1 = a * h + y1;
+          const y2 = y1 + m1 * h;
+          questionText = `[AP BC Variation #${k}] For $\\frac{dy}{dx} = ${a}x + y$ with $y(0) = ${y0}$, use Euler's method with two steps of $\\Delta x = 0.5$ to approximate $y(1)$.`;
+          correctAnswer = `${y2}`;
+          explanation = `Step 1 at $(0, ${y0})$ gives slope $${m0}$, so $y(0.5) \\approx ${y0} + (${m0})(0.5) = ${y1}$. Step 2 at $(0.5, ${y1})$ gives slope $${m1}$, so $y(1) \\approx ${y1} + (${m1})(0.5) = ${y2}$.`;
+          stepByStepSolution = [
+            `Step 1: $m_0 = ${a}(0) + ${y0} = ${m0} \\implies y_1 = ${y1}$.`,
+            `Step 2: $m_1 = ${a}(0.5) + ${y1} = ${m1} \\implies y_2 = ${y2}$.`,
+          ];
+        } else {
+          const c = (k % 3) + 2;
+          const total = a * (c * c);
+          questionText = `[AP AB/BC Variation #${k}] Evaluate the average value of $f(x) = ${3 * a}x^2$ on the closed interval $[0, ${c}]$.`;
+          correctAnswer = `${total / c}`;
+          explanation = `$f_{\\text{avg}} = \\frac{1}{${c} - 0}\\int_0^{${c}} ${3 * a}x^2\\,dx = \\frac{1}{${c}}[${a}x^3]_0^{${c}} = \\frac{${a * c * c * c}}{${c}} = ${total / c}$.`;
+          stepByStepSolution = [
+            `Compute $\\int_0^{${c}} ${3 * a}x^2\\,dx = ${a}(${c})^3 = ${a * c * c * c}$.`,
+            `Divide by interval length ${c}: ${total / c}.`,
+          ];
+        }
+      } else if (questionType === 'single_choice' || questionType === 'code_output') {
+        if (topicId.includes('series') || topicId.includes('convergence') || topicId.includes('power')) {
+          const p = (k % 3) + 2;
+          questionText = `[AP BC Variation #${k}] Which statement accurately describes the convergence of $\\sum_{n=1}^{\\infty} \\frac{(-1)^{n+1}}{n^{1/${p}}}$?`;
+          options = [
+            'Conditionally convergent (Alternating Series Test passes, $|a_n|$ diverges as $p$-series $p < 1$)',
+            'Absolutely convergent by $p$-series test',
+            'Divergent by the $n$th-term test for divergence',
+            'Divergent by the Ratio Test ($L > 1$)',
+          ];
+          correctAnswer = 'Conditionally convergent (Alternating Series Test passes, $|a_n|$ diverges as $p$-series $p < 1$)';
+          explanation = `Since $1/n^{1/${p}}$ decreases monotonically to $0$, the alternating series converges. Taking absolute values yields $\\sum 1/n^{1/${p}}$, which diverges because $1/${p} \\le 1$.`;
+          stepByStepSolution = [
+            `Check $\\sum |a_n| = \\sum n^{-1/${p}}$: diverges since $p = 1/${p} < 1$.`,
+            `Check AST: terms decrease monotonically to $0$, so original series converges conditionally.`,
+          ];
+        } else if (topicId.includes('separable') || topicId.includes('slope')) {
+          questionText = `[AP BC Variation #${k}] A population obeys the logistic ODE $\\frac{dP}{dt} = 0.002 P (${L} - P)$ with $P(0) = 50$. At what population $P$ is $\\frac{dP}{dt}$ maximized?`;
+          options = [`$P = ${L / 2}$`, `$P = ${L}$`, `$P = ${L / 4}$`, `$P = 50$`];
+          correctAnswer = `$P = ${L / 2}$`;
+          explanation = `Factoring shows carrying capacity $L = ${L}$. A logistic model grows fastest at the inflection level $P = L/2 = ${L / 2}$.`;
+          stepByStepSolution = [
+            `Identify carrying capacity $L = ${L}$ from nonzero equilibrium.`,
+            `Maximum growth rate occurs at $P = L/2 = ${L / 2}$.`,
+          ];
+        } else if (topicId.includes('parametric') || topicId.includes('polar')) {
+          questionText = `[AP BC Variation #${k}] A particle moves in the $xy$-plane with velocity $\\mathbf{v}(t) = \\langle ${a}\\cos(t),\\ ${a}\\sin(t) \\rangle$. What is the total distance traveled from $t = 0$ to $t = ${b}\\pi$?`;
+          options = [`$${a * b}\\pi$`, `$${a * b}$`, `$${2 * a * b}\\pi$`, `$0$`];
+          correctAnswer = `$${a * b}\\pi$`;
+          explanation = `Speed is $\\|\\mathbf{v}(t)\\| = \\sqrt{(${a}\\cos t)^2 + (${a}\\sin t)^2} = ${a}$. Integrating speed from $0$ to ${b}\\pi gives ${a} \\cdot ${b}\\pi = ${a * b}\\pi$.`;
+          stepByStepSolution = [
+            `Compute speed: $\\sqrt{x'(t)^2 + y'(t)^2} = ${a}$.`,
+            `Distance $= \\int_0^{${b}\\pi} ${a}\\,dt = ${a * b}\\pi$.`,
+          ];
+        } else {
+          questionText = `[AP AB/BC Variation #${k}] For the implicit curve $x^2 + ${b}xy + y^2 = ${a + b + 1}$, which expression equals $\\frac{dy}{dx}$?`;
+          options = [
+            `$-\\frac{2x + ${b}y}{${b}x + 2y}$`,
+            `$-\\frac{2x + ${b}y}{2y}$`,
+            `$\\frac{2x + ${b}y}{${b}x + 2y}$`,
+            `$-\\frac{x + y}{${b}x + y}$`,
+          ];
+          correctAnswer = `$-\\frac{2x + ${b}y}{${b}x + 2y}$`;
+          explanation = `Differentiating wrt $x$ gives $2x + ${b}y + ${b}x\\frac{dy}{dx} + 2y\\frac{dy}{dx} = 0$, solving to $\\frac{dy}{dx} = -\\frac{2x + ${b}y}{${b}x + 2y}$.`;
+          stepByStepSolution = [
+            `Differentiate term-by-term with product rule on $${b}xy$.`,
+            `Collect $\\frac{dy}{dx}$ terms: $(${b}x + 2y)\\frac{dy}{dx} = -(2x + ${b}y)$.`,
+          ];
+        }
+      } else if (questionType === 'multiple_choice') {
+        questionText = `[AP BC Variation #${k}] Which statements are guaranteed TRUE for a power series $\\sum c_n (x - ${a})^n$ that converges at $x = ${a + b + 2}$ and diverges at $x = ${a - b - 4}$? (Select all that apply)`;
+        options = [
+          `The series converges absolutely at $x = ${a + b + 1}$`,
+          `The radius of convergence $R$ satisfies ${b + 2} \\le R \\le ${b + 4}`,
+          `The series diverges at $x = ${a + b + 5}$`,
+          `The series must converge at $x = ${a - b - 2}$`,
+        ];
+        correctAnswer = [
+          `The series converges absolutely at $x = ${a + b + 1}$`,
+          `The radius of convergence $R$ satisfies ${b + 2} \\le R \\le ${b + 4}`,
+          `The series diverges at $x = ${a + b + 5}$`,
+        ];
+        explanation = `Distance from center $c = ${a}$ to convergent point is ${b + 2}$, so $R \\ge ${b + 2}$ (guaranteeing absolute convergence strictly inside distance ${b + 2}$, including $x = ${a + b + 1}$). Distance to divergent point is ${b + 4}$, so $R \\le ${b + 4}$ (forcing divergence at distance ${b + 5}$). Endpoint symmetry at exact distance ${b + 2}$ ($x = ${a - b - 2}$) is NOT guaranteed.`;
+        stepByStepSolution = [
+          `Compute $|(${a + b + 2}) - ${a}| = ${b + 2} \\le R$.`,
+          `Compute $|(${a - b - 4}) - ${a}| = ${b + 4} \\ge R$.`,
+          `Points strictly closer than ${b + 2}$ converge absolutely; points strictly farther than ${b + 4}$ diverge.`,
+        ];
+      } else if (questionType === 'assertion_reason') {
+        questionText = `[AP BC Variation #${k}] Consider:\nAssertion (A): If a twice-differentiable function $f(x)$ has $f''(x) > 0$ on an interval, Euler's method approximates solutions to $y' = f'(x)$ as underestimates.\nReason (R): When a curve is strictly concave up, every tangent line lies strictly below the curve away from the point of tangency.`;
+        options = [
+          'Both Assertion (A) and Reason (R) are TRUE, and Reason (R) is the CORRECT explanation of Assertion (A)',
+          'Both Assertion (A) and Reason (R) are TRUE, but Reason (R) is NOT the correct explanation of Assertion (A)',
+          'Assertion (A) is TRUE, but Reason (R) is FALSE',
+          'Assertion (A) is FALSE, but Reason (R) is TRUE',
+        ];
+        correctAnswer = 'Both Assertion (A) and Reason (R) are TRUE, and Reason (R) is the CORRECT explanation of Assertion (A)';
+        explanation = 'For concave-up solutions ($y\'\' > 0$), tangent slopes underestimate the increasing curvature across each Euler step, keeping piecewise-linear approximations below the exact trajectory.';
+        stepByStepSolution = [
+          'Concave-up ($y\'\' > 0$) means slope grows across each interval $\\Delta x$.',
+          'Euler steps hold the left-endpoint slope constant, undershooting the rising curve.',
+        ];
+      } else {
+        questionText = `[AP BC Variation #${k}] True or False: In a convergent alternating series $\\sum_{n=0}^{\\infty} (-1)^n b_n$ with $b_n > 0$ decreasing monotonically to $0$, the truncation error after $N$ terms is bounded above by the first omitted term magnitude $b_{N+1}$.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'By the Alternating Series Remainder Theorem, $|S - S_N| \\le b_{N+1}$ whenever terms alternate in sign and shrink monotonically toward zero.';
+        stepByStepSolution = ['Verify alternating signs, decreasing $|a_n|$, and $\\lim b_n = 0$.'];
+      }
+    } else if (subjectId === 'math') {
       const a = (k % 5) + 1;
       const b = (k % 7) + 2;
       const c = (k % 4) + 3;

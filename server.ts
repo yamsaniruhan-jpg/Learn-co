@@ -75,7 +75,8 @@ export async function createApp() {
     if (req.url.startsWith("/api")) {
       const safeUrl = req.url
         .replace(/(\/api\/auth\/reset-password\/)[^/?]+/i, '$1[REDACTED]')
-        .replace(/([?&]reset_token=)[^&]*/gi, '$1[REDACTED]');
+        .replace(/([?&]reset_token=)[^&]*/gi, '$1[REDACTED]')
+        .replace(/([?&]token=)[^&]*/gi, '$1[REDACTED]');
       console.log(`[API Request] ${req.method} ${safeUrl}`);
     }
     next();

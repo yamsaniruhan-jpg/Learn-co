@@ -14,6 +14,10 @@ import {
 import { UserProfile, SubjectId } from '../../types';
 import { MentorApplicationRecord } from '../../types/mentorship';
 import { MentorshipClient } from '../../services/mentorshipClient';
+import {
+  syncMentorApplicationToFirestore,
+  fetchMyMentorApplicationsFromFirestore,
+} from '../../services/clientFirestoreSync';
 import { OwnerMentorApplicationsQueue } from './OwnerMentorApplicationsQueue';
 
 interface MentorAccessPanelProps {
@@ -43,7 +47,12 @@ export const MentorAccessPanel: React.FC<MentorAccessPanelProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitBanner, setSubmitBanner] = useState<string | null>(null);
+  const [submitBanner, setSubmitBanner] = useState<{
+    message: string;
+    emailDispatched: boolean;
+    mailtoUrl?: string;
+  } | null>(null);
+  const [mailRelayConfigured, setMailRelayConfigured] = useState<boolean | null>(null);
 
   const [myApplications, setMyApplications] = useState<MentorApplicationRecord[]>([]);
   const [isLoadingMine, setIsLoadingMine] = useState(true);
@@ -58,8 +67,19 @@ export const MentorAccessPanel: React.FC<MentorAccessPanelProps> = ({
   const loadMyApplications = useCallback(async () => {
     setIsLoadingMine(true);
     try {
-      const data = await MentorshipClient.getMyMentorApplications();
-      setMyApplications(data.applications);
+      const [data, fsApps, mailStatus] = await Promise.all([
+        MentorshipClient.getMyMentorApplications(),
+        fetchMyMentorApplicationsFromFirestore(),
+        MentorshipClient.getMailStatus(),
+      ]);
+      const merged = new Map<string, MentorApplicationRecord>();
+      for (const app of fsApps) merged.set(app.id, app);
+      for (const app of data.applications) merged.set(app.id, app);
+      const sorted = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+      setMyApplications(sorted);
+      setMailRelayConfigured(mailStatus.configured);
       if (data.routedToEmail) setRoutedToEmail(data.routedToEmail);
     } catch (err) {
       console.debug('Could not load applicant history:', err);
@@ -112,11 +132,18 @@ export const MentorAccessPanel: React.FC<MentorAccessPanelProps> = ({
         bio: cleanBio,
       });
 
+      const clientSynced = await syncMentorApplicationToFirestore(res.application);
+      const savedInFirestore = res.firestoreSynced || clientSynced;
+
       setMyApplications((prev) => [res.application, ...prev]);
       setRoutedToEmail(res.routedToEmail);
-      setSubmitBanner(
-        `Application ${res.application.id} saved permanently to PostgreSQL and sent directly to ${res.routedToEmail} for review.`
-      );
+      setSubmitBanner({
+        emailDispatched: res.emailDispatched,
+        mailtoUrl: res.mailtoUrl,
+        message: res.emailDispatched
+          ? `Application ${res.application.id} saved (${savedInFirestore ? 'Firestore & DB' : 'Database'}) and emailed to ${res.routedToEmail}. You remain a Learner until ${res.routedToEmail} approves it.`
+          : `Application ${res.application.id} saved in ${savedInFirestore ? 'Firestore & Learn.co Owner Queue' : 'Learn.co Owner Queue'} for ${res.routedToEmail}. Outbound email relay is not configured on this server, so no automatic inbox email was sent — use the button below if you want to send a copy via your own email app.`,
+      });
       setDegree('');
       setInstitution('');
       setBio('');
@@ -270,20 +297,46 @@ export const MentorAccessPanel: React.FC<MentorAccessPanelProps> = ({
               <span>Formal Mentor Application Form</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Complete your credentials and teaching statement below. Submissions are stored in PostgreSQL and delivered directly to{' '}
-              <strong className="text-slate-700 dark:text-slate-300">{routedToEmail}</strong>.
+              Complete your credentials below. Applications are stored in Firestore &amp; the Learn.co queue and require explicit approval from{' '}
+              <strong className="text-slate-700 dark:text-slate-300">{routedToEmail}</strong> before you can join as a mentor.
             </p>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300 shrink-0">
             <Mail className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Direct Recipient: {routedToEmail}</span>
+            <span>Owner Approver: {routedToEmail}</span>
           </div>
         </div>
 
+        {mailRelayConfigured === false && !submitBanner && (
+          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              Notice: No server email relay (<code>RESEND_API_KEY</code> / <code>SMTP_URL</code>) is configured in this deployment. Your application will still be stored in Firestore and the Owner Queue, and we will give you a one-click <strong>Send via Email App</strong> button after submission.
+            </span>
+          </div>
+        )}
+
         {submitBanner && (
-          <div className="p-4 rounded-xl bg-emerald-600 text-white text-xs font-semibold flex items-center gap-2 shadow-sm animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>{submitBanner}</span>
+          <div
+            className={`p-4 rounded-xl text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-in fade-in ${
+              submitBanner.emailDispatched
+                ? 'bg-emerald-600 text-white'
+                : 'bg-indigo-600 text-white'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{submitBanner.message}</span>
+            </div>
+            {!submitBanner.emailDispatched && submitBanner.mailtoUrl && (
+              <a
+                href={submitBanner.mailtoUrl}
+                className="px-3.5 py-2 rounded-lg bg-white text-indigo-700 font-bold text-xs shrink-0 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1.5"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Send Copy via Email App</span>
+              </a>
+            )}
           </div>
         )}
 

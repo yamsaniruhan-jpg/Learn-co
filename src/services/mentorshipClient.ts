@@ -89,6 +89,29 @@ export class MentorshipClient {
     return data.recommendations || [];
   }
 
+  static async getMailStatus(): Promise<{
+    configured: boolean;
+    provider: 'resend' | 'smtp' | 'none';
+    mailFrom: string;
+    missingEnvVars: string[];
+  }> {
+    try {
+      const res = await fetch('/api/mentorship/mail-status');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && typeof data.configured === 'boolean') {
+        return {
+          configured: data.configured,
+          provider: data.provider || 'none',
+          mailFrom: data.mailFrom || '',
+          missingEnvVars: Array.isArray(data.missingEnvVars) ? data.missingEnvVars : [],
+        };
+      }
+    } catch {
+      // Fallback below
+    }
+    return { configured: false, provider: 'none', mailFrom: '', missingEnvVars: ['RESEND_API_KEY or SMTP_URL'] };
+  }
+
   static async createRequest(requestData: {
     mentorId: string;
     subjectId: SubjectId;
@@ -96,7 +119,14 @@ export class MentorshipClient {
     goalDescription: string;
     initialMessage: string;
     preferredCadence?: 'weekly' | 'biweekly' | 'on_demand';
-  }): Promise<MentorshipRequest> {
+    learnerEmail?: string;
+  }): Promise<{
+    request: MentorshipRequest;
+    mentorEmail?: string | null;
+    emailDispatched: boolean;
+    emailReason?: string;
+    mailtoUrl?: string;
+  }> {
     const res = await fetch('/api/mentorship/requests', {
       method: 'POST',
       headers: this.getHeaders(),
@@ -104,7 +134,13 @@ export class MentorshipClient {
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to submit request');
-    return data.request;
+    return {
+      request: data.request,
+      mentorEmail: data.mentorEmail ?? null,
+      emailDispatched: !!data.emailDispatched,
+      emailReason: data.emailReason,
+      mailtoUrl: data.mailtoUrl,
+    };
   }
 
   static async getRequests(): Promise<{ sent: MentorshipRequest[]; received: MentorshipRequest[] }> {
@@ -123,7 +159,14 @@ export class MentorshipClient {
     requestId: string,
     action: 'ACCEPT' | 'DECLINE',
     note?: string
-  ): Promise<{ request: MentorshipRequest; relationship: MentorshipRelationship | null }> {
+  ): Promise<{
+    request: MentorshipRequest;
+    relationship: MentorshipRelationship | null;
+    studentEmail?: string | null;
+    emailDispatched: boolean;
+    emailReason?: string;
+    mailtoUrl?: string;
+  }> {
     const res = await fetch(`/api/mentorship/requests/${requestId}/respond`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -134,6 +177,10 @@ export class MentorshipClient {
     return {
       request: data.request,
       relationship: data.relationship,
+      studentEmail: data.studentEmail ?? null,
+      emailDispatched: !!data.emailDispatched,
+      emailReason: data.emailReason,
+      mailtoUrl: data.mailtoUrl,
     };
   }
 
@@ -425,6 +472,9 @@ export class MentorshipClient {
     application: MentorApplicationRecord;
     routedToEmail: string;
     emailDispatched: boolean;
+    emailReason?: string;
+    firestoreSynced?: boolean;
+    mailtoUrl?: string;
   }> {
     const res = await fetch('/api/mentorship/applications', {
       method: 'POST',
@@ -439,6 +489,9 @@ export class MentorshipClient {
       application: data.application,
       routedToEmail: data.routedToEmail,
       emailDispatched: !!data.emailDispatched,
+      emailReason: data.emailReason,
+      firestoreSynced: !!data.firestoreSynced,
+      mailtoUrl: data.mailtoUrl,
     };
   }
 
@@ -487,6 +540,9 @@ export class MentorshipClient {
   ): Promise<{
     application: MentorApplicationRecord;
     mentorProfile: MentorProfile | null;
+    emailDispatched: boolean;
+    emailReason?: string;
+    mailtoUrl?: string;
   }> {
     const res = await fetch(`/api/mentorship/applications/${encodeURIComponent(applicationId)}/decision`, {
       method: 'POST',
@@ -500,6 +556,9 @@ export class MentorshipClient {
     return {
       application: data.application,
       mentorProfile: data.mentorProfile || null,
+      emailDispatched: !!data.emailDispatched,
+      emailReason: data.emailReason,
+      mailtoUrl: data.mailtoUrl,
     };
   }
 }

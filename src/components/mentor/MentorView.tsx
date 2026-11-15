@@ -106,7 +106,12 @@ export const MentorView: React.FC<MentorViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
-  const [actionFeedback, setActionFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{
+    type: 'error' | 'success';
+    message: string;
+    mailtoUrl?: string;
+    mailtoLabel?: string;
+  } | null>(null);
 
   // Modal State
   const [selectedMentorForProfile, setSelectedMentorForProfile] = useState<MentorProfile | null>(null);
@@ -120,9 +125,16 @@ export const MentorView: React.FC<MentorViewProps> = ({
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportedUser, setReportedUser] = useState<{ id: string; name: string } | null>(null);
 
-  const notifyAction = (message: string, type: 'error' | 'success' = 'success') => {
-    setActionFeedback({ type, message });
-    setTimeout(() => setActionFeedback(null), 4500);
+  const notifyAction = (
+    message: string,
+    type: 'error' | 'success' = 'success',
+    mailtoUrl?: string,
+    mailtoLabel?: string
+  ) => {
+    setActionFeedback({ type, message, mailtoUrl, mailtoLabel });
+    if (!mailtoUrl) {
+      setTimeout(() => setActionFeedback(null), 5000);
+    }
   };
 
   const syncOverviewData = useCallback(async (silent = false) => {
@@ -334,13 +346,25 @@ export const MentorView: React.FC<MentorViewProps> = ({
   };
 
   const handleSubmitRequest = async (requestData: any) => {
-    const req = await MentorshipClient.createRequest(requestData);
+    const res = await MentorshipClient.createRequest(requestData);
     setRequests((prev) => ({
       ...prev,
-      sent: [req, ...prev.sent],
+      sent: [res.request, ...prev.sent],
     }));
-    notifyAction('Mentorship request submitted live.');
+    notifyAction(
+      res.emailDispatched
+        ? `Mentorship request emailed to ${res.mentorEmail || res.request.mentorName}.`
+        : `Mentorship request saved in Educator Portal. No server mail relay configured.`,
+      'success',
+      !res.emailDispatched ? res.mailtoUrl : undefined,
+      'Send via Email App'
+    );
     syncOverviewData(true);
+    return {
+      emailDispatched: res.emailDispatched,
+      mentorEmail: res.mentorEmail,
+      mailtoUrl: res.mailtoUrl,
+    };
   };
 
   const handleCancelRequest = async (requestId: string) => {
@@ -366,7 +390,15 @@ export const MentorView: React.FC<MentorViewProps> = ({
       if (result.relationship) {
         setRelationships((prev) => [result.relationship!, ...prev]);
       }
-      notifyAction(action === 'ACCEPT' ? 'Mentorship request accepted.' : 'Mentorship request declined.');
+      const actionLabel = action === 'ACCEPT' ? 'accepted' : 'declined';
+      notifyAction(
+        result.emailDispatched
+          ? `Mentorship request ${actionLabel} and confirmation emailed to ${result.studentEmail}.`
+          : `Mentorship request ${actionLabel} and saved in Learn.co.${result.studentEmail ? ` (Server email relay unset for ${result.studentEmail}.)` : ''}`,
+        'success',
+        !result.emailDispatched ? result.mailtoUrl : undefined,
+        result.studentEmail ? `Email ${result.studentEmail}` : undefined
+      );
       syncOverviewData(true);
     } catch (err: any) {
       notifyAction(err?.message || 'Could not process mentorship decision.', 'error');
@@ -437,14 +469,26 @@ export const MentorView: React.FC<MentorViewProps> = ({
       {actionFeedback && (
         <div
           role="status"
-          className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 ${
+          className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-wrap items-center justify-between gap-2 ${
             actionFeedback.type === 'error'
               ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
               : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
           }`}
         >
           <span>{actionFeedback.message}</span>
-          <button type="button" onClick={() => setActionFeedback(null)} className="underline">Dismiss</button>
+          <div className="flex items-center gap-3">
+            {actionFeedback.mailtoUrl && (
+              <a
+                href={actionFeedback.mailtoUrl}
+                className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors"
+              >
+                {actionFeedback.mailtoLabel || 'Open Email App'}
+              </a>
+            )}
+            <button type="button" onClick={() => setActionFeedback(null)} className="underline cursor-pointer">
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -823,26 +867,54 @@ export const MentorView: React.FC<MentorViewProps> = ({
         </div>
       )}
 
-      {/* TAB 4: Educator Portal */}
+      {/* TAB 4: Educator Portal (Accredited Mentors Only) */}
       {activeMainTab === 'portal' && (
-        <MentorPortal
-          mentorProfile={portalData.mentorProfile}
-          activeMentees={portalData.activeMentees}
-          pendingRequests={portalData.pendingRequests}
-          upcomingSessions={portalData.upcomingSessions}
-          onRespondRequest={handleRespondRequest}
-          onUpdateProfile={async (prof) => {
-            await MentorshipClient.updateMentorProfile(prof);
-          }}
-          onSelectMentee={(rel) => {
-            setSelectedRelationship(rel);
-            setActiveMainTab('my_mentorship');
-          }}
-          onOpenSessionRoom={(sess) => {
-            setActiveSessionForRoom(sess);
-            setIsSessionRoomOpen(true);
-          }}
-        />
+        isMentorRole ? (
+          <MentorPortal
+            mentorProfile={portalData.mentorProfile}
+            activeMentees={portalData.activeMentees}
+            pendingRequests={portalData.pendingRequests}
+            upcomingSessions={portalData.upcomingSessions}
+            onRespondRequest={handleRespondRequest}
+            onUpdateProfile={async (prof) => {
+              await MentorshipClient.updateMentorProfile(prof);
+            }}
+            onSelectMentee={(rel) => {
+              setSelectedRelationship(rel);
+              setActiveMainTab('my_mentorship');
+            }}
+            onOpenSessionRoom={(sess) => {
+              setActiveSessionForRoom(sess);
+              setIsSessionRoomOpen(true);
+            }}
+          />
+        ) : (
+          <Card variant="default" padding="lg" className="text-center space-y-4 max-w-2xl mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
+                Owner Approval Required to Join as Mentor
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Submit a Formal Mentor Application first. Your application is saved in Firestore and reviewed by the platform owner (<strong>yamsaniruhan@gmail.com</strong>). Once approved, your Educator Portal and mentor listing unlock automatically.
+              </p>
+            </div>
+            <div className="pt-1">
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                onClick={() => setActiveMainTab('mentor_access')}
+              >
+                <span>Open Mentor Application &amp; Status</span>
+                <ArrowRight className="w-4 h-4 ml-1.5" />
+              </Button>
+            </div>
+          </Card>
+        )
       )}
 
       {/* TAB 5: Memory Forecast & Diagnostics (from Volume 6) */}
@@ -950,6 +1022,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
       {/* Modals */}
       <MentorProfileModal
         mentor={selectedMentorForProfile}
+        learnerEmailDefault={user.email}
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         onRequestSubmitted={handleSubmitRequest}

@@ -1,6 +1,7 @@
-import { doc, setDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db, auth } from './firebaseClient';
 import { UserProfile, UserGamification, LeaderboardEntry } from '../types/auth';
+import { MentorApplicationRecord, MentorProfile } from '../types/mentorship';
 
 /**
  * Client-side Firestore sync service.
@@ -260,5 +261,153 @@ export function subscribeToFirestoreLeaderboard(
   } catch (err: any) {
     console.debug('[ClientFirestoreSync] Could not initialize snapshot listener:', err);
     return () => {};
+  }
+}
+
+const PLATFORM_OWNER_EMAIL = 'yamsaniruhan@gmail.com';
+
+export async function syncMentorApplicationToFirestore(
+  app: MentorApplicationRecord
+): Promise<boolean> {
+  if (!db || !auth?.currentUser) return false;
+  try {
+    const firebaseUid = auth.currentUser.uid;
+    const payload = {
+      id: app.id,
+      applicantUid: firebaseUid,
+      backendApplicantUid: app.applicantUid,
+      applicantEmail: app.applicantEmail,
+      fullName: String(app.fullName || '').slice(0, 160),
+      degree: app.degree,
+      institution: app.institution,
+      subjectId: app.subjectId,
+      experienceYears: Number(app.experienceYears) || 0,
+      capacity: Number(app.capacity) || 5,
+      hourlyRate: Number(app.hourlyRate) || 0,
+      bio: String(app.bio || '').slice(0, 4000),
+      status: 'PENDING',
+      routedToEmail: PLATFORM_OWNER_EMAIL,
+      submittedAt: app.submittedAt,
+      updatedAt: app.updatedAt,
+    };
+    await setDoc(doc(db, 'mentor_applications', app.id), payload);
+    return true;
+  } catch (err: any) {
+    console.warn('[ClientFirestoreSync] mentor_applications write warning:', err?.message || err);
+    return false;
+  }
+}
+
+export async function fetchMyMentorApplicationsFromFirestore(): Promise<MentorApplicationRecord[]> {
+  if (!db || !auth?.currentUser) return [];
+  try {
+    const q = query(
+      collection(db, 'mentor_applications'),
+      where('applicantUid', '==', auth.currentUser.uid)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+      const data = d.data() as any;
+      return {
+        id: data.id || d.id,
+        applicantUid: data.backendApplicantUid || data.applicantUid || auth.currentUser!.uid,
+        applicantEmail: data.applicantEmail || '',
+        fullName: data.fullName || '',
+        degree: data.degree || '',
+        institution: data.institution || '',
+        subjectId: data.subjectId || 'math',
+        experienceYears: Number(data.experienceYears) || 0,
+        capacity: Number(data.capacity) || 5,
+        hourlyRate: Number(data.hourlyRate) || 0,
+        bio: data.bio || '',
+        status: data.status || 'PENDING',
+        routedToEmail: data.routedToEmail || PLATFORM_OWNER_EMAIL,
+        reviewerEmail: data.reviewerEmail || null,
+        reviewerNote: data.reviewerNote || null,
+        reviewedAt: data.reviewedAt || null,
+        submittedAt: data.submittedAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      } as MentorApplicationRecord;
+    });
+  } catch (err: any) {
+    console.debug('[ClientFirestoreSync] fetchMyMentorApplications note:', err?.message || err);
+    return [];
+  }
+}
+
+export async function fetchOwnerMentorApplicationsFromFirestore(): Promise<MentorApplicationRecord[]> {
+  if (!db || !auth?.currentUser) return [];
+  if ((auth.currentUser.email || '').trim().toLowerCase() !== PLATFORM_OWNER_EMAIL) return [];
+  try {
+    const snap = await getDocs(collection(db, 'mentor_applications'));
+    return snap.docs.map((d) => {
+      const data = d.data() as any;
+      return {
+        id: data.id || d.id,
+        applicantUid: data.backendApplicantUid || data.applicantUid || '',
+        applicantEmail: data.applicantEmail || '',
+        fullName: data.fullName || '',
+        degree: data.degree || '',
+        institution: data.institution || '',
+        subjectId: data.subjectId || 'math',
+        experienceYears: Number(data.experienceYears) || 0,
+        capacity: Number(data.capacity) || 5,
+        hourlyRate: Number(data.hourlyRate) || 0,
+        bio: data.bio || '',
+        status: data.status || 'PENDING',
+        routedToEmail: data.routedToEmail || PLATFORM_OWNER_EMAIL,
+        reviewerEmail: data.reviewerEmail || null,
+        reviewerNote: data.reviewerNote || null,
+        reviewedAt: data.reviewedAt || null,
+        submittedAt: data.submittedAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      } as MentorApplicationRecord;
+    });
+  } catch (err: any) {
+    console.debug('[ClientFirestoreSync] fetchOwnerMentorApplications note:', err?.message || err);
+    return [];
+  }
+}
+
+export async function syncOwnerApplicationDecisionToFirestore(
+  app: MentorApplicationRecord,
+  mentorProfile?: MentorProfile | null
+): Promise<boolean> {
+  if (!db || !auth?.currentUser) return false;
+  if ((auth.currentUser.email || '').trim().toLowerCase() !== PLATFORM_OWNER_EMAIL) return false;
+  try {
+    await setDoc(
+      doc(db, 'mentor_applications', app.id),
+      {
+        status: app.status,
+        reviewerEmail: app.reviewerEmail || PLATFORM_OWNER_EMAIL,
+        reviewerNote: app.reviewerNote || null,
+        reviewedAt: app.reviewedAt || new Date().toISOString(),
+        updatedAt: app.updatedAt,
+      },
+      { merge: true }
+    );
+    if (app.status === 'APPROVED' && mentorProfile) {
+      await setDoc(
+        doc(db, 'mentors', mentorProfile.id),
+        {
+          id: mentorProfile.id,
+          userId: app.applicantUid,
+          email: app.applicantEmail,
+          name: mentorProfile.name,
+          status: 'active',
+          subjects: mentorProfile.subjects,
+          education: mentorProfile.education,
+          rating: mentorProfile.rating,
+          totalSessions: mentorProfile.sessionsCompleted,
+          updatedAt: app.updatedAt,
+        },
+        { merge: true }
+      );
+    }
+    return true;
+  } catch (err: any) {
+    console.warn('[ClientFirestoreSync] owner decision Firestore sync warning:', err?.message || err);
+    return false;
   }
 }

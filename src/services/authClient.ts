@@ -229,6 +229,29 @@ export class AuthClient {
     return data;
   }
 
+  static async getMailStatus(): Promise<{
+    configured: boolean;
+    provider: 'resend' | 'smtp' | 'none';
+    mailFrom: string;
+    missingEnvVars: string[];
+  }> {
+    try {
+      const res = await fetch('/api/auth/mail-status');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && typeof data.configured === 'boolean') {
+        return {
+          configured: data.configured,
+          provider: data.provider || 'none',
+          mailFrom: data.mailFrom || '',
+          missingEnvVars: Array.isArray(data.missingEnvVars) ? data.missingEnvVars : [],
+        };
+      }
+    } catch {
+      // Fallback below
+    }
+    return { configured: false, provider: 'none', mailFrom: '', missingEnvVars: ['RESEND_API_KEY or SMTP_URL'] };
+  }
+
   /** Check a reset link before showing the "choose a new password" form. */
   static async validateResetToken(token: string): Promise<boolean> {
     try {
