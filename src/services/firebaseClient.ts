@@ -11,7 +11,7 @@ import {
   signOut,
   Auth,
 } from 'firebase/auth';
-import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
@@ -46,16 +46,8 @@ try {
   try { storageInstance = getStorage(appInstance); } catch { storageInstance = {} as FirebaseStorage; }
 }
 
-if (typeof window !== 'undefined' && !env.VITEST && dbInstance && appInstance?.name) {
-  (async () => {
-    try {
-      await getDocFromServer(doc(dbInstance, 'test', 'connection'));
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('the client is offline')) {
-        console.error('Please check your Firebase configuration.');
-      }
-    }
-  })();
+export function isFirebaseConfigured(): boolean {
+  return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && appInstance?.name);
 }
 
 export const app = appInstance;

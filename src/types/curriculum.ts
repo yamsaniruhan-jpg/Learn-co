@@ -190,6 +190,7 @@ export interface PracticeSessionConfig {
   timeLimitSeconds?: number;
   questionTypes?: QuestionTypeId[];
   mode?: 'standard' | 'mistake_remediation' | 'weak_topics' | 'weak_topics_remediation';
+  excludeQuestionIds?: string[];
 }
 
 export interface PracticeSessionState {

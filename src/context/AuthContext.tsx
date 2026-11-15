@@ -15,6 +15,7 @@ import {
 } from '../types/auth';
 import { getCurrentXp, syncLocalXpOnly } from '../utils/xpManager';
 import { loadUserStreak } from '../utils/streakManager';
+import { OfflineStorageManager } from '../utils/offlineStorage';
 import { hasMatchingFirebaseIdentity, syncClientToFirestore } from '../services/clientFirestoreSync';
 import {
   auth,
@@ -143,6 +144,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       setSettings(res.settings);
       syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        OfflineStorageManager.syncPendingAttemptsToServer().catch(() => {});
+      }
     } catch (err: any) {
       if (AuthClient.getToken() !== token) return;
       // A temporary network/server failure is not proof that the session is
@@ -189,7 +193,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (async () => {
       try {
         if (auth?.app && typeof getRedirectResult === 'function') {
-          const redirectResult = await getRedirectResult(auth).catch(() => null);
+          let redirectTimeout: ReturnType<typeof setTimeout> | undefined;
+          const redirectResult = await Promise.race([
+            getRedirectResult(auth).catch(() => null),
+            new Promise<null>((resolve) => {
+              redirectTimeout = setTimeout(() => resolve(null), 2500);
+            }),
+          ]);
+          if (redirectTimeout) clearTimeout(redirectTimeout);
           if (active && redirectResult?.user) {
             let pendingIntent: 'signin' | 'signup' | 'auto' = 'auto';
             let expectedEmail: string | undefined;
@@ -224,10 +235,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (active) {
                 setUser(res.user);
                 setProfile(res.profile);
-                syncLocalXpOnly(res.gamification?.xp ?? 0);
-                setGamification(res.gamification);
+                AuthClient.setCurrentUser(res.user);
+                const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+                const userStreak = loadUserStreak(res.user?.id || 'default_user');
+                setGamification(res.gamification ? {
+                  ...res.gamification,
+                  xp: displayXp,
+                  level: calculateLevelFromXp(displayXp).level,
+                  currentStreak: userStreak.currentStreak,
+                  longestStreak: userStreak.longestStreak,
+                } : res.gamification);
                 setSettings(res.settings);
                 await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+                if (typeof navigator === 'undefined' || navigator.onLine) {
+                  OfflineStorageManager.syncPendingAttemptsToServer().catch(() => {});
+                }
                 setIsLoading(false);
                 return;
               }
@@ -350,6 +372,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } : res.gamification);
       setSettings(res.settings);
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        OfflineStorageManager.syncPendingAttemptsToServer().catch(() => {});
+      }
     } catch (err: any) {
       if (firebaseSignedIn) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-in error */ }
@@ -406,6 +431,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } : res.gamification);
       setSettings(res.settings);
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        OfflineStorageManager.syncPendingAttemptsToServer().catch(() => {});
+      }
     } catch (err: any) {
       if (firebaseSignedIn) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-up error */ }
@@ -515,6 +543,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (_) {}
       }
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        OfflineStorageManager.syncPendingAttemptsToServer().catch(() => {});
+      }
     } catch (err: any) {
       if (firebaseSignedIn) {
         try { await fbSignOut(auth); } catch { /* retain the original Google sign-in error */ }

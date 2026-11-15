@@ -21,8 +21,14 @@ export class QuestionSelectionEngine {
   ): QuestionBankItem[] {
     const userAttempts = Database.getUserAttempts(userId);
     const userMistakes = Database.getMistakes(userId);
-    const allAttemptedIds = new Set(userAttempts.map((a) => a.questionId));
-    const resolvedAttemptIds = new Set(userAttempts.filter((a) => a.isCorrect).map((a) => a.questionId));
+    const allAttemptedIds = new Set<string>(userAttempts.map((a) => a.questionId));
+    const clientExcluded = Array.isArray(config.excludeQuestionIds)
+      ? config.excludeQuestionIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    const seenIds = new Set<string>([...allAttemptedIds, ...clientExcluded]);
+    const resolvedAttemptIds = new Set(
+      userAttempts.filter((a) => a.isCorrect).map((a) => a.questionId)
+    );
 
     // Get all available questions (master bank + any creator imported questions from DB)
     let candidatePool: QuestionBankItem[] = [...MASTER_QUESTION_BANK];
@@ -64,61 +70,95 @@ export class QuestionSelectionEngine {
 
     // When a learner opens practice for one specific concept, lead with the
     // items derived from that concept's own mini-check and worked examples.
-    // The topic-level generator produces subject archetypes that can drift from
-    // the concept being studied, so they should not crowd out the exact match.
     const isConceptScoped = Boolean(config.conceptId);
     const conceptNative = isConceptScoped
       ? candidatePool.filter((q) => q.id.startsWith('q-concept-'))
       : [];
-    const remainder = candidatePool.filter((q) => !conceptNative.includes(q));
+    const conceptNativeIds = new Set(conceptNative.map((q) => q.id));
+    const remainder = candidatePool.filter((q) => !conceptNativeIds.has(q.id));
 
-    // Shuffle each part so repeated sessions still vary
-    const shuffle = <T,>(items: T[]): T[] => [...items].sort(() => Math.random() - 0.5);
+    // Unbiased Fisher-Yates shuffle so repeated sessions draw uniformly
+    const shuffle = <T,>(items: T[]): T[] => {
+      const arr = [...items];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
     const shuffledPool = [...shuffle(conceptNative), ...shuffle(remainder)];
 
     // If Mistake Remediation Mode
     if (config.mode === 'mistake_remediation') {
-      const mistakeQuestionIds = new Set(userMistakes.filter((m) => !m.resolved).map((m) => m.questionId));
+      const mistakeQuestionIds = new Set(
+        userMistakes.filter((m) => !m.resolved).map((m) => m.questionId)
+      );
       const mistakePool = shuffledPool.filter((q) => mistakeQuestionIds.has(q.id));
       if (mistakePool.length >= config.questionCount) {
         return mistakePool.slice(0, config.questionCount);
       }
     }
 
-    const count = config.questionCount || 5;
+    const count = Math.max(1, config.questionCount || 5);
+
+    // Helper: pick unseen items strictly before revisiting already-seen items
+    const selectUnseenFirst = (pool: QuestionBankItem[], targetCount: number): QuestionBankItem[] => {
+      const unseen = pool.filter((q) => !seenIds.has(q.id));
+      if (unseen.length >= targetCount) {
+        return unseen.slice(0, targetCount);
+      }
+      const unseenSet = new Set(unseen.map((q) => q.id));
+      // Prefer unresolved/client-excluded only after genuinely unseen pool is exhausted
+      const unresolvedSeen = pool.filter(
+        (q) => !unseenSet.has(q.id) && !resolvedAttemptIds.has(q.id)
+      );
+      const resolvedSeen = pool.filter(
+        (q) => !unseenSet.has(q.id) && resolvedAttemptIds.has(q.id)
+      );
+      return [...unseen, ...unresolvedSeen, ...resolvedSeen].slice(0, targetCount);
+    };
 
     // Calibrated Ladder Mode (default 5-question ascending difficulty)
     if (!config.difficultyMode || config.difficultyMode === 'calibrated_ladder') {
-      const ladderDifficulties: DifficultyLevel[] = ['easy', 'easy_medium', 'medium', 'medium_hard', 'hard'];
+      const ladderDifficulties: DifficultyLevel[] = [
+        'easy',
+        'easy_medium',
+        'medium',
+        'medium_hard',
+        'hard',
+      ];
       const selected: QuestionBankItem[] = [];
       const usedInSessionIds = new Set<string>();
 
       for (let i = 0; i < count; i++) {
         const targetDiff = ladderDifficulties[i % ladderDifficulties.length];
-        
-        // Priority 1: Match target difficulty AND never attempted by user AND not used in this session
+
+        // Priority 1: Target difficulty + strictly unseen
         let match = shuffledPool.find(
-          (q) => q.difficulty === targetDiff && !allAttemptedIds.has(q.id) && !usedInSessionIds.has(q.id)
+          (q) => q.difficulty === targetDiff && !seenIds.has(q.id) && !usedInSessionIds.has(q.id)
         );
 
-        // Priority 2: Match target difficulty AND not resolved/mastered AND not used in this session
+        // Priority 2: Any unseen candidate (preserve non-repetition even if targetDiff is exhausted)
         if (!match) {
           match = shuffledPool.find(
-            (q) => q.difficulty === targetDiff && !resolvedAttemptIds.has(q.id) && !usedInSessionIds.has(q.id)
+            (q) => !seenIds.has(q.id) && !usedInSessionIds.has(q.id)
           );
         }
 
-        // Priority 3: Match target difficulty AND not used in this session (spaced review)
+        // Priority 3: Target difficulty + unresolved & unused in session
+        if (!match) {
+          match = shuffledPool.find(
+            (q) =>
+              q.difficulty === targetDiff &&
+              !resolvedAttemptIds.has(q.id) &&
+              !usedInSessionIds.has(q.id)
+          );
+        }
+
+        // Priority 4: Target difficulty + unused in session (spaced review only after unseen exhausted)
         if (!match) {
           match = shuffledPool.find(
             (q) => q.difficulty === targetDiff && !usedInSessionIds.has(q.id)
-          );
-        }
-
-        // Priority 4: Any unseen candidate not yet used in this session
-        if (!match) {
-          match = shuffledPool.find(
-            (q) => !allAttemptedIds.has(q.id) && !usedInSessionIds.has(q.id)
           );
         }
 
@@ -138,25 +178,25 @@ export class QuestionSelectionEngine {
       }
     }
 
-    // Standard / custom difficulty mode with deduplication
+    // Standard / custom difficulty mode: unseen first, backfill within matching difficulty before broadening
     if (config.difficultyMode && config.difficultyMode !== 'calibrated_ladder') {
       const filteredByDiff = shuffledPool.filter((q) => q.difficulty === config.difficultyMode);
-      const pool = filteredByDiff.length >= count ? filteredByDiff : shuffledPool;
-      
-      const unattempted = pool.filter((q) => !allAttemptedIds.has(q.id));
-      if (unattempted.length >= count) {
-        return unattempted.slice(0, count);
+      const unseenInDiff = filteredByDiff.filter((q) => !seenIds.has(q.id));
+      if (unseenInDiff.length >= count) {
+        return unseenInDiff.slice(0, count);
       }
-      return pool.slice(0, count);
+      const unseenAnywhere = shuffledPool.filter(
+        (q) => !seenIds.has(q.id) && q.difficulty !== config.difficultyMode
+      );
+      if (unseenInDiff.length + unseenAnywhere.length >= count) {
+        return [...unseenInDiff, ...unseenAnywhere].slice(0, count);
+      }
+      const pool = filteredByDiff.length >= count ? filteredByDiff : shuffledPool;
+      return selectUnseenFirst(pool, count);
     }
 
-    // General fallback: return unattempted candidates first
-    const unattempted = shuffledPool.filter((q) => !allAttemptedIds.has(q.id));
-    if (unattempted.length >= count) {
-      return unattempted.slice(0, count);
-    }
-
-    return shuffledPool.slice(0, count);
+    // General fallback: return strictly unseen candidates before any revisit
+    return selectUnseenFirst(shuffledPool, count);
   }
 
   /**

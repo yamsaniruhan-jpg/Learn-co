@@ -346,26 +346,110 @@ export default function App() {
     );
   }
 
-  // If user is not signed in: Strict Authentication Gating
+  // If user is not signed in: Flagship Live Website + Auth Portal
   if (!isAuthenticated || resetToken) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-        <header className="w-full border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-6 py-4 flex items-center justify-between shadow-xs">
-          <BrandLogo size="md" />
-          <div className="flex items-center gap-3">
+      <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col font-sans selection:bg-[#6C5CE7] selection:text-white">
+        <header className="w-full border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-4 sm:px-6 py-3.5 flex items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <BrandLogo size="md" />
+            <span className="hidden md:inline-block text-xs font-semibold text-[#6B6890] dark:text-[#B4B0D5] border-l border-[#E3DFF5] dark:border-[#3D3861] pl-3 whitespace-nowrap">
+              7 Subjects · IPhO · IChO · IBHO · IJSO · ICT
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <PWAInstallButton />
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
               aria-label="Toggle theme"
             >
               {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </header>
-        <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-          <div className="w-full max-w-2xl py-4">
-            <AuthView initialResetToken={resetToken} onExitReset={() => setResetToken(null)} onNavigateToTab={() => setActiveTab('dashboard')} />
+
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Flagship Platform Overview */}
+            <section className="lg:col-span-6 space-y-6 order-2 lg:order-1">
+              <div className="space-y-3">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#6C5CE7] dark:text-[#A594FF]">
+                  Learn.co Academic Platform · Web &amp; Installable Mobile App
+                </div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] leading-[1.1]">
+                  First-Principles STEM &amp; Olympiad Mastery
+                </h1>
+                <p className="text-sm sm:text-base text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
+                  Study AP Calculus BC, Physics, Chemistry, Biology, English, Data Science, and Computer Science with interactive 3D and quantitative virtual laboratories, verified mentor workflows, and offline-ready practice sync.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
+                  <div className="text-xs font-bold uppercase tracking-wide text-[#6C5CE7] dark:text-[#A594FF]">
+                    International Olympiads
+                  </div>
+                  <div className="text-sm font-black mt-1">IPhO · IChO · IBHO · IJSO · ICT</div>
+                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
+                    Dedicated olympiad chapters, competition theorems, and non-repeating calibrated problem ladders.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
+                  <div className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                    11 Virtual Laboratories
+                  </div>
+                  <div className="text-sm font-black mt-1">3D WebGL, Optics, Dijkstra &amp; Bayes</div>
+                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
+                    Manipulate parameters in thin-film optics, Nernst cells, enzyme kinetics, ROC thresholds, and prosody scansion.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
+                  <div className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                    Android, iOS &amp; Desktop PWA
+                  </div>
+                  <div className="text-sm font-black mt-1">Add to Home Screen &amp; Offline Sync</div>
+                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
+                    Install straight to your phone home screen or download a desktop launcher with automatic offline attempt queueing.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
+                  <div className="text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+                    Verified Mentorship
+                  </div>
+                  <div className="text-sm font-black mt-1">Email Dispatch &amp; Approval Flow</div>
+                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
+                    Connect with subject mentors through verified email notifications and real Firestore session tracking.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+                    Install Learn.co on Mobile or Desktop
+                  </div>
+                  <div className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">
+                    Auto-detects Android/iOS Home Screen installation or desktop `.url` / `.html` / `.webloc` / `.desktop` shortcuts.
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <PWAInstallButton />
+                </div>
+              </div>
+            </section>
+
+            {/* Right Sign-In / Sign-Up Card */}
+            <section className="lg:col-span-6 w-full max-w-xl mx-auto lg:max-w-none order-1 lg:order-2">
+              <AuthView
+                initialResetToken={resetToken}
+                onExitReset={() => setResetToken(null)}
+                onNavigateToTab={() => setActiveTab('dashboard')}
+              />
+            </section>
           </div>
         </main>
       </div>
@@ -414,7 +498,7 @@ export default function App() {
 
         {/* Dynamic Center Stage Canvas with Zen Focus Canvas */}
         <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
             <ErrorBoundary
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
@@ -430,8 +514,8 @@ export default function App() {
                       <h4 className="font-black text-sm text-[#2D2A4A] dark:text-[#F1EFFF]">
                         {arrivalReminder.title}
                       </h4>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#4CAF8E] text-white">
-                        0 AI Tokens • Free
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#4CAF8E] text-white">
+                        0 AI Tokens · Free
                       </span>
                     </div>
                     <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5 font-medium">

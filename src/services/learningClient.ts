@@ -141,19 +141,39 @@ export class LearningClient {
     return null;
   }
 
+  private static seenQuestionIds = new Set<string>();
+
+  static clearSeenQuestions() {
+    this.seenQuestionIds.clear();
+  }
+
   /**
    * Start a calibrated or custom practice session (verifies daily quota on server)
    */
   static async startPracticeSession(config: PracticeSessionConfig): Promise<StartSessionResponse> {
+    const shouldDeduplicate = config.mode !== 'mistake_remediation';
+    const mergedExclude = shouldDeduplicate
+      ? Array.from(new Set([...this.seenQuestionIds, ...(config.excludeQuestionIds ?? [])]))
+      : config.excludeQuestionIds;
+
+    const payloadConfig: PracticeSessionConfig = shouldDeduplicate
+      ? { ...config, excludeQuestionIds: mergedExclude }
+      : config;
+
     const res = await fetch('/api/learning/session/start', {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ config }),
+      body: JSON.stringify({ config: payloadConfig }),
     });
 
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Failed to start practice session');
+    }
+    if (shouldDeduplicate && Array.isArray(data?.questions)) {
+      data.questions.forEach((q: { id?: string }) => {
+        if (q?.id) this.seenQuestionIds.add(q.id);
+      });
     }
     return data;
   }

@@ -279,7 +279,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   return (
     <>
       {/* Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
-      <nav aria-label="Mobile feature navigation" className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-1 py-1.5 flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
+      <nav aria-label="Mobile feature navigation" className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
         {primaryBottomTabs.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -294,9 +294,9 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
               }`}
             >
               <Icon className="w-5 h-5 mb-0.5" />
-              <span>{item.shortLabel}</span>
+              <span className="truncate max-w-full px-0.5">{item.shortLabel}</span>
               {item.id === 'practice' && dailyAllowanceRemaining > 0 && (
-                <span className="absolute top-0.5 right-0.5 text-[9px] px-1 rounded-full bg-[#6C5CE7] text-white font-black">
+                <span className="absolute top-0.5 right-0.5 text-[9px] px-1 rounded-full bg-[#6C5CE7] text-white font-black tabular-nums">
                   {dailyAllowanceRemaining}
                 </span>
               )}
@@ -313,10 +313,7 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
               : 'text-[#6B6890] dark:text-[#B4B0D5]'
           }`}
         >
-          <div className="relative">
-            <Menu className="w-5 h-5 mb-0.5" />
-            <span className="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-[#6C5CE7]" />
-          </div>
+          <Menu className="w-5 h-5 mb-0.5" />
           <span>All Tabs</span>
         </button>
       </nav>

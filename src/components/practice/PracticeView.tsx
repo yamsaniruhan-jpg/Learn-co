@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   SubjectId,
   PracticeSessionConfig,
@@ -164,11 +164,30 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
     }
   };
 
+  const seenQuestionIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    for (const att of localAttempts) {
+      if (att.questionId) seenQuestionIdsRef.current.add(att.questionId);
+    }
+  }, [localAttempts]);
+
   const handleLaunchSession = async (config: PracticeSessionConfig) => {
     setIsConfigModalOpen(false);
     try {
-      const session = await LearningClient.startPracticeSession(config);
+      const mergedExcluded = Array.from(
+        new Set([
+          ...seenQuestionIdsRef.current,
+          ...localAttempts.map((a) => a.questionId).filter(Boolean),
+          ...(config.excludeQuestionIds ?? []),
+        ])
+      );
+      const session = await LearningClient.startPracticeSession({
+        ...config,
+        excludeQuestionIds: mergedExcluded,
+      });
       if (session && session.questions && session.questions.length > 0) {
+        session.questions.forEach((q) => seenQuestionIdsRef.current.add(q.id));
         setActivePracticeSession({
           config,
           questions: session.questions,
@@ -508,6 +527,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                     <option value="physics">Physics</option>
                     <option value="chemistry">Chemistry</option>
                     <option value="biology">Biology</option>
+                    <option value="english">English</option>
+                    <option value="data_science">Data Science</option>
                   </select>
                 </div>
 

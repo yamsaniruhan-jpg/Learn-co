@@ -120,7 +120,16 @@ export default defineConfig(() => {
           clientsClaim: true,
           skipWaiting: true,
           navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/healthz$/, /^\/_ah\/health$/],
+          navigateFallbackDenylist: [
+            /^\/api(?:\/|$)/,
+            /^\/healthz$/,
+            /^\/_ah\/health$/,
+            /^\/_aistudio/,
+            /^\/__aistudio/,
+            /^\/dev-sw\.js/,
+            /^\/sw\.js$/,
+            /^\/workbox-/,
+          ],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -154,7 +163,8 @@ export default defineConfig(() => {
         },
         devOptions: {
           enabled: true,
-          type: 'module',
+          type: 'classic',
+          suppressWarnings: true,
         },
       }),
     ],

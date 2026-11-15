@@ -65,6 +65,8 @@ export class OfflineStorageManager {
     let userId: string | undefined;
     try { userId = JSON.parse(localStorage.getItem('learnco_user') || 'null')?.id; } catch { /* No trusted account context. */ }
     if (!token || !userId) return 0;
+    const hasEligible = attempts.some((item) => item.userId === userId && Boolean(item.id));
+    if (!hasEligible) return 0;
     // Bind the local account label to the server session, including during a
     // sign-in transition or when browser storage is stale.
     try {
@@ -115,6 +117,11 @@ export class OfflineStorageManager {
     const remaining = this.getPendingAttempts().filter(item => !(item.userId === userId && syncedIds.has(item.id)));
     localStorage.setItem(STORAGE_KEY_PENDING_ATTEMPTS, JSON.stringify(remaining));
     window.dispatchEvent(new CustomEvent('learnco_offline_queue_updated'));
+    window.dispatchEvent(
+      new CustomEvent('learnco_offline_synced', {
+        detail: { syncedCount: syncedIds.size, timestamp: new Date().toISOString() },
+      })
+    );
     return syncedIds.size;
   }
 
@@ -133,6 +140,7 @@ export class OfflineStorageManager {
 export function useNetworkStatus(): {
   isOnline: boolean;
   pendingOfflineCount: number;
+  lastSyncedAt: string | null;
   triggerSync: () => Promise<number>;
 } {
   const [isOnline, setIsOnline] = useState<boolean>(() => {
@@ -141,6 +149,7 @@ export function useNetworkStatus(): {
   const [pendingCount, setPendingCount] = useState<number>(() => {
     return OfflineStorageManager.getPendingAttempts().length;
   });
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     const refreshCount = () => {
@@ -149,7 +158,10 @@ export function useNetworkStatus(): {
 
     const handleOnline = async () => {
       setIsOnline(true);
-      try { await OfflineStorageManager.syncPendingAttemptsToServer(); } catch { /* Keep pending data for retry. */ }
+      try {
+        const count = await OfflineStorageManager.syncPendingAttemptsToServer();
+        if (count > 0) setLastSyncedAt(new Date().toISOString());
+      } catch { /* Keep pending data for retry. */ }
       refreshCount();
     };
 
@@ -158,22 +170,42 @@ export function useNetworkStatus(): {
       refreshCount();
     };
 
+    const handleSynced = (e: Event) => {
+      const detail = (e as CustomEvent<{ syncedCount?: number; timestamp?: string }>).detail;
+      if (detail?.syncedCount && detail.syncedCount > 0 && detail.timestamp) {
+        setLastSyncedAt(detail.timestamp);
+      }
+      refreshCount();
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('learnco_offline_queue_updated', refreshCount);
+    window.addEventListener('learnco_offline_synced', handleSynced);
+
+    if ((typeof navigator === 'undefined' || navigator.onLine) && OfflineStorageManager.getPendingAttempts().length > 0) {
+      OfflineStorageManager.syncPendingAttemptsToServer()
+        .then((count) => {
+          if (count > 0) setLastSyncedAt(new Date().toISOString());
+          refreshCount();
+        })
+        .catch(() => {});
+    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('learnco_offline_queue_updated', refreshCount);
+      window.removeEventListener('learnco_offline_synced', handleSynced);
     };
   }, []);
 
   const triggerSync = async () => {
     const synced = await OfflineStorageManager.syncPendingAttemptsToServer();
+    if (synced > 0) setLastSyncedAt(new Date().toISOString());
     setPendingCount(OfflineStorageManager.getPendingAttempts().length);
     return synced;
   };
 
-  return { isOnline, pendingOfflineCount: pendingCount, triggerSync };
+  return { isOnline, pendingOfflineCount: pendingCount, lastSyncedAt, triggerSync };
 }

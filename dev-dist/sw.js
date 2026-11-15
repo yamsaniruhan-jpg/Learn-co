@@ -67,13 +67,24 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-266c7f0d'], (function (workbox) { 'use strict';
+define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
 
-  self.addEventListener('message', event => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-      self.skipWaiting();
-    }
-  });
+  self.skipWaiting();
+  workbox.clientsClaim();
+  /**
+   * The precacheAndRoute() method efficiently caches and responds to
+   * requests for URLs in the manifest.
+   * See https://goo.gl/S9QRab
+   */
+  workbox.precacheAndRoute([{
+    "url": "/index.html",
+    "revision": "0.9hdtins391g"
+  }], {});
+  workbox.cleanupOutdatedCaches();
+  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
+    allowlist: [/^\/$/],
+    denylist: [/^\/api(?:\/|$)/, /^\/healthz$/, /^\/_ah\/health$/]
+  }));
   workbox.registerRoute(/^https:\/\/fonts\.googleapis\.com\/.*/i, new workbox.CacheFirst({
     "cacheName": "google-fonts-cache",
     plugins: [new workbox.ExpirationPlugin({

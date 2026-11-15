@@ -99,10 +99,18 @@ router.get('/concept/:conceptId', (req, res: Response) => {
 router.post('/session/start', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const config: PracticeSessionConfig = req.body.config || {
+    const rawConfig = req.body.config || {
       questionCount: 5,
       difficultyMode: 'calibrated_ladder',
       timed: false,
+    };
+    const config: PracticeSessionConfig = {
+      ...rawConfig,
+      excludeQuestionIds: Array.isArray(rawConfig.excludeQuestionIds)
+        ? rawConfig.excludeQuestionIds
+            .filter((id: unknown): id is string => typeof id === 'string')
+            .slice(0, 2000)
+        : undefined,
     };
 
     // Check user daily quota before starting
