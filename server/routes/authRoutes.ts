@@ -176,11 +176,6 @@ router.post('/google', async (req, res: Response) => {
   try {
     const { email, name, avatarUrl, timezone, intent = 'auto', idToken } = req.body;
 
-    if (typeof email !== 'string' || email.length > 254 || !email.includes('@')) {
-      res.status(400).json({ error: 'A valid email is required for Google Sign-In.' });
-      return;
-    }
-
     if (!adminAuth) {
       res.status(503).json({ error: 'Google sign-in is unavailable until server-side Firebase authentication is configured.' });
       return;
@@ -189,12 +184,21 @@ router.post('/google', async (req, res: Response) => {
       res.status(401).json({ error: 'A valid Google sign-in token is required.' });
       return;
     }
+    const providedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (providedEmail && (providedEmail.length > 254 || !providedEmail.includes('@'))) {
+      res.status(400).json({ error: 'A valid email is required for Google Sign-In.' });
+      return;
+    }
     let verifiedEmail: string;
     let decodedUid: string | undefined;
     try {
       const decoded = await verifyFirebaseIdTokenSafely(adminAuth, idToken, true);
-      if (!decoded.email || !decoded.email_verified || decoded.firebase?.sign_in_provider !== 'google.com' ||
-          decoded.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+      if (
+        !decoded.email ||
+        !decoded.email_verified ||
+        decoded.firebase?.sign_in_provider !== 'google.com' ||
+        (providedEmail && decoded.email.trim().toLowerCase() !== providedEmail)
+      ) {
         res.status(401).json({ error: 'Google token does not match a verified Google account.' });
         return;
       }
@@ -230,8 +234,11 @@ router.post('/google', async (req, res: Response) => {
       token = created.token;
       profile = created.profile;
     } else {
+      user.lastLoginAt = new Date().toISOString();
+      user.updatedAt = new Date().toISOString();
       token = Database.createSession(user.id);
       profile = Database.getProfile(user.id);
+      Database.saveToDisk();
     }
 
     if (isOwnerEmail(user.email)) {

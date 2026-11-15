@@ -1,5 +1,4 @@
-// src/components/Marketplace.jsx
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiCall } from '../client/firebase';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -30,27 +29,27 @@ const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
 
 export default function Marketplace() {
   const { isAuthenticated } = useAuth();
-  const [courses, setCourses] = useState([]);
-  const [catalogSource, setCatalogSource] = useState(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [catalogSource, setCatalogSource] = useState<string | null>(null);
   const searchRequest = useRef(0);
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('');
   const [difficulty, setDifficulty] = useState('');
   const [sort, setSort] = useState('newest');
   const [loading, setLoading] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   const [enrolling, setEnrolling] = useState(false);
-  const [enrolledCourses, setEnrolledCourses] = useState({});
-  const [toast, setToast] = useState(null);
+  const [enrolledCourses, setEnrolledCourses] = useState<Record<string, boolean>>({});
+  const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Course reviews state
-  const [reviews, setReviews] = useState([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  const showToast = (text, type = 'success') => {
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 4000);
   };
@@ -61,13 +60,20 @@ export default function Marketplace() {
     try {
       const params = new URLSearchParams({ query, subject, difficulty, sort });
       const res = await apiCall(`/marketplace/search?${params}`);
-      if (!res.ok) throw new Error('Search failed');
-      const data = await res.json();
-      if (requestId === searchRequest.current) { setCourses(data.courses || []); setCatalogSource(data.catalogSource || null); }
-    } catch (error) {
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Server returned non-JSON response.');
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Marketplace request failed (${res.status})`);
+      if (requestId === searchRequest.current) {
+        setCourses(data.courses || []);
+        setCatalogSource(data.catalogSource || null);
+      }
+    } catch (error: any) {
       if (requestId === searchRequest.current) {
         console.error('Search error:', error);
-        showToast('Could not load marketplace courses.', 'error');
+        showToast(error?.message || 'Could not load marketplace courses.', 'error');
       }
     } finally {
       if (requestId === searchRequest.current) setLoading(false);
@@ -87,10 +93,11 @@ export default function Marketplace() {
     (async () => {
       try {
         const res = await apiCall('/marketplace/enrollments');
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
-          const map = {};
-          (data.enrolledCourseIds || []).forEach((id) => {
+          const map: Record<string, boolean> = {};
+          (data.enrolledCourseIds || []).forEach((id: string) => {
             map[id] = true;
           });
           setEnrolledCourses(map);
@@ -101,13 +108,14 @@ export default function Marketplace() {
     })();
   }, [isAuthenticated]);
 
-  const openCourseModal = async (course) => {
+  const openCourseModal = async (course: any) => {
     setSelectedCourse(course);
     setReviews([]);
     setLoadingReviews(true);
     try {
       const res = await apiCall(`/marketplace/reviews/${course.id}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setReviews(data.reviews || []);
       }
@@ -118,7 +126,7 @@ export default function Marketplace() {
     }
   };
 
-  const handleEnroll = async (courseId) => {
+  const handleEnroll = async (courseId: string) => {
     if (!isAuthenticated) {
       showToast('Please sign in first to enroll in marketplace courses.', 'error');
       return;
@@ -126,14 +134,15 @@ export default function Marketplace() {
     setEnrolling(true);
     try {
       const res = await apiCall(`/marketplace/enroll/${courseId}`, { method: 'POST' });
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await res.json() : {};
       if (res.ok && (data.success || data.alreadyEnrolled)) {
         setEnrolledCourses((prev) => ({ ...prev, [courseId]: true }));
         if (!data.alreadyEnrolled) {
           setCourses((prev) =>
             prev.map((c) => (c.id === courseId ? { ...c, enrolledCount: (c.enrolledCount || 0) + 1 } : c))
           );
-          setSelectedCourse((prev) =>
+          setSelectedCourse((prev: any) =>
             prev && prev.id === courseId ? { ...prev, enrolledCount: (prev.enrolledCount || 0) + 1 } : prev
           );
         }
@@ -150,7 +159,7 @@ export default function Marketplace() {
     }
   };
 
-  const handleSubmitReview = async (e) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourse) return;
     if (!isAuthenticated) {
@@ -167,14 +176,16 @@ export default function Marketplace() {
         method: 'POST',
         body: JSON.stringify({ rating: reviewRating, comment: reviewComment.trim() }),
       });
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await res.json() : {};
       if (res.ok && data.success) {
         setReviewComment('');
         showToast(data.review?.persistence === 'memory'
           ? 'Review is stored only for this server session and may disappear after restart.'
           : 'Review submitted!');
         const revRes = await apiCall(`/marketplace/reviews/${selectedCourse.id}`);
-        if (revRes.ok) {
+        const revContentType = revRes.headers.get('content-type') || '';
+        if (revRes.ok && revContentType.includes('application/json')) {
           const revData = await revRes.json();
           setReviews(revData.reviews || []);
         }
@@ -226,7 +237,7 @@ export default function Marketplace() {
         </div>
       )}
       {/* Search Bar & Filters */}
-      <div className="bg-white dark:bg-[#2A2647] p-4 sm:p-6 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-4">
+      <div className="bg-white dark:bg-[#2A2647] p-4 sm:p-6 rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-[#8E8BAF]" />
@@ -236,13 +247,13 @@ export default function Marketplace() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && search()}
               placeholder="Search courses by title, topic, instructor, or skill..."
-              className="w-full pl-12 pr-4 border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl py-3 focus:ring-2 focus:ring-[#6C5CE7] focus:outline-none bg-white dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] placeholder:text-[#8E8BAF] text-sm font-medium"
+              className="w-full pl-12 pr-4 border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl py-3 focus:ring-2 focus:ring-[#6C5CE7] focus:outline-none bg-white dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] placeholder:text-[#8E8BAF] text-sm font-medium"
             />
           </div>
           <button
             type="button"
             onClick={search}
-            className="bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white px-6 py-3 rounded-xl transition-colors font-bold text-sm shadow-md cursor-pointer flex items-center justify-center gap-2"
+            className="bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white px-6 py-3 rounded-2xl transition-colors font-bold text-sm shadow-md cursor-pointer flex items-center justify-center gap-2"
           >
             <Search className="w-4 h-4" />
             Search
@@ -319,7 +330,7 @@ export default function Marketplace() {
             />
           ))}
           {courses.length === 0 && (
-            <div className="col-span-full text-center py-20 rounded-2xl bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-8 space-y-2">
+            <div className="col-span-full text-center py-20 rounded-3xl bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-8 space-y-2">
               <p className="text-base font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">No courses found</p>
               <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">Try adjusting your search query or subject filters.</p>
             </div>
@@ -377,7 +388,7 @@ export default function Marketplace() {
                   <span>Course Curriculum Modules</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedCourse.modules.map((mod, idx) => (
+                  {selectedCourse.modules.map((mod: string, idx: number) => (
                     <div
                       key={idx}
                       className="p-2.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-2"
@@ -396,7 +407,7 @@ export default function Marketplace() {
               <div className="space-y-2">
                 <h4 className="text-xs font-black text-[#6B6890] dark:text-[#B4B0D5] uppercase tracking-wider">Skills Covered</h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {selectedCourse.tags.map((tag, idx) => (
+                  {selectedCourse.tags.map((tag: string, idx: number) => (
                     <span
                       key={idx}
                       className="text-xs px-2.5 py-1 rounded-lg bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#8577ED] font-bold border border-[#E3DFF5] dark:border-[#3D3861]"
@@ -493,7 +504,7 @@ export default function Marketplace() {
                 <button
                   type="button"
                   onClick={() => setSelectedCourse(null)}
-                  className="px-5 py-3 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] font-bold text-sm hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition cursor-pointer"
+                  className="px-5 py-3 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] font-bold text-sm hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition cursor-pointer"
                 >
                   Close
                 </button>
@@ -501,7 +512,7 @@ export default function Marketplace() {
                   type="button"
                   disabled={enrolling || enrolledCourses[selectedCourse.id]}
                   onClick={() => handleEnroll(selectedCourse.id)}
-                  className={`px-6 py-3 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 ${
+                  className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-md transition flex items-center gap-2 ${
                     enrolledCourses[selectedCourse.id]
                       ? 'bg-emerald-600 text-white cursor-default'
                       : 'bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white cursor-pointer'
@@ -527,7 +538,7 @@ export default function Marketplace() {
   );
 }
 
-function CourseCard({ course, isEnrolled, onSelect }) {
+function CourseCard({ course, isEnrolled, onSelect }: { course: any; isEnrolled: boolean; onSelect: () => void }) {
   const ratingVal = course.rating || 4.8;
   const roundedStars = Math.min(5, Math.max(0, Math.round(ratingVal)));
   const stars = '★'.repeat(roundedStars) + '☆'.repeat(5 - roundedStars);

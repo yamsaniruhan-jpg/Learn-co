@@ -20,6 +20,8 @@ import {
   auth,
   googleProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateFirebaseProfile,
@@ -183,7 +185,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    refreshUserData();
+    let active = true;
+    (async () => {
+      try {
+        if (auth?.app && typeof getRedirectResult === 'function') {
+          const redirectResult = await getRedirectResult(auth).catch(() => null);
+          if (active && redirectResult?.user) {
+            let pendingIntent: 'signin' | 'signup' | 'auto' = 'auto';
+            let expectedEmail: string | undefined;
+            try {
+              const raw = sessionStorage.getItem('learnco_google_redirect_pending');
+              sessionStorage.removeItem('learnco_google_redirect_pending');
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.intent) pendingIntent = parsed.intent;
+                if (parsed?.expectedEmail) expectedEmail = parsed.expectedEmail;
+              }
+            } catch {}
+
+            const resolvedEmail =
+              redirectResult.user.email ||
+              redirectResult.user.providerData?.find((p) => p?.email)?.email ||
+              '';
+            if (expectedEmail && resolvedEmail.trim().toLowerCase() !== expectedEmail.trim().toLowerCase()) {
+              setAuthError(
+                `You signed into Google as ${resolvedEmail || 'another account'}, which does not match ${expectedEmail}.`
+              );
+              try { await fbSignOut(auth); } catch {}
+            } else {
+              const firebaseToken = await redirectResult.user.getIdToken();
+              const res = await AuthClient.signInWithGoogle({
+                email: resolvedEmail,
+                name: redirectResult.user.displayName || '',
+                avatarUrl: redirectResult.user.photoURL || undefined,
+                intent: pendingIntent,
+                idToken: firebaseToken,
+              });
+              if (active) {
+                setUser(res.user);
+                setProfile(res.profile);
+                syncLocalXpOnly(res.gamification?.xp ?? 0);
+                setGamification(res.gamification);
+                setSettings(res.settings);
+                await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+                setIsLoading(false);
+                return;
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        if (active) {
+          setAuthError(err?.message || 'Google redirect sign-in could not be completed.');
+        }
+      }
+      if (active) {
+        await refreshUserData();
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [refreshUserData]);
 
   // Listen to global XP awarded events
@@ -370,34 +432,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error('Google authentication is unavailable in this environment. Please use Email & Password.');
         }
         let result;
+        const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
         try {
           result = await signInWithPopup(auth, googleProvider);
         } catch (popupErr: any) {
           const code = popupErr?.code || '';
-          if (code === 'auth/popup-blocked') {
-            throw new Error('Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
-          }
           if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
             throw new Error('Google sign-in was cancelled before completing. Click the button again to choose your Google account.');
           }
           if (code === 'auth/unauthorized-domain') {
-            throw new Error('This preview domain is not yet authorized for Google popup login. Please sign in with Email & Password.');
+            throw new Error('This domain is not authorized for Google Sign-In in Firebase Console. Open the live app URL or sign in with Email & Password.');
           }
-          if (code === 'auth/internal-error' || code === 'auth/operation-not-allowed') {
-            throw new Error('Google Sign-In is not enabled in the Firebase Console. Please enable Google authentication in your Firebase project settings, or sign in with Email & Password.');
+          if (code === 'auth/operation-not-allowed') {
+            throw new Error('Google Sign-In is disabled in Firebase Console. Enable Google under Authentication → Sign-in method, or sign in with Email & Password.');
+          }
+          if (code === 'auth/network-request-failed') {
+            throw new Error('Network error while contacting Google. Check your internet connection and try again.');
+          }
+          if (
+            code === 'auth/popup-blocked' ||
+            code === 'auth/internal-error' ||
+            code === 'auth/operation-not-supported-in-this-environment' ||
+            code === 'auth/web-storage-unsupported'
+          ) {
+            if (!isInIframe && typeof signInWithRedirect === 'function') {
+              try {
+                sessionStorage.setItem(
+                  'learnco_google_redirect_pending',
+                  JSON.stringify({ intent, expectedEmail: email || undefined })
+                );
+              } catch {}
+              await signInWithRedirect(auth, googleProvider);
+              return;
+            }
+            throw new Error(
+              'Google sign-in popup was blocked or restricted inside this embedded preview frame. Open the app in a new browser tab to complete Google Sign-In, or sign in with Email & Password.'
+            );
           }
           throw popupErr;
         }
         firebaseSignedIn = true;
         firebaseToken = await result.user.getIdToken();
-        if (email && result.user.email?.trim().toLowerCase() !== email.trim().toLowerCase()) {
+        const resolvedEmail =
+          result.user.email ||
+          result.user.providerData?.find((p) => p?.email)?.email ||
+          email ||
+          '';
+        if (email && resolvedEmail.trim().toLowerCase() !== email.trim().toLowerCase()) {
           throw new Error(
-            `You signed into Google as ${result.user.email}, which does not match ${email}. Clear the email filter or select the matching account.`
+            `You signed into Google as ${resolvedEmail || 'another account'}, which does not match ${email}. Clear the email filter or select the matching account.`
           );
         }
-        email = result.user.email || email;
-        name = result.user.displayName || name;
-        avatarUrl = result.user.photoURL || avatarUrl;
+        email = resolvedEmail;
+        name = result.user.displayName || result.user.providerData?.find((p) => p?.displayName)?.displayName || name;
+        avatarUrl = result.user.photoURL || result.user.providerData?.find((p) => p?.photoURL)?.photoURL || avatarUrl;
       }
 
       // 2. Pass the Firebase ID token to the backend

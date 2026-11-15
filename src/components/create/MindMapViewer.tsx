@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { latexToPlainText } from '../../utils/textSanitizer';
 
 interface MindMapViewerProps {
   mindmap: MindMapContent;
@@ -86,11 +87,11 @@ export const MindMapViewer: React.FC<MindMapViewerProps> = ({ mindmap, title }) 
 
             <div className="truncate">
               <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
-                {node.label}
+                {latexToPlainText(node.label)}
               </span>
               {node.formula && (
-                <span className="ml-2 text-[11px] font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900">
-                  {node.formula}
+                <span className="ml-2 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900">
+                  {latexToPlainText(node.formula)}
                 </span>
               )}
             </div>
@@ -160,23 +161,23 @@ export const MindMapViewer: React.FC<MindMapViewerProps> = ({ mindmap, title }) 
                 </Badge>
               </div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                {selectedNode.label}
+                {latexToPlainText(selectedNode.label)}
               </h3>
             </div>
 
             {selectedNode.description && (
-              <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                {selectedNode.description}
+              <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                {latexToPlainText(selectedNode.description)}
               </div>
             )}
 
             {selectedNode.formula && (
-              <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1">
+              <div className="p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1">
                 <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                   Mathematical Invariant
                 </span>
-                <p className="text-xs font-mono font-bold text-indigo-950 dark:text-indigo-200">
-                  $${selectedNode.formula}$$
+                <p className="text-xs sm:text-sm font-bold text-indigo-950 dark:text-indigo-200">
+                  {latexToPlainText(selectedNode.formula)}
                 </p>
               </div>
             )}

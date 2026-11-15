@@ -172,7 +172,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Quick Launch Practice CTA Box */}
-          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] p-6 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row items-center gap-4 shrink-0 shadow-[0_4px_16px_rgba(0,0,0,0.1)]">
+          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] p-6 rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row items-center gap-4 shrink-0 shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
             <div className="text-center sm:text-left">
               <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-black text-[#FFB84D] mb-0.5">
                 <Flame className="w-4 h-4 fill-[#FFB84D]" />
@@ -186,7 +186,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
-                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
+                className="px-4 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
                 title="60-second sample flash check (device-local activity points)"
               >
                 <Zap className="w-4 h-4 fill-current text-slate-950" />
@@ -324,7 +324,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2.5">
                         <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-xs"
+                          className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-xs shrink-0"
                           style={{ backgroundColor: subject.color }}
                         >
                           {subject.name.slice(0, 2).toUpperCase()}
@@ -367,11 +367,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Card
               variant="subtle"
               padding="md"
-              className="border-l-4 border-l-rose-500 bg-rose-50/40 dark:bg-rose-950/20"
+              className="rounded-3xl border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
+                  <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
                     <AlertCircle className="w-5 h-5" />
                   </div>
                   <div>
@@ -385,7 +385,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {weakConcepts.map((w) => (
                         <span
                           key={w.conceptId}
-                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-1.5"
+                          className="text-[11px] font-semibold px-3 py-1 rounded-full bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-1.5"
                         >
                           <span>{w.conceptTitle}</span>
                           <span className="font-bold opacity-80">({w.masteryScore}%)</span>
@@ -398,7 +398,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   variant="destructive"
                   size="sm"
                   onClick={() => onNavigate('practice')}
-                  className="shrink-0"
+                  className="shrink-0 rounded-full"
                 >
                   Remediate
                 </Button>
@@ -408,11 +408,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Card
               variant="subtle"
               padding="md"
-              className="border-l-4 border-l-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20"
+              className="rounded-3xl border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20"
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                     <Target className="w-5 h-5" />
                   </div>
                   <div>
@@ -428,7 +428,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   variant="primary"
                   size="sm"
                   onClick={() => onNavigate('practice')}
-                  className="shrink-0"
+                  className="shrink-0 rounded-full"
                 >
                   Start First Session
                 </Button>
@@ -447,7 +447,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <button
                   key={idx}
                   onClick={() => onNavigate(item.tab, { initialPrompt: item.prompt })}
-                  className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 text-left transition-all hover:shadow-xs group cursor-pointer"
+                  className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 text-left transition-all hover:shadow-xs group cursor-pointer"
                 >
                   <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block mb-1">
                     {item.category}
@@ -528,7 +528,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-500/30"
           >
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-xs shrink-0">
+              <div className="w-10 h-10 rounded-full bg-amber-500 text-white shadow-xs flex items-center justify-center shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="space-y-1">

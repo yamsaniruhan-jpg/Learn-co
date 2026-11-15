@@ -46,13 +46,41 @@ export default defineConfig(() => {
           });
         },
       },
+      {
+        name: 'disable-hmr-websocket-when-disabled',
+        enforce: 'post' as const,
+        transform(code: string, id: string) {
+          if (
+            id.endsWith('vite/dist/client/client.mjs') ||
+            id.endsWith('vite\\dist\\client\\client.mjs')
+          ) {
+            const patched = code.replace(
+              /const transport = normalizeModuleRunnerTransport\([\s\S]*?\);\s*(?=let willUnload = false)/,
+              'const transport = normalizeModuleRunnerTransport({ connect() {}, disconnect() {}, send() {} });\n'
+            );
+            return {
+              code: patched,
+              map: null,
+            };
+          }
+          return null;
+        },
+      },
       react(),
       ...tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: false,
         manifestFilename: 'manifest.json',
-        includeAssets: ['favicon.jpg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'],
+        includeAssets: [
+          'favicon.ico',
+          'favicon.jpg',
+          'logo-mark.png',
+          'logo.jpg',
+          'icons/icon-192.png',
+          'icons/icon-512.png',
+          'icons/icon-maskable-512.png',
+        ],
         manifest: {
           id: '/',
           name: 'Learn.co - AI Learning Companion',

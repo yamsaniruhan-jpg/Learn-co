@@ -21,6 +21,7 @@ import { useAuth } from './context/AuthContext';
 import { SubjectId, UserProfile, NotificationItem } from './types';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
+import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
 import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
@@ -30,6 +31,7 @@ import { OfflineSyncView } from './components/common/OfflineSyncView';
 import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import { WalkthroughModal } from './components/common/WalkthroughModal';
+import { FloatingGuideButton } from './components/common/FloatingGuideButton';
 import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
 import { useLocalPractice } from './utils/localPractice';
@@ -351,6 +353,7 @@ export default function App() {
         <header className="w-full border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-6 py-4 flex items-center justify-between shadow-xs">
           <BrandLogo size="md" />
           <div className="flex items-center gap-3">
+            <PWAInstallButton />
             <button
               onClick={toggleTheme}
               className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -740,7 +743,14 @@ export default function App() {
         }}
       />
 
-      {/* Floating Omni Copilot Widget */}
+      {/* Floating Guide Icon beside Floating Omni Copilot Widget */}
+      {!isZenMode && (
+        <FloatingGuideButton
+          activeTab={activeTab}
+          onNavigate={handleNavigateWithContext}
+          copilotVisible={activeTab !== 'copilot'}
+        />
+      )}
       {activeTab !== 'copilot' && !isZenMode && <OmniCopilot />}
     </div>
   );

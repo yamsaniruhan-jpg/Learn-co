@@ -3,13 +3,15 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile as updateFirebaseProfile,
   signOut,
   Auth,
 } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
@@ -44,11 +46,25 @@ try {
   try { storageInstance = getStorage(appInstance); } catch { storageInstance = {} as FirebaseStorage; }
 }
 
+if (typeof window !== 'undefined' && !env.VITEST && dbInstance && appInstance?.name) {
+  (async () => {
+    try {
+      await getDocFromServer(doc(dbInstance, 'test', 'connection'));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('the client is offline')) {
+        console.error('Please check your Firebase configuration.');
+      }
+    }
+  })();
+}
+
 export const app = appInstance;
 export const auth = authInstance;
 export const db = dbInstance;
 export const storage = storageInstance;
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Store the original under the authenticated Firebase UID; do not create a public
@@ -64,6 +80,8 @@ export async function uploadUserFile(userId: string, sourceId: string, file: Fil
 
 export {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateFirebaseProfile,

@@ -206,8 +206,8 @@ export const FlashcardDeckViewer: React.FC<FlashcardDeckViewerProps> = ({
 
               {/* Hint Display */}
               {currentCard.hint && showHint && !isFlipped && (
-                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs max-w-md mx-auto animate-in fade-in duration-150">
-                  <strong>Hint:</strong> {currentCard.hint}
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs max-w-md mx-auto animate-in fade-in duration-150">
+                  <strong>Hint:</strong> {latexToPlainText(currentCard.hint)}
                 </div>
               )}
             </div>
@@ -287,10 +287,10 @@ export const FlashcardDeckViewer: React.FC<FlashcardDeckViewerProps> = ({
                 )}
               </div>
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-2">
-                {card.front}
+                {latexToPlainText(card.front)}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 border-t border-slate-100 dark:border-slate-800 pt-2">
-                {card.back}
+                {latexToPlainText(card.back)}
               </p>
             </div>
           ))}

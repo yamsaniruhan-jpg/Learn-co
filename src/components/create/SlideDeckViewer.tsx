@@ -3,17 +3,16 @@ import { SlideItem } from '../../types/creator';
 import {
   ChevronLeft,
   ChevronRight,
-  Presentation,
   Volume2,
-  Tv,
-  Sparkles,
   Copy,
   CheckCircle2,
   Download,
+  Printer,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { latexToPlainText } from '../../utils/textSanitizer';
+import { latexToPlainText, toCleanDocumentText } from '../../utils/textSanitizer';
+import { printCleanSlidesPdf } from '../../utils/pdfExport';
 
 interface SlideDeckViewerProps {
   slides: SlideItem[];
@@ -43,51 +42,39 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
     setCurrentSlide((prev) => Math.max(prev - 1, 0));
   };
 
-  const handleCopyAllSlides = () => {
-    let text = `LECTURE SLIDES: ${title || 'Stem Presentation'}\n`;
+  const buildPlainSlidesText = () => {
+    let text = `LECTURE SLIDES: ${toCleanDocumentText(title || 'STEM Presentation')}\n`;
     text += `==================================================\n\n`;
 
     slides.forEach((s, idx) => {
-      text += `SLIDE ${idx + 1}: ${latexToPlainText(s.title)}\n`;
-      if (s.subtitle) text += `Subtitle: ${latexToPlainText(s.subtitle)}\n`;
+      text += `SLIDE ${idx + 1}: ${toCleanDocumentText(s.title)}\n`;
+      if (s.subtitle) text += `Subtitle: ${toCleanDocumentText(s.subtitle)}\n`;
       text += `--------------------------------------------------\n`;
       if (s.bullets && s.bullets.length > 0) {
         text += `Key Takeaways:\n`;
         s.bullets.forEach((b) => {
-          text += `  • ${latexToPlainText(b)}\n`;
+          text += `  • ${toCleanDocumentText(b)}\n`;
         });
       }
       if (s.calloutFormula) {
-        text += `Equation / Principle: ${latexToPlainText(s.calloutFormula)}\n`;
+        text += `Equation / Principle: ${toCleanDocumentText(s.calloutFormula)}\n`;
       }
       if (s.speakerNotes) {
-        text += `Presenter Script: ${latexToPlainText(s.speakerNotes)}\n`;
+        text += `Presenter Script: ${toCleanDocumentText(s.speakerNotes)}\n`;
       }
       text += `\n\n`;
     });
+    return text;
+  };
 
-    navigator.clipboard.writeText(text);
+  const handleCopyAllSlides = () => {
+    navigator.clipboard.writeText(buildPlainSlidesText());
     setCopied(true);
     setTimeout(() => setCopied(false), 2200);
   };
 
   const handleSaveNormally = () => {
-    let text = `LECTURE SLIDES: ${title || 'Stem Presentation'}\n\n`;
-    slides.forEach((s, idx) => {
-      text += `SLIDE ${idx + 1}: ${latexToPlainText(s.title)}\n`;
-      if (s.subtitle) text += `${latexToPlainText(s.subtitle)}\n`;
-      if (s.bullets) {
-        s.bullets.forEach((b) => (text += `  • ${latexToPlainText(b)}\n`));
-      }
-      if (s.calloutFormula) {
-        text += `Formula: ${latexToPlainText(s.calloutFormula)}\n`;
-      }
-      if (s.speakerNotes) {
-        text += `Notes: ${latexToPlainText(s.speakerNotes)}\n`;
-      }
-      text += `\n`;
-    });
-
+    const text = buildPlainSlidesText();
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -99,9 +86,13 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
     URL.revokeObjectURL(url);
   };
 
+  const handleExportPdf = () => {
+    printCleanSlidesPdf(slides, title || 'LearnCo Presenter Slides');
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header bar with Normal Copy & Save actions */}
+      {/* Header bar with Clean PDF, Copy & Save symbol actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
         <div className="flex items-center gap-2">
           <Badge variant="primary" size="sm">
@@ -114,13 +105,24 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
 
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            variant="primary"
+            size="sm"
+            onClick={handleExportPdf}
+            leftIcon={<Printer className="w-3.5 h-3.5" />}
+            className="text-xs font-bold rounded-full"
+            title="Print or Save Clean PDF without raw LaTeX"
+          >
+            Save / Print PDF
+          </Button>
+
+          <Button
             variant="outline"
             size="sm"
             onClick={handleCopyAllSlides}
             leftIcon={copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-            className="text-xs font-bold"
+            className="text-xs font-bold rounded-full"
           >
-            {copied ? 'Copied Slides Text!' : 'Copy Slides Normally'}
+            {copied ? 'Copied!' : 'Copy Text'}
           </Button>
 
           <Button
@@ -128,32 +130,33 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
             size="sm"
             onClick={handleSaveNormally}
             leftIcon={<Download className="w-3.5 h-3.5" />}
-            className="text-xs font-bold"
+            className="text-xs font-bold rounded-full"
           >
-            Save as Text (.txt)
+            Text (.txt)
           </Button>
 
           <Button
-            variant={showNotes ? 'primary' : 'outline'}
+            variant={showNotes ? 'secondary' : 'outline'}
             size="sm"
             onClick={() => setShowNotes(!showNotes)}
             leftIcon={<Volume2 className="w-3.5 h-3.5" />}
-            className="text-xs"
+            className="text-xs rounded-full"
           >
-            {showNotes ? 'Speaker Notes (On)' : 'Speaker Notes (Off)'}
+            {showNotes ? 'Notes On' : 'Notes Off'}
           </Button>
         </div>
       </div>
 
       {/* Main 16:9 Presentation Canvas */}
-      <div className="relative aspect-[16/9] w-full rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 text-white p-6 sm:p-10 flex flex-col justify-between shadow-lg overflow-hidden select-none">
+      <div className="relative aspect-[16/9] w-full rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 text-white p-6 sm:p-10 flex flex-col justify-between shadow-lg overflow-hidden select-none">
         {/* Ambient background glow */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Slide Top Metadata */}
         <div className="flex items-center justify-between z-10 text-xs font-semibold text-indigo-300">
-          <span className="uppercase tracking-widest text-[10px] font-bold bg-indigo-500/20 px-2.5 py-1 rounded-md border border-indigo-400/20">
-            Learn.co Lecture Series
+          <span className="inline-flex items-center gap-2 uppercase tracking-widest text-[10px] font-bold bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-400/20">
+            <img src="/logo-mark.png" alt="LearnCo" className="w-4 h-4 rounded-full object-cover" />
+            <span>LearnCo Lecture Series</span>
           </span>
           <span className="font-mono text-slate-400">
             {currentSlide + 1} / {slides.length}
@@ -186,8 +189,8 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
 
           {/* Clean Normal Formula Callout (no raw $$ markup) */}
           {slide.calloutFormula && (
-            <div className="mt-3 p-3 rounded-xl bg-indigo-900/60 border border-indigo-500/30 text-indigo-200 text-xs font-semibold inline-flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-300 font-mono text-[10px] uppercase font-bold">
+            <div className="mt-3 p-3.5 rounded-2xl bg-indigo-900/60 border border-indigo-500/30 text-indigo-100 text-xs font-semibold inline-flex items-center gap-2.5">
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 text-[10px] uppercase font-bold">
                 Formula
               </span>
               <span>{latexToPlainText(slide.calloutFormula)}</span>
@@ -210,8 +213,9 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
           onClick={handlePrev}
           disabled={currentSlide === 0}
           leftIcon={<ChevronLeft className="w-4 h-4" />}
+          className="rounded-full"
         >
-          Previous Slide
+          Previous
         </Button>
 
         {/* Slide dots */}
@@ -220,10 +224,11 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
             <button
               key={idx}
               onClick={() => setCurrentSlide(idx)}
-              className={`h-2 rounded-full transition-all cursor-pointer ${
+              aria-label={`Go to slide ${idx + 1}`}
+              className={`h-2.5 rounded-full transition-all cursor-pointer min-h-[10px] ${
                 idx === currentSlide
-                  ? 'w-6 bg-indigo-600 dark:bg-indigo-400'
-                  : 'w-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300'
+                  ? 'w-7 bg-indigo-600 dark:bg-indigo-400'
+                  : 'w-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300'
               }`}
             />
           ))}
@@ -235,14 +240,15 @@ export const SlideDeckViewer: React.FC<SlideDeckViewerProps> = ({ slides, title 
           onClick={handleNext}
           disabled={currentSlide === slides.length - 1}
           rightIcon={<ChevronRight className="w-4 h-4" />}
+          className="rounded-full"
         >
-          Next Slide
+          Next
         </Button>
       </div>
 
       {/* Presenter Lecture Notes Box with Clean Text */}
       {showNotes && slide.speakerNotes && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-150">
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-150">
           <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300">
             <Volume2 className="w-3.5 h-3.5" />
             <span>Speaker Script & Pedagogical Talking Points:</span>

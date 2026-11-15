@@ -144,7 +144,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none text-xs sm:text-sm space-y-2 selection:bg-purple-500 selection:text-white">
-              <FormattedMathText text={message.content} />
+              <FormattedMathText text={message.content} preferNormalText />
             </div>
           )}
         </div>
@@ -214,9 +214,9 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
               </span>
             </div>
 
-            <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
-              {message.artifact.data.questionText}
-            </p>
+            <div className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
+              <FormattedMathText text={message.artifact.data.questionText} preferNormalText />
+            </div>
 
             {/* Multiple Choice Options */}
             <div className="space-y-1.5">
@@ -246,7 +246,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
                     onClick={() => handlePracticeOptionSelect(opt, message.artifact?.data)}
                     className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between cursor-pointer ${btnStyles}`}
                   >
-                    <span>{opt}</span>
+                    <span><FormattedMathText text={opt} inline preferNormalText /></span>
                     {isSubmitted && isCorrectAnswer && (
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     )}
@@ -274,9 +274,9 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
                   <span>{feedbackMsg}</span>
                 </div>
                 {message.artifact.data.explanation && (
-                  <p className="text-[11px] opacity-90 pt-1 border-t border-black/10 dark:border-white/10">
-                    <strong>Invariant Explanation:</strong> {message.artifact.data.explanation}
-                  </p>
+                  <div className="text-[11px] opacity-90 pt-1 border-t border-black/10 dark:border-white/10">
+                    <strong>Invariant Explanation:</strong> <FormattedMathText text={message.artifact.data.explanation} inline preferNormalText />
+                  </div>
                 )}
               </div>
             )}

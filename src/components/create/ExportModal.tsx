@@ -5,14 +5,12 @@ import {
   Download,
   Copy,
   CheckCircle2,
-  FileText,
   Printer,
-  Sparkles,
   Bookmark,
-  Share2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { resourceToPlainText } from '../../utils/textSanitizer';
+import { resourceToPlainText, toCleanDocumentText } from '../../utils/textSanitizer';
+import { printCleanResourcePdf } from '../../utils/pdfExport';
 
 interface ExportModalProps {
   resource: CreatorResource;
@@ -34,41 +32,41 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const normalText = resourceToPlainText(resource);
 
   const generateMarkdown = (): string => {
-    let md = `# ${resource.title}\n\n`;
+    let md = `# ${toCleanDocumentText(resource.title)}\n\n`;
     md += `**Subject**: ${resource.subjectId.toUpperCase()} | **Difficulty**: ${resource.difficulty} | **Version**: v${resource.version}\n\n---\n\n`;
 
     if (resource.resourceType === 'slides' && resource.content.slides) {
       resource.content.slides.forEach((s: any, idx: number) => {
-        md += `## Slide ${idx + 1}: ${s.title}\n\n`;
-        if (s.subtitle) md += `*${s.subtitle}*\n\n`;
+        md += `## Slide ${idx + 1}: ${toCleanDocumentText(s.title)}\n\n`;
+        if (s.subtitle) md += `*${toCleanDocumentText(s.subtitle)}*\n\n`;
         if (s.bullets) {
           s.bullets.forEach((b: string) => {
-            md += `* ${b}\n`;
+            md += `* ${toCleanDocumentText(b)}\n`;
           });
           md += `\n`;
         }
-        if (s.calloutFormula) md += `> Formula: ${s.calloutFormula}\n\n`;
-        if (s.speakerNotes) md += `**Speaker Notes**: ${s.speakerNotes}\n\n`;
+        if (s.calloutFormula) md += `> Formula: ${toCleanDocumentText(s.calloutFormula)}\n\n`;
+        if (s.speakerNotes) md += `**Speaker Notes**: ${toCleanDocumentText(s.speakerNotes)}\n\n`;
         md += `---\n\n`;
       });
     } else if (resource.resourceType === 'flashcards' && resource.content.flashcards) {
       md += `## Flashcard Deck (${resource.content.flashcards.length} Cards)\n\n`;
       resource.content.flashcards.forEach((fc: any, idx: number) => {
-        md += `### Card ${idx + 1}: ${fc.front}\n\n`;
-        md += `**Answer**: ${fc.back}\n\n`;
-        if (fc.formula) md += `Formula: ${fc.formula}\n\n`;
+        md += `### Card ${idx + 1}: ${toCleanDocumentText(fc.front)}\n\n`;
+        md += `**Answer**: ${toCleanDocumentText(fc.back)}\n\n`;
+        if (fc.formula) md += `Formula: ${toCleanDocumentText(fc.formula)}\n\n`;
       });
     } else if (resource.resourceType === 'quiz' && resource.content.quiz) {
       md += `## Diagnostic Quiz\n\n`;
       resource.content.quiz.forEach((q: any, idx: number) => {
-        md += `### Question ${idx + 1}: ${q.question}\n\n`;
+        md += `### Question ${idx + 1}: ${toCleanDocumentText(q.question)}\n\n`;
         q.options.forEach((opt: string, oIdx: number) => {
-          md += `* [${oIdx === q.correctIndex ? 'x' : ' '}] ${String.fromCharCode(65 + oIdx)}. ${opt}\n`;
+          md += `* [${oIdx === q.correctIndex ? 'x' : ' '}] ${String.fromCharCode(65 + oIdx)}. ${toCleanDocumentText(opt)}\n`;
         });
-        md += `\n**Explanation**: ${q.explanation}\n\n`;
+        md += `\n**Explanation**: ${toCleanDocumentText(q.explanation)}\n\n`;
       });
     } else if (resource.resourceType === 'summary' && resource.content.summary) {
-      md += `## Executive Summary\n\n${resource.content.summary.executiveSummary}\n\n`;
+      md += `## Executive Summary\n\n${toCleanDocumentText(resource.content.summary.executiveSummary)}\n\n`;
     } else {
       md += normalText;
     }
@@ -129,7 +127,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    printCleanResourcePdf(resource);
   };
 
   return (
@@ -137,18 +135,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       <div className="w-full max-w-2xl max-h-[88vh] bg-[#FFFFFF] dark:bg-[#2A2647] rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              Save & Copy Artifact
-            </span>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
-              {resource.title}
-            </h2>
+          <div className="flex items-center gap-3">
+            <img src="/logo-mark.png" alt="LearnCo" className="w-9 h-9 rounded-2xl object-cover border border-indigo-500/30 shrink-0" />
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                Save &amp; Export Clean Study File
+              </span>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
+                {toCleanDocumentText(resource.title)}
+              </h2>
+            </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+            aria-label="Close export modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -156,69 +158,66 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         {/* Format Selector Pills (Default: Normal Text) */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800">
+          <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100 dark:bg-slate-800">
             <button
               onClick={() => setFormat('normal')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer ${
                 format === 'normal'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              Normal Text (Clean)
+              Normal Text
             </button>
             <button
               onClick={() => setFormat('markdown')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 format === 'markdown'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              Markdown (.md)
+              Markdown
             </button>
             <button
               onClick={() => setFormat('json')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 format === 'json'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              JSON Data
+              JSON
             </button>
           </div>
 
-          {/* Quick In-App Save Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleSaveNormally}
             leftIcon={savedLocally ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Bookmark className="w-3.5 h-3.5 text-amber-500" />}
-            className="text-xs"
+            className="text-xs rounded-full"
           >
-            {savedLocally ? 'Saved to My Notes!' : 'Save Normally to App'}
+            {savedLocally ? 'Saved to App' : 'Bookmark'}
           </Button>
         </div>
 
-        {/* Text Preview Canvas */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950/60 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text">
+        {/* Clean Readable Preview Canvas */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950/60 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text">
           {exportText}
         </div>
 
         {/* Action Footer */}
         <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              leftIcon={<Printer className="w-3.5 h-3.5" />}
-              className="text-xs"
-            >
-              Print / PDF
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            leftIcon={<Printer className="w-3.5 h-3.5" />}
+            className="text-xs rounded-full font-bold"
+          >
+            Save / Print Clean PDF
+          </Button>
 
           <div className="flex items-center gap-2">
             <Button
@@ -226,9 +225,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               size="sm"
               onClick={handleCopy}
               leftIcon={copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-              className="text-xs font-bold"
+              className="text-xs font-bold rounded-full"
             >
-              {copied ? 'Copied Normally!' : 'Copy Normally'}
+              {copied ? 'Copied!' : 'Copy'}
             </Button>
 
             <Button
@@ -236,9 +235,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               size="sm"
               onClick={handleDownload}
               leftIcon={<Download className="w-3.5 h-3.5" />}
-              className="text-xs font-bold"
+              className="text-xs font-bold rounded-full"
             >
-              {format === 'normal' ? 'Save as Normal Text (.txt)' : `Download .${format === 'markdown' ? 'md' : 'json'}`}
+              {format === 'normal' ? 'Download (.txt)' : `Download (.${format === 'markdown' ? 'md' : 'json'})`}
             </Button>
           </div>
         </div>
