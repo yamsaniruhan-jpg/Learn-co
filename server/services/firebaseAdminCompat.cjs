@@ -25,6 +25,7 @@ const {
   getApps,
   getApp,
   applicationDefault,
+  cert,
 } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
@@ -71,19 +72,17 @@ function hasGoogleCredentials() {
  * already handles a `null` database by using the local JSON store instead.
  */
 function initAdminApp() {
-  if (getApps().length > 0) return getApp();
   if (!hasGoogleCredentials()) return null;
+  if (getApps().length > 0) return getApp();
 
   try {
-    return initializeApp({ credential: applicationDefault(), projectId });
-  } catch (err) {
-    try {
-      return initializeApp({ projectId });
-    } catch (fallbackErr) {
-      if (getApps().length > 0) return getApp();
-      console.warn('[FirebaseAdminCompat] Initialisation skipped:', fallbackErr?.message || fallbackErr);
-      return null;
-    }
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
+    const credential = serviceAccount ? cert(JSON.parse(serviceAccount)) : applicationDefault();
+    return initializeApp({ credential, projectId });
+  } catch {
+    if (getApps().length > 0) return getApp();
+    console.warn('[FirebaseAdminCompat] Initialisation skipped. Check Firebase Admin credential configuration.');
+    return null;
   }
 }
 

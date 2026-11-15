@@ -194,14 +194,14 @@ export const FlashCheckModal: React.FC<FlashCheckModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Flash Check: Spaced Micro-Quiz
+                  Flash Check: Sample Micro-Quiz
                 </h3>
                 <span className="px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[10px] font-bold">
                   60s Sprint
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Question {currentIndex + 1} of {questions.length} • {currentQ?.topic}
+                Fixed sample questions, not scheduled reviews • Question {currentIndex + 1} of {questions.length} • {currentQ?.topic}
               </p>
             </div>
           </div>
@@ -215,6 +215,7 @@ export const FlashCheckModal: React.FC<FlashCheckModalProps> = ({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close flash check"
               className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -306,13 +307,13 @@ export const FlashCheckModal: React.FC<FlashCheckModalProps> = ({
                 Flash Check Completed!
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Score: <strong className="text-slate-800 dark:text-slate-100">{score} / {questions.length} Correct</strong> • Retained Invariants Updated
+                Score: <strong className="text-slate-800 dark:text-slate-100">{score} / {questions.length} Correct</strong>
               </p>
             </div>
 
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-300">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>+{15 + score * 5} XP Earned & Spaced Repetition Retained</span>
+              <span>+{15 + score * 5} device-local activity points</span>
             </div>
           </div>
         )}

@@ -668,7 +668,7 @@ export const SEED_BADGES: AchievementBadge[] = [
   {
     id: 'badge-streak-7',
     title: 'Weekly Relentlessness',
-    description: 'Complete 7 uninterrupted days of calibrated STEM problem solving.',
+    description: 'Maintain a device-local activity streak for 7 consecutive days.',
     icon: 'Flame',
     unlocked: false,
     category: 'streak',

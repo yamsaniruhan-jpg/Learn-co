@@ -16,6 +16,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import dns from 'node:dns';
+import net from 'node:net';
+import ipaddr from 'ipaddr.js';
+import { Agent } from 'undici';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB decoded
@@ -178,49 +182,63 @@ export async function extractPdfText(
   };
 }
 
-/** Block loopback/private/link-local targets so a URL intake can't probe the network. */
+/** Only globally routable IP addresses may be used for an outbound connection. */
+export function isPublicImportAddress(address: string): boolean {
+  if (!net.isIP(address)) return false;
+  try {
+    const ip = ipaddr.process(address);
+    if (ip.range() !== 'unicast') return false;
+    if (ip.kind() === 'ipv6') {
+      // Only global-unicast IPv6. Reject transition, unique-local, and special ranges.
+      return ip.match(ipaddr.IPv6.parse('2000::'), 3);
+    }
+    // Additional IANA special-purpose ranges not consistently marked by older parsers.
+    const blocked = ['192.0.0.0/24', '192.0.2.0/24', '192.88.99.0/24',
+      '198.18.0.0/15', '198.51.100.0/24', '203.0.113.0/24'];
+    return !blocked.some(cidr => ip.match(ipaddr.IPv4.parseCIDR(cidr)));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve and validate every DNS answer in the connection's lookup callback.
+ * The transport uses the returned address directly, preventing a second DNS
+ * lookup from rebinding between validation and connection.
+ */
+export function lookupPublicImportHost(
+  hostname: string,
+  options: dns.LookupOptions,
+  callback: (error: NodeJS.ErrnoException | null, address: any, family?: number) => void
+): void {
+  dns.lookup(hostname, { all: true, verbatim: true }, (error, addresses) => {
+    if (error) return callback(error, options.all ? [] : '', 0);
+    if (!addresses.length || addresses.some(({ address }) => !isPublicImportAddress(address))) {
+      const blocked = Object.assign(new Error('URL resolves to a private or reserved address.'), { code: 'URL_BLOCKED' });
+      return callback(blocked, options.all ? [] : '', 0);
+    }
+    if (options.all) return callback(null, addresses);
+    callback(null, addresses[0].address, addresses[0].family);
+  });
+}
+
+const importAgent = new Agent({ connect: { lookup: lookupPublicImportHost as typeof dns.lookup } });
+
+/** Reject local names and unsafe IP literals before opening a request. */
 function assertPublicHost(hostname: string): void {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.internal') ||
-    host.endsWith('.local')
-  ) {
-    throw new ExtractionError('That URL points to a private address.', 'URL_BLOCKED');
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local') ||
+      (net.isIP(host) && !isPublicImportAddress(host))) {
+    throw new ExtractionError('That URL points to a private or reserved address.', 'URL_BLOCKED');
   }
+}
 
-  // IPv4 literal checks.
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    const isPrivate =
-      a === 10 ||
-      a === 127 ||
-      a === 0 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      a >= 224;
-    if (isPrivate) {
-      throw new ExtractionError('That URL points to a private address.', 'URL_BLOCKED');
-    }
+function wasBlockedLookup(error: unknown): boolean {
+  let current: any = error;
+  for (let i = 0; current && i < 5; i += 1, current = current.cause) {
+    if (current.code === 'URL_BLOCKED') return true;
   }
-
-  // IPv6 loopback / unique-local / link-local.
-  if (host.includes(':')) {
-    if (
-      host.startsWith('::') || // loopback, unspecified and IPv4-mapped/compatible forms
-      host.startsWith('fc') ||
-      host.startsWith('fd') ||
-      /^fe[89ab][0-9a-f]:/.test(host) || // link-local fe80::/10
-      host.startsWith('ff') // multicast
-    ) {
-      throw new ExtractionError('That URL points to a private address.', 'URL_BLOCKED');
-    }
-  }
+  return false;
 }
 
 /** Reduce an HTML document to readable prose without pulling in a parser dependency. */
@@ -246,7 +264,11 @@ export function htmlToText(html: string): string {
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&mdash;/gi, '—')
     .replace(/&ndash;/gi, '–')
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#(\d+);/g, (_, code) => {
+      const value = Number(code);
+      return Number.isInteger(value) && value <= 0x10ffff && !(value >= 0xd800 && value <= 0xdfff)
+        ? String.fromCodePoint(value) : '\ufffd';
+    })
     .replace(/&[a-z]+;/gi, ' ');
 
   return normaliseWhitespace(decoded);
@@ -307,16 +329,24 @@ export async function extractUrlText(
       throw new ExtractionError('Only http and https links can be imported.', 'UNSUPPORTED_PROTOCOL');
     }
     assertPublicHost(currentUrl.hostname);
+    if (currentUrl.username || currentUrl.password) {
+      throw new ExtractionError('URLs with embedded credentials are not supported.', 'INVALID_URL');
+    }
     try {
       response = await fetch(currentUrl.toString(), {
         signal: combined,
         redirect: 'manual',
+        // Node's fetch accepts an undici dispatcher. It pins validated DNS results.
+        dispatcher: importAgent,
         headers: {
           'User-Agent': 'LearnCo-ResourceImporter/1.0 (+https://learn.co)',
           Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
         },
-      });
+      } as RequestInit);
     } catch (err) {
+      if (wasBlockedLookup(err)) {
+        throw new ExtractionError('That URL points to a private or reserved address.', 'URL_BLOCKED');
+      }
       const message = err instanceof Error ? err.message : String(err);
       if (/abort|timeout/i.test(message)) {
         throw new ExtractionError(
@@ -345,6 +375,7 @@ export async function extractUrlText(
   }
 
   if (!response.ok) {
+    await response.body?.cancel();
     throw new ExtractionError(
       `That page responded with HTTP ${response.status}. It may be private or removed.`,
       'URL_BAD_STATUS',
@@ -364,6 +395,7 @@ export async function extractUrlText(
     contentType.includes('text/xml');
 
   if (!isTextual) {
+    await response.body?.cancel();
     throw new ExtractionError(
       `That link is ${contentType.split(';')[0] || 'not a web page'} — only HTML and text pages can be imported.`,
       'URL_NOT_TEXT',
@@ -373,13 +405,35 @@ export async function extractUrlText(
 
   const declaredLength = Number(response.headers.get('content-length') || 0);
   if (declaredLength > MAX_URL_BYTES) {
+    await response.body?.cancel();
     throw new ExtractionError('That page is too large to import.', 'URL_TOO_LARGE', 413);
   }
 
-  const raw = await response.text();
-  if (raw.length > MAX_URL_BYTES) {
-    throw new ExtractionError('That page is too large to import.', 'URL_TOO_LARGE', 413);
+  // Count bytes as they arrive instead of buffering an unbounded response first.
+  const reader = response.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    if (reader) {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_URL_BYTES) {
+          await reader.cancel();
+          throw new ExtractionError('That page is too large to import.', 'URL_TOO_LARGE', 413);
+        }
+        chunks.push(value);
+      }
+    }
+  } catch (err) {
+    if (err instanceof ExtractionError) throw err;
+    if (combined.aborted) throw new ExtractionError('That page took too long to respond. Try again or paste the text instead.', 'URL_TIMEOUT', 504);
+    throw new ExtractionError('That page could not be read. Try again or paste the text instead.', 'URL_UNREACHABLE', 502);
+  } finally {
+    reader?.releaseLock();
   }
+  const raw = Buffer.concat(chunks).toString('utf8');
 
   const isPlain = contentType.includes('text/plain');
   const title = isPlain ? null : extractHtmlTitle(raw);

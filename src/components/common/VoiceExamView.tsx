@@ -394,11 +394,6 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
             missing: data.missing,
             verdict: data.verdict,
             mode: data.mode || 'ai_low_token',
-            rubricBreakdown: {
-              thesisScore: Math.round(data.score * 0.35),
-              derivationScore: Math.round(data.score * 0.45),
-              boundaryScore: Math.round(data.score * 0.2),
-            },
           });
 
           if (data.score >= 70 && !hasAwardedXp) {
@@ -410,7 +405,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
         }
       }
 
-      // Fast, authentic deterministic rubric evaluation (Zero tokens)
+      // Local keyword/length heuristic; it cannot assess factual correctness.
       const combined = `${thesisText} ${derivationText} ${constraintsText}`.toLowerCase();
       const rubricKeywords = activeQuestion.rubric
         .toLowerCase()
@@ -433,7 +428,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
         score: totalScore,
         strength:
           matchedWords.length > 0
-            ? `Accurately anchored core concept terms: "${matchedWords.slice(0, 3).join(', ')}".`
+            ? `Mentioned rubric terms: "${matchedWords.slice(0, 3).join(', ')}".`
             : 'Clear logical structure and progression across oral defense sections.',
         missing:
           matchRatio < 0.6
@@ -889,7 +884,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
                   )}
                   <div>
                     <h4 className="font-black text-lg">
-                      {evaluation.verdict === 'PASS' ? 'Oral Defense Passed!' : 'Defense Needs Revision'}
+                      {evaluation.mode === 'deterministic_offline' ? 'Practice Estimate' : (evaluation.verdict === 'PASS' ? 'Oral Defense Passed!' : 'Defense Needs Revision')}
                     </h4>
                     <span className="text-xs opacity-75">
                       Evaluated via {evaluation.mode === 'ai_low_token' ? 'Low-Token Gemini Engine' : 'Instant Local Rubric'}
@@ -908,6 +903,12 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
                   )}
                 </div>
               </div>
+
+              <p className="text-xs opacity-80" role="status">
+                {evaluation.mode === 'deterministic_offline'
+                  ? 'This estimate uses keywords and response length; it cannot verify correctness and is not an exam grade.'
+                  : 'AI feedback can be mistaken. Verify it against the source or with a qualified instructor.'}
+              </p>
 
               {/* Rubric Score Breakdown Bars */}
               {evaluation.rubricBreakdown && (

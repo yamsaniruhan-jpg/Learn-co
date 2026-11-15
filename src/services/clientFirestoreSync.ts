@@ -1,6 +1,6 @@
 import { doc, setDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { db, auth } from './firebaseClient';
-import { UserProfile, UserGamification, LeaderboardEntry, calculateLevelFromXp } from '../types/auth';
+import { UserProfile, UserGamification, LeaderboardEntry } from '../types/auth';
 
 /**
  * Client-side Firestore sync service.
@@ -42,13 +42,6 @@ export async function syncClientToFirestore(
       `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || uid)}`;
 
     const now = new Date().toISOString();
-    const xpVal = Math.min(10000000, typeof gamification?.xp === 'number' ? Math.max(0, Math.round(gamification.xp)) : 0);
-    const levelVal = Math.min(
-      1000,
-      typeof gamification?.level === 'number' && gamification.level >= 1
-        ? Math.round(gamification.level)
-        : calculateLevelFromXp(xpVal).level
-    );
     const streakVal = Math.min(10000, typeof gamification?.currentStreak === 'number' ? Math.max(0, Math.round(gamification.currentStreak)) : 0);
 
     // 1. Direct Firestore writes when Firebase Auth user is signed in (matches firestore.rules isOwner)
@@ -66,8 +59,6 @@ export async function syncClientToFirestore(
             fullName: profile?.fullName || displayName,
             avatarUrl,
             authProvider: user?.authProvider || 'firebase',
-            xp: xpVal,
-            level: levelVal,
             targetExam: profile?.targetExam || 'STEM Mastery',
             educationLevel: profile?.educationLevel || 'Undergraduate',
             onboardingStatus: profile?.onboardingStatus || 'COMPLETED',
@@ -92,8 +83,6 @@ export async function syncClientToFirestore(
             targetExam: profile?.targetExam || 'STEM Mastery',
             targetScore: profile?.targetScore || '100%',
             bio: (profile?.bio || '').slice(0, 1000),
-            xp: xpVal,
-            level: levelVal,
             updatedAt: now,
           },
           { merge: true }
@@ -102,29 +91,9 @@ export async function syncClientToFirestore(
         console.warn('[ClientFirestoreSync] public_profiles collection sync warning:', e?.message || e);
       }
 
-      // Sync Leaderboard Document to 'leaderboard' collection
-      try {
-        const leaderboardDocRef = doc(db, 'leaderboard', firestoreUid);
-        await setDoc(
-          leaderboardDocRef,
-          {
-            userId: firestoreUid,
-            displayName,
-            avatarUrl,
-            xp: xpVal,
-            level: levelVal,
-            streak: streakVal,
-            streakDays: streakVal,
-            updatedAt: now,
-          },
-          { merge: true }
-        );
-      } catch (e: any) {
-        console.warn('[ClientFirestoreSync] leaderboard collection sync warning:', e?.message || e);
-      }
     }
 
-    // 2. Dual-write to backend dataset when authenticated to ensure permanent persistence across server restarts
+    // Sync profile metadata with the backend. This is not a durable backup.
     try {
       const token = localStorage.getItem('learnco_auth_token') || localStorage.getItem('auth_token');
       if (token) {
@@ -139,8 +108,6 @@ export async function syncClientToFirestore(
             email,
             displayName,
             avatarUrl,
-            xp: xpVal,
-            level: levelVal,
             streak: streakVal,
           }),
         });
@@ -151,81 +118,13 @@ export async function syncClientToFirestore(
   }
 }
 
-/**
- * Real-time XP update sync to Firebase Console and backend dataset.
- * Called whenever a user earns XP anywhere in the application.
- */
+/** Legacy callers may still invoke this function. Client-reported XP is local
+ * only; it must not be written to Firestore or promoted to server XP. */
 export async function syncXpToFirestoreAndBackend(
-  newTotalXp: number,
-  reason: string = 'Activity'
+  _newTotalXp: number,
+  _reason: string = 'Activity'
 ): Promise<void> {
-  try {
-    const currentAuthUser = auth?.currentUser;
-    let storedUser: any = null;
-    try {
-      const saved =
-        localStorage.getItem('learnco_user') ||
-        localStorage.getItem('learnco_auth_user');
-      if (saved) storedUser = JSON.parse(saved);
-    } catch (_) {}
-
-    const firebaseMatches = hasMatchingFirebaseIdentity(currentAuthUser?.email, storedUser?.email);
-    const firestoreUid = firebaseMatches ? currentAuthUser?.uid : undefined;
-    const uid = storedUser?.id || firestoreUid;
-    if (!uid && !firestoreUid) return;
-
-    const email = storedUser?.email || (firebaseMatches ? currentAuthUser?.email : '') || '';
-    const displayName = (
-      storedUser?.name ||
-      storedUser?.displayName ||
-      (firebaseMatches ? currentAuthUser?.displayName : '') ||
-      (email ? email.split('@')[0] : 'Scholar')
-    ).slice(0, 120);
-
-    const safeXp = Math.max(0, Math.round(Number.isFinite(newTotalXp) ? newTotalXp : 0));
-    const levelInfo = calculateLevelFromXp(safeXp);
-    const now = new Date().toISOString();
-
-    // 1. Update Firestore leaderboard doc directly only when Firebase Auth user is active
-    if (db && firestoreUid) {
-      try {
-        const lbDocRef = doc(db, 'leaderboard', firestoreUid);
-        await setDoc(
-          lbDocRef,
-          {
-            userId: firestoreUid,
-            displayName,
-            xp: safeXp,
-            level: levelInfo.level,
-            updatedAt: now,
-          },
-          { merge: true }
-        );
-      } catch (e) {
-        console.debug('[ClientFirestoreSync] Realtime XP update to leaderboard:', e);
-      }
-    }
-
-    // 2. Update backend dataset when authenticated
-    try {
-      const token = localStorage.getItem('learnco_auth_token');
-      if (token) {
-        await fetch('/api/leaderboard/xp', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            xp: newTotalXp,
-            reason,
-          }),
-        });
-      }
-    } catch (_) {}
-  } catch (err: any) {
-    console.debug('[ClientFirestoreSync] Failed to sync XP update:', err?.message || err);
-  }
+  return;
 }
 
 /**

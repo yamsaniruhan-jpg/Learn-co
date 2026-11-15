@@ -57,6 +57,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 }) => {
   const [showRawJson, setShowRawJson] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [copyError, setCopyError] = useState<string>('');
   const [readerMode, setReaderMode] = useState<'normal' | 'typeset'>('normal');
 
   const getResourceTypeIcon = (type: CreatorResourceType) => {
@@ -147,14 +148,25 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
     }
   };
 
-  const handleCopyShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  const handleCopyShare = async () => {
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(window.location.origin + window.location.pathname);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      setCopyError('Could not copy the workspace link. Copy the address from your browser instead.');
+    }
   };
 
   return (
     <div className="space-y-6">
+      {copyError && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{copyError}</p>}
+      {resource.tags?.includes('template-generated') && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          AI synthesis was unavailable. This is a template-based draft, not an AI-verified resource; check it against your source before studying or sharing.
+        </div>
+      )}
       {/* Header & Meta Bar */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -300,6 +312,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 
             <button
               onClick={handleCopyShare}
+              title="Copies the workspace address, not a shareable link to this resource"
               className="flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
               {copiedLink ? (
@@ -310,7 +323,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               ) : (
                 <>
                   <Share2 className="w-3.5 h-3.5" />
-                  <span>Share</span>
+                  <span>Copy workspace link</span>
                 </>
               )}
             </button>

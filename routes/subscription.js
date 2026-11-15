@@ -129,7 +129,17 @@ router.post('/checkout', verifyFirebaseAuth, async (req, res) => {
 
     const selectedTier = TIERS[tier];
 
-    // If Stripe is configured with live credentials, initiate Stripe Checkout
+    // Do not take new production payments until cancellation, durable customer
+    // mapping and webhook/entitlement reconciliation have been implemented and
+    // verified together. This does not alter any existing Stripe subscriptions.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({
+        error: 'Paid checkout is temporarily unavailable while billing management is being completed. No payment was started.',
+        code: 'BILLING_UNAVAILABLE',
+      });
+    }
+
+    // If Stripe is configured with credentials, initiate Stripe Checkout
     if (stripe && process.env.STRIPE_SECRET_KEY) {
       try {
         const session = await stripe.checkout.sessions.create({
@@ -209,6 +219,15 @@ router.post('/checkout', verifyFirebaseAuth, async (req, res) => {
  */
 router.post('/cancel', verifyFirebaseAuth, async (req, res) => {
   try {
+    // This endpoint has no verified Stripe subscription ID or cancellation
+    // integration. Do not report cancellation or downgrade locally while an
+    // actual paid subscription may continue billing the customer.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({
+        error: 'Automatic cancellation is unavailable. Your subscription has not been cancelled; contact billing support.',
+        code: 'CANCELLATION_UNAVAILABLE',
+      });
+    }
     const uid = req.user.uid;
     const db = getDb();
 
@@ -267,6 +286,12 @@ router.post('/webhook', async (req, res) => {
   }
 
   const db = getDb();
+
+  // Stripe retries non-2xx responses. Acknowledging an event without its
+  // required entitlement store would permanently drop the update.
+  if (!db && ['checkout.session.completed', 'customer.subscription.deleted'].includes(event?.type)) {
+    return res.status(503).json({ error: 'Subscription storage is unavailable; retry this webhook.', code: 'BILLING_STORAGE_UNAVAILABLE' });
+  }
 
   try {
     switch (event.type) {

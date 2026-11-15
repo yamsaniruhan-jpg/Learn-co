@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
-import { Database, flushDb } from '../db';
+import { Database } from '../db';
+import { flushCurrentState } from '../services/flushCurrentState';
 import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
 import { GoogleGenAI, Type } from '@google/genai';
 import {
@@ -7,9 +8,8 @@ import {
   CreatorResourceContent,
   GenerateResourceRequest,
 } from '../../src/types/creator';
-import { QuestionBankItem } from '../../src/types/curriculum';
+import { convertCreatorQuiz } from '../services/creatorQuizConversion';
 import { DAILY_ARTIFACTS_LIMIT, DAILY_SOURCES_UPLOAD_LIMIT } from '../../src/types/auth';
-import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 import {
   extractPdfText,
   extractUrlText,
@@ -74,6 +74,7 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
   // Tracked outside the try so a failed extraction can refund the quota slot.
   let quotaKind: 'source' | 'url' | null = null;
   let quotaReserved = false;
+  let reservationDate: string | undefined;
   let sourceCreated = false;
 
   try {
@@ -120,6 +121,7 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
     }
 
     quotaReserved = true;
+    reservationDate = (Database.getGamification(userId) as any)?.lastQuotaResetDate;
 
     let extractedText = '';
     let determinedTitle = title || '';
@@ -186,7 +188,7 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
 
     // A successful intake must reach the configured local store before responding.
     try {
-      await flushDb();
+      await flushCurrentState();
     } catch {
       Database.deleteSource(userId, newSource.id);
       throw new Error('Could not save the source to server storage. Please try again.');
@@ -200,7 +202,12 @@ router.post('/sources', requireAuth, async (req: AuthenticatedRequest, res: Resp
     }
     res.status(500).json({ error: err.message || 'Failed to ingest source.' });
   } finally {
-    if (quotaReserved && !sourceCreated && quotaKind) Database.releaseQuota(userId, quotaKind);
+    // A slow extraction may cross the user's daily reset. Never refund a
+    // previous day's reservation against usage already recorded for today.
+    if (quotaReserved && !sourceCreated && quotaKind && reservationDate &&
+        (Database.getGamification(userId) as any)?.lastQuotaResetDate === reservationDate) {
+      Database.releaseQuota(userId, quotaKind);
+    }
   }
 });
 
@@ -220,7 +227,7 @@ router.get('/sources/:id', requireAuth, (req: AuthenticatedRequest, res: Respons
 });
 
 // DELETE /api/creator/sources/:id
-router.delete('/sources/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+router.delete('/sources/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const deleted = Database.deleteSource(userId, req.params.id);
@@ -228,9 +235,10 @@ router.delete('/sources/:id', requireAuth, (req: AuthenticatedRequest, res: Resp
       res.status(404).json({ error: 'Source document not found or unauthorized.' });
       return;
     }
+    await flushCurrentState();
     res.json({ success: true, message: 'Source document removed.' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to delete source.' });
+    res.status(500).json({ error: 'Could not confirm source deletion was saved. Check the source list before retrying.' });
   }
 });
 
@@ -272,7 +280,7 @@ router.get('/resources/:id', requireAuth, (req: AuthenticatedRequest, res: Respo
 });
 
 // PUT /api/creator/resources/:id
-router.put('/resources/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+router.put('/resources/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { title, content, tags, difficulty, subjectId, status, isPublic, changelog } = req.body;
@@ -293,14 +301,15 @@ router.put('/resources/:id', requireAuth, (req: AuthenticatedRequest, res: Respo
       return;
     }
 
+    await flushCurrentState();
     res.json({ success: true, resource: updated });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Failed to update resource.' });
+    res.status(500).json({ error: 'Could not confirm resource changes were saved. Reload the resource before retrying.' });
   }
 });
 
 // DELETE /api/creator/resources/:id
-router.delete('/resources/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+router.delete('/resources/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const deleted = Database.deleteResource(userId, req.params.id);
@@ -308,9 +317,10 @@ router.delete('/resources/:id', requireAuth, (req: AuthenticatedRequest, res: Re
       res.status(404).json({ error: 'Resource not found or unauthorized.' });
       return;
     }
+    await flushCurrentState();
     res.json({ success: true, message: 'Resource removed.' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to delete resource.' });
+    res.status(500).json({ error: 'Could not confirm resource deletion was saved. Check the resource list before retrying.' });
   }
 });
 
@@ -379,8 +389,11 @@ Use LaTeX formatting for formulas with $ inline and $$ display math.`,
 
 // POST /api/creator/generate
 router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  let quotaReserved = false;
+  let resourceCreated = false;
+  let reservationDate: string | undefined;
   try {
-    const userId = req.userId!;
     const {
       sourceId,
       sourceIds,
@@ -401,9 +414,10 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
     }
 
     // Enforce daily artifact quota (DAILY_ARTIFACTS_LIMIT per day)
-    let quotaResult;
     try {
-      quotaResult = Database.checkAndIncrementArtifactQuota(userId, sourcesToUse.length);
+      Database.checkAndIncrementArtifactQuota(userId, sourcesToUse.length);
+      quotaReserved = true;
+      reservationDate = (Database.getGamification(userId) as any)?.lastQuotaResetDate;
     } catch (quotaErr: any) {
       res.status(429).json({
         error: quotaErr.message || `Daily artifact generation limit reached (${DAILY_ARTIFACTS_LIMIT}/${DAILY_ARTIFACTS_LIMIT}).`,
@@ -464,6 +478,7 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     const ai = getGeminiClient();
     let generatedContent: CreatorResourceContent = {};
+    let usedTemplateFallback = false;
     let resourceTitle = title || `Synthesized ${resourceType.replace(/_/g, ' ').toUpperCase()}`;
 
     if (ai) {
@@ -474,10 +489,12 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
         if (parsed?.title) resourceTitle = parsed.title;
       } catch (aiErr) {
         console.warn('Gemini API experiencing high demand, seamlessly generating high-fidelity structured pedagogical artifact.', (aiErr as any)?.message || aiErr);
+        usedTemplateFallback = true;
         generatedContent = generateStructuredFallback(resourceType, rawContent, title, subjectId);
       }
     } else {
       // Offline/Preview Fallback Synthesis Engine
+      usedTemplateFallback = true;
       generatedContent = generateStructuredFallback(resourceType, rawContent, title, subjectId);
     }
 
@@ -488,10 +505,19 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
       resourceType,
       subjectId,
       difficulty,
-      tags: [subjectId, resourceType, 'ai-generated'],
+      tags: [subjectId, resourceType, usedTemplateFallback ? 'template-generated' : 'ai-generated'],
       content: generatedContent,
       isPublic: true,
     });
+    // A source can already have been saved before synthesis. Ensure the new
+    // resource and its version are also flushed before reporting success.
+    try {
+      await flushCurrentState();
+    } catch {
+      Database.deleteResource(userId, resource.id);
+      throw new Error('Could not save the resource to server storage. Please try again.');
+    }
+    resourceCreated = true;
 
     res.status(201).json({
       success: true,
@@ -503,6 +529,16 @@ router.post('/generate', requireAuth, async (req: AuthenticatedRequest, res: Res
       return;
     }
     res.status(500).json({ error: err.message || 'AI Pedagogical Generation failed.' });
+  } finally {
+    if (quotaReserved && !resourceCreated) {
+      const gam = Database.getGamification(userId);
+      // Do not subtract a previous day's reservation from today's new quota.
+      if (gam && (gam as any).lastQuotaResetDate === reservationDate) {
+        gam.dailyArtifactsCreatedToday = Math.max(0, (gam.dailyArtifactsCreatedToday || 0) - 1);
+        // Persist the refund, including when a source save captured the earlier reservation.
+        Database.saveToDisk();
+      }
+    }
   }
 });
 
@@ -1092,93 +1128,19 @@ router.post('/resources/:id/add-to-practice', requireAuth, (req: AuthenticatedRe
       return;
     }
 
-    const questions: QuestionBankItem[] = [];
-
-    if (resource.resourceType === 'quiz' && Array.isArray(resource.content.quiz)) {
-      resource.content.quiz.forEach((q: any, idx: number) => {
-        const item: QuestionBankItem = {
-          id: `creator-${resource.id}-${idx + 1}`,
-          subjectId: (resource.subjectId as any) || 'math',
-          examTracks: ['all'],
-          chapterId: `ch-${resource.subjectId}-creator`,
-          topicId: `topic-${resource.id}`,
-          subtopicId: `sub-${resource.id}`,
-          conceptId: `concept-${resource.id}`,
-          difficulty: (resource.difficulty as any) || 'medium',
-          questionType: 'single_choice',
-          questionText: q.question,
-          options: q.options && q.options.length > 0 ? q.options : [q.correctAnswer, 'Alternative option A', 'Alternative option B', 'Alternative option C'],
-          correctAnswer: q.correctAnswer || (q.options ? q.options[0] : ''),
-          explanation: q.explanation || 'Verified creator studio practice question.',
-          stepByStepSolution: [q.explanation || 'Refer to creator notes for step-by-step resolution.'],
-          hints: ['Think through the fundamental definitions in this module.'],
-          tags: ['creator-studio', resource.subjectId || 'math'],
-          source: `Creator Studio: ${resource.title}`,
-          verificationStatus: 'verified',
-          version: 1,
-        };
-        questions.push(item);
-        MASTER_QUESTION_BANK.push(item);
-      });
-    } else if (resource.resourceType === 'flashcards' && Array.isArray(resource.content.flashcards)) {
-      resource.content.flashcards.forEach((f: any, idx: number) => {
-        const item: QuestionBankItem = {
-          id: `creator-${resource.id}-${idx + 1}`,
-          subjectId: (resource.subjectId as any) || 'math',
-          examTracks: ['all'],
-          chapterId: `ch-${resource.subjectId}-creator`,
-          topicId: `topic-${resource.id}`,
-          subtopicId: `sub-${resource.id}`,
-          conceptId: `concept-${resource.id}`,
-          difficulty: (resource.difficulty as any) || 'medium',
-          questionType: 'single_choice',
-          questionText: f.front,
-          options: [f.back, 'Incorrect distractor A', 'Incorrect distractor B', 'Incorrect distractor C'],
-          correctAnswer: f.back,
-          explanation: f.mnemonic ? `Mnemonic / Key: ${f.mnemonic}. ${f.back}` : f.back,
-          stepByStepSolution: [f.back],
-          hints: [f.mnemonic || 'Recall the core flashcard concept.'],
-          tags: ['creator-studio', 'flashcards', resource.subjectId || 'math'],
-          source: `Creator Studio: ${resource.title}`,
-          verificationStatus: 'verified',
-          version: 1,
-        };
-        questions.push(item);
-        MASTER_QUESTION_BANK.push(item);
-      });
-    } else if (resource.resourceType === 'worksheet' && resource.content.worksheet?.problems) {
-      resource.content.worksheet.problems.forEach((p: any, idx: number) => {
-        const item: QuestionBankItem = {
-          id: `creator-${resource.id}-${idx + 1}`,
-          subjectId: (resource.subjectId as any) || 'math',
-          examTracks: ['all'],
-          chapterId: `ch-${resource.subjectId}-creator`,
-          topicId: `topic-${resource.id}`,
-          subtopicId: `sub-${resource.id}`,
-          conceptId: `concept-${resource.id}`,
-          difficulty: (resource.difficulty as any) || 'medium',
-          questionType: 'single_choice',
-          questionText: p.problemStatement,
-          options: [p.solution, 'Alternative approach 1', 'Alternative approach 2', 'Alternative approach 3'],
-          correctAnswer: p.solution,
-          explanation: p.solution,
-          stepByStepSolution: p.hints && p.hints.length > 0 ? p.hints : [p.solution],
-          hints: p.hints || ['Consider applying the relevant formula step by step.'],
-          tags: ['creator-studio', 'worksheet', resource.subjectId || 'math'],
-          source: `Creator Studio: ${resource.title}`,
-          verificationStatus: 'verified',
-          version: 1,
-        };
-        questions.push(item);
-        MASTER_QUESTION_BANK.push(item);
-      });
+    let questions;
+    try {
+      questions = convertCreatorQuiz(resource);
+    } catch (error: any) {
+      res.status(422).json({ error: error.message });
+      return;
     }
 
     const addedCount = questions.length;
 
     res.json({
       success: true,
-      message: `Successfully integrated ${addedCount} items from "${resource.title}" into your Practice Arena!`,
+      message: `${addedCount} unverified quiz item${addedCount === 1 ? '' : 's'} ready for a private device-local practice session. No server XP is awarded.`,
       addedCount,
       targetSubject: resource.subjectId,
       questions,

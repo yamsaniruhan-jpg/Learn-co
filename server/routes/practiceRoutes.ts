@@ -4,6 +4,7 @@ import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware'
 import { XpEngine } from '../xpEngine';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 import { invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
+import { isValidSubmittedAnswer } from '../../src/utils/gradeAnswer';
 
 const router = Router();
 
@@ -49,6 +50,8 @@ router.post('/submit-attempt', requireAuth, async (req: AuthenticatedRequest, re
     if (!questionId || typeof questionId !== 'string') invalidFields.push('questionId');
     if (!subjectId || typeof subjectId !== 'string') invalidFields.push('subjectId');
     if (typeof isCorrect !== 'boolean') invalidFields.push('isCorrect');
+    if (!isValidSubmittedAnswer(selectedAnswer)) invalidFields.push('selectedAnswer');
+    if (correctAnswer !== undefined && !isValidSubmittedAnswer(correctAnswer)) invalidFields.push('correctAnswer');
 
     if (invalidFields.length > 0) {
       res.status(400).json({
@@ -59,30 +62,35 @@ router.post('/submit-attempt', requireAuth, async (req: AuthenticatedRequest, re
       return;
     }
 
+    if (attemptId !== undefined && (typeof attemptId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(attemptId) || ['__proto__', 'constructor', 'prototype'].includes(attemptId))) {
+      res.status(400).json({ error: 'Invalid attempt ID.', code: 'INVALID_ATTEMPT_ID' });
+      return;
+    }
     if (!attemptId) {
       attemptId = `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     }
 
-    // Look up question in MASTER_QUESTION_BANK if some metadata is missing
+    // A bank question must always be graded and recorded using server-owned
+    // metadata. A caller-supplied answer key must never override the bank.
     const bankQuestion = MASTER_QUESTION_BANK.find((q) => q.id === questionId);
     if (bankQuestion) {
-      if (!subjectId) subjectId = bankQuestion.subjectId;
-      if (!topicId) topicId = bankQuestion.topicId;
-      if (!conceptId) conceptId = bankQuestion.conceptId;
-      if (!difficulty) difficulty = bankQuestion.difficulty;
-      if (!questionText) questionText = bankQuestion.questionText;
-      if (correctAnswer === undefined) {
-        correctAnswer = Array.isArray(bankQuestion.correctAnswer)
-          ? bankQuestion.correctAnswer.join(', ')
-          : bankQuestion.correctAnswer;
-      }
-      if (!explanation) explanation = bankQuestion.explanation;
-      if (!stepByStepSolution) stepByStepSolution = bankQuestion.stepByStepSolution;
+      subjectId = bankQuestion.subjectId;
+      topicId = bankQuestion.topicId;
+      conceptId = bankQuestion.conceptId;
+      difficulty = bankQuestion.difficulty;
+      questionText = bankQuestion.questionText;
+      correctAnswer = Array.isArray(bankQuestion.correctAnswer)
+        ? bankQuestion.correctAnswer.join(', ')
+        : bankQuestion.correctAnswer;
+      explanation = bankQuestion.explanation;
+      stepByStepSolution = bankQuestion.stepByStepSolution;
     }
 
-    if (correctAnswer === undefined && isCorrect !== undefined) {
-      correctAnswer = isCorrect ? selectedAnswer : 'Other';
-    }
+    // For unverified questions with no answer key, retain the client's
+    // self-check result explicitly rather than inventing a conflicting key.
+    const unverifiedCorrect = !bankQuestion && correctAnswer === undefined ? isCorrect : undefined;
+    if (correctAnswer === undefined) correctAnswer = 'Answer key unavailable (self-check)';
+    if (Array.isArray(correctAnswer)) correctAnswer = correctAnswer.join(', ');
 
     const result = await XpEngine.submitAttempt(userId, {
       attemptId,
@@ -95,6 +103,7 @@ router.post('/submit-attempt', requireAuth, async (req: AuthenticatedRequest, re
       questionText: questionText || '',
       selectedAnswer: selectedAnswer ?? '',
       correctAnswer: correctAnswer ?? '',
+      unverifiedCorrect,
       explanation: explanation || '',
       stepByStepSolution,
       solvingTimeSeconds: solvingTimeSeconds || timeSpentSeconds || 0,

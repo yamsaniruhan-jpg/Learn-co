@@ -72,12 +72,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-x-3 gap-y-1">
         {/* Left: Brand Logo */}
         <div className="flex items-center gap-6">
-          <div
+          <button
+            type="button"
             onClick={() => setActiveTab('dashboard')}
-            className="cursor-pointer hover:opacity-90 transition-opacity"
+            aria-label="Go to dashboard"
+            className="cursor-pointer hover:opacity-90 transition-opacity rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6C5CE7]"
           >
             <BrandLogo size="md" />
-          </div>
+          </button>
 
           {/* Quick Command Palette Button on Desktop */}
           <button

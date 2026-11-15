@@ -16,6 +16,10 @@ import {
   DailyPracticeQuota,
   SubjectId,
 } from '../src/types/auth';
+import { MASTER_QUESTION_BANK } from './data/questionBankData';
+import { flushCurrentState } from './services/flushCurrentState';
+import { gradeQuestionAnswer, type SubmittedAnswer } from '../src/utils/gradeAnswer';
+import { nextPracticeReset } from './services/practiceQuotaTime';
 
 export interface SubmitAttemptRequest {
   attemptId: string;
@@ -26,8 +30,10 @@ export interface SubmitAttemptRequest {
   conceptId?: string;
   difficulty: 'easy' | 'easy_medium' | 'medium' | 'medium_hard' | 'hard';
   questionText: string;
-  selectedAnswer: string | number;
+  selectedAnswer: SubmittedAnswer;
   correctAnswer: string | number;
+  /** For non-bank items only; callers may send a self-check result. */
+  unverifiedCorrect?: boolean;
   explanation: string;
   stepByStepSolution?: string[];
   solvingTimeSeconds: number;
@@ -46,6 +52,7 @@ export interface SubmitAttemptResult {
   dailyAllowanceRemaining: number;
   quota: DailyPracticeQuota;
   mistakeRecorded: boolean;
+  verification: 'bank' | 'unverified';
   xpTransaction?: XPTransaction;
 }
 
@@ -73,16 +80,12 @@ export class XpEngine {
     const remaining = Math.max(0, DAILY_PRACTICE_LIMIT - questionsSolvedToday);
     const isLimitReached = remaining === 0;
 
-    // Calculate next local midnight ISO string
-    const tomorrow = new Date();
-    tomorrow.setHours(24, 0, 0, 0);
-
     return {
       questionsSolvedToday,
       dailyLimit: DAILY_PRACTICE_LIMIT,
       remaining,
       isLimitReached,
-      resetsAt: tomorrow.toISOString(),
+      resetsAt: nextPracticeReset(userTimezone),
     };
   }
 
@@ -104,8 +107,17 @@ export class XpEngine {
       }
 
       // Check for Idempotency / Duplicate Replay Prevention
-      if (db.attemptsById[req.attemptId]) {
+      if (Object.hasOwn(db.attemptsById, req.attemptId)) {
         const existingAttempt = db.attemptsById[req.attemptId];
+        if (existingAttempt.userId !== userId) {
+          const err: any = new Error('Attempt ID is already in use.');
+          err.statusCode = 409;
+          err.code = 'ATTEMPT_ID_CONFLICT';
+          throw err;
+        }
+        // A prior response may have failed during disk flush. Retry the write
+        // before acknowledging an idempotent replay.
+        await flushCurrentState();
         const quota = this.getDailyQuota(userId);
         return {
           attempt: existingAttempt,
@@ -119,6 +131,7 @@ export class XpEngine {
           dailyAllowanceRemaining: Math.max(0, DAILY_PRACTICE_LIMIT - gam.dailyQuestionsSolvedToday),
           quota,
           mistakeRecorded: false,
+          verification: existingAttempt.verification === 'bank' ? 'bank' : 'unverified',
         };
       }
 
@@ -140,15 +153,27 @@ export class XpEngine {
         throw err;
       }
 
-      // 2. Validate Question Correctness
-      const userAnsStr = String(req.selectedAnswer).trim().toLowerCase();
-      const correctAnsStr = String(req.correctAnswer).trim().toLowerCase();
-      const isCorrect = userAnsStr === correctAnsStr;
-
-      // 3. Exact Learn.co XP Rule:
-      // Correct = +5 XP
-      // Incorrect = 0 XP
-      const xpAwarded = isCorrect ? XP_PER_CORRECT_QUESTION : XP_PER_INCORRECT_QUESTION;
+      // Only the server's bank can provide a verified answer key. Imported or
+      // generated questions can still be practiced, but their correctness is
+      // client-reported and must not mint competitive XP.
+      const bankQuestion = MASTER_QUESTION_BANK.find(question => question.id === req.questionId);
+      const verification = bankQuestion ? 'bank' as const : 'unverified' as const;
+      const answerKey = bankQuestion
+        ? (Array.isArray(bankQuestion.correctAnswer) ? bankQuestion.correctAnswer.join(', ') : bankQuestion.correctAnswer)
+        : req.correctAnswer;
+      const selectedText = Array.isArray(req.selectedAnswer) ? req.selectedAnswer.join(', ') : req.selectedAnswer;
+      const isCorrect = bankQuestion
+        ? gradeQuestionAnswer(bankQuestion, req.selectedAnswer)
+        : (req.unverifiedCorrect ?? (String(selectedText).trim().toLowerCase() === String(answerKey).trim().toLowerCase()));
+      const rewardedToday = db.questionAttempts.some(attempt => {
+        if (attempt.userId !== userId || attempt.questionId !== req.questionId || !(attempt.xpAwarded > 0)) return false;
+        const submittedAt = new Date(attempt.submittedAt);
+        return Number.isFinite(submittedAt.getTime()) && getDateInTimezone(userTimezone, submittedAt) === todayDateStr;
+      });
+      // Repeating a correct bank question remains useful practice but does not
+      // award XP repeatedly on the same local day.
+      const xpAwarded = verification === 'bank' && isCorrect && !rewardedToday
+        ? XP_PER_CORRECT_QUESTION : XP_PER_INCORRECT_QUESTION;
 
       const now = new Date().toISOString();
 
@@ -162,8 +187,8 @@ export class XpEngine {
         subtopicId: req.subtopicId,
         conceptId: req.conceptId,
         difficulty: req.difficulty,
-        selectedAnswer: req.selectedAnswer,
-        correctAnswer: req.correctAnswer,
+        selectedAnswer: selectedText,
+        correctAnswer: answerKey,
         isCorrect,
         solvingTimeSeconds: req.solvingTimeSeconds || 0,
         hintsRevealedCount: req.hintsRevealedCount || 0,
@@ -171,6 +196,7 @@ export class XpEngine {
         submittedAt: now,
         status: isCorrect ? 'CORRECT' : 'INCORRECT',
         xpAwarded,
+        verification,
         questionText: req.questionText,
         explanation: req.explanation,
         stepByStepSolution: req.stepByStepSolution,
@@ -242,8 +268,8 @@ export class XpEngine {
           conceptId: req.conceptId,
           difficulty: req.difficulty,
           questionText: req.questionText,
-          userAnswer: req.selectedAnswer,
-          correctAnswer: req.correctAnswer,
+          userAnswer: selectedText,
+          correctAnswer: answerKey,
           explanation: req.explanation,
           resolved: false,
           createdAt: now,
@@ -253,6 +279,9 @@ export class XpEngine {
       }
 
       const quota = this.getDailyQuota(userId);
+      // The engine mutates the in-memory store directly; mark it dirty and
+      // flush before telling an offline queue that its attempt was accepted.
+      await flushCurrentState();
 
       return {
         attempt: attemptRecord,
@@ -266,6 +295,7 @@ export class XpEngine {
         dailyAllowanceRemaining: Math.max(0, DAILY_PRACTICE_LIMIT - gam.dailyQuestionsSolvedToday),
         quota,
         mistakeRecorded,
+        verification,
         xpTransaction: xpTx,
       };
     });

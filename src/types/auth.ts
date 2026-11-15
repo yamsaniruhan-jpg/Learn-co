@@ -184,6 +184,8 @@ export interface QuestionAttemptRecord {
   submittedAt: string;
   status: AttemptStatus;
   xpAwarded: number;
+  /** Older records may not have provenance; unknown-source attempts are unverified. */
+  verification?: 'bank' | 'unverified';
   questionText: string;
   explanation: string;
   stepByStepSolution?: string[];
@@ -196,7 +198,7 @@ export interface SubmitAttemptRequest {
   topicId: string;
   difficulty: DifficultyLevel;
   questionText: string;
-  selectedAnswer: string | number;
+  selectedAnswer: string | number | string[];
   correctAnswer: string | number;
   explanation: string;
   stepByStepSolution?: string[];

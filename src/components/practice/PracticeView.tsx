@@ -10,6 +10,9 @@ import { LearningClient } from '../../services/learningClient';
 import { AuthClient } from '../../services/authClient';
 import { useAuth } from '../../context/AuthContext';
 import { PracticeArena } from './PracticeArena';
+import { ConfidenceSummary } from './ConfidenceSummary';
+import { useLocalPractice } from '../../utils/localPractice';
+import { creatorPracticeTransferKey, readCreatorPracticeTransfer } from '../../utils/creatorPracticeTransfer';
 import { PracticeResultsView } from './PracticeResultsView';
 import { PracticeConfigModal } from '../learn/PracticeConfigModal';
 import { RecommendedPracticeView } from './RecommendedPracticeView';
@@ -49,7 +52,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
   initialPracticeContext,
   onConsumePracticeContext,
 }) => {
-  const { gamification, refreshUserData } = useAuth();
+  const { gamification, refreshUserData, user } = useAuth();
+  const { attempts: localAttempts } = useLocalPractice(user?.id || null);
   const [activeTab, setActiveTab] = useState<'hub' | 'recommendations' | 'weak_topics' | 'history' | 'bank'>('hub');
   
   // Practice Session State
@@ -90,29 +94,25 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
     resourceTitle: string;
     questions: QuestionBankItem[];
     resourceId?: string;
+    accountId: string;
   } | null>(null);
 
   useEffect(() => {
     const checkCreatorSession = () => {
-      try {
-        const stored = localStorage.getItem('learnco_creator_practice_session');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.questions && parsed.questions.length > 0) {
-            setCreatorImportSession({
-              resourceTitle: parsed.resourceTitle || 'Creator Studio Custom Resource',
-              questions: parsed.questions,
-              resourceId: parsed.resourceId,
-            });
-          }
-        }
-      } catch (_) {}
+      const accountId = typeof user?.id === 'string' ? user.id : null;
+      const parsed = readCreatorPracticeTransfer(accountId);
+      setCreatorImportSession(parsed && accountId ? {
+        resourceTitle: parsed.resourceTitle || 'Creator Studio Custom Resource',
+        questions: parsed.questions,
+        resourceId: parsed.resourceId,
+        accountId,
+      } : null);
     };
 
     checkCreatorSession();
     window.addEventListener('focus', checkCreatorSession);
     return () => window.removeEventListener('focus', checkCreatorSession);
-  }, []);
+  }, [user?.id]);
 
   // Async data
   const [recommendations, setRecommendations] = useState<PracticeRecommendation[]>([]);
@@ -252,14 +252,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 </span>
                 <div className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Authoritative Server Verification</span>
+                  <span>Server-checked bank questions</span>
                 </div>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                 Practice & Diagnostic Engine
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Test STEM comprehension across Mathematics, CS & AI, Physics, Chemistry, and Biology. Earn +5 XP per correct question while reinforcing knowledge decay limits.
+                Practice across Mathematics, CS & AI, Physics, Chemistry, and Biology. Eligible correct bank answers can earn server XP; custom and offline answers may be unverified or provisional.
               </p>
 
               {/* Quick Actions */}
@@ -295,7 +295,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           </div>
 
           {/* Creator Studio Imported Resource Banner */}
-          {creatorImportSession && (
+          {creatorImportSession && creatorImportSession.accountId === user?.id && (
             <div className="p-5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border-2 border-indigo-500/40 dark:border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-sm shrink-0">
@@ -319,7 +319,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.removeItem('learnco_creator_practice_session');
+                    localStorage.removeItem(creatorPracticeTransferKey(creatorImportSession.accountId));
                     setCreatorImportSession(null);
                   }}
                   className="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -339,7 +339,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                       },
                       questions: creatorImportSession.questions,
                     });
-                    localStorage.removeItem('learnco_creator_practice_session');
+                    localStorage.removeItem(creatorPracticeTransferKey(creatorImportSession.accountId));
                     setCreatorImportSession(null);
                   }}
                   className="flex-1 sm:flex-none px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
@@ -382,6 +382,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           {/* TAB 1: PRACTICE HUB & QUICK LADDERS */}
           {activeTab === 'hub' && (
             <div className="space-y-6">
+              <ConfidenceSummary attempts={localAttempts} />
               {/* Subject 5-Question Ladder Starters */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

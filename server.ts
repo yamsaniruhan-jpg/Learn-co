@@ -187,7 +187,7 @@ export async function createApp() {
   return app;
 }
 
-async function startServer() {
+export async function startServer() {
   const app = await createApp();
 
   const portArgIndex = process.argv.indexOf("--port");

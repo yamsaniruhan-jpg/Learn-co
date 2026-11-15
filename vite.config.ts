@@ -115,7 +115,12 @@ export default defineConfig(() => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-          navigateFallback: null,
+          // Claim the first open page and serve only the app shell for offline
+          // navigations. API responses remain network-only and are never cached.
+          clientsClaim: true,
+          skipWaiting: true,
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/healthz$/, /^\/_ah\/health$/],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

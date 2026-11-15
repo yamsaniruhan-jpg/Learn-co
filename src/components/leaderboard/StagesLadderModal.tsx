@@ -52,7 +52,7 @@ export const StagesLadderModal: React.FC<StagesLadderModalProps> = ({
               Competitive League Hierarchy
             </h2>
             <p className="text-xs sm:text-sm text-[#F1EFFF]/90 max-w-xl font-medium">
-              Advance weekly through 10 ordered leagues, each containing 3 competitive divisions (III ➔ II ➔ I).
+              Explore illustrative XP-based stages and divisions (III ➔ II ➔ I). Automatic weekly promotions are not implemented.
             </p>
           </div>
 
@@ -231,7 +231,7 @@ export const StagesLadderModal: React.FC<StagesLadderModalProps> = ({
         {/* Footer */}
         <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            Promotions & division updates are calculated automatically every Sunday at midnight UTC.
+            Promotion cutoffs shown here are illustrative; automatic promotions and division updates are not currently implemented.
           </span>
           <Button variant="primary" onClick={onClose} size="sm">
             Close Ladder

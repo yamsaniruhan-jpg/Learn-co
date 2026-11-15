@@ -46,6 +46,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
   // Practice Question State if artifact attached
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string>('');
 
@@ -58,9 +59,10 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
   };
 
   const handlePracticeOptionSelect = async (opt: string, practiceData: any) => {
-    if (isSubmitted) return;
+    if (isSubmitted || isSubmitting) return;
     setSelectedAnswer(opt);
-    setIsSubmitted(true);
+    setFeedbackMsg('');
+    setIsSubmitting(true);
 
     try {
       const res = await CopilotClient.submitPracticeAnswer({
@@ -73,6 +75,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
 
       setIsCorrect(res.isCorrect);
       setFeedbackMsg(res.message);
+      setIsSubmitted(true);
 
       if (res.isCorrect) {
         confetti({
@@ -81,8 +84,10 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
           origin: { y: 0.8 },
         });
       }
-    } catch (err) {
-      console.error('Practice answer submission failed:', err);
+    } catch {
+      setFeedbackMsg('Could not confirm the submission. Check practice history before retrying if the connection was lost.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -149,16 +154,19 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
           <div className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-xl p-2.5 space-y-1.5 text-xs">
             <button
               onClick={() => setShowCitations((prev) => !prev)}
+              aria-expanded={showCitations}
               className="w-full flex items-center justify-between font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-[11px] cursor-pointer"
             >
               <div className="flex items-center gap-1.5">
                 <Bookmark className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Grounded Citations & Reference Knowledge ({message.citations.length})</span>
+                <span>Retrieved reference material ({message.citations.length})</span>
               </div>
               {showCitations ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
 
             {showCitations && (
+              <div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">These items were retrieved as context; they are not verified citations for specific claims. Check each source and the response.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
                 {message.citations.map((cit, idx) => (
                   <div
@@ -179,6 +187,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
                   </div>
                 ))}
               </div>
+              </div>
             )}
           </div>
         )}
@@ -196,7 +205,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
                     {message.artifact.title || 'Interactive Diagnostic Practice Drill'}
                   </h4>
                   <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                    Reward: +5 XP upon correct resolution
+                    Self-check only; generated questions earn no server XP
                   </span>
                 </div>
               </div>
@@ -233,7 +242,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
                 return (
                   <button
                     key={i}
-                    disabled={isSubmitted}
+                    disabled={isSubmitted || isSubmitting}
                     onClick={() => handlePracticeOptionSelect(opt, message.artifact?.data)}
                     className={`w-full text-left p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between cursor-pointer ${btnStyles}`}
                   >
@@ -249,6 +258,8 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
               })}
             </div>
 
+            {isSubmitting && <p role="status" className="text-xs text-slate-500">Submitting answer…</p>}
+            {!isSubmitted && feedbackMsg && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{feedbackMsg}</p>}
             {/* Feedback & Invariant Explanation */}
             {isSubmitted && (
               <div

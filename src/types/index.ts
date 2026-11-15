@@ -159,6 +159,10 @@ export interface QuestionAttempt {
   questionText: string;
   correctAnswerText: string;
   explanation: string;
+  /** Optional device-local self-assessment, selected before answer feedback. */
+  confidence?: 'unsure' | 'somewhat' | 'confident';
+  /** Missing on historical attempts; offline results remain provisional locally. */
+  verification?: 'bank' | 'unverified' | 'provisional';
 }
 
 export interface ConceptMastery {

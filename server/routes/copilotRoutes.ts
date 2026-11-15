@@ -7,12 +7,25 @@ import { CopilotCacheEngine } from '../services/copilotCacheEngine';
 import { XpEngine } from '../xpEngine';
 import { DAILY_DOUBTS_LIMIT } from '../../src/types/auth';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
+import { isValidSubmittedAnswer } from '../../src/utils/gradeAnswer';
 import {
   CopilotPromptOptions,
 } from '../../src/types/copilot';
 import { adminDb } from '../services/firebaseAdmin';
 
 const router = Router();
+
+// Reservations are in-memory and not transactional across processes. Avoid
+// subtracting yesterday's reservation from a new day's quota after a slow call.
+function refundUnavailableDoubt(userId: string, reservationDate: string | undefined) {
+  const gam = Database.getGamification(userId);
+  if (gam && reservationDate && (gam as any).lastQuotaResetDate === reservationDate) {
+    gam.dailyDoubtsAskedToday = Math.max(0, (gam.dailyDoubtsAskedToday || 0) - 1);
+    Database.saveToDisk();
+  }
+  const { used, remaining } = Database.getUserDailyQuotas(userId).doubts;
+  return { used, remaining };
+}
 
 // GET /api/copilot/quota
 router.get('/quota', requireAuth, (req: AuthenticatedRequest, res: Response) => {
@@ -206,6 +219,12 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
     }
 
     const prompt = rawPrompt.trim();
+    // The legacy database append method does not enforce ownership itself.
+    // Validate before reservation and before appending to a supplied conversation.
+    if (conversationId && (typeof conversationId !== 'string' || !Database.getCopilotConversation(userId, conversationId))) {
+      res.status(404).json({ error: 'Conversation not found or access denied.' });
+      return;
+    }
 
     // Enforce daily doubts quota (DAILY_DOUBTS_LIMIT per day, refreshes at midnight)
     let quotaInfo;
@@ -220,6 +239,8 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
       });
       return;
     }
+
+    const reservationDate = (Database.getGamification(userId) as any)?.lastQuotaResetDate as string | undefined;
 
     // Ensure conversation exists or create one
     let targetConvId = conversationId;
@@ -250,6 +271,14 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
       context,
       selectedModel,
     });
+
+    if (genResult.modelUsed === 'unavailable') quotaInfo = refundUnavailableDoubt(userId, reservationDate);
+    // A conversation can be deleted while generation is in flight. Never
+    // recreate it implicitly or append after ownership no longer holds.
+    if (!Database.getCopilotConversation(userId, targetConvId)) {
+      res.status(409).json({ error: 'Conversation is no longer available.' });
+      return;
+    }
 
     // Save assistant message to database
     const assistantMsg = Database.addCopilotMessage(userId, targetConvId, {
@@ -291,8 +320,12 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
       selectedModel,
     } = req.body as CopilotPromptOptions;
 
-    if (!prompt || !prompt.trim()) {
+    if (typeof prompt !== 'string' || !prompt.trim()) {
       res.status(400).json({ error: 'Prompt is required.' });
+      return;
+    }
+    if (conversationId && (typeof conversationId !== 'string' || !Database.getCopilotConversation(userId, conversationId))) {
+      res.status(404).json({ error: 'Conversation not found or access denied.' });
       return;
     }
 
@@ -308,6 +341,8 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
       });
       return;
     }
+
+    const reservationDate = (Database.getGamification(userId) as any)?.lastQuotaResetDate as string | undefined;
 
     // Prepare SSE response headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -343,6 +378,12 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
       context,
       selectedModel,
     });
+    if (genResult.modelUsed === 'unavailable') refundUnavailableDoubt(userId, reservationDate);
+    if (!Database.getCopilotConversation(userId, targetConvId)) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Conversation is no longer available.' })}\n\n`);
+      res.end();
+      return;
+    }
 
     // Stream tokens in chunked simulation if full string returned
     const text = genResult.reply;
@@ -365,6 +406,12 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
       res.write(`data: ${JSON.stringify({ type: 'artifact', artifact: genResult.artifact })}\n\n`);
     }
 
+    // The client may delete the conversation during streaming too.
+    if (!Database.getCopilotConversation(userId, targetConvId)) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Conversation is no longer available.' })}\n\n`);
+      res.end();
+      return;
+    }
     // Save assistant message to database
     const assistantMsg = Database.addCopilotMessage(userId, targetConvId, {
       role: 'assistant',
@@ -430,22 +477,22 @@ router.post('/practice/submit', requireAuth, async (req: AuthenticatedRequest, r
     } = req.body;
 
     let resolvedCorrectAnswer = providedCorrectAnswer;
-    if (resolvedCorrectAnswer === undefined && questionId) {
-      const bankQuestion = MASTER_QUESTION_BANK.find((q) => q.id === questionId);
-      if (bankQuestion) {
-        resolvedCorrectAnswer = Array.isArray(bankQuestion.correctAnswer)
-          ? bankQuestion.correctAnswer.join(', ')
-          : bankQuestion.correctAnswer;
-      }
+    const bankQuestion = MASTER_QUESTION_BANK.find((q) => q.id === questionId);
+    if (bankQuestion) {
+      // Never allow a submitted answer key to override a known bank question.
+      resolvedCorrectAnswer = Array.isArray(bankQuestion.correctAnswer)
+        ? bankQuestion.correctAnswer.join(', ')
+        : bankQuestion.correctAnswer;
     }
-    if (resolvedCorrectAnswer === undefined && providedIsCorrect !== undefined && userAnswer !== undefined) {
-      resolvedCorrectAnswer = providedIsCorrect ? userAnswer : '__INCORRECT__';
-    }
-
-    if (userAnswer === undefined || userAnswer === null || userAnswer === '' || !resolvedCorrectAnswer) {
-      res.status(400).json({ error: 'userAnswer and correctAnswer are required.' });
+    if (!isValidSubmittedAnswer(userAnswer) ||
+        (resolvedCorrectAnswer !== undefined && !isValidSubmittedAnswer(resolvedCorrectAnswer)) ||
+        (resolvedCorrectAnswer === undefined && typeof providedIsCorrect !== 'boolean')) {
+      res.status(400).json({ error: 'A valid userAnswer and correctAnswer or self-check are required.' });
       return;
     }
+    const unverifiedCorrect = !bankQuestion && resolvedCorrectAnswer === undefined ? providedIsCorrect : undefined;
+    if (resolvedCorrectAnswer === undefined) resolvedCorrectAnswer = 'Answer key unavailable (self-check)';
+    if (Array.isArray(resolvedCorrectAnswer)) resolvedCorrectAnswer = resolvedCorrectAnswer.join(', ');
 
     const attemptResult = await XpEngine.submitAttempt(userId, {
       attemptId: `att-copilot-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -456,7 +503,8 @@ router.post('/practice/submit', requireAuth, async (req: AuthenticatedRequest, r
       questionText: `Practice Question: ${topic}`,
       selectedAnswer: userAnswer,
       correctAnswer: resolvedCorrectAnswer,
-      explanation: 'Copilot verified derivation.',
+      unverifiedCorrect,
+      explanation: bankQuestion ? bankQuestion.explanation : 'Answer key supplied by the practice artifact; correctness has not been verified by the server.',
       solvingTimeSeconds: timeSpentSeconds,
       hintsRevealedCount: 0,
     });
@@ -464,9 +512,12 @@ router.post('/practice/submit', requireAuth, async (req: AuthenticatedRequest, r
     res.json({
       isCorrect: attemptResult.isCorrect,
       xpEarned: attemptResult.xpAwarded,
-      message: attemptResult.isCorrect
-        ? 'Correct! +5 XP awarded to your streak ledger.'
-        : 'Not quite. Review the step-by-step invariant derivation.',
+      verification: attemptResult.verification,
+      message: attemptResult.verification === 'unverified'
+        ? 'Compared with the artifact answer key; this result is unverified and earns no server XP.'
+        : attemptResult.isCorrect
+          ? `Correct! +${attemptResult.xpAwarded} XP awarded. Each bank question earns XP once per day.`
+          : 'Not quite. Review the question explanation.',
       gamification: Database.getGamification(userId),
     });
   } catch (err: any) {

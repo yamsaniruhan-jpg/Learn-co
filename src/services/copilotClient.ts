@@ -257,6 +257,8 @@ export class CopilotClient {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let completed = false;
+      let streamError: string | undefined;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -281,16 +283,20 @@ export class CopilotClient {
               callbacks.onCitation(data.citation);
             } else if (data.type === 'artifact' && callbacks.onArtifact && data.artifact) {
               callbacks.onArtifact(data.artifact);
-            } else if (data.type === 'done' && callbacks.onDone) {
-              callbacks.onDone(data);
-            } else if (data.type === 'error' && callbacks.onError) {
-              callbacks.onError(data.error || 'Unknown streaming error');
+            } else if (data.type === 'done') {
+              completed = true;
+              callbacks.onDone?.(data);
+            } else if (data.type === 'error') {
+              completed = true;
+              streamError = data.error || 'Unknown streaming error';
             }
           } catch (parseErr) {
             console.warn('Failed to parse SSE chunk:', parseErr);
           }
         }
       }
+      if (streamError) throw new Error(streamError);
+      if (!completed) throw new Error('Stream ended before completion.');
     } catch (err: any) {
       if (err.name === 'AbortError') {
         console.log('Stream generation was aborted by user.');
