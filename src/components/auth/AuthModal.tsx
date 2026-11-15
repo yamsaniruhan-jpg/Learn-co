@@ -113,11 +113,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Modal Header */}
           <div className="p-6 pb-4 border-b border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 border border-[#6C5CE7] shadow-xs shrink-0">
+              <div className="w-10 h-10 rounded-2xl overflow-hidden bg-[#01000E] border border-[#6C5CE7]/60 shadow-xs shrink-0 p-0.5">
                 <img
-                  src="/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg"
+                  src="/logo-mark.png"
                   alt="LearnCo Logo"
-                  className="w-full h-full object-cover scale-110"
+                  className="w-full h-full object-contain"
                 />
               </div>
               <div>

@@ -1207,31 +1207,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </Button>
                   </div>
 
-                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                    <FormattedMathText text={mistake.questionText} />
+                  <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <FormattedMathText text={mistake.questionText} preferNormalText />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300">
                       <strong className="block text-[10px] uppercase font-bold text-rose-500">
                         Your Submitted Answer
                       </strong>
-                      <FormattedMathText text={String(mistake.userAnswer)} inline />
+                      <FormattedMathText text={String(mistake.userAnswer)} inline preferNormalText />
                     </div>
 
-                    <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300">
+                    <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300">
                       <strong className="block text-[10px] uppercase font-bold text-emerald-500">
                         Authoritative Correct Answer
                       </strong>
-                      <FormattedMathText text={String(mistake.correctAnswer)} inline />
+                      <FormattedMathText text={String(mistake.correctAnswer)} inline preferNormalText />
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                     <strong className="block text-[10px] uppercase font-bold text-slate-400 mb-0.5">
                       Analytical Explanation:
                     </strong>
-                    <FormattedMathText text={mistake.explanation} />
+                    <FormattedMathText text={mistake.explanation} preferNormalText />
                   </div>
                 </Card>
               ))}

@@ -43,6 +43,7 @@ import { Badge } from '../ui/Badge';
 import { CopilotClient } from '../../services/copilotClient';
 import { CopilotSidebar } from './CopilotSidebar';
 import { CopilotMessageItem } from './CopilotMessageItem';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface CopilotViewProps {
   user: UserProfile;
@@ -786,8 +787,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
                     <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-purple-200 dark:border-purple-900 shadow-xs">
                       {streamingContent ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none text-xs sm:text-sm space-y-2">
-                          <Markdown>{streamingContent}</Markdown>
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-xs sm:text-sm space-y-2 whitespace-pre-wrap leading-relaxed">
+                          <FormattedMathText text={streamingContent} preferNormalText />
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-xs text-slate-400">

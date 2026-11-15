@@ -72,9 +72,19 @@ export const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
         </button>
 
         <div className="flex flex-col items-center text-center mt-2">
-          <div className="w-20 h-20 rounded-full bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7] mb-5">
-            <IconComponent className="w-10 h-10" />
-          </div>
+          {step === 0 ? (
+            <div className="w-20 h-20 rounded-3xl bg-[#01000E] border border-[#6C5CE7]/50 flex items-center justify-center p-2 mb-5 shadow-lg shadow-indigo-500/20">
+              <img
+                src="/logo-mark.png"
+                alt="LearnCo Logo"
+                className="w-full h-full object-contain"
+              />
+            </div>
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7] mb-5">
+              <IconComponent className="w-10 h-10" />
+            </div>
+          )}
 
           <h3 className="text-xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] mb-2">
             {current.title}

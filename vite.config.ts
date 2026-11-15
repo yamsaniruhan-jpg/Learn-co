@@ -72,7 +72,15 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         injectRegister: false,
         manifestFilename: 'manifest.json',
-        includeAssets: ['favicon.jpg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'],
+        includeAssets: [
+          'favicon.ico',
+          'favicon.jpg',
+          'logo-mark.png',
+          'logo.jpg',
+          'icons/icon-192.png',
+          'icons/icon-512.png',
+          'icons/icon-maskable-512.png',
+        ],
         manifest: {
           id: '/',
           name: 'Learn.co - AI Learning Companion',

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { cleanLatexToNormalText } from '../common/FormattedMathText';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 
@@ -914,8 +915,8 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
                       {item.title}
                     </span>
-                    <div className="p-3 rounded-xl bg-slate-900 text-emerald-400 font-mono text-xs overflow-x-auto">
-                      <code>{item.latexOrEquation}</code>
+                    <div className="p-3 rounded-2xl bg-indigo-50/80 dark:bg-slate-900 text-indigo-950 dark:text-emerald-300 border border-indigo-200/70 dark:border-slate-700 font-semibold text-xs sm:text-sm overflow-x-auto">
+                      {cleanLatexToNormalText(item.latexOrEquation)}
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                       {item.explanation}
@@ -1081,8 +1082,8 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
                   {doc.abstract}
                 </p>
 
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
-                  <code>{doc.rigorAndFormulas[0]?.latexOrEquation}</code>
+                <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-indigo-700 dark:text-emerald-400 truncate">
+                  {cleanLatexToNormalText(doc.rigorAndFormulas[0]?.latexOrEquation || '')}
                 </div>
               </div>
 

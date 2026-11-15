@@ -32,6 +32,7 @@ import { OfflineSyncView } from './components/common/OfflineSyncView';
 import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { FlashCheckModal } from './components/practice/FlashCheckModal';
 import { WalkthroughModal } from './components/common/WalkthroughModal';
+import { FloatingGuideButton } from './components/common/FloatingGuideButton';
 import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
 import { readStoredArray } from './utils/storageSafety';
@@ -771,7 +772,14 @@ export default function App() {
         }}
       />
 
-      {/* Floating Omni Copilot Widget */}
+      {/* Floating Guide Icon beside Floating Omni Copilot Widget */}
+      {!isZenMode && (
+        <FloatingGuideButton
+          activeTab={activeTab}
+          onNavigate={handleNavigateWithContext}
+          copilotVisible={activeTab !== 'copilot'}
+        />
+      )}
       {activeTab !== 'copilot' && !isZenMode && <OmniCopilot />}
     </div>
   );

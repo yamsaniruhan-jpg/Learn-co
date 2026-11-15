@@ -175,11 +175,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
       {/* Top Header */}
       <div className="text-center space-y-3">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-950 border border-indigo-500/40 shadow-lg shadow-indigo-500/25 p-0.5">
+          <div className="w-16 h-16 rounded-3xl overflow-hidden bg-[#01000E] border border-indigo-500/40 shadow-lg shadow-indigo-500/25 p-1">
             <img
-              src="/assets/aistudio/Screenshot_20261025-000443_ChatGPT_a6cdbef4.jpg"
+              src="/logo-mark.png"
               alt="LearnCo Logo"
-              className="w-full h-full object-cover scale-110"
+              className="w-full h-full object-contain"
             />
           </div>
         </div>

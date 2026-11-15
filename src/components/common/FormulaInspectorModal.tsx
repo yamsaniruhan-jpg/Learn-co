@@ -31,7 +31,7 @@ function analyzeFormula(latex: string): FormulaMetadata {
       name: 'Mass-Energy Equivalence',
       domain: 'Special Relativity / Modern Physics',
       dimensionUnits: 'Joules (kg · m² · s⁻² | [M L² T⁻²])',
-      invariantPrinciple: 'Invariance of the speed of light $c$ in all inertial reference frames.',
+      invariantPrinciple: 'Invariance of the speed of light c in all inertial reference frames.',
       variableMap: {
         'E': 'Rest-mass energy of the stationary particle',
         'm': 'Rest mass (invariant inertial mass)',
@@ -119,7 +119,7 @@ export const FormulaInspectorModal: React.FC<FormulaInspectorModalProps> = ({
       throwOnError: false,
     });
   } catch {
-    renderedHtml = `<code>${latex}</code>`;
+    renderedHtml = `<span>${cleanLatexToNormalText(latex)}</span>`;
   }
 
   const handleCopyLatex = () => {

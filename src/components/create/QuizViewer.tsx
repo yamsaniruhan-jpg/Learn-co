@@ -194,8 +194,8 @@ export const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, title, onComplete 
 
               {/* Socratic Hint */}
               {revealedHints[qIdx] && q.hints && q.hints.length > 0 && (
-                <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
-                  <strong>Socratic Hint:</strong> {q.hints[0]}
+                <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                  <strong>Socratic Hint:</strong> {latexToPlainText(q.hints[0])}
                 </div>
               )}
 

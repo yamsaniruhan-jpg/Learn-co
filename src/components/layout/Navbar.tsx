@@ -82,13 +82,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Command Palette Button on Desktop */}
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-56 lg:w-72 justify-between cursor-pointer min-h-[40px]"
+            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-56 lg:w-72 justify-between cursor-pointer min-h-[40px]"
           >
             <span className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-[#6B6890]" />
               <span>Search STEM modules & tools...</span>
             </span>
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#FFFFFF] dark:bg-[#2A2647] rounded border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]">
+            <kbd className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#FFFFFF] dark:bg-[#2A2647] rounded-full border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]">
               ⌘K
             </kbd>
           </button>
@@ -99,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile Search Icon Trigger */}
           <button
             onClick={onOpenSearch}
-            className="md:hidden p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]"
+            className="md:hidden p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]"
             aria-label="Open Search"
           >
             <Search className="w-5 h-5" />
@@ -108,7 +108,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Offline Mode Indicator if disconnected */}
           {!isOnline && (
             <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFB84D] text-[#2D2A4A] border border-[#e09d3b] text-xs font-black shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFB84D] text-[#2D2A4A] border border-[#e09d3b] text-xs font-black shadow-xs"
               title="Offline Mode: studying from local cached curriculum and offline attempts"
             >
               <WifiOff className="w-3.5 h-3.5 text-[#2D2A4A]" />
@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenFlashCheck && (
             <button
               onClick={onOpenFlashCheck}
-              className="hidden 2xl:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
+              className="hidden 2xl:flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#FFFFFF] dark:bg-[#1E1B33] hover:bg-[#F7F5FF] border border-[#FFB84D] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold transition-all shadow-[0_1px_3px_rgba(45,42,74,0.06)] cursor-pointer min-h-[40px]"
               title="Start 60-second Spaced Retention Flash Check (+15 XP)"
             >
               <Zap className="w-4 h-4 fill-[#FFB84D] text-[#FFB84D]" />
@@ -131,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Zen Focus Timer Button */}
           <button
             onClick={() => setActiveTab('focus')}
-            className={`hidden 2xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
+            className={`hidden 2xl:flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'focus'
                 ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
                 : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
@@ -145,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick User Guide Button */}
           <button
             onClick={() => setActiveTab('user-guide')}
-            className={`hidden 2xl:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
+            className={`hidden 2xl:flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer min-h-[40px] ${
               activeTab === 'user-guide' || activeTab === 'guide'
                 ? 'bg-[#6C5CE7] text-white shadow-[0_2px_6px_rgba(108,92,231,0.25)]'
                 : 'bg-[#FFFFFF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861]'
@@ -160,7 +160,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onToggleZenMode && (
             <button
               onClick={onToggleZenMode}
-              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
               title={isZenMode ? "Exit Zen Mode" : "Enter Distraction-Free Zen Study Canvas (Esc to exit)"}
               aria-label="Toggle Zen Focus Mode"
             >
@@ -195,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Notification Bell */}
           <button
             onClick={onOpenNotifications}
-            className="relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+            className="relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
             aria-label="Notifications"
           >
             <Bell className="w-5 h-5" />
@@ -207,7 +207,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Theme Toggle (Dark/Light) */}
           <button
             onClick={onToggleTheme}
-            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
             {isDarkMode ? (
@@ -221,7 +221,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onToggleContextPanel && (
             <button
               onClick={onToggleContextPanel}
-              className="hidden lg:flex p-2.5 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+              className="hidden lg:flex p-2.5 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
               title="Toggle Study Companion"
             >
               <PanelRight className="w-5 h-5" />
