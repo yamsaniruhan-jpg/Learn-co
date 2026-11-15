@@ -520,16 +520,35 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search concepts, formulas, or chapters..."
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-          />
+        {/* Search Bar & Subject Filter Dropdown */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 justify-end">
+          {/* Subject Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              aria-label="Filter concepts by subject category"
+              className="px-3.5 py-2 text-xs sm:text-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer"
+            >
+              <option value="all">All Disciplines</option>
+              <option value="math">Mathematics</option>
+              <option value="cs">Computer Science</option>
+              <option value="physics">Physics</option>
+              <option value="chemistry">Chemistry</option>
+            </select>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search concepts, formulas..."
+              className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+            />
+          </div>
         </div>
       </div>
 
