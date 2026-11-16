@@ -147,6 +147,35 @@ export class LearningClient {
     this.seenQuestionIds.clear();
   }
 
+  static getCachedSeenQuestionIds(): string[] {
+    return Array.from(this.seenQuestionIds);
+  }
+
+  /**
+   * Fetch all previously solved/attempted question IDs for the signed-in account
+   * from Cloud SQL / backend so mobile & desktop sessions never repeat problems.
+   */
+  static async syncSolvedQuestionIds(): Promise<string[]> {
+    try {
+      const token = AuthClient.getToken();
+      if (!token) return [];
+      const res = await fetch('/api/practice/solved-ids', {
+        headers: this.getHeaders(),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (Array.isArray(data?.solvedIds)) {
+        data.solvedIds.forEach((id: string) => {
+          if (typeof id === 'string' && id) this.seenQuestionIds.add(id);
+        });
+        return data.solvedIds;
+      }
+    } catch {
+      // Offline / unreachable: preserve already-collected local IDs
+    }
+    return Array.from(this.seenQuestionIds);
+  }
+
   /**
    * Start a calibrated or custom practice session (verifies daily quota on server)
    */
@@ -173,6 +202,76 @@ export class LearningClient {
     if (shouldDeduplicate && Array.isArray(data?.questions)) {
       data.questions.forEach((q: { id?: string }) => {
         if (q?.id) this.seenQuestionIds.add(q.id);
+      });
+    }
+    return data;
+  }
+
+  static async startOlympiadContest(params: {
+    track: 'ipho' | 'icho' | 'ibho' | 'ijso' | 'ict' | 'mixed';
+    durationMinutes: number;
+    questionCount: number;
+    excludeQuestionIds?: string[];
+  }): Promise<{
+    success: boolean;
+    contestId: string;
+    track: string;
+    title: string;
+    durationSeconds: number;
+    questions: Array<Omit<QuestionBankItem, 'correctAnswer' | 'explanation' | 'stepByStepSolution'>>;
+  }> {
+    const mergedExclude = Array.from(
+      new Set([...this.seenQuestionIds, ...(params.excludeQuestionIds ?? [])])
+    );
+    const res = await fetch('/api/learning/contest/start', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ ...params, excludeQuestionIds: mergedExclude }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to start Olympiad contest');
+    }
+    return data;
+  }
+
+  static async submitOlympiadContest(params: {
+    contestId: string;
+    track: string;
+    questionIds: string[];
+    answers: Record<string, any>;
+    timeSpentSeconds: number;
+  }): Promise<{
+    success: boolean;
+    contestId: string;
+    track: string;
+    title: string;
+    totalQuestions: number;
+    correctCount: number;
+    accuracy: number;
+    medalTier: string;
+    totalXpEarned: number;
+    timeSpentSeconds: number;
+    reviews: Array<{
+      question: QuestionBankItem;
+      userAnswer: any;
+      isCorrect: boolean;
+      xpAwarded: number;
+      timeSpent: number;
+    }>;
+  }> {
+    const res = await fetch('/api/learning/contest/submit', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to submit Olympiad contest');
+    }
+    if (Array.isArray(params.questionIds)) {
+      params.questionIds.forEach((id) => {
+        if (id) this.seenQuestionIds.add(id);
       });
     }
     return data;

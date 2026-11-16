@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import { calculateLevelFromXp } from '../types/auth';
+import { QuestionBankItem } from '../types/curriculum';
+import {
+  BUNDLED_OLYMPIAD_PACK,
+  OLYMPIAD_CHEAT_SHEETS,
+  OlympiadStudyCheatSheet,
+} from '../data/offlineOlympiadPack';
 import { syncLocalXpOnly } from './xpManager';
 
 export interface PendingOfflineAttempt {
@@ -16,7 +22,41 @@ export interface PendingOfflineAttempt {
   timestamp: string;
 }
 
+export type OlympiadPackTrackCounts = Record<'IPhO' | 'IChO' | 'IBHO' | 'IJSO' | 'ICT', number>;
+
+export interface OfflineOlympiadPack {
+  version: number;
+  downloadedAt: string;
+  approxSizeKb: number;
+  questions: QuestionBankItem[];
+  cheatSheets: OlympiadStudyCheatSheet[];
+  trackCounts: OlympiadPackTrackCounts;
+}
+
 const STORAGE_KEY_PENDING_ATTEMPTS = 'learnco_offline_pending_attempts';
+const STORAGE_KEY_OLYMPIAD_PACK = 'learnco_offline_olympiad_pack_v1';
+const STORAGE_KEY_OLYMPIAD_LAUNCH = 'learnco_offline_pack_launch_v1';
+
+function computeOlympiadTrackCounts(questions: QuestionBankItem[]): OlympiadPackTrackCounts {
+  const counts: OlympiadPackTrackCounts = { IPhO: 0, IChO: 0, IBHO: 0, IJSO: 0, ICT: 0 };
+  for (const q of questions) {
+    const tagsUpper = (q.tags || []).map((t) => t.toUpperCase());
+    const topicUpper = (q.topicId || '').toUpperCase();
+    const tracks = q.examTracks || [];
+    if (tagsUpper.some((t) => t.includes('IPHO')) || topicUpper.includes('IPHO') || (q.subjectId === 'physics' && tracks.includes('iapt_exams'))) {
+      counts.IPhO += 1;
+    } else if (tagsUpper.some((t) => t.includes('ICHO')) || topicUpper.includes('ICHO') || (q.subjectId === 'chemistry' && tracks.includes('iapt_exams'))) {
+      counts.IChO += 1;
+    } else if (tagsUpper.some((t) => t.includes('IBHO') || t.includes('IBO')) || topicUpper.includes('IBHO') || (q.subjectId === 'biology' && tracks.includes('iapt_exams'))) {
+      counts.IBHO += 1;
+    } else if (tagsUpper.some((t) => t.includes('IJSO') || t.includes('NSEJS')) || topicUpper.includes('IJSO') || tracks.includes('nsejs')) {
+      counts.IJSO += 1;
+    } else if (tagsUpper.some((t) => t.includes('ICT')) || topicUpper.includes('ICT') || tracks.includes('ict_hackathon') || q.subjectId === 'cs') {
+      counts.ICT += 1;
+    }
+  }
+  return counts;
+}
 
 export class OfflineStorageManager {
   /**
@@ -45,6 +85,118 @@ export class OfflineStorageManager {
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Download & cache verified Olympiad questions + formula cheat sheets for offline flights/study
+   */
+  static async downloadOlympiadPack(): Promise<OfflineOlympiadPack> {
+    const byId = new Map<string, QuestionBankItem>();
+    for (const q of BUNDLED_OLYMPIAD_PACK) {
+      byId.set(q.id, q);
+    }
+
+    if (typeof navigator === 'undefined' || navigator.onLine) {
+      try {
+        const res = await fetch('/api/learning/questions?limit=60');
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (Array.isArray(data?.questions)) {
+            for (const q of data.questions as QuestionBankItem[]) {
+              if (q?.id && !byId.has(q.id) && byId.size < 65) {
+                byId.set(q.id, q);
+              }
+            }
+          }
+        }
+      } catch {
+        // Offline or server unreachable; keep curated BUNDLED_OLYMPIAD_PACK
+      }
+    }
+
+    const questions = Array.from(byId.values());
+    const packDraft: OfflineOlympiadPack = {
+      version: 1,
+      downloadedAt: new Date().toISOString(),
+      approxSizeKb: 0,
+      questions,
+      cheatSheets: OLYMPIAD_CHEAT_SHEETS,
+      trackCounts: computeOlympiadTrackCounts(questions),
+    };
+
+    const rawBytes = new TextEncoder().encode(JSON.stringify(packDraft)).length;
+    const pack: OfflineOlympiadPack = {
+      ...packDraft,
+      approxSizeKb: Math.max(1, Math.round(rawBytes / 1024)),
+    };
+
+    localStorage.setItem(STORAGE_KEY_OLYMPIAD_PACK, JSON.stringify(pack));
+
+    if (typeof caches !== 'undefined') {
+      try {
+        const cache = await caches.open('learnco-olympiad-pack-v1');
+        await Promise.allSettled([cache.add('/'), cache.add('/manifest.json')]);
+      } catch {
+        // Ignore CacheStorage restrictions in sandboxed environments
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('learnco_olympiad_pack_updated', { detail: pack }));
+    }
+    return pack;
+  }
+
+  static getOlympiadPack(): OfflineOlympiadPack | null {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_OLYMPIAD_PACK);
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as OfflineOlympiadPack;
+      if (!parsed || !Array.isArray(parsed.questions) || parsed.questions.length === 0) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  static clearOlympiadPack(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEY_OLYMPIAD_PACK);
+      sessionStorage.removeItem(STORAGE_KEY_OLYMPIAD_LAUNCH);
+    } catch {
+      // ignore
+    }
+    if (typeof caches !== 'undefined') {
+      caches.delete('learnco-olympiad-pack-v1').catch(() => {});
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('learnco_olympiad_pack_updated', { detail: null }));
+    }
+  }
+
+  static queueOfflinePackLaunch(): OfflineOlympiadPack | null {
+    const pack = this.getOlympiadPack();
+    if (!pack) return null;
+    try {
+      sessionStorage.setItem(STORAGE_KEY_OLYMPIAD_LAUNCH, '1');
+    } catch {
+      // ignore
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('learnco-launch-offline-olympiad-pack', { detail: pack }));
+    }
+    return pack;
+  }
+
+  static consumeOfflinePackLaunch(): OfflineOlympiadPack | null {
+    try {
+      const pending = sessionStorage.getItem(STORAGE_KEY_OLYMPIAD_LAUNCH);
+      if (!pending) return null;
+      sessionStorage.removeItem(STORAGE_KEY_OLYMPIAD_LAUNCH);
+      return this.getOlympiadPack();
+    } catch {
+      return null;
     }
   }
 
@@ -209,3 +361,4 @@ export function useNetworkStatus(): {
 
   return { isOnline, pendingOfflineCount: pendingCount, lastSyncedAt, triggerSync };
 }
+

@@ -20,6 +20,9 @@ export const bruteForceLimiter = rateLimit({
 });
 
 export async function aiTierLimiter(req: Request | any, res: Response, next: NextFunction) {
+  if (req.method === 'GET' && req.path === '/usage') {
+    return next();
+  }
   try {
     const uid = req.user?.id || req.user?.uid;
     if (!uid) {

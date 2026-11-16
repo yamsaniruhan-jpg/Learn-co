@@ -118,6 +118,13 @@ export async function createApp() {
   // /api/auth/signin|signup against the application session store.
   setSessionResolver((token: string) => Database.getSessionUser(token));
 
+  // Hydrate users, sessions, profiles, gamification, and solved question history from Cloud SQL
+  try {
+    await Database.hydrateFromSql();
+  } catch (err) {
+    console.warn("[CloudSQL] Startup hydration skipped:", (err as Error)?.message || err);
+  }
+
   // Mount API Endpoints
   app.use("/api/auth", authRoutes);
   app.use("/api/user", userRoutes);

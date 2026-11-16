@@ -122,6 +122,8 @@ export default defineConfig(() => {
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [
             /^\/api(?:\/|$)/,
+            /^\/__\//,
+            /^\/__cookie_check\.html/,
             /^\/healthz$/,
             /^\/_ah\/health$/,
             /^\/_aistudio/,
@@ -162,12 +164,26 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
           type: 'classic',
           suppressWarnings: true,
         },
       }),
     ],
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'lucide-react',
+        'recharts',
+        'katex',
+        'motion/react',
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+        'firebase/storage',
+      ],
+    },
     resolve: {
       // `@` points at the project root (matches the tsconfig `paths` mapping).
       alias: {

@@ -17,6 +17,7 @@ import {
   SubjectId,
 } from '../src/types/auth';
 import { MASTER_QUESTION_BANK } from './data/questionBankData';
+import { resolveParameterizedQuestionById } from './services/parameterizedQuestionGenerator';
 import { flushCurrentState } from './services/flushCurrentState';
 import { gradeQuestionAnswer, type SubmittedAnswer } from '../src/utils/gradeAnswer';
 import { nextPracticeReset } from './services/practiceQuotaTime';
@@ -153,10 +154,11 @@ export class XpEngine {
         throw err;
       }
 
-      // Only the server's bank can provide a verified answer key. Imported or
-      // generated questions can still be practiced, but their correctness is
-      // client-reported and must not mint competitive XP.
-      const bankQuestion = MASTER_QUESTION_BANK.find(question => question.id === req.questionId);
+      // Only the server's bank (or deterministic parameterized engine) can provide a verified answer key.
+      // Imported or custom questions remain client-reported and do not mint competitive XP.
+      const bankQuestion =
+        MASTER_QUESTION_BANK.find(question => question.id === req.questionId) ||
+        resolveParameterizedQuestionById(req.questionId);
       const verification = bankQuestion ? 'bank' as const : 'unverified' as const;
       const answerKey = bankQuestion
         ? (Array.isArray(bankQuestion.correctAnswer) ? bankQuestion.correctAnswer.join(', ') : bankQuestion.correctAnswer)
@@ -282,6 +284,7 @@ export class XpEngine {
       // The engine mutates the in-memory store directly; mark it dirty and
       // flush before telling an offline queue that its attempt was accepted.
       await flushCurrentState();
+      Database.persistAttemptToSql(attemptRecord, gam);
 
       return {
         attempt: attemptRecord,

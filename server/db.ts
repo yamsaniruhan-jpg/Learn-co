@@ -80,6 +80,18 @@ import {
   SEED_STUDY_TASKS,
   SEED_PLAN_VERSIONS,
 } from './data/plannerSeedData';
+import {
+  hydrateDatabaseFromSql,
+  persistAccountToSql,
+  persistProfileToSql,
+  persistGamificationToSql,
+  persistSettingsToSql,
+  persistFullUserRecordToSql,
+  persistSessionToSql,
+  revokeSessionInSql,
+  revokeUserSessionsInSql,
+  persistSolvedQuestionToSql,
+} from '../src/db/persistence';
 
 export interface AuditLogEntry {
   id: string;
@@ -459,6 +471,34 @@ export class Database {
     saveDbToDisk();
   }
 
+  static async hydrateFromSql(): Promise<void> {
+    await hydrateDatabaseFromSql(memoryDb);
+  }
+
+  static persistAttemptToSql(attempt: QuestionAttemptRecord, gamification?: UserGamification | null): void {
+    void persistSolvedQuestionToSql(attempt);
+    if (gamification) {
+      void persistGamificationToSql(gamification);
+    }
+  }
+
+  static cacheResolvedSqlIdentity(resolved: {
+    user: UserAccount;
+    profile?: UserProfile;
+    gamification?: UserGamification;
+    settings?: UserSettings;
+    session?: { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean };
+    token?: string;
+  }): void {
+    const { user, profile, gamification, settings, session, token } = resolved;
+    memoryDb.users[user.id] = user;
+    memoryDb.usersByEmail[user.email.toLowerCase().trim()] = user.id;
+    if (profile) memoryDb.profiles[user.id] = profile;
+    if (gamification) memoryDb.gamification[user.id] = gamification;
+    if (settings) memoryDb.settings[user.id] = settings;
+    if (token && session) memoryDb.sessions[token.trim()] = session;
+  }
+
   static findUserByEmail(email: string): UserAccount | null {
     const norm = email.toLowerCase().trim();
     const userId = memoryDb.usersByEmail[norm];
@@ -785,6 +825,8 @@ export class Database {
     }
 
     saveDbToDisk();
+    void persistAccountToSql(user);
+    void revokeUserSessionsInSql(user.id);
     return { userId: user.id };
   }
 
@@ -792,8 +834,10 @@ export class Database {
     const token = generateToken();
     const createdAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-    memoryDb.sessions[token] = { userId, createdAt, expiresAt, ...(verifiedOwner ? { verifiedOwner: true } : {}) };
+    const session = { userId, createdAt, expiresAt, ...(verifiedOwner ? { verifiedOwner: true } : {}) };
+    memoryDb.sessions[token] = session;
     saveDbToDisk();
+    void persistSessionToSql(token, session);
     return token;
   }
 
@@ -811,6 +855,7 @@ export class Database {
     if (new Date(session.expiresAt) < new Date()) {
       delete memoryDb.sessions[cleanToken];
       saveDbToDisk();
+      void revokeSessionInSql(cleanToken);
       return null;
     }
 
@@ -825,6 +870,7 @@ export class Database {
     if (memoryDb.sessions[token]) {
       delete memoryDb.sessions[token];
       saveDbToDisk();
+      void revokeSessionInSql(token);
       return true;
     }
     return false;
@@ -927,6 +973,7 @@ export class Database {
     memoryDb.settings[userId] = newSettings;
 
     saveDbToDisk();
+    void persistFullUserRecordToSql(newUser, newProfile, newGamification, newSettings);
 
     const token = this.createSession(userId);
 
@@ -961,6 +1008,7 @@ export class Database {
 
     Object.assign(profile, safeUpdates);
     saveDbToDisk();
+    void persistProfileToSql(profile);
     return profile;
   }
 
@@ -981,6 +1029,7 @@ export class Database {
       user.subscriptionExpiresAt = expiresAt;
     }
     saveDbToDisk();
+    void persistAccountToSql(user);
     return user;
   }
 
@@ -996,6 +1045,7 @@ export class Database {
     if (updates.learningPreferences) Object.assign(current.learningPreferences, updates.learningPreferences);
 
     saveDbToDisk();
+    void persistSettingsToSql(current);
     return current;
   }
 

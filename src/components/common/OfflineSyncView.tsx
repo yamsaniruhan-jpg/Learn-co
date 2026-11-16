@@ -8,13 +8,24 @@ import {
   Server,
   UserCheck,
   Smartphone,
+  Download,
+  BookOpen,
+  Play,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useNetworkStatus } from '../../utils/offlineStorage';
+import {
+  useNetworkStatus,
+  OfflineStorageManager,
+  OfflineOlympiadPack,
+} from '../../utils/offlineStorage';
 import { useAuth } from '../../context/AuthContext';
 import { isFirebaseConfigured, auth } from '../../services/firebaseClient';
 import { syncClientToFirestore } from '../../services/clientFirestoreSync';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { FormattedMathText } from '../common/FormattedMathText';
 
 interface OfflineSyncViewProps {
   onNavigateToTab: (tabId: string) => void;
@@ -28,6 +39,13 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
   const [cacheCount, setCacheCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  const [olympiadPack, setOlympiadPack] = useState<OfflineOlympiadPack | null>(() =>
+    OfflineStorageManager.getOlympiadPack()
+  );
+  const [isDownloadingPack, setIsDownloadingPack] = useState(false);
+  const [showCheatSheets, setShowCheatSheets] = useState(false);
+  const [packMessage, setPackMessage] = useState<string | null>(null);
 
   const checkEnvironmentStatus = useCallback(async () => {
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
@@ -72,6 +90,44 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
   useEffect(() => {
     void checkEnvironmentStatus();
   }, [checkEnvironmentStatus]);
+
+  useEffect(() => {
+    const refreshPack = () => setOlympiadPack(OfflineStorageManager.getOlympiadPack());
+    window.addEventListener('learnco_olympiad_pack_updated', refreshPack);
+    return () => window.removeEventListener('learnco_olympiad_pack_updated', refreshPack);
+  }, []);
+
+  const handleDownloadOlympiadPack = async () => {
+    setIsDownloadingPack(true);
+    setPackMessage(null);
+    try {
+      const pack = await OfflineStorageManager.downloadOlympiadPack();
+      setOlympiadPack(pack);
+      setPackMessage(
+        `Cached ${pack.questions.length} Olympiad problems and ${pack.cheatSheets.length} formula cheat sheets (${pack.approxSizeKb} KB) for offline study.`
+      );
+      await checkEnvironmentStatus();
+    } catch {
+      setPackMessage('Could not cache offline pack. Check browser storage permissions.');
+    } finally {
+      setIsDownloadingPack(false);
+    }
+  };
+
+  const handleLaunchOfflinePack = () => {
+    const queued = OfflineStorageManager.queueOfflinePackLaunch();
+    if (queued) {
+      onNavigateToTab('practice');
+    }
+  };
+
+  const handleClearPack = () => {
+    OfflineStorageManager.clearOlympiadPack();
+    setOlympiadPack(null);
+    setShowCheatSheets(false);
+    setPackMessage('Offline Olympiad Pack cleared from device storage.');
+    void checkEnvironmentStatus();
+  };
 
   const handleForceSync = async () => {
     if (!isOnline) {
@@ -146,6 +202,140 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
             Practice Arena
           </Button>
         </div>
+      </div>
+
+      {/* Offline Olympiad Study Pack */}
+      <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              Flight &amp; Commute Ready &middot; IPhO &middot; IChO &middot; IBHO &middot; IJSO &middot; ICT
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+              Offline Olympiad Study Pack
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+              Cache curated Olympiad question sets and essential formula cheat sheets locally on your device so you can practice and review solutions without an active internet connection.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={isDownloadingPack}
+              onClick={() => void handleDownloadOlympiadPack()}
+              className="min-h-[44px] px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <Download className="w-4 h-4" />
+              <span>
+                {isDownloadingPack
+                  ? 'Downloading Pack...'
+                  : olympiadPack
+                  ? 'Refresh Olympiad Pack'
+                  : 'Download Olympiad Pack for Offline Study'}
+              </span>
+            </button>
+
+            {olympiadPack && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleLaunchOfflinePack}
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Practice Offline Pack</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearPack}
+                  aria-label="Clear offline Olympiad pack"
+                  className="min-h-[44px] min-w-[44px] px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {packMessage && (
+          <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs font-medium text-indigo-800 dark:text-indigo-200">
+            {packMessage}
+          </div>
+        )}
+
+        {olympiadPack && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Cached Problems</div>
+                <div className="text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                  {olympiadPack.questions.length}
+                </div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Formula Sheets</div>
+                <div className="text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                  {olympiadPack.cheatSheets.length}
+                </div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Device Footprint</div>
+                <div className="text-lg font-black text-indigo-600 dark:text-indigo-400 tabular-nums">
+                  {olympiadPack.approxSizeKb} KB
+                </div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Last Saved</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-1 tabular-nums">
+                  {new Date(olympiadPack.downloadedAt).toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 dark:text-slate-300 font-medium tabular-nums">
+              Track breakdown: IPhO ({olympiadPack.trackCounts.IPhO}) &middot; IChO ({olympiadPack.trackCounts.IChO}) &middot; IBHO ({olympiadPack.trackCounts.IBHO}) &middot; IJSO ({olympiadPack.trackCounts.IJSO}) &middot; ICT ({olympiadPack.trackCounts.ICT})
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowCheatSheets((prev) => !prev)}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4 text-indigo-500" />
+                <span>{showCheatSheets ? 'Hide Offline Formula Cheat Sheets' : 'View Cached Olympiad Formula Cheat Sheets'}</span>
+                {showCheatSheets ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {showCheatSheets && (
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {olympiadPack.cheatSheets.map((sheet) => (
+                    <div
+                      key={sheet.track}
+                      className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2"
+                    >
+                      <div className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                        {sheet.track} &middot; {sheet.title}
+                      </div>
+                      <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                        {sheet.keyFormulas.map((kf, idx) => (
+                          <li key={idx} className="flex flex-col">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{kf.label}</span>
+                            <span className="text-slate-600 dark:text-slate-400">
+                              <FormattedMathText text={kf.formula} />
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6">
@@ -296,3 +486,4 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
     </div>
   );
 };
+

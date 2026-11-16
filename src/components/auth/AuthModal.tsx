@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Mail,
@@ -12,6 +12,7 @@ import {
   EyeOff,
   GraduationCap,
   UserPlus,
+  LogIn,
   ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -42,6 +43,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [accountNotFoundPrompt, setAccountNotFoundPrompt] = useState<boolean>(false);
   const [isGoogleDialogOpen, setIsGoogleDialogOpen] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setLocalError(null);
+      setAccountNotFoundPrompt(false);
+      clearAuthError();
+    }
+  }, [isOpen, initialMode]);
+
   if (!isOpen) return null;
 
   const handleDirectGoogleAuth = async () => {
@@ -53,6 +63,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       await signInWithGoogle(undefined, undefined, undefined, 'auto');
       onClose();
     } catch (err: any) {
+      if (err?.isRedirecting) {
+        return;
+      }
       setLocalError(err?.message || 'Google sign-in failed. Please try again.');
     } finally {
       setIsGoogleSubmitting(false);
@@ -122,11 +135,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
-                  {mode === 'signin' ? 'Sign In to Learn.co' : 'Create Learn.co Account'}
+                  {mode === 'signin'
+                    ? 'Sign In to Learn.co'
+                    : mode === 'reset'
+                    ? 'Reset Your Password'
+                    : 'Create Learn.co Account'}
                 </h3>
                 <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] font-medium">
                   {mode === 'signin'
                     ? 'Access your personal learning matrix, streak & notes'
+                    : mode === 'reset'
+                    ? 'Recover access to your Learn.co account'
                     : 'Start your rigorous STEM mastery journey'}
                 </p>
               </div>
@@ -218,7 +237,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </svg>
                 <span>{isGoogleSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</span>
               </button>
-              <div className="text-right">
+              <div className="flex items-center justify-between gap-2">
+                {typeof window !== 'undefined' && window.self !== window.top ? (
+                  <a
+                    href={window.location.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Open in new tab</span>
+                  </a>
+                ) : (
+                  <span />
+                )}
                 <button
                   type="button"
                   onClick={() => setIsGoogleDialogOpen(true)}
@@ -257,7 +289,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <span>Open App in New Tab for Google Sign-In</span>
                     </a>
                   )}
-                {accountNotFoundPrompt && mode === 'signin' && (
+                {mode === 'signin' && /uses Google Sign-In/i.test(localError || authError || '') && (
+                  <button
+                    type="button"
+                    onClick={handleDirectGoogleAuth}
+                    disabled={isGoogleSubmitting}
+                    className="mt-1 w-full py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>{isGoogleSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</span>
+                  </button>
+                )}
+                {accountNotFoundPrompt && mode === 'signin' && !/uses Google Sign-In/i.test(localError || authError || '') && (
                   <button
                     type="button"
                     onClick={handleSwitchToSignUp}
@@ -265,6 +308,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     <span>Create new account with this email</span>
+                  </button>
+                )}
+                {mode === 'signup' && /already exists/i.test(localError || authError || '') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('signin');
+                      setLocalError(null);
+                      clearAuthError();
+                    }}
+                    className="mt-1 w-full py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sign In to Existing Account</span>
                   </button>
                 )}
               </div>

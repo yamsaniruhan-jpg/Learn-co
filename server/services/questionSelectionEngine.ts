@@ -8,6 +8,10 @@ import {
   SubjectId,
   DifficultyLevel,
 } from '../../src/types/curriculum';
+import {
+  generateFreshParameterizedQuestions,
+  OlympiadDiscipline,
+} from './parameterizedQuestionGenerator';
 
 export class QuestionSelectionEngine {
   /**
@@ -174,6 +178,25 @@ export class QuestionSelectionEngine {
       }
 
       if (selected.length > 0) {
+        // If any selected questions were already seen (e.g. bank exhausted), replace repeats with fresh parameterized variants
+        const unseenSelected = selected.filter((q) => !seenIds.has(q.id));
+        if (unseenSelected.length < count) {
+          const usedIds = new Set<string>([
+            ...seenIds,
+            ...unseenSelected.map((q) => q.id),
+          ]);
+          const needed = count - unseenSelected.length;
+          const freshVariants = generateFreshParameterizedQuestions({
+            count: needed,
+            subjectId: config.subjectId,
+            examTrack: config.examTrack,
+            excludeIds: usedIds,
+          });
+          const combined = [...unseenSelected, ...freshVariants];
+          if (combined.length >= count) {
+            return combined.slice(0, count);
+          }
+        }
         return selected;
       }
     }
@@ -191,12 +214,106 @@ export class QuestionSelectionEngine {
       if (unseenInDiff.length + unseenAnywhere.length >= count) {
         return [...unseenInDiff, ...unseenAnywhere].slice(0, count);
       }
+      const unseenStatic = [...unseenInDiff, ...unseenAnywhere];
+      const freshVariants = generateFreshParameterizedQuestions({
+        count: count - unseenStatic.length,
+        subjectId: config.subjectId,
+        examTrack: config.examTrack,
+        excludeIds: new Set([...seenIds, ...unseenStatic.map((q) => q.id)]),
+      });
+      if (unseenStatic.length + freshVariants.length >= count) {
+        return [...unseenStatic, ...freshVariants].slice(0, count);
+      }
       const pool = filteredByDiff.length >= count ? filteredByDiff : shuffledPool;
       return selectUnseenFirst(pool, count);
     }
 
     // General fallback: return strictly unseen candidates before any revisit
-    return selectUnseenFirst(shuffledPool, count);
+    const picked = selectUnseenFirst(shuffledPool, count);
+    const unseenOnly = picked.filter((q) => !seenIds.has(q.id));
+    if (unseenOnly.length < count) {
+      const freshVariants = generateFreshParameterizedQuestions({
+        count: count - unseenOnly.length,
+        subjectId: config.subjectId,
+        examTrack: config.examTrack,
+        excludeIds: new Set([...seenIds, ...unseenOnly.map((q) => q.id)]),
+      });
+      if (unseenOnly.length + freshVariants.length > 0) {
+        return [...unseenOnly, ...freshVariants].slice(0, count);
+      }
+    }
+    return picked;
+  }
+
+  /**
+   * Select a balanced, non-repeating Olympiad Mock Contest problem set.
+   */
+  static selectOlympiadContest(
+    userId: string,
+    track: OlympiadDiscipline,
+    questionCount: number,
+    excludeIdsExtra: string[] = []
+  ): QuestionBankItem[] {
+    const userAttempts = Database.getUserAttempts(userId);
+    const seenIds = new Set<string>([
+      ...userAttempts.map((a) => a.questionId),
+      ...excludeIdsExtra,
+    ]);
+
+    const disciplineFilter = (q: QuestionBankItem): boolean => {
+      if (track === 'ipho') {
+        return q.subjectId === 'physics' && (q.examTracks.includes('iapt_exams') || q.examTracks.includes('stem_olympiad') || q.chapterId.includes('ipho') || q.difficulty !== 'easy');
+      }
+      if (track === 'icho') {
+        return q.subjectId === 'chemistry' && (q.examTracks.includes('iapt_exams') || q.examTracks.includes('stem_olympiad') || q.chapterId.includes('icho') || q.difficulty !== 'easy');
+      }
+      if (track === 'ibho') {
+        return q.subjectId === 'biology' && (q.examTracks.includes('iapt_exams') || q.examTracks.includes('stem_olympiad') || q.chapterId.includes('ibho') || q.difficulty !== 'easy');
+      }
+      if (track === 'ijso') {
+        return ['physics', 'chemistry', 'biology'].includes(q.subjectId) && (q.examTracks.includes('nsejs') || q.examTracks.includes('stem_olympiad') || q.chapterId.includes('ijso'));
+      }
+      if (track === 'ict') {
+        return q.subjectId === 'cs' && (q.examTracks.includes('ict_hackathon') || q.examTracks.includes('stem_olympiad') || q.chapterId.includes('ict'));
+      }
+      return (
+        q.examTracks.includes('stem_olympiad') ||
+        q.examTracks.includes('iapt_exams') ||
+        q.examTracks.includes('nsejs') ||
+        q.examTracks.includes('ict_hackathon')
+      );
+    };
+
+    const candidateBank = MASTER_QUESTION_BANK.filter(
+      (q) => disciplineFilter(q) && !seenIds.has(q.id)
+    );
+    // Shuffle deterministically-enough with Fisher-Yates
+    const shuffled = [...candidateBank];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Mix ~40% fresh parameterized quantitative Olympiad items + ~60% unseen bank items
+    const paramTarget = Math.max(2, Math.ceil(questionCount * 0.4));
+    const bankTarget = Math.max(0, questionCount - paramTarget);
+    const chosenBank = shuffled.slice(0, bankTarget);
+    chosenBank.forEach((q) => seenIds.add(q.id));
+
+    const neededParam = questionCount - chosenBank.length;
+    const paramItems = generateFreshParameterizedQuestions({
+      count: neededParam,
+      olympiadDiscipline: track,
+      excludeIds: seenIds,
+    });
+
+    const combined = [...chosenBank, ...paramItems];
+    // Final shuffle across difficulties/items
+    for (let i = combined.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [combined[i], combined[j]] = [combined[j], combined[i]];
+    }
+    return combined.slice(0, questionCount);
   }
 
   /**

@@ -77,6 +77,9 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
         onClose();
       }, 500);
     } catch (err: any) {
+      if (err?.isRedirecting) {
+        return;
+      }
       setStep('prompt');
       if (err?.notFound || err?.message?.includes('No Learn.co account found')) {
         setAccountNotFound(true);

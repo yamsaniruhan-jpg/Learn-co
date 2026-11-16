@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PracticeSessionConfig, QuestionTypeId, SubjectId } from '../../types/curriculum';
+import { ExamTrackId, PracticeSessionConfig, QuestionTypeId, SubjectId } from '../../types/curriculum';
 import { Zap, Clock, ShieldCheck, X, CheckSquare, Sparkles } from 'lucide-react';
 
 interface PracticeConfigModalProps {
@@ -12,6 +12,15 @@ interface PracticeConfigModalProps {
   initialTitle?: string;
   dailyQuotaRemaining: number;
 }
+
+const MODAL_EXAM_TRACK_OPTIONS: Array<{ id: ExamTrackId; label: string }> = [
+  { id: 'all', label: 'All Tracks' },
+  { id: 'stem_olympiad', label: 'STEM Olympiad (IPhO/IChO/IBHO)' },
+  { id: 'iapt_exams', label: 'IAPT Olympiads (NSEP/NSEC/NSEB)' },
+  { id: 'nsejs', label: 'IJSO / NSEJS Junior Olympiad' },
+  { id: 'ict_hackathon', label: 'ICT Coding & Algorithms' },
+  { id: 'jee_advanced', label: 'JEE Advanced' },
+];
 
 export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
   isOpen,
@@ -29,6 +38,7 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
       setSessionTitle(initialTitle);
     }
   }, [isOpen, initialTitle]);
+  const [examTrack, setExamTrack] = useState<ExamTrackId>('all');
   const [difficultyMode, setDifficultyMode] = useState<'calibrated_ladder' | 'easy' | 'medium' | 'hard'>('calibrated_ladder');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [isTimed, setIsTimed] = useState<boolean>(false);
@@ -58,6 +68,7 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
     onStart({
       sessionTitle,
       subjectId: initialSubjectId,
+      examTrack: examTrack !== 'all' ? examTrack : undefined,
       topicId: initialTopicId,
       conceptId: initialConceptId,
       difficultyMode,
@@ -100,6 +111,24 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
           <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
             {dailyQuotaRemaining} / 25 remaining today
           </span>
+        </div>
+
+        {/* Exam / Olympiad Track Filter */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Target Exam / Olympiad Track
+          </label>
+          <select
+            value={examTrack}
+            onChange={(e) => setExamTrack(e.target.value as ExamTrackId)}
+            className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer"
+          >
+            {MODAL_EXAM_TRACK_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Difficulty Progression Mode */}

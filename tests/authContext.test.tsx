@@ -4,9 +4,10 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getToken: vi.fn(), getMe: vi.fn(), removeToken: vi.fn(), signIn: vi.fn(), setCurrentUser: vi.fn(),
+  getToken: vi.fn(), getMe: vi.fn(), removeToken: vi.fn(), signIn: vi.fn(), signInWithGoogle: vi.fn(), setCurrentUser: vi.fn(),
   auth: { app: {}, currentUser: null as null | { email: string } },
   firebaseSignIn: vi.fn(), firebaseSignOut: vi.fn(async () => {}),
+  onAuthStateChanged: vi.fn(),
 }));
 vi.mock('../src/services/authClient', () => ({ AuthClient: mocks }));
 vi.mock('../src/services/clientFirestoreSync', () => ({
@@ -17,6 +18,7 @@ vi.mock('../src/services/firebaseClient', () => ({
   auth: mocks.auth, googleProvider: {}, signInWithPopup: vi.fn(),
   signInWithRedirect: vi.fn(), getRedirectResult: vi.fn(async () => null),
   signInWithEmailAndPassword: mocks.firebaseSignIn, createUserWithEmailAndPassword: vi.fn(), signOut: mocks.firebaseSignOut,
+  onAuthStateChanged: mocks.onAuthStateChanged,
 }));
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 
@@ -28,8 +30,11 @@ let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
+  sessionStorage.clear();
   mocks.getToken.mockReset(); mocks.getMe.mockReset(); mocks.removeToken.mockReset(); mocks.signIn.mockReset();
+  mocks.signInWithGoogle.mockReset();
   mocks.setCurrentUser.mockReset();
+  mocks.onAuthStateChanged.mockReset();
   mocks.firebaseSignIn.mockReset(); mocks.firebaseSignOut.mockClear(); mocks.auth.currentUser = null;
   container = document.createElement('div'); document.body.appendChild(container);
   root = createRoot(container);
@@ -100,5 +105,46 @@ describe('session refresh failures', () => {
     token = 'new-session';
     await act(async () => { reject(Object.assign(new Error('unauthorized'), { status: 401 })); });
     expect(mocks.removeToken).not.toHaveBeenCalled();
+  });
+
+  it('ignores onAuthStateChanged unless a Google redirect is pending', async () => {
+    let authCallback: ((user: any) => Promise<void> | void) | undefined;
+    mocks.onAuthStateChanged.mockImplementation((_auth: any, cb: any) => {
+      authCallback = cb;
+      return () => {};
+    });
+    mocks.getToken.mockReturnValue(null);
+    await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
+
+    await act(async () => {
+      await authCallback?.({
+        email: 'alice@example.test',
+        providerData: [{ providerId: 'google.com', email: 'alice@example.test' }],
+        getIdToken: async () => 'fb-token',
+      });
+    });
+    expect(mocks.signInWithGoogle).not.toHaveBeenCalled();
+
+    sessionStorage.setItem('learnco_google_redirect_pending', JSON.stringify({ intent: 'signin' }));
+    mocks.signInWithGoogle.mockResolvedValue({
+      user: { id: 'g-1', email: 'alice@example.test', authProvider: 'google' },
+      profile: null,
+      gamification: { userId: 'g-1', xp: 10, level: 1 },
+      settings: null,
+    });
+    await act(async () => {
+      await authCallback?.({
+        email: 'alice@example.test',
+        displayName: 'Alice',
+        providerData: [{ providerId: 'google.com', email: 'alice@example.test' }],
+        getIdToken: async () => 'fb-google-token',
+      });
+    });
+    expect(mocks.signInWithGoogle).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'alice@example.test',
+      intent: 'signin',
+      idToken: 'fb-google-token',
+    }));
+    expect(snapshot.isAuthenticated).toBe(true);
   });
 });

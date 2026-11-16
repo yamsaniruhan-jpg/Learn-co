@@ -5,6 +5,8 @@ import { XpEngine } from '../xpEngine';
 import { MASTER_QUESTION_BANK } from '../data/questionBankData';
 import { invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
 import { isValidSubmittedAnswer } from '../../src/utils/gradeAnswer';
+import { resolveParameterizedQuestionById } from '../services/parameterizedQuestionGenerator';
+import { getSolvedQuestionIdsFromSql } from '../../src/db/persistence';
 
 const router = Router();
 
@@ -70,9 +72,11 @@ router.post('/submit-attempt', requireAuth, async (req: AuthenticatedRequest, re
       attemptId = `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     }
 
-    // A bank question must always be graded and recorded using server-owned
-    // metadata. A caller-supplied answer key must never override the bank.
-    const bankQuestion = MASTER_QUESTION_BANK.find((q) => q.id === questionId);
+    // A bank or server-parameterized question must always be graded and recorded using
+    // server-owned metadata. A caller-supplied answer key must never override the bank.
+    const bankQuestion =
+      MASTER_QUESTION_BANK.find((q) => q.id === questionId) ||
+      resolveParameterizedQuestionById(questionId);
     if (bankQuestion) {
       subjectId = bankQuestion.subjectId;
       topicId = bankQuestion.topicId;
@@ -135,6 +139,23 @@ router.get('/history', requireAuth, (req: AuthenticatedRequest, res: Response) =
     res.json({ attempts });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch attempt history.' });
+  }
+});
+
+// GET /api/practice/solved-ids
+router.get('/solved-ids', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const memoryIds = Database.getUserAttempts(userId).map((a) => a.questionId);
+    const sqlIds = await getSolvedQuestionIdsFromSql(userId);
+    const solvedIds = Array.from(new Set([...memoryIds, ...sqlIds].filter(Boolean)));
+    res.json({
+      success: true,
+      solvedIds,
+      solvedCount: solvedIds.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch solved question IDs.' });
   }
 });
 

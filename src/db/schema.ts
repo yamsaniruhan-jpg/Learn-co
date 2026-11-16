@@ -7,6 +7,7 @@ import {
   timestamp,
   boolean,
   jsonb,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 /**
@@ -22,6 +23,95 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+/**
+ * Durable authentication accounts (credentials & provider metadata).
+ */
+export const authAccounts = pgTable('auth_accounts', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash'),
+  authProvider: text('auth_provider').notNull().default('email'),
+  subscription: text('subscription'),
+  subscriptionExpiresAt: text('subscription_expires_at'),
+  lastLoginAt: timestamp('last_login_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * Persistent bearer sessions so logins survive container restarts.
+ */
+export const authSessions = pgTable('auth_sessions', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull().unique(),
+  userId: text('user_id').notNull(),
+  verifiedOwner: boolean('verified_owner').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+});
+
+/**
+ * Persistent learner profiles and onboarding state.
+ */
+export const userProfiles = pgTable('user_profiles', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  email: text('email').notNull(),
+  profileJson: jsonb('profile_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * Persistent gamification, streaks, XP, and daily quota counters.
+ */
+export const userGamification = pgTable('user_gamification', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  xp: integer('xp').notNull().default(0),
+  level: integer('level').notNull().default(1),
+  currentStreak: integer('current_streak').notNull().default(0),
+  longestStreak: integer('longest_streak').notNull().default(0),
+  lastActiveDate: text('last_active_date').notNull().default(''),
+  gamificationJson: jsonb('gamification_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * Persistent user appearance & learning preferences.
+ */
+export const userSettings = pgTable('user_settings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  settingsJson: jsonb('settings_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * Cross-device solved question history per user for strict non-repetition.
+ */
+export const userSolvedQuestions = pgTable(
+  'user_solved_questions',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    questionId: text('question_id').notNull(),
+    subjectId: text('subject_id').notNull(),
+    topicId: text('topic_id'),
+    isCorrect: boolean('is_correct').notNull().default(false),
+    xpAwarded: integer('xp_awarded').notNull().default(0),
+    attemptCount: integer('attempt_count').notNull().default(1),
+    lastAttemptJson: jsonb('last_attempt_json').$type<Record<string, any>>(),
+    lastAttemptAt: timestamp('last_attempt_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userQuestionUniqueIdx: uniqueIndex('user_solved_questions_user_q_idx').on(
+      table.userId,
+      table.questionId
+    ),
+  })
+);
 
 /**
  * Persistent Mentor Application submissions routed to platform owner (yamsaniruhan@gmail.com).

@@ -86,9 +86,9 @@ export class AuthClient {
       body: JSON.stringify(params),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to create account.');
+      throw new Error(data.error || `Failed to create account (HTTP ${res.status}).`);
     }
 
     if (data.token) {
@@ -114,9 +114,13 @@ export class AuthClient {
       body: JSON.stringify({ email, password, idToken }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Invalid credentials.');
+      const err: any = new Error(data.error || `Sign in failed (HTTP ${res.status}).`);
+      err.status = res.status;
+      err.notFound = data.notFound;
+      err.googleOnly = data.googleOnly;
+      throw err;
     }
 
     if (data.token) {
@@ -150,9 +154,10 @@ export class AuthClient {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err: any = new Error(data.error || 'Google authentication failed.');
+      const err: any = new Error(data.error || `Google authentication failed (HTTP ${res.status}).`);
+      err.status = res.status;
       err.notFound = data.notFound;
       err.email = data.email;
       throw err;
@@ -179,9 +184,9 @@ export class AuthClient {
       headers: this.getHeaders(),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const error = new Error(data.error || 'Session verification failed.') as Error & { status?: number };
+      const error = new Error(data.error || `Session verification failed (HTTP ${res.status}).`) as Error & { status?: number };
       error.status = res.status;
       throw error;
     }
@@ -299,9 +304,9 @@ export class AuthClient {
       body: JSON.stringify(data),
     });
 
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(result.error || 'Failed to save onboarding data.');
+      throw new Error(result.error || `Failed to save onboarding data (HTTP ${res.status}).`);
     }
 
     return result;
@@ -316,9 +321,9 @@ export class AuthClient {
       body: JSON.stringify(updates),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to update profile.');
+      throw new Error(data.error || `Failed to update profile (HTTP ${res.status}).`);
     }
 
     return data;
@@ -333,9 +338,9 @@ export class AuthClient {
       body: JSON.stringify(updates),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to update settings.');
+      throw new Error(data.error || `Failed to update settings (HTTP ${res.status}).`);
     }
 
     return data;
@@ -350,9 +355,9 @@ export class AuthClient {
       body: JSON.stringify({ imageData }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to upload profile photo.');
+      throw new Error(data.error || `Failed to upload profile photo (HTTP ${res.status}).`);
     }
 
     return data;

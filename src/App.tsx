@@ -1,41 +1,16 @@
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
-import { Navbar } from './components/layout/Navbar';
-import { Sidebar } from './components/layout/Sidebar';
-import { RightContextPanel } from './components/layout/RightContextPanel';
-import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
-import { NotificationCenter } from './components/layout/NotificationCenter';
-import { AuthModal } from './components/auth/AuthModal';
-import { OnboardingWizard } from './components/auth/OnboardingWizard';
-
-import { DashboardView } from './components/dashboard/DashboardView';
-import { LearnView } from './components/learn/LearnView';
-import { CopilotView } from './components/copilot/CopilotView';
 import type { PracticeNavigationContext } from './components/practice/PracticeView';
-import { GamificationView } from './components/gamification/GamificationView';
-import { ProfileView } from './components/profile/ProfileView';
-import { AuthView } from './components/auth/AuthView';
-import { Leaderboard } from './components/leaderboard/Leaderboard';
-import { MobileAllTabsNav } from './components/layout/MobileAllTabsNav';
-
+import type { FormulaInspectionData } from './components/common/FormulaInspectorModal';
 import { useAuth } from './context/AuthContext';
 import { SubjectId, UserProfile, NotificationItem } from './types';
 import { DAILY_PRACTICE_LIMIT } from './types/auth';
 import { BrandLogo } from './components/ui/BrandLogo';
 import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { ZenFocusCanvas } from './components/common/ZenFocusCanvas';
-import { GenFocusTimerView } from './components/focus/GenFocusTimerView';
-import { StudyRoomsView } from './components/common/StudyRoomsView';
-import { ExamForecasterView } from './components/common/ExamForecasterView';
-import { OfflineSyncView } from './components/common/OfflineSyncView';
-import { FormulaInspectorModal, FormulaInspectionData } from './components/common/FormulaInspectorModal';
-import { FlashCheckModal } from './components/practice/FlashCheckModal';
-import { WalkthroughModal } from './components/common/WalkthroughModal';
-import { FloatingGuideButton } from './components/common/FloatingGuideButton';
-import OmniCopilot from './components/OmniCopilot';
 import { awardXp } from './utils/xpManager';
 import { useLocalPractice } from './utils/localPractice';
 import { useLocalNotifications } from './utils/localNotifications';
+import { lazyNamed } from './utils/lazyNamed';
 import {
   Sparkles,
   ShieldCheck,
@@ -45,41 +20,147 @@ import {
   X,
 } from 'lucide-react';
 
-const SimulationsHubView = lazy(() =>
-  import('./components/simulations/SimulationsHubView').then((m) => ({ default: m.SimulationsHubView }))
+// Authenticated workspace shell & modals (excluded from signed-out boot waterfall)
+const Navbar = lazy(() =>
+  import('./components/layout/Navbar').then((m) => ({ default: m.Navbar }))
 );
-const ConceptLibraryView = lazy(() =>
-  import('./components/concepts/ConceptLibraryView').then((m) => ({ default: m.ConceptLibraryView }))
+const Sidebar = lazy(() =>
+  import('./components/layout/Sidebar').then((m) => ({ default: m.Sidebar }))
 );
-const IntelligenceView = lazy(() =>
-  import('./components/intelligence/IntelligenceView').then((m) => ({ default: m.IntelligenceView }))
+const RightContextPanel = lazy(() =>
+  import('./components/layout/RightContextPanel').then((m) => ({ default: m.RightContextPanel }))
 );
-const CreatorStudioView = lazy(() =>
-  import('./components/create/CreatorStudioView').then((m) => ({ default: m.CreatorStudioView }))
+const GlobalSearchModal = lazy(() =>
+  import('./components/layout/GlobalSearchModal').then((m) => ({ default: m.GlobalSearchModal }))
 );
-const PracticeView = lazy(() =>
-  import('./components/practice/PracticeView').then((m) => ({ default: m.PracticeView }))
+const AuthModal = lazy(() =>
+  import('./components/auth/AuthModal').then((m) => ({ default: m.AuthModal }))
 );
-const AdminStudioView = lazy(() =>
-  import('./components/admin/AdminStudioView').then((m) => ({ default: m.AdminStudioView }))
+const OnboardingWizard = lazy(() =>
+  import('./components/auth/OnboardingWizard').then((m) => ({ default: m.OnboardingWizard }))
 );
-const VoiceExamView = lazy(() =>
-  import('./components/common/VoiceExamView').then((m) => ({ default: m.VoiceExamView }))
+const MobileAllTabsNav = lazy(() =>
+  import('./components/layout/MobileAllTabsNav').then((m) => ({ default: m.MobileAllTabsNav }))
 );
-const DocsViewer = lazy(() =>
-  import('./components/docs/DocsViewer').then((m) => ({ default: m.DocsViewer }))
+const ZenFocusCanvas = lazy(() =>
+  import('./components/common/ZenFocusCanvas').then((m) => ({ default: m.ZenFocusCanvas }))
 );
-const UserGuideView = lazy(() =>
-  import('./components/guide/UserGuideView').then((m) => ({ default: m.UserGuideView }))
+const FloatingGuideButton = lazy(() =>
+  import('./components/common/FloatingGuideButton').then((m) => ({ default: m.FloatingGuideButton }))
 );
-const MentorView = lazy(() =>
-  import('./components/mentor/MentorView').then((m) => ({ default: m.MentorView }))
+const OmniCopilot = lazy(() => import('./components/OmniCopilot'));
+const IOSInstallBanner = lazy(() =>
+  import('./components/pwa/IOSInstallBanner').then((m) => ({ default: m.IOSInstallBanner }))
 );
-const PlannerView = lazy(() =>
-  import('./components/planner/PlannerView').then((m) => ({ default: m.PlannerView }))
+
+// Route-level & modal views tracked by tests/lazyViews.test.ts
+const DashboardView = lazyNamed(
+  () => import('./components/dashboard/DashboardView'),
+  'DashboardView'
 );
-const DigitalArchiveHub = lazy(() =>
-  import('./components/learn/DigitalArchiveHub').then((m) => ({ default: m.DigitalArchiveHub }))
+const LearnView = lazyNamed(
+  () => import('./components/learn/LearnView'),
+  'LearnView'
+);
+const CreatorStudioView = lazyNamed(
+  () => import('./components/create/CreatorStudioView'),
+  'CreatorStudioView'
+);
+const MentorView = lazyNamed(
+  () => import('./components/mentor/MentorView'),
+  'MentorView'
+);
+const CopilotView = lazyNamed(
+  () => import('./components/copilot/CopilotView'),
+  'CopilotView'
+);
+const PracticeView = lazyNamed(
+  () => import('./components/practice/PracticeView'),
+  'PracticeView'
+);
+const PlannerView = lazyNamed(
+  () => import('./components/planner/PlannerView'),
+  'PlannerView'
+);
+const GamificationView = lazyNamed(
+  () => import('./components/gamification/GamificationView'),
+  'GamificationView'
+);
+const IntelligenceView = lazyNamed(
+  () => import('./components/intelligence/IntelligenceView'),
+  'IntelligenceView'
+);
+const AdminStudioView = lazyNamed(
+  () => import('./components/admin/AdminStudioView'),
+  'AdminStudioView'
+);
+const DocsViewer = lazyNamed(
+  () => import('./components/docs/DocsViewer'),
+  'DocsViewer'
+);
+const ProfileView = lazyNamed(
+  () => import('./components/profile/ProfileView'),
+  'ProfileView'
+);
+const AuthView = lazyNamed(
+  () => import('./components/auth/AuthView'),
+  'AuthView'
+);
+const Leaderboard = lazyNamed(
+  () => import('./components/leaderboard/Leaderboard'),
+  'Leaderboard'
+);
+const ConceptLibraryView = lazyNamed(
+  () => import('./components/concepts/ConceptLibraryView'),
+  'ConceptLibraryView'
+);
+const DigitalArchiveHub = lazyNamed(
+  () => import('./components/learn/DigitalArchiveHub'),
+  'DigitalArchiveHub'
+);
+const SimulationsHubView = lazyNamed(
+  () => import('./components/simulations/SimulationsHubView'),
+  'SimulationsHubView'
+);
+const UserGuideView = lazyNamed(
+  () => import('./components/guide/UserGuideView'),
+  'UserGuideView'
+);
+const GenFocusTimerView = lazyNamed(
+  () => import('./components/focus/GenFocusTimerView'),
+  'GenFocusTimerView'
+);
+const StudyRoomsView = lazyNamed(
+  () => import('./components/common/StudyRoomsView'),
+  'StudyRoomsView'
+);
+const VoiceExamView = lazyNamed(
+  () => import('./components/common/VoiceExamView'),
+  'VoiceExamView'
+);
+const ExamForecasterView = lazyNamed(
+  () => import('./components/common/ExamForecasterView'),
+  'ExamForecasterView'
+);
+const OfflineSyncView = lazyNamed(
+  () => import('./components/common/OfflineSyncView'),
+  'OfflineSyncView'
+);
+const FormulaInspectorModal = lazyNamed(
+  () => import('./components/common/FormulaInspectorModal'),
+  'FormulaInspectorModal'
+);
+const FlashCheckModal = lazyNamed(
+  () => import('./components/practice/FlashCheckModal'),
+  'FlashCheckModal'
+);
+const WalkthroughModal = lazyNamed(
+  () => import('./components/common/WalkthroughModal'),
+  'WalkthroughModal'
+);
+const NotificationCenter = lazyNamed(
+  () => import('./components/layout/NotificationCenter'),
+  'NotificationCenter'
 );
 const Marketplace = lazy(() => import('./components/Marketplace'));
 
@@ -261,15 +342,18 @@ export default function App() {
     };
     const handleFlashCheck = () => setIsFlashCheckOpen(true);
     const handleZenToggle = () => setIsZenMode((prev) => !prev);
+    const handleOfflinePackLaunch = () => setActiveTab('practice');
 
     window.addEventListener('learnco-inspect-formula', handleInspect);
     window.addEventListener('learnco-open-flash-check', handleFlashCheck);
     window.addEventListener('learnco-toggle-zen-mode', handleZenToggle);
+    window.addEventListener('learnco-launch-offline-olympiad-pack', handleOfflinePackLaunch);
 
     return () => {
       window.removeEventListener('learnco-inspect-formula', handleInspect);
       window.removeEventListener('learnco-open-flash-check', handleFlashCheck);
       window.removeEventListener('learnco-toggle-zen-mode', handleZenToggle);
+      window.removeEventListener('learnco-launch-offline-olympiad-pack', handleOfflinePackLaunch);
     };
   }, []);
 
@@ -444,11 +528,19 @@ export default function App() {
 
             {/* Right Sign-In / Sign-Up Card */}
             <section className="lg:col-span-6 w-full max-w-xl mx-auto lg:max-w-none order-1 lg:order-2">
-              <AuthView
-                initialResetToken={resetToken}
-                onExitReset={() => setResetToken(null)}
-                onNavigateToTab={() => setActiveTab('dashboard')}
-              />
+              <Suspense
+                fallback={
+                  <div className="p-8 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-[#6C5CE7] animate-spin" />
+                  </div>
+                }
+              >
+                <AuthView
+                  initialResetToken={resetToken}
+                  onExitReset={() => setResetToken(null)}
+                  onNavigateToTab={() => setActiveTab('dashboard')}
+                />
+              </Suspense>
             </section>
           </div>
         </main>
@@ -462,42 +554,57 @@ export default function App() {
     profile &&
     (profile.onboardingStatus === 'NOT_STARTED' || profile.onboardingStatus === 'IN_PROGRESS')
   ) {
-    return <OnboardingWizard />;
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-[#6C5CE7] animate-spin" />
+          </div>
+        }
+      >
+        <OnboardingWizard />
+      </Suspense>
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col font-sans selection:bg-[#6C5CE7] selection:text-white">
       {/* Top Universal Navigation Bar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenNotifications={() => setIsNotificationOpen(true)}
-        unreadNotificationsCount={notifications.filter((n) => !n.isRead).length}
-        onToggleContextPanel={() => setIsContextPanelOpen((prev) => !prev)}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
-        onOpenProfile={() => setActiveTab('profile')}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onOpenFlashCheck={() => setIsFlashCheckOpen(true)}
-        onToggleZenMode={() => setIsZenMode((prev) => !prev)}
-        isZenMode={isZenMode}
-      />
+      <Suspense fallback={<div className="h-16 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647]" />}>
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onOpenNotifications={() => setIsNotificationOpen(true)}
+          unreadNotificationsCount={notifications.filter((n) => !n.isRead).length}
+          onToggleContextPanel={() => setIsContextPanelOpen((prev) => !prev)}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          onOpenProfile={() => setActiveTab('profile')}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onOpenFlashCheck={() => setIsFlashCheckOpen(true)}
+          onToggleZenMode={() => setIsZenMode((prev) => !prev)}
+          isZenMode={isZenMode}
+        />
+      </Suspense>
 
       {/* Main Body Workspace */}
       <div className="flex-1 flex overflow-hidden">
         {/* Desktop Left Nav Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          dailyAllowanceRemaining={Math.max(
-            0,
-            DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
-          )}
-        />
+        <Suspense fallback={null}>
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            dailyAllowanceRemaining={Math.max(
+              0,
+              DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
+            )}
+          />
+        </Suspense>
 
         {/* Dynamic Center Stage Canvas with Zen Focus Canvas */}
-        <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
+        <Suspense fallback={<div className="flex-1" />}>
+          <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
           <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
             <ErrorBoundary
               fallbackTitle="STEM Workspace View Error"
@@ -723,119 +830,159 @@ export default function App() {
           </ErrorBoundary>
         </main>
         </ZenFocusCanvas>
+        </Suspense>
 
         {/* Right Collapsible Socratic Companion Panel */}
-        <RightContextPanel
-          isOpen={isContextPanelOpen}
-          onClose={() => setIsContextPanelOpen(false)}
-          activeSubject={selectedSubjectId}
-          averageMastery={averageMasteryPercent}
-          activeStreak={gamification?.currentStreak ?? 0}
-          onAskCopilot={(prompt) => {
-            setCopilotContext(prompt);
-            setActiveTab('copilot');
-            setIsContextPanelOpen(false);
-          }}
-        />
+        {isContextPanelOpen && (
+          <Suspense fallback={null}>
+            <RightContextPanel
+              isOpen={isContextPanelOpen}
+              onClose={() => setIsContextPanelOpen(false)}
+              activeSubject={selectedSubjectId}
+              averageMastery={averageMasteryPercent}
+              activeStreak={gamification?.currentStreak ?? 0}
+              onAskCopilot={(prompt) => {
+                setCopilotContext(prompt);
+                setActiveTab('copilot');
+                setIsContextPanelOpen(false);
+              }}
+            />
+          </Suspense>
+        )}
       </div>
 
       {/* Global Command Search Modal (⌘K) */}
-      <GlobalSearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onNavigate={handleNavigateWithContext}
-        onSelectConcept={() => {
-          setActiveTab('learn');
-          setIsSearchOpen(false);
-        }}
-      />
+      {isSearchOpen && (
+        <Suspense fallback={null}>
+          <GlobalSearchModal
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            onNavigate={handleNavigateWithContext}
+            onSelectConcept={() => {
+              setActiveTab('learn');
+              setIsSearchOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Notification Center Drawer */}
-      <NotificationCenter
-        isOpen={isNotificationOpen}
-        onClose={() => setIsNotificationOpen(false)}
-        notifications={notifications}
-        onSelectNotification={handleSelectNotification}
-        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-        onNavigate={(tab) => {
-          setActiveTab(tab);
-          setIsNotificationOpen(false);
-        }}
-      />
+      {isNotificationOpen && (
+        <Suspense fallback={null}>
+          <NotificationCenter
+            isOpen={isNotificationOpen}
+            onClose={() => setIsNotificationOpen(false)}
+            notifications={notifications}
+            onSelectNotification={handleSelectNotification}
+            onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              setIsNotificationOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Auth Modal (Sign In / Sign Up) */}
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      {isAuthModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Mobile All-Tabs Navigation (Scrollable strip + Bottom Bar + All-Feature Drawer) */}
-      <MobileAllTabsNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        dailyAllowanceRemaining={Math.max(
-          0,
-          DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
-        )}
-      />
+      <Suspense fallback={null}>
+        <MobileAllTabsNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          dailyAllowanceRemaining={Math.max(
+            0,
+            DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
+          )}
+        />
+      </Suspense>
 
       {/* Spaced-Repetition Micro-Quiz Modal (60s Flash Check) */}
-      <FlashCheckModal
-        isOpen={isFlashCheckOpen}
-        onClose={() => setIsFlashCheckOpen(false)}
-        onComplete={(xpEarned) => {
-          awardXp(xpEarned, 'Completed 60s Flash Check');
-          setNotifications((prev) => [
-            {
-              id: `notif-fc-${Date.now()}`,
-              type: 'achievement',
-              title: `⚡ Flash Check Completed (+${xpEarned} XP)`,
-              message: 'Sample flash check completed. Activity points are stored on this device; review intervals were not updated.',
-              timestamp: 'Just now',
-              isRead: false,
-              actionUrl: 'practice',
-            },
-            ...prev,
-          ]);
-        }}
-        onAskCopilot={(prompt) => {
-          setCopilotContext(prompt);
-          setActiveTab('copilot');
-          setIsFlashCheckOpen(false);
-        }}
-      />
+      {isFlashCheckOpen && (
+        <Suspense fallback={null}>
+          <FlashCheckModal
+            isOpen={isFlashCheckOpen}
+            onClose={() => setIsFlashCheckOpen(false)}
+            onComplete={(xpEarned) => {
+              awardXp(xpEarned, 'Completed 60s Flash Check');
+              setNotifications((prev) => [
+                {
+                  id: `notif-fc-${Date.now()}`,
+                  type: 'achievement',
+                  title: `⚡ Flash Check Completed (+${xpEarned} XP)`,
+                  message: 'Sample flash check completed. Activity points are stored on this device; review intervals were not updated.',
+                  timestamp: 'Just now',
+                  isRead: false,
+                  actionUrl: 'practice',
+                },
+                ...prev,
+              ]);
+            }}
+            onAskCopilot={(prompt) => {
+              setCopilotContext(prompt);
+              setActiveTab('copilot');
+              setIsFlashCheckOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Interactive Formula Inspector Tooltip & Invariant Modal */}
-      <FormulaInspectorModal
-        formulaData={inspectedFormula}
-        onClose={() => setInspectedFormula(null)}
-        onAskCopilot={(prompt) => {
-          setCopilotContext(prompt);
-          setActiveTab('copilot');
-          setInspectedFormula(null);
-        }}
-      />
+      {inspectedFormula && (
+        <Suspense fallback={null}>
+          <FormulaInspectorModal
+            formulaData={inspectedFormula}
+            onClose={() => setInspectedFormula(null)}
+            onAskCopilot={(prompt) => {
+              setCopilotContext(prompt);
+              setActiveTab('copilot');
+              setInspectedFormula(null);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* First-Time Onboarding Walkthrough Tour */}
-      <WalkthroughModal
-        isOpen={isWalkthroughOpen}
-        onClose={() => {
-          setIsWalkthroughOpen(false);
-          localStorage.setItem('learnco_walkthrough_seen', 'true');
-        }}
-        onNavigate={(tab) => {
-          setActiveTab(tab);
-          setIsWalkthroughOpen(false);
-          localStorage.setItem('learnco_walkthrough_seen', 'true');
-        }}
-      />
+      {isWalkthroughOpen && (
+        <Suspense fallback={null}>
+          <WalkthroughModal
+            isOpen={isWalkthroughOpen}
+            onClose={() => {
+              setIsWalkthroughOpen(false);
+              localStorage.setItem('learnco_walkthrough_seen', 'true');
+            }}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              setIsWalkthroughOpen(false);
+              localStorage.setItem('learnco_walkthrough_seen', 'true');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Floating Guide Icon beside Floating Omni Copilot Widget */}
       {!isZenMode && (
-        <FloatingGuideButton
-          activeTab={activeTab}
-          onNavigate={handleNavigateWithContext}
-          copilotVisible={activeTab !== 'copilot'}
-        />
+        <Suspense fallback={null}>
+          <FloatingGuideButton
+            activeTab={activeTab}
+            onNavigate={handleNavigateWithContext}
+            copilotVisible={activeTab !== 'copilot'}
+          />
+        </Suspense>
       )}
-      {activeTab !== 'copilot' && !isZenMode && <OmniCopilot />}
+      {activeTab !== 'copilot' && !isZenMode && (
+        <Suspense fallback={null}>
+          <OmniCopilot />
+        </Suspense>
+      )}
+      <Suspense fallback={null}>
+        <IOSInstallBanner />
+      </Suspense>
     </div>
   );
 }

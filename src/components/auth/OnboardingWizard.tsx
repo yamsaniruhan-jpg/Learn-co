@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   GraduationCap,
   Layers,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { SubjectId } from '../../types/auth';
@@ -46,6 +47,7 @@ export const OnboardingWizard: React.FC = () => {
   const { profile, saveOnboarding } = useAuth();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form State
   const [displayName, setDisplayName] = useState<string>(
@@ -94,6 +96,7 @@ export const OnboardingWizard: React.FC = () => {
   };
 
   const handleComplete = async () => {
+    setError(null);
     setIsSubmitting(true);
     try {
       await saveOnboarding({
@@ -117,8 +120,9 @@ export const OnboardingWizard: React.FC = () => {
         spread: 70,
         origin: { y: 0.6 },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to complete onboarding', err);
+      setError(err?.message || 'Could not save your setup. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -363,7 +367,12 @@ export const OnboardingWizard: React.FC = () => {
                     onChange={(e) => setGoalInput(e.target.value)}
                     placeholder="e.g. Master Linear Operators & Hilbert Spaces"
                     className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddGoal()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddGoal();
+                      }
+                    }}
                   />
                   <Button variant="outline" size="sm" onClick={handleAddGoal}>
                     Add
@@ -387,6 +396,13 @@ export const OnboardingWizard: React.FC = () => {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 

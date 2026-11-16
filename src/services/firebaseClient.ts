@@ -9,6 +9,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile as updateFirebaseProfile,
   signOut,
+  onAuthStateChanged,
   Auth,
 } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
@@ -78,4 +79,5 @@ export {
   createUserWithEmailAndPassword,
   updateFirebaseProfile,
   signOut,
+  onAuthStateChanged,
 };
