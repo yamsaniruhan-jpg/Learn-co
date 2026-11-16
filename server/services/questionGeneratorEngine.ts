@@ -291,6 +291,39 @@ export class QuestionGeneratorEngine {
         explanation = 'By the Alternating Series Remainder Theorem, $|S - S_N| \\le b_{N+1}$ whenever terms alternate in sign and shrink monotonically toward zero.';
         stepByStepSolution = ['Verify alternating signs, decreasing $|a_n|$, and $\\lim b_n = 0$.'];
       }
+    } else if (subjectId === 'math' && (chapterId.includes('inmo') || topicId.includes('inmo'))) {
+      const a = (k % 4) + 1;
+      const b = (k % 5) + 2;
+
+      if (questionType === 'numerical') {
+        // Titu's Lemma minimum for 1/x + 4/y + 9/z where x+y+z = 6 -> (1+2+3)^2 / 6 = 36/6 = 6
+        questionText = `[INMO Olympiad Variation #${k}] For positive real numbers $x, y, z > 0$ such that $x + y + z = 6$, find the minimum possible value of $\\frac{1}{x} + \\frac{4}{y} + \\frac{9}{z}$ using Titu's Lemma (Engel form of Cauchy-Schwarz).`;
+        correctAnswer = '6';
+        explanation = 'By Titu’s Lemma: $\\frac{1^2}{x} + \\frac{2^2}{y} + \\frac{3^2}{z} \\ge \\frac{(1 + 2 + 3)^2}{x + y + z} = \\frac{36}{6} = 6$. Equality holds at $(x, y, z) = (1, 2, 3)$.';
+        stepByStepSolution = [
+          'Rewrite terms with explicit squared numerators: $\\frac{1^2}{x} + \\frac{2^2}{y} + \\frac{3^2}{z}$',
+          'Apply Titu’s Lemma: $\\ge \\frac{(1 + 2 + 3)^2}{x + y + z} = \\frac{36}{6} = 6$',
+        ];
+      } else if (questionType === 'single_choice' || questionType === 'code_output') {
+        questionText = `[INMO Olympiad Variation #${k}] A continuous function $f: \\mathbb{R} \\to \\mathbb{R}$ satisfies the Cauchy functional equation $f(x + y) = f(x) + f(y)$ for all $x, y \\in \\mathbb{R}$. If $f(3) = 12$, what is the value of $f(7)$?`;
+        options = ['28', '21', '35', '14'];
+        correctAnswer = '28';
+        explanation = 'Any continuous additive Cauchy function has the form $f(x) = cx$. From $f(3) = 3c = 12 \\implies c = 4$. Thus $f(7) = 4 \\times 7 = 28$.';
+        stepByStepSolution = [
+          'Continuous additive function satisfies $f(x) = c x$.',
+          'Determine $c = f(3)/3 = 4$.',
+          'Evaluate $f(7) = 4 \\times 7 = 28$.',
+        ];
+      } else {
+        questionText = `[INMO Olympiad Variation #${k}] True or False: For an odd prime $p$ such that $p \\mid (x - y)$ and $p \\nmid x, y$, the Lifting The Exponent Lemma (LTE) asserts that $v_p(x^n - y^n) = v_p(x - y) + v_p(n)$ for all positive integers $n$.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'This is the exact statement of the standard Lifting The Exponent Lemma for odd primes.';
+        stepByStepSolution = [
+          'Verify conditions: $p$ is an odd prime, $x \\equiv y \\pmod p$, and $p \\nmid x$.',
+          'LTE valuation theorem guarantees $v_p(x^n - y^n) = v_p(x - y) + v_p(n)$.',
+        ];
+      }
     } else if (subjectId === 'math') {
       const a = (k % 5) + 1;
       const b = (k % 7) + 2;
@@ -364,6 +397,41 @@ export class QuestionGeneratorEngine {
           `All roots of the characteristic polynomial of a real symmetric matrix lie on the real axis.`,
         ];
       }
+    } else if (subjectId === 'cs' && (chapterId.includes('ict') || topicId.includes('ict'))) {
+      const pow2 = Math.pow(2, (k % 4) + 6); // 64, 128, 256, 512
+      const logVal = (k % 4) + 6;
+
+      if (questionType === 'numerical') {
+        questionText = `[ICT Coding Test Variation #${k}] In an iterative Segment Tree supporting range sum queries on an array of size $N = ${pow2}$, what is the exact height (number of levels) of the tree?`;
+        correctAnswer = `${logVal}`;
+        explanation = `For $N = 2^{${logVal}} = ${pow2}$, the tree height is $\\log_2(${pow2}) = ${logVal}$ levels.`;
+        stepByStepSolution = [
+          `Calculate binary logarithm: $\\log_2(${pow2}) = ${logVal}$.`,
+        ];
+      } else if (questionType === 'code_output' || questionType === 'single_choice') {
+        questionText = `[ICT Coding Test Variation #${k}] In a Fenwick Tree (Binary Indexed Tree), which bitwise expression isolates the least significant set bit (LSB) of a 1-indexed integer $i$?`;
+        options = [
+          '`i & (-i)`',
+          '`i | (~i)`',
+          '`i ^ (i >> 1)`',
+          '`i & (i - 1)`',
+        ];
+        correctAnswer = '`i & (-i)`';
+        explanation = 'Using two\'s complement representation, -i is (~i + 1). Bitwise ANDing i with -i clears all bits except the lowest set bit.';
+        stepByStepSolution = [
+          'Recall two’s complement negation: $-i = \\sim i + 1$.',
+          'ANDing with $i$ leaves only the trailing set bit: `i & (-i)`.',
+        ];
+      } else {
+        questionText = `[ICT Coding Test Variation #${k}] True or False: Dijkstra\'s algorithm with a min-priority queue guarantees finding the shortest path in $O((V + E)\\log V)$ time even if some edge weights are negative, provided there are no negative-weight cycles.`;
+        options = ['True', 'False'];
+        correctAnswer = 'False';
+        explanation = 'Dijkstra requires all edge weights to be non-negative. Once a node is marked visited / popped from min-heap, Dijkstra assumes its distance is finalized; negative edges violate this greediness. Bellman-Ford or SPFA must be used instead.';
+        stepByStepSolution = [
+          'Recall Dijkstra’s non-negative weight prerequisite.',
+          'Negative edge weights can reduce distance to an already-settled node.',
+        ];
+      }
     } else if (subjectId === 'cs') {
       const n = 10 * k;
       if (questionType === 'code_output' || questionType === 'single_choice') {
@@ -413,6 +481,42 @@ export class QuestionGeneratorEngine {
           'Partition tolerance is mandatory in real networks, forcing a tradeoff between C and A.',
         ];
       }
+    } else if (subjectId === 'physics' && (chapterId.includes('ipho') || topicId.includes('ipho'))) {
+      const m = (k % 4) + 1;
+      const N = (k % 5 + 3) * 100;
+      const B = (k % 4 + 1) * 0.1;
+      const R = (k % 5 + 2) * 0.1;
+      const omega = (k % 6 + 4) * 10;
+
+      if (questionType === 'numerical') {
+        const emf = 0.5 * B * omega * R * R;
+        questionText = `[IPhO Variation #${k}] A copper disk of radius $R = ${R.toFixed(1)}\\text{ m}$ rotates with angular velocity $\\omega = ${omega}\\text{ rad/s}$ perpendicular to a uniform magnetic field $B = ${B.toFixed(1)}\\text{ T}$. Calculate the motional EMF generated between axle and rim in Volts.`;
+        correctAnswer = `${emf.toFixed(3)}`;
+        explanation = `Using Faraday's disk formula $\\mathcal{E} = \\frac{1}{2} B \\omega R^2 = 0.5 \\times ${B.toFixed(1)} \\times ${omega} \\times ${R.toFixed(1)}^2 = ${emf.toFixed(3)}\\text{ V}$.`;
+        stepByStepSolution = [
+          'Integrate motional electric field: $\\mathcal{E} = \\int_0^R (\\omega r) B\\,dr$',
+          `Evaluate $\\frac{1}{2} B \\omega R^2 = 0.5 \\times ${B.toFixed(1)} \\times ${omega} \\times ${(R * R).toFixed(2)} = ${emf.toFixed(3)}\\text{ V}$`,
+        ];
+      } else if (questionType === 'single_choice') {
+        questionText = `[IPhO Variation #${k}] For an optical transmission grating with $N = ${N}$ illuminated rulings operated at diffraction order $m = ${m}$, what is its chromatic resolving power $\\mathcal{R} = \\frac{\\lambda}{\\Delta\\lambda}$?`;
+        options = [`${m * N}`, `${m * N * 2}`, `${Math.round(N / m)}`, `${N}`];
+        correctAnswer = `${m * N}`;
+        explanation = `The chromatic resolving power of a diffraction grating is given directly by Rayleigh criterion $\\mathcal{R} = m N = ${m} \\times ${N} = ${m * N}$.`;
+        stepByStepSolution = [
+          'State Rayleigh resolving power formula $\\mathcal{R} = m N$',
+          `Substitute $m = ${m}, N = ${N} \\implies \\mathcal{R} = ${m * N}$`,
+        ];
+      } else {
+        questionText = `[IPhO Variation #${k}] True or False: In thin-film interference, when light travels from air ($n_1 = 1.00$) into an anti-reflective coating ($n_2 = 1.38$) on crown glass ($n_3 = 1.52$), both the air-coating interface and the coating-glass interface produce a $180^\\circ$ ($\\pi$) reflection phase shift, canceling out net interfacial phase shift difference.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'Because $n_1 < n_2$ and $n_2 < n_3$, both reflecting surfaces transition into an optically denser medium, each incurring a $\\pi$ phase reversal.';
+        stepByStepSolution = [
+          'Check boundary 1: $1.00 < 1.38 \\implies \\pi$ phase shift.',
+          'Check boundary 2: $1.38 < 1.52 \\implies \\pi$ phase shift.',
+          'Net relative boundary phase shift = $\\pi - \\pi = 0$.',
+        ];
+      }
     } else if (subjectId === 'physics') {
       const mass = (k % 5) + 2;
       const velocity = (k % 6) + 3;
@@ -454,6 +558,40 @@ export class QuestionGeneratorEngine {
           'Verify Lenz\'s Law physical interpretation.',
         ];
       }
+    } else if (subjectId === 'chemistry' && (chapterId.includes('icho') || topicId.includes('icho'))) {
+      const deltaH = ((k % 6) + 2) * 10; // 20, 30, ... 70 kJ/mol
+      const t1 = 300;
+      const t2 = 400;
+
+      if (questionType === 'numerical') {
+        // d6 low spin CFSE = 2.4 Delta_o
+        questionText = `[IChO Variation #${k}] In an octahedral strong-field complex such as $[\\text{Fe(CN)}_6]^{4-}$ (low-spin $d^6$), what is the magnitude of the Crystal Field Stabilization Energy (CFSE) expressed as a multiple of $\\Delta_o$?`;
+        correctAnswer = '2.4';
+        explanation = 'All 6 d-electrons occupy lower $t_{2g}$ orbitals: $\\text{CFSE} = 6 \\times (-0.4\\Delta_o) = -2.4\\Delta_o$. The magnitude is $2.4\\Delta_o$.';
+        stepByStepSolution = [
+          'Strong-field ligand forces low-spin configuration: $t_{2g}^6 e_g^0$.',
+          'Calculate CFSE: $6 \\times (-0.4\\Delta_o) + 0 \\times (0.6\\Delta_o) = -2.4\\Delta_o$.',
+        ];
+      } else if (questionType === 'single_choice') {
+        questionText = `[IChO Variation #${k}] According to the integrated Van 't Hoff equation $\\ln(K_2/K_1) = -\\frac{\\Delta H^\\circ}{R}\\left(\\frac{1}{T_2} - \\frac{1}{T_1}\\right)$, an endothermic reaction ($\\Delta H^\\circ > 0$) subjected to a temperature increase from $300\\text{ K}$ to $400\\text{ K}$ will have an equilibrium constant ratio $K_2 / K_1$ that is:`;
+        options = ['Strictly greater than 1 ($K$ increases)', 'Strictly less than 1 ($K$ decreases)', 'Exactly equal to 1', 'Equal to zero'];
+        correctAnswer = 'Strictly greater than 1 ($K$ increases)';
+        explanation = 'For $\\Delta H^\\circ > 0$, since $1/400 < 1/300$, the term $-(1/T_2 - 1/T_1)$ is positive, which makes $\\ln(K_2/K_1) > 0 \\implies K_2 > K_1$.';
+        stepByStepSolution = [
+          'Evaluate signs: $\\Delta H^\\circ > 0$ and $(1/400 - 1/300) < 0$.',
+          'Product $-\\frac{\\Delta H^\\circ}{R}(1/T_2 - 1/T_1) > 0 \\implies \\ln(K_2/K_1) > 0$.',
+          'Conclude $K_2 / K_1 > 1$.',
+        ];
+      } else {
+        questionText = `[IChO Variation #${k}] True or False: When combining two reduction half-reactions $\\text{Fe}^{3+} + e^- \\to \\text{Fe}^{2+}$ ($E_1^\\circ = +0.77\\text{ V}$) and $\\text{Fe}^{2+} + 2e^- \\to \\text{Fe}$ ($E_2^\\circ = -0.44\\text{ V}$) to find $E_3^\\circ$ for $\\text{Fe}^{3+} + 3e^- \\to \\text{Fe}$, one cannot directly add standard voltages $E_1^\\circ + E_2^\\circ$, but must instead use extensive Gibbs energies $n_3 E_3^\\circ = n_1 E_1^\\circ + n_2 E_2^\\circ$.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'Standard reduction potentials are intensive properties. Additivity applies only to extensive thermodynamic properties $\\Delta G^\\circ = -nFE^\\circ$.';
+        stepByStepSolution = [
+          'State $\\Delta G_3^\\circ = \\Delta G_1^\\circ + \\Delta G_2^\\circ$.',
+          'Substitute $\\Delta G^\\circ = -nFE^\\circ$ to obtain $n_3 E_3^\\circ = n_1 E_1^\\circ + n_2 E_2^\\circ$.',
+        ];
+      }
     } else if (subjectId === 'chemistry') {
       const ea = (k % 50) + 30;
       const temp1 = 300 + k;
@@ -493,6 +631,44 @@ export class QuestionGeneratorEngine {
         stepByStepSolution = [
           'State standard Nernst equation: $E = E^\\circ - \\frac{RT}{nF} \\ln Q$',
           'Convert to base 10 log at $298\\text{ K}: \\frac{RT \\ln 10}{F} = 0.05916 \\approx 0.0592\\text{ V}$',
+        ];
+      }
+    } else if (subjectId === 'biology' && (chapterId.includes('ibho') || chapterId.includes('ijso') || topicId.includes('ibho') || topicId.includes('ijso'))) {
+      const s = (k % 4 + 2) * 10;
+      const km = 10;
+      const vmax = 120;
+
+      if (questionType === 'numerical') {
+        const v0 = (vmax * s) / (km + s);
+        questionText = `[IBHO Variation #${k}] An enzyme has $V_{\\max} = ${vmax}\\,\\mu\\text{M/min}$ and $K_m = ${km}\\,\\mu\\text{M}$. Calculate initial catalytic velocity $v_0$ in $\\mu\\text{M/min}$ when $[S] = ${s}\\,\\mu\\text{M}$.`;
+        correctAnswer = `${v0.toFixed(1)}`;
+        explanation = `Using Michaelis-Menten: $v_0 = \\frac{V_{\\max}[S]}{K_m + [S]} = \\frac{${vmax} \\times ${s}}{${km} + ${s}} = ${v0.toFixed(1)}\\,\\mu\\text{M/min}$.`;
+        stepByStepSolution = [
+          'State Michaelis-Menten: $v_0 = \\frac{V_{\\max}[S]}{K_m + [S]}$',
+          `Compute: $\\frac{${vmax * s}}{${km + s}} = ${v0.toFixed(1)}\\,\\mu\\text{M/min}$`,
+        ];
+      } else if (questionType === 'single_choice') {
+        questionText = `[IBHO/IJSO Variation #${k}] In enzyme kinetics, which type of reversible inhibitor binds exclusively to the enzyme-substrate ($ES$) complex, resulting in a proportional DECREASE in both apparent $V_{\\max}$ and apparent $K_m$?`;
+        options = [
+          'Uncompetitive inhibitor',
+          'Competitive inhibitor',
+          'Noncompetitive inhibitor',
+          'Irreversible suicide inhibitor',
+        ];
+        correctAnswer = 'Uncompetitive inhibitor';
+        explanation = 'Uncompetitive inhibitors bind only to the ES complex, trapping substrate and lowering both Vmax and Km by the same factor (yielding parallel Lineweaver-Burk lines).';
+        stepByStepSolution = [
+          'Recall Lineweaver-Burk transformations for enzyme inhibitors.',
+          'Parallel line shifts in both axes correspond exclusively to uncompetitive inhibition.',
+        ];
+      } else {
+        questionText = `[IBHO/IJSO Variation #${k}] True or False: In cellular respiration, chemical proton uncouplers such as 2,4-dinitrophenol (DNP) collapse the inner mitochondrial proton-motive force ($\\Delta p$), which halts ATP synthesis while accelerating oxygen consumption and electron transport into heat.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'Uncouplers dissipate the proton gradient across the inner membrane, removing respiratory control so electron transport runs maximally without generating ATP.';
+        stepByStepSolution = [
+          'DNP shuttles H+ back into matrix, destroying Delta p.',
+          'ATP synthase loses its driving force while ETC runs unconstrained.',
         ];
       }
     } else if (subjectId === 'biology') {
@@ -604,6 +780,45 @@ export class QuestionGeneratorEngine {
         stepByStepSolution = [
           'Identify the rule of coordination in independent clauses.',
           'Verify that comma splice prevention requires coordinating conjunction + comma or semicolon.',
+        ];
+      }
+    } else if (chapterId.includes('ioai') || topicId.includes('ioai')) {
+      // Data Science Olympiad
+      if (questionType === 'numerical') {
+        // Ridge filter factor d = sigma^2 / (sigma^2 + lambda)
+        const sigma = 2;
+        const lambda = 12;
+        const d = (sigma * sigma) / (sigma * sigma + lambda); // 4 / 16 = 0.25
+        questionText = `[Data Science Olympiad Variation #${k}] In SVD spectral analysis of Ridge regression with regularization parameter $\\lambda = ${lambda}$, what is the spectral shrinkage filter factor $d = \\frac{\\sigma^2}{\\sigma^2 + \\lambda}$ for a singular direction with singular value $\\sigma = ${sigma}$?`;
+        correctAnswer = `${d.toFixed(2)}`;
+        explanation = `Spectral shrinkage factor $d = \\frac{\\sigma^2}{\\sigma^2 + \\lambda} = \\frac{2^2}{2^2 + 12} = \\frac{4}{16} = 0.25$.`;
+        stepByStepSolution = [
+          'Calculate $\\sigma^2 = 2^2 = 4$.',
+          'Divide by $\\sigma^2 + \\lambda = 4 + 12 = 16$.',
+          'Result = 4 / 16 = 0.25.',
+        ];
+      } else if (questionType === 'single_choice' || questionType === 'code_output') {
+        questionText = `[Data Science Olympiad Variation #${k}] In probabilistic binary classification, what does the Area Under the Receiver Operating Characteristic Curve (ROC-AUC) mathematically represent?`;
+        options = [
+          'The concordance probability $P(\\text{score}(X^+) > \\text{score}(X^-))$ that a randomly selected positive ranks higher than a randomly selected negative',
+          'The exact accuracy of the model when decision threshold is fixed at 0.5',
+          'The fraction of true positives among all model-declared positive predictions',
+          'The Kullback-Leibler divergence between predicted probabilities and labels',
+        ];
+        correctAnswer = 'The concordance probability $P(\\text{score}(X^+) > \\text{score}(X^-))$ that a randomly selected positive ranks higher than a randomly selected negative';
+        explanation = 'ROC-AUC is equivalent to the normalized Mann-Whitney U rank statistic, corresponding to the probability that a random positive instance is assigned a higher predicted score than a random negative instance.';
+        stepByStepSolution = [
+          'Recall Mann-Whitney U equivalence to trapezoidal ROC integration.',
+          'Conclude that ROC-AUC measures pairwise ranking concordance $P(X^+ > X^-)$.',
+        ];
+      } else {
+        questionText = `[Data Science Olympiad Variation #${k}] True or False: In Gradient Boosted Decision Trees (GBDT), each sequential tree fits the negative gradient pseudo-residuals $- \\frac{\\partial L(y_i, F(x_i))}{\\partial F(x_i)}$ of the loss function, performing functional gradient descent in prediction space.`;
+        options = ['True', 'False'];
+        correctAnswer = 'True';
+        explanation = 'Jerome Friedman’s Gradient Boosting formulation fits successive decision trees to negative functional gradients of the specified loss function.';
+        stepByStepSolution = [
+          'Recall GBDT algorithm definition.',
+          'Successive trees approximate step directions along $- \\nabla_F L(y, F)$.',
         ];
       }
     } else {
