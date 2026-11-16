@@ -42,6 +42,9 @@ const OnboardingWizard = lazy(() =>
 const MobileAllTabsNav = lazy(() =>
   import('./components/layout/MobileAllTabsNav').then((m) => ({ default: m.MobileAllTabsNav }))
 );
+const SlidingTaskbar = lazy(() =>
+  import('./components/layout/SlidingTaskbar').then((m) => ({ default: m.SlidingTaskbar }))
+);
 const ZenFocusCanvas = lazy(() =>
   import('./components/common/ZenFocusCanvas').then((m) => ({ default: m.ZenFocusCanvas }))
 );
@@ -586,6 +589,11 @@ export default function App() {
           onToggleZenMode={() => setIsZenMode((prev) => !prev)}
           isZenMode={isZenMode}
         />
+      </Suspense>
+
+      {/* Horizontal Sliding Taskbar for All Tabs */}
+      <Suspense fallback={null}>
+        <SlidingTaskbar activeTab={activeTab} setActiveTab={setActiveTab} />
       </Suspense>
 
       {/* Main Body Workspace */}
