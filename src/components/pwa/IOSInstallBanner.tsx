@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Share, PlusSquare, X, CheckCircle2, Smartphone } from 'lucide-react';
+import { Share, PlusSquare, X, CheckCircle2, Smartphone, MoreVertical, Download } from 'lucide-react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 
 const DISMISS_STORAGE_KEY = 'learnco_ios_install_banner_dismissed_v1';
 
 export const IOSInstallBanner: React.FC = () => {
-  const { isIOS, isInstalled } = usePWAInstall();
+  const { isIOS, isMobile, isInstallable, isInstalled, install } = usePWAInstall();
   const [dismissed, setDismissed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(DISMISS_STORAGE_KEY) === 'true';
@@ -17,14 +17,14 @@ export const IOSInstallBanner: React.FC = () => {
   const [showStepsModal, setShowStepsModal] = useState(false);
 
   useEffect(() => {
-    if (!isIOS || isInstalled || dismissed) return;
+    if (!isMobile || isInstalled || dismissed) return;
     const timer = window.setTimeout(() => {
       setDwellElapsed(true);
-    }, 10000);
+    }, 2500);
     return () => window.clearTimeout(timer);
-  }, [isIOS, isInstalled, dismissed]);
+  }, [isMobile, isInstalled, dismissed]);
 
-  if (!isIOS || isInstalled || dismissed || !dwellElapsed) {
+  if (!isMobile || isInstalled || dismissed || !dwellElapsed) {
     return null;
   }
 
@@ -38,15 +38,22 @@ export const IOSInstallBanner: React.FC = () => {
     }
   };
 
+  const handlePrimaryAction = async () => {
+    if (isInstallable) {
+      const ok = await install();
+      if (ok) return;
+    }
+    setShowStepsModal(true);
+  };
+
   return (
     <>
       <div
         role="region"
-        aria-label="Install LearnCo on iPhone or iPad"
-        style={{ paddingBottom: 'max(0.65rem, env(safe-area-inset-bottom))' }}
-        className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 pointer-events-none"
+        aria-label="Install LearnCo on Mobile Home Screen"
+        className="fixed inset-x-0 bottom-20 md:bottom-4 z-40 px-3 pt-2 pointer-events-none"
       >
-        <div className="max-w-lg mx-auto pointer-events-auto rounded-2xl bg-[#2D2A4A] text-white border border-[#4B4578] shadow-xl px-3.5 py-2.5 flex items-center justify-between gap-2.5 max-h-[15vh]">
+        <div className="max-w-lg mx-auto pointer-events-auto rounded-2xl bg-[#2D2A4A] text-white border border-[#4B4578] shadow-xl px-3.5 py-2 flex items-center justify-between gap-2.5 max-h-[15vh]">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-[#6C5CE7] flex items-center justify-center shrink-0">
               <Smartphone className="w-4 h-4 text-white" />
@@ -54,9 +61,18 @@ export const IOSInstallBanner: React.FC = () => {
             <div className="min-w-0">
               <div className="text-xs font-bold truncate">Add LearnCo to Home Screen</div>
               <div className="text-[11px] text-slate-300 truncate flex items-center gap-1">
-                <span>Tap</span>
-                <Share className="w-3 h-3 inline shrink-0" />
-                <span>then Add to Home Screen</span>
+                {isIOS ? (
+                  <>
+                    <span>Tap</span>
+                    <Share className="w-3 h-3 inline shrink-0" />
+                    <span>then Add to Home Screen</span>
+                  </>
+                ) : (
+                  <>
+                    <MoreVertical className="w-3 h-3 inline shrink-0" />
+                    <span>Offline study pack &amp; cloud sync ready</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -64,10 +80,11 @@ export const IOSInstallBanner: React.FC = () => {
           <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
-              onClick={() => setShowStepsModal(true)}
-              className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold cursor-pointer"
+              onClick={handlePrimaryAction}
+              className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
             >
-              How
+              {isInstallable ? <Download className="w-3.5 h-3.5" /> : null}
+              <span>{isInstallable ? 'Install' : 'How'}</span>
             </button>
             <button
               type="button"
@@ -85,13 +102,13 @@ export const IOSInstallBanner: React.FC = () => {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="iOS Home Screen Install Instructions"
+          aria-label="Mobile Home Screen Install Instructions"
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/70 p-4"
         >
           <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
-                Install on iPhone &amp; iPad
+                {isIOS ? 'Install on iPhone & iPad' : 'Install on Android Phone'}
               </h3>
               <button
                 type="button"
@@ -102,26 +119,49 @@ export const IOSInstallBanner: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <ol className="text-xs text-[#2D2A4A] dark:text-[#F1EFFF] space-y-3">
-              <li className="flex items-start gap-2.5">
-                <Share className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
-                <span>
-                  1. Tap Safari&apos;s <strong>Share</strong> button at the bottom or top toolbar.
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <PlusSquare className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
-                <span>
-                  2. Scroll down and select <strong>Add to Home Screen</strong>.
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <span>
-                  3. Tap <strong>Add</strong> for full-screen offline Olympiad study access.
-                </span>
-              </li>
-            </ol>
+            {isIOS ? (
+              <ol className="text-xs text-[#2D2A4A] dark:text-[#F1EFFF] space-y-3">
+                <li className="flex items-start gap-2.5">
+                  <Share className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
+                  <span>
+                    1. Tap Safari&apos;s <strong>Share</strong> button at the bottom or top toolbar.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <PlusSquare className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
+                  <span>
+                    2. Scroll down and select <strong>Add to Home Screen</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>
+                    3. Tap <strong>Add</strong> for full-screen offline Olympiad study access.
+                  </span>
+                </li>
+              </ol>
+            ) : (
+              <ol className="text-xs text-[#2D2A4A] dark:text-[#F1EFFF] space-y-3">
+                <li className="flex items-start gap-2.5">
+                  <MoreVertical className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
+                  <span>
+                    1. Tap your browser menu icon in the top-right corner of Chrome or Edge.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <PlusSquare className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
+                  <span>
+                    2. Select <strong>Add to Home screen</strong> or <strong>Install app</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>
+                    3. Launch LearnCo directly from your Home Screen with automatic offline sync.
+                  </span>
+                </li>
+              </ol>
+            )}
             <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
@@ -144,3 +184,4 @@ export const IOSInstallBanner: React.FC = () => {
     </>
   );
 };
+

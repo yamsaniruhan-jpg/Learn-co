@@ -55,6 +55,9 @@ const OmniCopilot = lazy(() => import('./components/OmniCopilot'));
 const IOSInstallBanner = lazy(() =>
   import('./components/pwa/IOSInstallBanner').then((m) => ({ default: m.IOSInstallBanner }))
 );
+const OfflineIndicator = lazy(() =>
+  import('./components/pwa/OfflineIndicator').then((m) => ({ default: m.OfflineIndicator }))
+);
 
 // Route-level & modal views tracked by tests/lazyViews.test.ts
 const DashboardView = lazyNamed(
@@ -592,9 +595,11 @@ export default function App() {
       </Suspense>
 
       {/* Horizontal Sliding Taskbar for All Tabs */}
-      <Suspense fallback={null}>
-        <SlidingTaskbar activeTab={activeTab} setActiveTab={setActiveTab} />
-      </Suspense>
+      {!isZenMode && (
+        <Suspense fallback={null}>
+          <SlidingTaskbar activeTab={activeTab} setActiveTab={setActiveTab} />
+        </Suspense>
+      )}
 
       {/* Main Body Workspace */}
       <div className="flex-1 flex overflow-hidden">
@@ -990,6 +995,9 @@ export default function App() {
       )}
       <Suspense fallback={null}>
         <IOSInstallBanner />
+      </Suspense>
+      <Suspense fallback={null}>
+        <OfflineIndicator onOpenOfflineSync={() => setActiveTab('offline-sync')} />
       </Suspense>
     </div>
   );

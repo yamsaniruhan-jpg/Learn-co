@@ -14,7 +14,9 @@ import {
   Share,
   PlusSquare,
   MoreVertical,
+  RefreshCw,
 } from 'lucide-react';
+import { OfflineStorageManager } from '../../utils/offlineStorage';
 
 type ShortcutOS = 'windows' | 'macos' | 'linux' | 'universal';
 
@@ -177,6 +179,8 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
   const [showInstallGuide, setShowInstallGuide] = useState(false);
   const [downloadedFile, setDownloadedFile] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [syncingPack, setSyncingPack] = useState(false);
+  const [packSyncMessage, setPackSyncMessage] = useState<string | null>(null);
 
   const detectedOS = useMemo(() => detectDesktopOS(), []);
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -257,7 +261,12 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
         ) : (
           <Download className={compact ? 'w-3.5 h-3.5 shrink-0' : 'w-4 h-4 shrink-0'} />
         )}
-        {!compact && <span>{buttonLabel}</span>}
+        {!compact && (
+          <>
+            <span className="sm:hidden">{isMobile ? 'Add App' : 'Install'}</span>
+            <span className="hidden sm:inline">{buttonLabel}</span>
+          </>
+        )}
       </button>
 
       {showInstallGuide && (
@@ -474,6 +483,47 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                     Downloaded <strong>{downloadedFile}</strong>. Move it onto your Desktop and double-click anytime to launch LearnCo.
                   </span>
                 </div>
+              )}
+            </div>
+
+            {/* Mobile Offline Pack Download & Sync */}
+            <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+                  Offline Study Pack &amp; Cloud Sync
+                </h4>
+                <span className="text-[10px] font-black text-[#00B8A9] uppercase">Mobile Ready</span>
+              </div>
+              <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
+                Download Olympiad problems &amp; formula sheets for offline mobile practice and sync pending progress immediately.
+              </p>
+              <button
+                type="button"
+                disabled={syncingPack}
+                onClick={async () => {
+                  setSyncingPack(true);
+                  setPackSyncMessage(null);
+                  try {
+                    const pack = await OfflineStorageManager.downloadOlympiadPack();
+                    const synced = await OfflineStorageManager.syncPendingAttemptsToServer();
+                    setPackSyncMessage(
+                      `Cached ${pack.questions.length} problems (${pack.approxSizeKb} KB)${synced > 0 ? ` and synced ${synced} queued attempts` : ''}.`
+                    );
+                  } catch {
+                    setPackSyncMessage('Offline pack cached locally; cloud sync will retry automatically when online.');
+                  } finally {
+                    setSyncingPack(false);
+                  }
+                }}
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-[#00B8A9] hover:bg-[#009b8e] disabled:opacity-60 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncingPack ? 'animate-spin' : ''}`} />
+                <span>{syncingPack ? 'Downloading & Syncing...' : 'Download Offline Study Pack & Sync Now'}</span>
+              </button>
+              {packSyncMessage && (
+                <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  {packSyncMessage}
+                </p>
               )}
             </div>
 

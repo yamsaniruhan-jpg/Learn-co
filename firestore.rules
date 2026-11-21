@@ -176,5 +176,141 @@ service cloud.firestore {
           && resource.data.userId == request.auth.uid;
       }
     }
+
+    // Study Room Validation Blueprints (never allow password/passwordHash fields)
+    function isValidStudyRoom(data, roomId) {
+      return data.keys().hasAll(['id', 'title', 'topic', 'color', 'visibility', 'roomCode', 'hostUid', 'createdAt'])
+        && data.keys().hasOnly(['id', 'title', 'topic', 'color', 'visibility', 'roomCode', 'hostUid', 'hostName', 'memberCount', 'timer', 'activePoll', 'createdAt', 'updatedAt'])
+        && data.id == roomId
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 80
+        && data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 120
+        && data.color is string && data.color in ['indigo', 'amber', 'rose', 'purple', 'emerald']
+        && data.visibility is string && data.visibility in ['public', 'private']
+        && data.roomCode is string && data.roomCode.size() >= 4 && data.roomCode.size() <= 16 && data.roomCode.matches('^[A-Z0-9\\-]+$')
+        && data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128
+        && (!('hostName' in data) || (data.hostName is string && data.hostName.size() <= 80))
+        && (!('memberCount' in data) || (data.memberCount is number && data.memberCount >= 0 && data.memberCount <= 10000))
+        && data.createdAt is string && data.createdAt.size() <= 40
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 40));
+    }
+
+    function isValidStudyRoomInvite(data) {
+      return data.keys().hasAll(['roomId', 'roomCode', 'hostUid', 'visibility', 'createdAt'])
+        && data.keys().hasOnly(['roomId', 'roomCode', 'hostUid', 'visibility', 'createdAt'])
+        && isValidId(data.roomId)
+        && data.roomCode is string && data.roomCode.size() >= 4 && data.roomCode.size() <= 16 && data.roomCode.matches('^[A-Z0-9\\-]+$')
+        && data.hostUid == request.auth.uid
+        && data.visibility == 'private'
+        && data.createdAt is string && data.createdAt.size() <= 40;
+    }
+
+    function isValidStudyRoomMember(data, memberUid) {
+      return data.keys().hasAll(['userId', 'displayName', 'joinedAt'])
+        && data.keys().hasOnly(['userId', 'displayName', 'inviteKey', 'joinedAt'])
+        && data.userId == memberUid
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && data.joinedAt is string && data.joinedAt.size() <= 40
+        && (!('inviteKey' in data) || (data.inviteKey is string && data.inviteKey.size() <= 128));
+    }
+
+    function isValidStudyRoomMessage(data, roomId, messageId) {
+      return data.keys().hasAll(['id', 'roomId', 'senderUid', 'user', 'text', 'visibility', 'createdAt'])
+        && data.keys().hasOnly(['id', 'roomId', 'senderUid', 'user', 'text', 'visibility', 'createdAt'])
+        && data.id == messageId
+        && data.roomId == roomId
+        && data.senderUid == request.auth.uid
+        && data.user is string && data.user.size() >= 1 && data.user.size() <= 80
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 600
+        && data.visibility is string && data.visibility in ['public', 'private']
+        && data.createdAt is string && data.createdAt.size() <= 40;
+    }
+
+    // Collaborative Study Rooms (Public & Private)
+    match /study_rooms/{roomId} {
+      allow get: if isValidId(roomId) && (
+        resource.data.visibility == 'public' ||
+        (isAuthenticated() && (
+          resource.data.hostUid == request.auth.uid ||
+          exists(/databases/$(database)/documents/study_rooms/$(roomId)/members/$(request.auth.uid))
+        ))
+      );
+      allow list: if resource.data.visibility == 'public' || (isAuthenticated() && resource.data.hostUid == request.auth.uid);
+      allow create: if isAuthenticated()
+        && isValidId(roomId)
+        && isValidStudyRoom(request.resource.data, roomId)
+        && request.resource.data.hostUid == request.auth.uid;
+      allow update: if isAuthenticated()
+        && isValidId(roomId)
+        && isValidStudyRoom(request.resource.data, roomId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.hostUid == resource.data.hostUid
+        && request.resource.data.visibility == resource.data.visibility
+        && request.resource.data.roomCode == resource.data.roomCode
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          (resource.data.hostUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'topic', 'color', 'timer', 'activePoll', 'memberCount', 'updatedAt'])) ||
+          ((resource.data.visibility == 'public' || exists(/databases/$(database)/documents/study_rooms/$(roomId)/members/$(request.auth.uid))) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['timer', 'activePoll', 'memberCount', 'updatedAt']))
+        );
+      allow delete: if isAuthenticated() && isValidId(roomId) && resource.data.hostUid == request.auth.uid;
+
+      match /members/{memberUid} {
+        allow get: if isOwner(memberUid) && isValidId(roomId);
+        allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+        allow create, update: if isOwner(memberUid)
+          && isValidId(roomId)
+          && isValidStudyRoomMember(request.resource.data, memberUid)
+          && exists(/databases/$(database)/documents/study_rooms/$(roomId))
+          && (
+            get(/databases/$(database)/documents/study_rooms/$(roomId)).data.visibility == 'public' ||
+            get(/databases/$(database)/documents/study_rooms/$(roomId)).data.hostUid == request.auth.uid ||
+            (
+              'inviteKey' in request.resource.data
+              && isValidId(request.resource.data.inviteKey)
+              && exists(/databases/$(database)/documents/study_room_invites/$(request.resource.data.inviteKey))
+              && get(/databases/$(database)/documents/study_room_invites/$(request.resource.data.inviteKey)).data.roomId == roomId
+            )
+          );
+        allow delete: if isOwner(memberUid) && isValidId(roomId);
+      }
+
+      match /messages/{messageId} {
+        allow get: if isValidId(roomId) && isValidId(messageId)
+          && exists(/databases/$(database)/documents/study_rooms/$(roomId))
+          && (
+            get(/databases/$(database)/documents/study_rooms/$(roomId)).data.visibility == 'public' ||
+            (isAuthenticated() && (
+              get(/databases/$(database)/documents/study_rooms/$(roomId)).data.hostUid == request.auth.uid ||
+              exists(/databases/$(database)/documents/study_rooms/$(roomId)/members/$(request.auth.uid))
+            ))
+          );
+        allow list: if resource.data.visibility == 'public' || (isAuthenticated() && resource.data.senderUid == request.auth.uid);
+        allow create: if isAuthenticated()
+          && isValidId(roomId)
+          && isValidId(messageId)
+          && isValidStudyRoomMessage(request.resource.data, roomId, messageId)
+          && exists(/databases/$(database)/documents/study_rooms/$(roomId))
+          && request.resource.data.visibility == get(/databases/$(database)/documents/study_rooms/$(roomId)).data.visibility
+          && (
+            get(/databases/$(database)/documents/study_rooms/$(roomId)).data.visibility == 'public' ||
+            get(/databases/$(database)/documents/study_rooms/$(roomId)).data.hostUid == request.auth.uid ||
+            exists(/databases/$(database)/documents/study_rooms/$(roomId)/members/$(request.auth.uid))
+          );
+        allow update: if false;
+        allow delete: if isAuthenticated() && isValidId(roomId) && isValidId(messageId) && resource.data.senderUid == request.auth.uid;
+      }
+    }
+
+    // Hash-keyed private room invites (never listable; requires knowing code + password to derive inviteKey)
+    match /study_room_invites/{inviteKey} {
+      allow get: if isAuthenticated() && isValidId(inviteKey);
+      allow list: if false;
+      allow create: if isAuthenticated()
+        && isValidId(inviteKey)
+        && isValidStudyRoomInvite(request.resource.data)
+        && exists(/databases/$(database)/documents/study_rooms/$(request.resource.data.roomId))
+        && get(/databases/$(database)/documents/study_rooms/$(request.resource.data.roomId)).data.hostUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if isAuthenticated() && isValidId(inviteKey) && resource.data.hostUid == request.auth.uid;
+    }
   }
 }

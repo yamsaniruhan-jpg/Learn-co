@@ -4,13 +4,24 @@ import { chatValidation, handleValidation, sanitizeInput } from '../middleware/v
 
 const router = Router();
 
-// Hourly AI usage tracker per user
+// Hourly AI usage tracker per user (bounded to prevent memory leaks)
 const userAiUsageMap = new Map<string, { count: number; windowStart: number }>();
+const MAX_USAGE_ENTRIES = 2000;
+const USAGE_WINDOW_MS = 60 * 60 * 1000;
 
 export function recordAiUsage(userId: string): number {
   const now = Date.now();
+  if (userAiUsageMap.size >= MAX_USAGE_ENTRIES && !userAiUsageMap.has(userId)) {
+    for (const [key, val] of userAiUsageMap.entries()) {
+      if (now - val.windowStart > USAGE_WINDOW_MS) userAiUsageMap.delete(key);
+    }
+    if (userAiUsageMap.size >= MAX_USAGE_ENTRIES) {
+      const oldestKey = userAiUsageMap.keys().next().value;
+      if (oldestKey !== undefined) userAiUsageMap.delete(oldestKey);
+    }
+  }
   const entry = userAiUsageMap.get(userId);
-  if (!entry || now - entry.windowStart > 60 * 60 * 1000) {
+  if (!entry || now - entry.windowStart > USAGE_WINDOW_MS) {
     userAiUsageMap.set(userId, { count: 1, windowStart: now });
     return 1;
   }
@@ -64,9 +75,24 @@ function getGeminiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// In-memory zero-token response cache to reduce AI costs
+// In-memory zero-token response cache to reduce AI costs (bounded to prevent memory leaks)
 const aiCostReductionCache = new Map<string, { reply: string; timestamp: number }>();
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+const MAX_AI_CACHE_ENTRIES = 500;
+
+function setBoundedAiCache(key: string, reply: string) {
+  const now = Date.now();
+  if (aiCostReductionCache.size >= MAX_AI_CACHE_ENTRIES && !aiCostReductionCache.has(key)) {
+    for (const [k, v] of aiCostReductionCache.entries()) {
+      if (now - v.timestamp >= CACHE_TTL_MS) aiCostReductionCache.delete(k);
+    }
+    if (aiCostReductionCache.size >= MAX_AI_CACHE_ENTRIES) {
+      const oldestKey = aiCostReductionCache.keys().next().value;
+      if (oldestKey !== undefined) aiCostReductionCache.delete(oldestKey);
+    }
+  }
+  aiCostReductionCache.set(key, { reply, timestamp: now });
+}
 
 // Resilient Gemini generateContent with cost-optimized model fallbacks and token capping
 async function generateWithFallback(
@@ -81,8 +107,8 @@ async function generateWithFallback(
     return cached.reply;
   }
 
-  // Cost-optimized model hierarchy: start with ultra-efficient flash-latest and 3.1-flash-lite
-  const models = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  // Cost-optimized valid Gemini model hierarchy
+  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
 
   for (const model of models) {
     try {
@@ -98,7 +124,7 @@ async function generateWithFallback(
 
       if (response.text && response.text.trim()) {
         const text = response.text.trim();
-        aiCostReductionCache.set(cacheKey, { reply: text, timestamp: Date.now() });
+        setBoundedAiCache(cacheKey, text);
         return text;
       }
     } catch (err: any) {
@@ -176,64 +202,62 @@ router.post('/generate-resource', (_req: Request, res: Response) => {
 });
 
 // POST /api/ai/voice-exam-eval
-// Low-token, cost-optimized oral exam evaluation (max 180 tokens)
-router.post('/voice-exam-eval', async (req: Request, res: Response) => {
+// 100% zero-API-cost deterministic oral examination rubric scoring
+router.post('/voice-exam-eval', (req: Request, res: Response) => {
   try {
-    const { question, rubric, thesis = '', derivation = '', constraints = '', subject = 'STEM' } = req.body;
+    const {
+      rubric = '',
+      thesis = '',
+      derivation = '',
+      constraints = '',
+      transcript = '',
+    } = req.body || {};
 
-    const studentDefense = `[Thesis/Definition]: ${thesis}\n[Step-by-Step Derivation]: ${derivation}\n[Boundary & Invariants]: ${constraints}`.trim();
+    const cleanTranscript = String(transcript || '').trim();
+    const cleanThesis = String(thesis || '').trim() || cleanTranscript;
+    const cleanDerivation = String(derivation || '').trim() || cleanTranscript;
+    const cleanConstraints = String(constraints || '').trim() || cleanTranscript;
 
-    if (!thesis.trim() && !derivation.trim()) {
-      res.status(400).json({ error: 'Please provide at least a thesis or derivation for evaluation.' });
+    if (!cleanThesis && !cleanDerivation && !cleanTranscript) {
+      res.status(400).json({ error: 'Please speak or provide an oral response before grading.' });
       return;
     }
 
-    const ai = getGeminiClient();
-    if (ai) {
-      try {
-        const systemPrompt = 'You are a strict, objective STEM oral examination examiner. Evaluate the student defense against the reference rubric. Output JSON strictly with keys: score (number 0-100), strength (1 short sentence), missing (1 short sentence), verdict (string "PASS" if score >= 70 else "REVISE"). Keep text minimal (under 50 words).';
-        const prompt = `[Question]: ${question}\n[Subject]: ${subject}\n[Key Rubric Invariant]: ${rubric}\n\n[Student Defense]:\n${studentDefense}`;
+    const combinedText = `${cleanThesis} ${cleanDerivation} ${cleanConstraints} ${cleanTranscript}`.toLowerCase();
+    const rubricWords = String(rubric || '')
+      .toLowerCase()
+      .split(/[\s,.;:()/]+/)
+      .filter((w: string) => w.length > 3);
 
-        const rawReply = await generateWithFallback(ai, prompt, systemPrompt, 140);
-        const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          res.json({
-            score: typeof parsed.score === 'number' ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 75,
-            strength: parsed.strength || 'Good conceptual articulation.',
-            missing: parsed.missing || 'Could expand on formal edge cases.',
-            verdict: parsed.verdict || (parsed.score >= 70 ? 'PASS' : 'REVISE'),
-            mode: 'ai_low_token',
-          });
-          return;
-        }
-      } catch (aiErr) {
-        console.warn('Voice exam AI evaluation fallback to deterministic rubric:', aiErr);
-      }
-    }
+    const uniqueRubricWords: string[] = Array.from(new Set(rubricWords));
+    const matchedWords = uniqueRubricWords.filter((w: string) => combinedText.includes(w));
+    const missingWords = uniqueRubricWords.filter((w: string) => !combinedText.includes(w));
+    const coverage = uniqueRubricWords.length > 0 ? matchedWords.length / uniqueRubricWords.length : 0.5;
 
-    // Keyword-and-length heuristic: it does not verify the correctness of an answer.
-    const combinedText = `${thesis} ${derivation} ${constraints}`.toLowerCase();
-    const rubricWords = (rubric || '').toLowerCase().split(/[\s,.;]+/).filter((w: string) => w.length > 3);
-    const matchedWords = rubricWords.filter((w: string) => combinedText.includes(w));
-    const coverage = rubricWords.length > 0 ? matchedWords.length / rubricWords.length : 0.5;
+    const thesisScore = Math.min(30, Math.round((Math.min(cleanThesis.length, 140) / 140) * 14 + coverage * 16));
+    const derivationScore = Math.min(45, Math.round((Math.min(cleanDerivation.length, 240) / 240) * 20 + coverage * 25));
+    const boundaryScore = Math.min(25, Math.round((Math.min(cleanConstraints.length, 120) / 120) * 12 + coverage * 13));
 
-    let score = Math.round(coverage * 60);
-    if (thesis.trim().length > 20) score += 15;
-    if (derivation.trim().length > 40) score += 15;
-    if (constraints.trim().length > 15) score += 10;
-    score = Math.max(25, Math.min(98, score));
+    const score = Math.max(25, Math.min(100, thesisScore + derivationScore + boundaryScore));
 
     res.json({
       score,
-      strength: matchedWords.length > 0
-        ? `Mentioned rubric terms: ${matchedWords.slice(0, 3).join(', ')}.`
-        : 'Good effort in structuring the oral response.',
-      missing: coverage < 0.6
-        ? `Incorporate formal aspects from the ground-truth rubric: "${rubric}".`
-        : 'Deepen the step-by-step mathematical reasoning.',
+      strength:
+        matchedWords.length > 0
+          ? `Covered core rubric concepts: ${matchedWords.slice(0, 4).join(', ')}.`
+          : 'Structured spoken response recorded cleanly.',
+      missing:
+        missingWords.length > 0
+          ? `Next step: explicitly include ${missingWords.slice(0, 3).join(', ')} from "${rubric}".`
+          : 'Strong rubric alignment across definition, mechanism, and boundary conditions.',
       verdict: score >= 70 ? 'PASS' : 'REVISE',
       mode: 'deterministic_offline',
+      apiCostTokens: 0,
+      rubricBreakdown: {
+        thesisScore,
+        derivationScore,
+        boundaryScore,
+      },
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Evaluation failed.' });

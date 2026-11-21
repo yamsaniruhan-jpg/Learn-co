@@ -333,7 +333,7 @@ async function generateJsonWithAi(
   ai: GoogleGenAI,
   synthesisPrompt: string
 ): Promise<any> {
-  const models = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
   for (const model of models) {

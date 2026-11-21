@@ -460,7 +460,7 @@ router.post('/socratic-hint', requireAuth, async (req: AuthenticatedRequest, res
       return;
     }
 
-    const models = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
     let hint = '';
 
     for (const model of models) {

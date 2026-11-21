@@ -501,7 +501,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
               <span>Accredited STEM Mentorship Network</span>
             </span>
             <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span>Live Sync{lastSyncedAt ? ` • ${lastSyncedAt}` : ''}</span>
             </span>
           </div>
@@ -1028,16 +1028,24 @@ export const MentorView: React.FC<MentorViewProps> = ({
         onRequestSubmitted={handleSubmitRequest}
       />
 
-      {activeSessionForRoom && selectedRelationship && (
-        <SessionRoomModal
-          session={activeSessionForRoom}
-          relationship={selectedRelationship}
-          isOpen={isSessionRoomOpen}
-          onClose={() => setIsSessionRoomOpen(false)}
-          onUpdateSession={handleUpdateSession}
-          onSubmitFeedback={handleSubmitFeedback}
-        />
-      )}
+      {(() => {
+        const sessionRelationship = activeSessionForRoom
+          ? relationships.find((r) => r.id === activeSessionForRoom.mentorshipId) ||
+            portalData.activeMentees.find((m) => m.relationship.id === activeSessionForRoom.mentorshipId)?.relationship ||
+            selectedRelationship
+          : selectedRelationship;
+        if (!activeSessionForRoom || !sessionRelationship) return null;
+        return (
+          <SessionRoomModal
+            session={activeSessionForRoom}
+            relationship={sessionRelationship}
+            isOpen={isSessionRoomOpen}
+            onClose={() => setIsSessionRoomOpen(false)}
+            onUpdateSession={handleUpdateSession}
+            onSubmitFeedback={handleSubmitFeedback}
+          />
+        );
+      })()}
 
       {selectedRelationship && (
         <PrivacySettingsModal

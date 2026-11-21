@@ -14,6 +14,21 @@ export interface AuthenticatedRequest extends Request {
 
 type AuthIdentity = { user: UserAccount | any; verifiedOwner: boolean };
 const tokenCache = new Map<string, AuthIdentity & { expires: number }>();
+const MAX_TOKEN_CACHE_ENTRIES = 1000;
+
+function setBoundedTokenCache(token: string, entry: AuthIdentity & { expires: number }) {
+  const now = Date.now();
+  if (tokenCache.size >= MAX_TOKEN_CACHE_ENTRIES && !tokenCache.has(token)) {
+    for (const [k, v] of tokenCache.entries()) {
+      if (v.expires <= now) tokenCache.delete(k);
+    }
+    if (tokenCache.size >= MAX_TOKEN_CACHE_ENTRIES) {
+      const oldestKey = tokenCache.keys().next().value;
+      if (oldestKey !== undefined) tokenCache.delete(oldestKey);
+    }
+  }
+  tokenCache.set(token, entry);
+}
 
 async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<AuthIdentity | null> {
   const authHeader = req.headers.authorization;
@@ -69,7 +84,7 @@ async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<Auth
       const verifiedOwner = isOwnerEmail(decodedToken.email) && decodedToken.email_verified === true &&
         decodedToken.firebase?.sign_in_provider === 'google.com' && isOwnerEmail(resolvedUser.email);
       const expires = Math.min(Date.now() + 5 * 60 * 1000, (decodedToken.exp || 0) * 1000);
-      if (!verifiedOwner && expires > Date.now()) tokenCache.set(token, { user: resolvedUser, verifiedOwner, expires });
+      if (!verifiedOwner && expires > Date.now()) setBoundedTokenCache(token, { user: resolvedUser, verifiedOwner, expires });
       return { user: resolvedUser, verifiedOwner };
     } catch {
       return null;

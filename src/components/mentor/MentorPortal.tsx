@@ -63,6 +63,15 @@ export const MentorPortal: React.FC<MentorPortalProps> = ({
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
 
+  React.useEffect(() => {
+    if (mentorProfile) {
+      setHeadline(mentorProfile.headline || '');
+      setBio(mentorProfile.bio || '');
+      setMentoringStyle(mentorProfile.mentoringStyle || '');
+      setAcceptingMentees(mentorProfile.acceptingNewMentees ?? true);
+    }
+  }, [mentorProfile]);
+
   const handleResponse = async (requestId: string, action: 'ACCEPT' | 'DECLINE') => {
     setIsResponding(requestId);
     try {

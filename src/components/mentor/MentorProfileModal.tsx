@@ -192,7 +192,7 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
             <Send className="w-4 h-4" />
             <span>Apply for Mentorship</span>
             {mentor.acceptingNewMentees && (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
             )}
           </button>
         </div>

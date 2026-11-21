@@ -14,9 +14,13 @@ import {
   calculateLevelFromXp,
 } from '../types/auth';
 import { getCurrentXp, syncLocalXpOnly } from '../utils/xpManager';
-import { loadUserStreak } from '../utils/streakManager';
+import { loadUserStreak, saveUserStreak, StreakData } from '../utils/streakManager';
 import { OfflineStorageManager } from '../utils/offlineStorage';
 import { hasMatchingFirebaseIdentity, syncClientToFirestore } from '../services/clientFirestoreSync';
+import {
+  pullAndMergeStreakFromFirestore,
+  pushStreakToFirestore,
+} from '../services/streakFirestoreSync';
 import {
   auth,
   googleProvider,
@@ -112,7 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       if (res.gamification) {
         const displayXp = syncLocalXpOnly(res.gamification.xp ?? 0, res.user?.id);
-        const userStreak = loadUserStreak(res.user?.id || 'default_user');
+        const uidKey = res.user?.id || 'default_user';
+        const userStreak = loadUserStreak(uidKey);
         setGamification({
           ...res.gamification,
           xp: displayXp,
@@ -120,6 +125,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           currentStreak: userStreak.currentStreak,
           longestStreak: userStreak.longestStreak,
         });
+        pullAndMergeStreakFromFirestore(userStreak)
+          .then((merged) => {
+            if (merged) {
+              saveUserStreak(uidKey, merged);
+              setGamification((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      currentStreak: merged.currentStreak,
+                      longestStreak: merged.longestStreak,
+                      lastActiveDate: merged.lastActiveDate,
+                    }
+                  : prev
+              );
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('learnco_streak_updated', { detail: merged }));
+              }
+            }
+          })
+          .catch(() => {});
       } else {
         setGamification(res.gamification ?? null);
       }
@@ -414,9 +439,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    const handleStreakUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<StreakData>).detail;
+      if (!detail) return;
+      setGamification((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentStreak: detail.currentStreak,
+              longestStreak: detail.longestStreak,
+              lastActiveDate: detail.lastActiveDate,
+            }
+          : prev
+      );
+      if (user) {
+        pushStreakToFirestore(detail).catch(() => {});
+      }
+    };
+
     window.addEventListener('learnco_xp_awarded', handleXpAwarded);
+    window.addEventListener('learnco_streak_updated', handleStreakUpdated);
     return () => {
       window.removeEventListener('learnco_xp_awarded', handleXpAwarded);
+      window.removeEventListener('learnco_streak_updated', handleStreakUpdated);
     };
   }, [user, profile]);
 

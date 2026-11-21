@@ -17,6 +17,9 @@ import {
   BarChart2,
   Trophy,
   Shield,
+  Download,
+  Smartphone,
+  RefreshCw,
 } from 'lucide-react';
 import { UserProfile, ConceptMastery, QuestionAttempt, SubjectId } from '../../types';
 import { calculateLevelFromXp } from '../../types/auth';
@@ -28,8 +31,18 @@ import { XPIndicator, StreakIndicator, MasteryIndicator } from '../ui/Gamificati
 import { SEED_SUBJECTS } from '../../data/seedData';
 import { Leaderboard } from '../leaderboard/Leaderboard';
 import { loadUserStreak, getWeeklyStreakPills, getRecentStudyMinutes, StreakData } from '../../utils/streakManager';
+import { StreakHeatmapCard } from './StreakHeatmapCard';
+import { StreakModal } from '../common/StreakModal';
+import { OfflineStorageManager } from '../../utils/offlineStorage';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { PlannerClient } from '../../services/plannerClient';
 import { StudyTask } from '../../types/planner';
+import {
+  getDueReviewQueue,
+  recordSM2Review,
+  SM2CardState,
+  SM2Quality,
+} from '../../utils/spacedRepetition';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -51,7 +64,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [streakData, setStreakData] = useState<StreakData>(() =>
     loadUserStreak(user.id || 'default_user')
   );
+  const [showStreakModal, setShowStreakModal] = useState(false);
+  const [packDownloading, setPackDownloading] = useState(false);
+  const [packReady, setPackReady] = useState(() => Boolean(OfflineStorageManager.getOlympiadPack()));
+  const { isInstalled, isInstallable, install } = usePWAInstall();
   const [upcomingTasks, setUpcomingTasks] = useState<StudyTask[]>([]);
+  const [sm2Tick, setSm2Tick] = useState(0);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -113,6 +131,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     : weakConcepts.length > 0
     ? `Your device-local practice estimate is ${averageMastery}%. Consider reviewing "${weakConcepts[0].conceptTitle}" (${weakConcepts[0].masteryScore}%).`
     : `Your device-local practice estimate is ${averageMastery}% across ${attempts.length} recorded attempts. Challenge yourself with more practice.`;
+
+  const { dueCards, totalDueCount } = React.useMemo(
+    () => getDueReviewQueue(user.id || 'default_user', masteries, attempts, new Date(), 4),
+    [user.id, masteries, attempts, sm2Tick]
+  );
+
+  const handleSM2Grade = (card: SM2CardState, quality: SM2Quality) => {
+    recordSM2Review(user.id || 'default_user', card, quality);
+    setSm2Tick((t) => t + 1);
+  };
 
   const quickPrompts = [
     { title: 'Derive First Derivative Test', category: 'Math', tab: 'copilot', prompt: 'Derive the first derivative test for local extrema from first principles.' },
@@ -276,6 +304,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* 12-Week Activity Heatmap & Streak Milestones */}
+      <StreakHeatmapCard
+        streakData={streakData}
+        onOpenStreakModal={() => setShowStreakModal(true)}
+      />
+
       {/* Main Grid: Core STEM Tracks & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         {/* Left 2 Columns: STEM Curriculum Progress & Weak Topics */}
@@ -435,6 +469,92 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </Card>
           ) : null}
+
+          {/* SM-2 Spaced Repetition Due-for-Review Queue */}
+          <Card variant="default" padding="md" className="space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Due for Spaced Review (SM-2)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {totalDueCount > 0
+                      ? `${totalDueCount} concept${totalDueCount === 1 ? '' : 's'} ready for active recall today`
+                      : 'All scheduled concept intervals are up to date'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate('practice')}
+                className="text-xs rounded-full"
+              >
+                Open Arena
+              </Button>
+            </div>
+
+            {dueCards.length === 0 ? (
+              <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-3 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>You&apos;ve cleared today&apos;s spaced repetition queue! Come back tomorrow or explore new concepts.</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {dueCards.map((card) => (
+                  <div
+                    key={card.conceptId}
+                    className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/70 flex flex-col justify-between gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                          {card.subjectId.toUpperCase()} &middot; EF {card.easeFactor.toFixed(1)}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                          {card.conceptTitle}
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('practice', { subjectId: card.subjectId, conceptId: card.conceptId })}
+                        className="px-2.5 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shrink-0 cursor-pointer"
+                      >
+                        Drill
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-200/70 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Rate recall:</span>
+                      <div className="flex items-center gap-1">
+                        {(
+                          [
+                            { label: 'Again', quality: 0, cls: 'hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-950/60' },
+                            { label: 'Hard', quality: 2, cls: 'hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-950/60' },
+                            { label: 'Good', quality: 4, cls: 'hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-950/60' },
+                            { label: 'Easy', quality: 5, cls: 'hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-950/60' },
+                          ] as Array<{ label: string; quality: SM2Quality; cls: string }>
+                        ).map((opt) => (
+                          <button
+                            type="button"
+                            key={opt.label}
+                            onClick={() => handleSM2Grade(card, opt.quality)}
+                            className={`px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition cursor-pointer ${opt.cls}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
 
           {/* Quick First-Principles Inquiries for Copilot */}
           <div className="space-y-3">
@@ -598,8 +718,72 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onSelectScholar={() => onNavigate('leaderboard')}
             />
           </div>
+
+          {/* Mobile App & Offline Pack Card */}
+          <Card variant="default" padding="md" className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-[#6C5CE7]" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Mobile App &amp; Offline Sync
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded-lg bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A497F7] text-[10px] font-black">
+                {packReady ? 'Pack Ready' : 'PWA'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Save LearnCo to your phone Home Screen and cache Olympiad drills for offline practice with automatic cloud sync.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {!isInstalled && isInstallable && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    void install();
+                  }}
+                  leftIcon={<Download className="w-3.5 h-3.5" />}
+                  className="text-xs"
+                >
+                  Add to Home Screen
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={packDownloading}
+                onClick={async () => {
+                  setPackDownloading(true);
+                  try {
+                    await OfflineStorageManager.downloadOlympiadPack();
+                    setPackReady(true);
+                    await OfflineStorageManager.syncPendingAttemptsToServer();
+                  } finally {
+                    setPackDownloading(false);
+                  }
+                }}
+                leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${packDownloading ? 'animate-spin' : ''}`} />}
+                className="text-xs"
+              >
+                {packDownloading ? 'Downloading...' : packReady ? 'Sync & Refresh Pack' : 'Download Offline Pack'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onNavigate('offline-sync')}
+                className="text-xs"
+              >
+                Sync Center
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
+
+      {showStreakModal && (
+        <StreakModal isOpen={showStreakModal} onClose={() => setShowStreakModal(false)} />
+      )}
     </div>
   );
 };

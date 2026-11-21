@@ -412,11 +412,8 @@ mentorshipRouter.post('/applications', async (req: AuthenticatedRequest, res: Re
         bio: cleanBio,
       });
     } catch (sqlErr: any) {
-      console.error('[Mentorship] Cloud SQL application insert error:', sqlErr?.message || sqlErr);
-      return res.status(503).json({
-        success: false,
-        error: 'Unable to save application to PostgreSQL right now. Please try again shortly.',
-      });
+      console.warn('[Mentorship] Cloud SQL application insert fallback:', sqlErr?.message || sqlErr);
+      record = null;
     }
 
     if (!record) {
@@ -584,10 +581,8 @@ mentorshipRouter.get('/applications', async (req: AuthenticatedRequest, res: Res
     try {
       sqlApps = await listSqlMentorApplications();
     } catch (sqlErr: any) {
-      return res.status(503).json({
-        success: false,
-        error: sqlErr?.message || 'Unable to fetch applications from PostgreSQL.',
-      });
+      console.warn('[Mentorship] Cloud SQL list applications fallback:', sqlErr?.message || sqlErr);
+      sqlApps = null;
     }
 
     const localApps = Database.listMentorApplicationsLocal();
@@ -652,8 +647,8 @@ mentorshipRouter.post('/applications/:id/decision', async (req: AuthenticatedReq
     }
 
     let updated = await decideSqlMentorApplication(appId, decision, reviewerEmail, note).catch((err) => {
-      console.error('[CloudSQL] Application decision update error:', err);
-      throw err;
+      console.warn('[CloudSQL] Application decision update fallback:', err?.message || err);
+      return null;
     });
 
     if (!updated) {

@@ -71,7 +71,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   // Mode, Model & Learner Configuration
   const [activeMode, setActiveMode] = useState<CopilotMode>('socratic_hint');
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>('intermediate');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
 
   // Interactive Context
   const [activeContextNote, setActiveContextNote] = useState<string>(initialContext);
@@ -537,10 +537,10 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="bg-transparent text-[11px] font-semibold text-slate-700 dark:text-slate-200 outline-hidden pr-2 cursor-pointer"
               >
-                <option value="gemini-3.5-flash" className="dark:bg-slate-800">⚡ Gemini 3.5 Flash (Recommended)</option>
-                <option value="gemini-3.8-flash" className="dark:bg-slate-800">🔷 Gemini 3.8 Flash (Reasoning)</option>
+                <option value="gemini-2.5-flash" className="dark:bg-slate-800">⚡ Gemini 2.5 Flash (Recommended)</option>
+                <option value="gemini-2.5-pro" className="dark:bg-slate-800">🔷 Gemini 2.5 Pro (Deep Reasoning)</option>
                 <option value="gemini-flash-latest" className="dark:bg-slate-800">✨ Gemini Flash Latest</option>
-                <option value="gemini-3.5-flash-lite" className="dark:bg-slate-800">🟢 3.5 Flash-Lite</option>
+                <option value="gemini-2.5-flash-lite" className="dark:bg-slate-800">🟢 Gemini 2.5 Flash-Lite</option>
               </select>
             </div>
 

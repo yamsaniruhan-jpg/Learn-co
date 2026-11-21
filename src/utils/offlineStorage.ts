@@ -330,10 +330,28 @@ export function useNetworkStatus(): {
       refreshCount();
     };
 
+    const handleVisibilityChange = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible' &&
+        (typeof navigator === 'undefined' || navigator.onLine)
+      ) {
+        OfflineStorageManager.syncPendingAttemptsToServer()
+          .then((count) => {
+            if (count > 0) setLastSyncedAt(new Date().toISOString());
+            refreshCount();
+          })
+          .catch(() => {});
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('learnco_offline_queue_updated', refreshCount);
     window.addEventListener('learnco_offline_synced', handleSynced);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
 
     if ((typeof navigator === 'undefined' || navigator.onLine) && OfflineStorageManager.getPendingAttempts().length > 0) {
       OfflineStorageManager.syncPendingAttemptsToServer()
@@ -349,6 +367,9 @@ export function useNetworkStatus(): {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('learnco_offline_queue_updated', refreshCount);
       window.removeEventListener('learnco_offline_synced', handleSynced);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     };
   }, []);
 

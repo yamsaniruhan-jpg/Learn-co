@@ -14,6 +14,8 @@ import copilotRoutes from "./server/routes/copilotRoutes";
 import { mentorshipRouter } from "./server/routes/mentorshipRoutes";
 import plannerRoutes from "./server/routes/plannerRoutes";
 import { analyticsRouter } from "./server/routes/analyticsRoutes";
+import studyRoomRoutes from "./server/routes/studyRoomRoutes";
+import { studyRoomHub } from "./server/services/studyRoomHub";
 // Legacy CommonJS routers. Their folders are marked `"type": "commonjs"`, so
 // these default imports resolve in dev (ESM + tsx) and in the bundled CJS build.
 import subscriptionRoutes from "./routes/subscription";
@@ -140,6 +142,7 @@ export async function createApp() {
   app.use("/api/marketplace", marketplaceRoutes);
   app.use("/api/planner", plannerRoutes);
   app.use("/api/analytics", analyticsRouter);
+  app.use("/api/study-rooms", studyRoomRoutes);
 
   // Unknown API paths must return JSON, never the SPA shell.
   app.use("/api", (_req, res) => {
@@ -208,6 +211,7 @@ export async function startServer() {
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Learn.co Server running on http://0.0.0.0:${PORT}`);
   });
+  studyRoomHub.attachWebSocketServer(server);
 
   server.on("error", (err: any) => {
     console.error(`[Server] Error on port ${PORT}:`, err);
