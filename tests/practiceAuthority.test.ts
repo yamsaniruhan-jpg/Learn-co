@@ -17,6 +17,14 @@ const submit = (id: string) => request(app).post('/api/practice/submit-attempt')
 });
 
 describe('server XP authority', () => {
+  it('does not expose email-based legacy avatar URLs on the public leaderboard', async () => {
+    const update = await request(app).put('/api/user/profile').set(auth()).send({ avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=alice%40example.test' });
+    expect(update.status).toBe(200);
+    const board = await request(app).get('/api/leaderboard');
+    const entry = board.body.leaderboard.find((item: any) => item.userId === userId);
+    expect(entry).toBeTruthy();
+    expect(entry.avatarUrl).toBe('');
+  });
   it('rejects repeated attempts to push client-selected XP totals', async () => {
     for (let i = 1; i <= 3; i++) {
       const response = await request(app).post('/api/leaderboard/xp').set(auth()).send({xp: i * 50});

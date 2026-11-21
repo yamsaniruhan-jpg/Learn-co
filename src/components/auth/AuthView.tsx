@@ -85,23 +85,20 @@ export const AuthView: React.FC<AuthViewProps> = ({
       return;
     }
 
-    if (!password || password.length < 6) {
-      setLocalError('Password must contain at least 6 characters.');
+    if (!password) {
+      setLocalError('Please enter your password.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       await signInWithEmail(cleanEmail, password);
-      setSuccessMessage('Successfully signed in! Accessing scholar kernel...');
+      setSuccessMessage('Signed in successfully.');
       setTimeout(() => {
         if (onNavigateToTab) onNavigateToTab('dashboard');
       }, 800);
     } catch (err: any) {
       const errMsg = err.message || 'Invalid email or password combination.';
-      if (errMsg.toLowerCase().includes('invalid') || errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('credentials')) {
-        setAccountNotFoundPrompt(true);
-      }
       setLocalError(errMsg);
     } finally {
       setIsSubmitting(false);
@@ -120,8 +117,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
       return;
     }
 
-    if (!password || password.length < 6) {
-      setLocalError('Password must contain at least 6 characters.');
+    if (password.length < 8 || password.length > 1024 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      setLocalError('Use 8 to 1024 characters, including a letter and a number.');
       return;
     }
 
@@ -152,8 +149,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
     clearAuthError();
     setIsGoogleSubmitting(true);
     try {
-      await signInWithGoogle(undefined, undefined, undefined, 'auto');
-      handleGoogleSuccess();
+      const result = await signInWithGoogle(undefined, undefined, undefined, 'auto');
+      if (result === 'signed-in') handleGoogleSuccess();
     } catch (err: any) {
       setLocalError(err?.message || 'Google sign-in failed. Please try again.');
     } finally {
@@ -162,8 +159,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
   };
 
   const handleSignOutAction = () => {
-    signOut();
-    setSuccessMessage('You have been securely signed out of your session.');
+    void signOut();
+    setSuccessMessage('Signed out on this device.');
     setActiveMode('signin');
     setTimeout(() => {
       setSuccessMessage(null);
@@ -185,13 +182,13 @@ export const AuthView: React.FC<AuthViewProps> = ({
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
           <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span>LearnCo Session & Identity Management</span>
+          <span>Your learning space</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
-          Authentication Portal
+          Welcome to LearnCo
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-          Manage your verified student credentials, sign in to sync streaks and XP, or securely sign out of your device.
+          Sign in or create an account to continue learning.
         </p>
       </div>
 
@@ -260,7 +257,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
       {/* Error Banner */}
       {(localError || authError) && (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs sm:text-sm space-y-2 animate-in fade-in">
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs sm:text-sm space-y-2 animate-in fade-in">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
             <span className="font-semibold">{localError || authError}</span>
@@ -302,10 +299,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
           <div className="space-y-1">
             <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <LogIn className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span>Scholar Sign In</span>
+              <span>Sign in</span>
             </h3>
             <p className="text-xs text-slate-400">
-              Enter your registered credentials to restore state and continue practice streaks.
+              Use your email and password to continue.
             </p>
           </div>
 
@@ -361,41 +358,46 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
           <form onSubmit={handleSignInSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signin-email" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="signin-email"
+                  autoComplete="email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your.email@example.com"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label htmlFor="signin-password" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Password
                 </label>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="signin-password"
+                  autoComplete="current-password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-9 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -452,10 +454,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
           <div className="space-y-1">
             <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span>Create New Scholar Account</span>
+              <span>Create your account</span>
             </h3>
             <p className="text-xs text-slate-400">
-              Join the cohort to track STEM mastery across Math, CS, Physics, Chemistry, and Biology.
+              Create an account to save your progress.
             </p>
           </div>
 
@@ -496,56 +498,63 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
           <form onSubmit={handleSignUpSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signup-name" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Full Name
               </label>
               <div className="relative">
                 <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="signup-name"
+                  autoComplete="name"
                   type="text"
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. Alex Vance"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signup-email" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="signup-email"
+                  autoComplete="email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="alex.vance@stanford.edu"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signup-password" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Create Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="signup-password"
+                  autoComplete="new-password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  className="w-full pl-9 pr-9 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  placeholder="8+ characters, a letter and a number"
+                  className="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -572,7 +581,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               className="w-full"
               rightIcon={<Sparkles className="w-4 h-4" />}
             >
-              {isSubmitting ? 'Creating Account...' : 'Register & Launch Scholar Onboarding'}
+              {isSubmitting ? 'Creating Account...' : 'Create account'}
             </Button>
           </form>
         </Card>

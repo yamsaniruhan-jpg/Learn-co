@@ -55,6 +55,25 @@ describe('authentication', () => {
     expect(res.status).toBe(401);
   });
 
+  it('uses the same error for an unknown account and a wrong password', async () => {
+    const unknown = await request(app).post('/api/auth/signin').send({ email: `missing-${Date.now()}@example.test`, password: 'wrong-password' });
+    const wrong = await request(app).post('/api/auth/signin').send({ email: UNIQUE_EMAIL, password: 'wrong-password' });
+    expect(unknown.status).toBe(401);
+    expect(unknown.body).toEqual(wrong.body);
+  });
+
+  it('preserves leaderboard privacy across sign-in', async () => {
+    const updated = await request(app).put('/api/user/settings').set('Authorization', `Bearer ${token}`).send({ privacy: { leaderboardVisibility: false } });
+    expect(updated.status).toBe(200);
+    const login = await request(app).post('/api/auth/signin').send({ email: UNIQUE_EMAIL, password: PASSWORD });
+    expect(login.body.settings.privacy.leaderboardVisibility).toBe(false);
+  });
+
+  it('applies the reset password policy to new accounts', async () => {
+    const res = await request(app).post('/api/auth/signup').send({ email: `weak-${Date.now()}@example.test`, password: 'abcdef', fullName: 'Test' });
+    expect(res.status).toBe(400);
+  });
+
   it('returns the session for a valid token', async () => {
     const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);

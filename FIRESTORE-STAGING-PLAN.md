@@ -9,6 +9,16 @@
 3. Specify an approved encrypted backup destination outside the repository, access controls, retention, incident/legal hold, restoration owner, recovery point and recovery time objectives. Back up the *authoritative current state*, not an assumed Git snapshot, and test restoration with sanitized synthetic users in a separate environment.
 4. Choose a migration window and rollback conditions; coordinate all instances and writers. Decide which historical records are trusted, how to handle client-supplied awards and unknown provenance, and whether other services still rely on direct writes. Configure staging-only synthetic identities, Stripe test mode and disabled or sandboxed email/AI. Production changes require separate approval after reviewed staging evidence.
 
+## Local emulator test preparation
+
+`tests/firestoreRules.emulator.mjs` is an opt-in rules test harness using synthetic identities and a randomly generated `demo-` project ID. It explicitly refuses a host other than `127.0.0.1:<port>`, does not load app/cloud credentials or delete existing project data, and installs the repository rules into its isolated emulator project. Use a freshly started, trusted local emulator, not a forwarded production service. With Java and the Firebase CLI installed, run from the repository root:
+
+```sh
+firebase emulators:exec --project demo-learnco --only firestore 'npm run test:firestore:emulator'
+```
+
+The CLI supplies `FIRESTORE_EMULATOR_HOST`. The test harness requires Node 24.12+ and installed dev dependencies. `tests/firestoreEmulatorSafety.test.ts` checks the host guard without starting an emulator. The emulator suite itself has **not been run** in this environment: Java and the official emulator are unavailable. It must pass on a machine with the official emulator before its results can be relied on. Its tests of public resource reads and extra profile fields intentionally characterize known permissive behavior; their passing is **not** privacy approval. Add negative tests and modify rules only after reviewing data, clients and intended policy. These tests do not assess deployed rules, IAM, the Admin SDK, Storage rules, queries/indexes, account linking or transactional migration, and do not make cloud writes.
+
 ## Proposed target architecture (not implemented)
 
 - Keep the API as the authority. Use a dedicated namespaced set of server-managed collections; avoid silently reusing current `/users`, `/resources`, `/marketplace`, or other client-written/mirrored collections. Exact schemas, retention and indexes must be finalized after inventory. The Firebase Admin SDK bypasses client rules, so enforce authorization and tenant/account ownership in server code and use least-privilege IAM in addition to rules.

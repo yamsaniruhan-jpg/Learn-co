@@ -114,13 +114,17 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          // A precached /404.html would be served with 200 by Workbox.
+          globIgnores: ['**/404.html'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           // Claim the first open page and serve only the app shell for offline
           // navigations. API responses remain network-only and are never cached.
           clientsClaim: true,
           skipWaiting: true,
           navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/healthz$/, /^\/_ah\/health$/],
+          // The SPA uses only the root path (including reset query strings).
+          // Do not mask server 404s for arbitrary URLs with the offline shell.
+          navigateFallbackAllowlist: [/^\/(?:\?.*)?$/],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

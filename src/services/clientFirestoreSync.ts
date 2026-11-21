@@ -1,6 +1,8 @@
 import { doc, setDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { db, auth } from './firebaseClient';
 import { UserProfile, UserGamification, LeaderboardEntry } from '../types/auth';
+import { AuthClient } from './authClient';
+import { safeAvatarUrl } from '../utils/avatarSafety';
 
 /**
  * Client-side Firestore sync service.
@@ -17,9 +19,13 @@ export function hasMatchingFirebaseIdentity(firebaseEmail?: string | null, backe
 export async function syncClientToFirestore(
   user: any,
   profile: UserProfile | null,
-  gamification: UserGamification | null
+  _gamification: UserGamification | null
 ): Promise<void> {
   try {
+    // Never let an older account's asynchronous sync run as a newer session.
+    const token = AuthClient.getToken();
+    const isCurrentAccount = () => Boolean(token && AuthClient.getToken() === token && AuthClient.getCurrentUser()?.id === user?.id);
+    if (!isCurrentAccount()) return;
     const currentAuthUser = auth?.currentUser;
     const backendUid = user?.id || currentAuthUser?.uid;
     const firebaseMatches = hasMatchingFirebaseIdentity(currentAuthUser?.email, user?.email || profile?.email);
@@ -36,13 +42,10 @@ export async function syncClientToFirestore(
       (email ? email.split('@')[0] : 'Scholar')
     ).trim().slice(0, 120) || 'Scholar';
 
-    const avatarUrl =
-      profile?.avatarUrl ||
-      (firebaseMatches ? currentAuthUser?.photoURL : '') ||
-      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || uid)}`;
+    const avatarUrl = safeAvatarUrl(profile?.avatarUrl) ||
+      safeAvatarUrl(firebaseMatches ? currentAuthUser?.photoURL : '') || '/logo-mark.png';
 
     const now = new Date().toISOString();
-    const streakVal = Math.min(10000, typeof gamification?.currentStreak === 'number' ? Math.max(0, Math.round(gamification.currentStreak)) : 0);
 
     // 1. Direct Firestore writes when Firebase Auth user is signed in (matches firestore.rules isOwner)
     if (db && firestoreUid) {
@@ -71,48 +74,12 @@ export async function syncClientToFirestore(
         console.warn('[ClientFirestoreSync] users collection sync warning:', e?.message || e);
       }
 
-      // Sync Public Profile Document to 'public_profiles' collection
-      try {
-        const profileDocRef = doc(db, 'public_profiles', firestoreUid);
-        await setDoc(
-          profileDocRef,
-          {
-            userId: firestoreUid,
-            displayName,
-            avatarUrl,
-            targetExam: profile?.targetExam || 'STEM Mastery',
-            targetScore: profile?.targetScore || '100%',
-            bio: (profile?.bio || '').slice(0, 1000),
-            updatedAt: now,
-          },
-          { merge: true }
-        );
-      } catch (e: any) {
-        console.warn('[ClientFirestoreSync] public_profiles collection sync warning:', e?.message || e);
-      }
-
+      // Public profile visibility is not enforced in the cloud mirror. Do not
+      // publish to it automatically; existing documents are not changed here.
     }
 
-    // Sync profile metadata with the backend. This is not a durable backup.
-    try {
-      const token = localStorage.getItem('learnco_auth_token') || localStorage.getItem('auth_token');
-      if (token) {
-        await fetch('/api/leaderboard/sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            userId: uid,
-            email,
-            displayName,
-            avatarUrl,
-            streak: streakVal,
-          }),
-        });
-      }
-    } catch (_) {}
+    // Backend profile changes are already saved through authenticated profile
+    // endpoints; replaying this snapshot can overwrite a newer account/profile.
   } catch (err: any) {
     console.warn('[ClientFirestoreSync] Global sync note:', err?.message || err);
   }
@@ -152,10 +119,7 @@ export async function fetchFirestoreLeaderboardEntries(): Promise<LeaderboardEnt
         const data = docSnap.data();
         const userId = data.userId || docSnap.id;
         const displayName = getSafeName(data, userId);
-        const email = data.email || '';
-        const avatarUrl =
-          data.avatarUrl ||
-          `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || userId)}`;
+        const avatarUrl = safeAvatarUrl(data.avatarUrl) || '/logo-mark.png';
 
         entriesMap.set(userId, {
           rank: 0,
@@ -180,10 +144,7 @@ export async function fetchFirestoreLeaderboardEntries(): Promise<LeaderboardEnt
         const userId = data.userId || docSnap.id;
         if (!entriesMap.has(userId)) {
           const displayName = getSafeName(data, userId);
-          const email = data.email || '';
-          const avatarUrl =
-            data.avatarUrl ||
-            `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || userId)}`;
+          const avatarUrl = safeAvatarUrl(data.avatarUrl) || '/logo-mark.png';
 
           entriesMap.set(userId, {
             rank: 0,
@@ -232,9 +193,7 @@ export function subscribeToFirestoreLeaderboard(
           const displayName =
             data.displayName ||
             (email ? email.split('@')[0] : userId.substring(0, 8));
-          const avatarUrl =
-            data.avatarUrl ||
-            `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email || userId)}`;
+          const avatarUrl = safeAvatarUrl(data.avatarUrl) || '/logo-mark.png';
 
           entries.push({
             rank: 0,

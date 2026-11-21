@@ -10,6 +10,12 @@ import type { Express } from 'express';
  * one of them corresponds to a way a reset endpoint can be abused.
  */
 
+const mail = vi.hoisted(() => ({ configured: vi.fn(() => true), send: vi.fn(async (_message: any) => ({ delivered: true as const, provider: 'test' })) }));
+vi.mock('../server/services/mailer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../server/services/mailer')>();
+  return { ...actual, isMailerConfigured: mail.configured, sendMail: mail.send };
+});
+
 let app: Express;
 let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -25,21 +31,16 @@ async function signUp(email: string) {
 /**
  * Ask for a reset and recover the token the way a *user* would.
  *
- * The API deliberately never returns the token. With no mail provider configured
- * the server writes it to its own log instead, so the test reads that log — the
- * same path the operator uses. No test-only backdoor exists in the app.
+ * The API deliberately never returns the token. A mocked mail provider captures
+ * the outgoing message without delivering mail or logging credentials.
  */
 async function requestToken(email: string): Promise<string> {
   const res = await request(app).post('/api/auth/forgot-password').send({ email });
   expect(res.status).toBe(200);
 
-  const logged = [...warnSpy.mock.calls]
-    .map((c) => c.join(' '))
-    .reverse()
-    .find((line) => line.includes(email) && line.includes('reset_token='));
-
-  expect(logged, 'server should log the reset link when no mail provider is set').toBeTruthy();
-  const match = logged!.match(/reset_token=([A-Za-z0-9]+)/);
+  const message = [...mail.send.mock.calls].reverse().map(([value]) => value).find(value => value.to === email);
+  expect(message, 'reset message should be delivered to the mock provider').toBeTruthy();
+  const match = message.text.match(/reset_token=([A-Za-z0-9]+)/);
   expect(match).toBeTruthy();
   return match![1];
 }
@@ -47,7 +48,7 @@ async function requestToken(email: string): Promise<string> {
 beforeAll(async () => {
   process.env.NODE_ENV = 'test';
   process.env.LEARNCO_DB_FILE = `/tmp/learnco-reset-${process.pid}.json`;
-  // Capture the operator-console link without polluting test output.
+  // Ensure no reset credentials are written to the operator log.
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const mod = await import('../server.js');
   app = await mod.createApp();
@@ -73,6 +74,41 @@ describe('password reset', () => {
     expect(JSON.stringify(a.body)).toBe(JSON.stringify(b.body));
   });
 
+  it('refuses reset without a mail provider for both known and unknown accounts, without issuing or logging a token', async () => {
+    const email = uniqueEmail();
+    await signUp(email);
+    mail.configured.mockReturnValue(false);
+    const { Database } = await import('../server/db');
+    const issue = vi.spyOn(Database, 'createPasswordReset');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const a = await request(app).post('/api/auth/forgot-password').send({ email });
+      const b = await request(app).post('/api/auth/forgot-password').send({ email: 'unknown@example.test' });
+      expect(a.status).toBe(503);
+      expect(a.body).toEqual(b.body);
+      expect(b.status).toBe(503);
+      expect(issue).not.toHaveBeenCalled();
+      expect(JSON.stringify([...warnSpy.mock.calls, ...log.mock.calls, ...error.mock.calls])).not.toContain('reset_token=');
+    } finally {
+      mail.configured.mockReturnValue(true);
+      issue.mockRestore(); log.mockRestore(); error.mockRestore();
+    }
+  });
+
+  it('does not disclose recovery credentials if a mailer throws', async () => {
+    const email = uniqueEmail();
+    await signUp(email);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mail.send.mockRejectedValueOnce(new Error('reset_token=synthetic-sensitive-value'));
+    try {
+      const response = await request(app).post('/api/auth/forgot-password').send({ email });
+      expect(response.status).toBe(500);
+      expect(JSON.stringify(response.body)).not.toContain('synthetic-sensitive-value');
+      expect(JSON.stringify(error.mock.calls)).not.toContain('synthetic-sensitive-value');
+    } finally { error.mockRestore(); }
+  });
+
   it('uses the configured reset origin rather than the request Origin header', async () => {
     const email = uniqueEmail();
     await signUp(email);
@@ -82,10 +118,9 @@ describe('password reset', () => {
       const response = await request(app).post('/api/auth/forgot-password')
         .set('Origin', 'https://attacker.example').send({ email });
       expect(response.status).toBe(200);
-      const logged = warnSpy.mock.calls.map((line) => line.join(' ')).reverse()
-        .find((line) => line.includes(email) && line.includes('reset_token='));
-      expect(logged).toContain('https://learn.example/?reset_token=');
-      expect(logged).not.toContain('attacker.example');
+      const message = [...mail.send.mock.calls].reverse().map(([value]) => value).find(value => value.to === email);
+      expect(message.text).toContain('https://learn.example/?reset_token=');
+      expect(message.text).not.toContain('attacker.example');
     } finally {
       if (previous === undefined) delete process.env.APP_URL;
       else process.env.APP_URL = previous;
@@ -111,8 +146,8 @@ describe('password reset', () => {
 
     const res = await request(app).post('/api/auth/forgot-password').send({ email });
     expect(res.status).toBe(200);
-    // The token must reach the user out-of-band (email or operator log), never the
-    // API response — otherwise knowing an address is enough to take the account.
+    // The token must reach the user out-of-band by email, never in the API
+    // response — otherwise knowing an address is enough to take the account.
     expect(JSON.stringify(res.body)).not.toMatch(/resetUrl|reset_token/);
     expect(res.body.token).toBeUndefined();
   });

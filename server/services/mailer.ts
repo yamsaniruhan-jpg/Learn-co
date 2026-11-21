@@ -11,9 +11,8 @@
  *   RESEND_API_KEY  + MAIL_FROM   -> Resend HTTP API
  *   SMTP_URL        + MAIL_FROM   -> any SMTP relay (optional, uses nodemailer)
  *
- * With neither set, `isMailerConfigured()` is false and callers fall back to
- * returning the reset link directly (see authRoutes), which is safe for
- * self-hosted/single-operator deployments and clearly signposted in the UI.
+ * With neither set, `isMailerConfigured()` is false. Password recovery is
+ * unavailable until a provider is configured; reset links are never logged.
  */
 
 export interface MailMessage {
@@ -57,15 +56,15 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
       });
 
       if (!res.ok) {
-        const detail = await res.text().catch(() => '');
-        console.error('[mailer] Resend rejected the message:', res.status, detail.slice(0, 200));
+        // Provider response bodies may echo recipient addresses or message content.
+        console.error('[mailer] Resend rejected the message:', res.status);
         return { delivered: false, provider: 'none', reason: `resend_${res.status}` };
       }
 
       const body: any = await res.json().catch(() => ({}));
       return { delivered: true, provider: 'resend', id: body?.id };
-    } catch (err: any) {
-      console.error('[mailer] Resend request failed:', err?.message || err);
+    } catch {
+      console.error('[mailer] Resend request failed.');
       return { delivered: false, provider: 'none', reason: 'resend_unreachable' };
     }
   }
@@ -90,8 +89,8 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
         html: message.html,
       });
       return { delivered: true, provider: 'smtp', id: info?.messageId };
-    } catch (err: any) {
-      console.error('[mailer] SMTP send failed:', err?.message || err);
+    } catch {
+      console.error('[mailer] SMTP send failed.');
       return { delivered: false, provider: 'none', reason: 'smtp_failed' };
     }
   }

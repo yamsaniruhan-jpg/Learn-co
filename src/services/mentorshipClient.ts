@@ -13,12 +13,11 @@ import {
   MentorApplicationRecord,
 } from '../types/mentorship';
 import { SubjectId } from '../types';
+import { AuthClient } from './authClient';
 
 export class MentorshipClient {
   private static getHeaders(): HeadersInit {
-    const token =
-      localStorage.getItem('learnco_auth_token') ||
-      localStorage.getItem('auth_token');
+    const token = AuthClient.getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };

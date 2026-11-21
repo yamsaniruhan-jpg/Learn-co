@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { safeAvatarUrl } from '../../utils/avatarSafety';
 
 export interface AvatarProps {
   src?: string;
@@ -15,6 +16,9 @@ export const Avatar: React.FC<AvatarProps> = ({
   className = '',
   status,
 }) => {
+  const safeSrc = safeAvatarUrl(src);
+  const [failedSrc, setFailedSrc] = useState<string | undefined>();
+  useEffect(() => setFailedSrc(undefined), [safeSrc]);
   const sizeStyles = {
     sm: 'w-7 h-7 text-xs',
     md: 'w-9 h-9 text-sm',
@@ -33,10 +37,11 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <div className={`relative inline-flex select-none shrink-0 ${className}`}>
-      {src ? (
+      {safeSrc && failedSrc !== safeSrc ? (
         <img
-          src={src}
+          src={safeSrc}
           alt={name}
+          onError={() => setFailedSrc(safeSrc)}
           className={`${sizeStyles[size]} rounded-full object-cover ring-2 ring-white dark:ring-slate-800 shadow-2xs`}
         />
       ) : (

@@ -64,12 +64,13 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
     setStep('authorizing');
 
     try {
-      await signInWithGoogle(
+      const result = await signInWithGoogle(
         expectedEmail,
         undefined,
         undefined,
         activeIntent
       );
+      if (result === 'redirecting') return;
 
       setStep('success');
       setTimeout(() => {

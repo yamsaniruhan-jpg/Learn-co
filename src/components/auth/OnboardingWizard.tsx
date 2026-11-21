@@ -46,6 +46,7 @@ export const OnboardingWizard: React.FC = () => {
   const { profile, saveOnboarding } = useAuth();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Form State
   const [displayName, setDisplayName] = useState<string>(
@@ -94,6 +95,7 @@ export const OnboardingWizard: React.FC = () => {
   };
 
   const handleComplete = async () => {
+    setSaveError(null);
     setIsSubmitting(true);
     try {
       await saveOnboarding({
@@ -117,8 +119,8 @@ export const OnboardingWizard: React.FC = () => {
         spread: 70,
         origin: { y: 0.6 },
       });
-    } catch (err) {
-      console.error('Failed to complete onboarding', err);
+    } catch {
+      setSaveError('Could not save your setup. Check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -388,6 +390,12 @@ export const OnboardingWizard: React.FC = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {saveError && (
+            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-200">
+              {saveError}
+            </p>
           )}
 
           {/* Navigation Controls */}

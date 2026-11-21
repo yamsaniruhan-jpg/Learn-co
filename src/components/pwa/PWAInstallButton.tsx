@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePWAInstall } from './usePWAInstall';
 import {
   Download,
@@ -170,8 +170,10 @@ function buildDesktopFile(os: ShortcutOS, appUrl: string): {
 }
 
 export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const { isInstallable, isInstalled, isIOS, isMobile, install } = usePWAInstall();
   const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [downloadedFile, setDownloadedFile] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
@@ -182,20 +184,31 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
   const appOriginUrl =
     typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://learn-co.ai.studio/';
 
+  useEffect(() => {
+    if (!showInstallGuide) return;
+    closeRef.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowInstallGuide(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => { window.removeEventListener('keydown', handleKey); triggerRef.current?.focus(); };
+  }, [showInstallGuide]);
+
   const handleClick = async () => {
     setDownloadedFile(null);
     if (isInstallable) {
-      const accepted = await install();
-      if (accepted) return;
+      const result = await install();
+      if (result === 'accepted' || result === 'dismissed') return;
     }
     setShowInstallGuide(true);
   };
 
-  const handleCopyUrl = () => {
-    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
-    navigator.clipboard.writeText(appOriginUrl);
-    setCopiedUrl(true);
-    window.setTimeout(() => setCopiedUrl(false), 2000);
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(appOriginUrl);
+      setCopiedUrl(true);
+      window.setTimeout(() => setCopiedUrl(false), 2000);
+    } catch { setCopiedUrl(false); }
   };
 
   const triggerDesktopDownload = (os: ShortcutOS) => {
@@ -213,28 +226,28 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
     setDownloadedFile(filename);
   };
 
-  if (isInstalled && compact) {
-    return null;
-  }
+  if (isInstalled) return null;
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={handleClick}
+        aria-label={isMobile ? 'Add LearnCo to mobile' : 'Install LearnCo'}
         className={
           compact
             ? 'w-full flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-full bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold shadow-xs transition cursor-pointer'
             : 'flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#6C5CE7] to-[#8577ED] hover:from-[#5B4BC4] hover:to-[#6C5CE7] text-white text-xs font-extrabold shadow-sm transition cursor-pointer'
         }
-        title="Install LearnCo app or download Desktop launcher file (no Google Play Store required)"
+        title="Add LearnCo to your home screen or install it in your browser"
       >
         {isIOS ? (
           <Smartphone className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
         ) : (
           <Download className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
         )}
-        {!compact && <span>{isInstalled ? 'Desktop App' : 'Install App'}</span>}
+        {!compact && <span>{isMobile ? 'Add to mobile' : 'Install App'}</span>}
       </button>
 
       {showInstallGuide && (
@@ -242,7 +255,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#2D2A4A]/75 dark:bg-[#100E1C]/85 p-4 animate-in fade-in duration-150"
           role="dialog"
           aria-modal="true"
-          aria-label="Install LearnCo App or Save Desktop File"
+          aria-label="Install LearnCo"
         >
           <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#2A2647] p-6 shadow-2xl border border-[#E3DFF5] dark:border-[#3D3861] space-y-5 text-left">
             <div className="flex items-center justify-between gap-2">
@@ -256,16 +269,17 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                 </div>
                 <div>
                   <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
-                    Install LearnCo (No Play Store Needed)
+                    {isMobile ? 'Add LearnCo to your mobile' : 'Install LearnCo'}
                   </h3>
                   <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
-                    Save a Desktop file or install as a standalone app
+                    {isMobile ? 'Add the web app to your home screen' : 'Install the web app or save a desktop shortcut'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowInstallGuide(false)}
+                ref={closeRef}
                 className="w-9 h-9 rounded-full flex items-center justify-center text-[#6B6890] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] cursor-pointer shrink-0"
                 aria-label="Close install instructions"
               >
@@ -277,16 +291,16 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] flex items-center gap-2 text-[11px] font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">
                 <CheckCircle2 className={`w-4 h-4 shrink-0 ${isInstallable || isInstalled ? 'text-emerald-500' : 'text-amber-500'}`} />
-                <span>{isInstalled ? 'Running as App' : isInstallable ? '1-Click Ready' : 'Tab Install Ready'}</span>
+                <span>{isInstallable ? 'Browser install available' : 'Use browser menu to install'}</span>
               </div>
               <div className="p-2.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] flex items-center gap-2 text-[11px] font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">
                 <Wifi className={`w-4 h-4 shrink-0 ${swSupported ? 'text-emerald-500' : 'text-slate-400'}`} />
-                <span>{swSupported ? 'Offline Cache Ready' : 'Online Sync Ready'}</span>
+                <span>{swSupported ? 'Offline cache supported' : 'Offline app support unavailable'}</span>
               </div>
             </div>
 
-            {/* Save File Directly for Desktop */}
-            <div className="p-4 rounded-3xl bg-gradient-to-br from-[#F0EDFA] to-[#E6F8F6] dark:from-[#1E1B33] dark:to-[#192838] border border-[#D4CEF4] dark:border-[#3D3861] space-y-3">
+            {/* Desktop shortcuts are not mobile app downloads. */}
+            {!isMobile && <div className="p-4 rounded-3xl bg-gradient-to-br from-[#F0EDFA] to-[#E6F8F6] dark:from-[#1E1B33] dark:to-[#192838] border border-[#D4CEF4] dark:border-[#3D3861] space-y-3">
               <div className="flex items-start gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-[#6C5CE7]/15 flex items-center justify-center shrink-0 mt-0.5">
                   <Laptop className="w-4 h-4 text-[#6C5CE7]" />
@@ -296,7 +310,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                     Save Clickable App File to Your Desktop
                   </h4>
                   <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] mt-0.5 leading-relaxed">
-                    Download this file onto your Desktop. Double-clicking it opens LearnCo directly with Google Sign-In and cloud sync active.
+                    This shortcut opens LearnCo in your browser; it does not install an app or guarantee sign-in or sync.
                   </p>
                 </div>
               </div>
@@ -318,7 +332,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                   <Download className="w-4 h-4 shrink-0 text-[#00B8A9]" />
                   <span>
                     {detectedOS === 'windows'
-                      ? 'Windows (.url)'
+                      ? 'Windows (.bat)'
                       : detectedOS === 'macos'
                       ? 'macOS (.webloc)'
                       : 'Linux (.desktop)'}
@@ -348,7 +362,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                   </span>
                 </div>
               )}
-            </div>
+            </div>}
 
             {isInIframe && (
               <div className="p-3.5 rounded-3xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-800 dark:text-amber-300 space-y-2.5">
@@ -357,7 +371,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                   <span>Embedded Preview Detected</span>
                 </p>
                 <p className="leading-relaxed">
-                  Open the live URL in a top-level browser tab to unlock the address-bar <strong>Install App</strong> icon and native window mode.
+                    Open this page in a browser tab first. Installation may not be available inside an embedded preview.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <a
@@ -381,6 +395,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
               </div>
             )}
 
+            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">This adds a web app, not an APK or app-store download. Availability depends on your browser and a secure connection. Signing in and loading new content still require a connection.</p>
             {isIOS ? (
               <ol className="text-xs sm:text-sm text-[#2D2A4A] dark:text-[#F1EFFF] space-y-2 list-decimal list-inside leading-relaxed">
                 <li>
@@ -390,19 +405,19 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                   Scroll down and tap <strong>Add to Home Screen</strong>.
                 </li>
                 <li>
-                  Tap <strong>Add</strong> to launch LearnCo as a standalone app.
+                  Tap <strong>Add</strong>. Then open LearnCo from your home screen.
                 </li>
               </ol>
             ) : (
               <div className="space-y-2.5 text-xs text-[#2D2A4A] dark:text-[#F1EFFF]">
-                <div className="p-3.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-1">
+                {!isMobile && <div className="p-3.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-1">
                   <p className="font-black text-[#6C5CE7] dark:text-[#8577ED]">
                     Browser Standalone App (Chrome / Edge / Brave)
                   </p>
                   <p className="text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
                     Click the <strong>Install</strong> icon on the right side of the address bar, or open menu (&vellip;) &rarr; <strong>Cast, save, and share</strong> &rarr; <strong>Install LearnCo</strong>.
                   </p>
-                </div>
+                </div>}
                 <div className="p-3.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-1">
                   <p className="font-black text-[#00B8A9]">
                     Direct Web App on Android (No Play Store)

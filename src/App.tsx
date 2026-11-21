@@ -7,12 +7,7 @@ import { NotificationCenter } from './components/layout/NotificationCenter';
 import { AuthModal } from './components/auth/AuthModal';
 import { OnboardingWizard } from './components/auth/OnboardingWizard';
 
-import { DashboardView } from './components/dashboard/DashboardView';
-import { LearnView } from './components/learn/LearnView';
-import { CopilotView } from './components/copilot/CopilotView';
 import type { PracticeNavigationContext } from './components/practice/PracticeView';
-import { GamificationView } from './components/gamification/GamificationView';
-import { ProfileView } from './components/profile/ProfileView';
 import { AuthView } from './components/auth/AuthView';
 import { Leaderboard } from './components/leaderboard/Leaderboard';
 import { MobileAllTabsNav } from './components/layout/MobileAllTabsNav';
@@ -44,6 +39,13 @@ import {
   Moon,
   X,
 } from 'lucide-react';
+
+// Load authenticated sections only when the learner opens them.
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
+const LearnView = lazy(() => import('./components/learn/LearnView').then(m => ({ default: m.LearnView })));
+const CopilotView = lazy(() => import('./components/copilot/CopilotView').then(m => ({ default: m.CopilotView })));
+const GamificationView = lazy(() => import('./components/gamification/GamificationView').then(m => ({ default: m.GamificationView })));
+const ProfileView = lazy(() => import('./components/profile/ProfileView').then(m => ({ default: m.ProfileView })));
 
 const SimulationsHubView = lazy(() =>
   import('./components/simulations/SimulationsHubView').then((m) => ({ default: m.SimulationsHubView }))
@@ -315,9 +317,7 @@ export default function App() {
       profile?.fullName ||
       (user?.email ? user.email.split('@')[0] : 'Guest Scholar'),
     email: user?.email || profile?.email || 'guest@learn.co',
-    avatarUrl:
-      profile?.avatarUrl ||
-      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user?.email || 'guest-scholar')}`,
+    avatarUrl: profile?.avatarUrl || '',
     role: (isAdmin ? 'admin' : profile?.role || user?.role || 'student') as any,
     joinedDate: profile?.joinedDate || new Date().toISOString().split('T')[0],
     xp: gamification?.xp ?? 0,

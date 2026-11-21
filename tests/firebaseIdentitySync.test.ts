@@ -18,22 +18,40 @@ describe('Firestore identity isolation', () => {
     mocks.auth.currentUser = { uid: 'firebase-b', email: 'other@example.test', displayName: 'Other' };
     const fetch = vi.fn(async (_url: string, _options: { body: string }) => ({ ok: true }));
     vi.stubGlobal('fetch', fetch);
-    vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'learnco_auth_token' ? 'local-token' : null });
+    vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'learnco_auth_token' ? 'local-token' : key === 'learnco_user' ? JSON.stringify({ id: 'local-a' }) : null });
     await syncClientToFirestore({ id: 'local-a', email: 'alice@example.test' }, null, null);
     expect(mocks.setDoc).not.toHaveBeenCalled();
-    expect(JSON.parse(fetch.mock.calls[0][1].body).email).toBe('alice@example.test');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('continues to sync when Firebase and local email match', async () => {
     mocks.auth.currentUser = { uid: 'firebase-a', email: 'ALICE@example.test' };
-    vi.stubGlobal('localStorage', { getItem: () => null });
+    vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'learnco_auth_token' ? 'local-token' : key === 'learnco_user' ? JSON.stringify({ id: 'local-a' }) : null });
     await syncClientToFirestore({ id: 'local-a', email: 'alice@example.test' }, null, null);
-    expect(mocks.setDoc).toHaveBeenCalledTimes(2);
-    expect(mocks.setDoc.mock.calls.every((call: any) => call[0].collection !== 'leaderboard')).toBe(true);
+    expect(mocks.setDoc).toHaveBeenCalledTimes(1);
+    expect(mocks.setDoc.mock.calls.every((call: any) => call[0].collection === 'users')).toBe(true);
     for (const call of mocks.setDoc.mock.calls as any[]) {
       expect(call[1]).not.toHaveProperty('xp');
       expect(call[1]).not.toHaveProperty('level');
     }
+  });
+
+  it('stops after a session changes during an in-flight Firestore write', async () => {
+    mocks.auth.currentUser = { uid: 'firebase-a', email: 'alice@example.test' };
+    let token = 'token-a';
+    let userId = 'local-a';
+    let finish!: () => void;
+    mocks.setDoc.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'learnco_auth_token' ? token : key === 'learnco_user' ? JSON.stringify({ id: userId }) : null });
+    const pending = syncClientToFirestore({ id: 'local-a', email: 'alice@example.test' }, null, null);
+    expect(mocks.setDoc).toHaveBeenCalledTimes(1);
+    token = 'token-b'; userId = 'local-b';
+    finish();
+    await pending;
+    expect(mocks.setDoc).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('does not send XP to an unrelated Firebase identity', async () => {
