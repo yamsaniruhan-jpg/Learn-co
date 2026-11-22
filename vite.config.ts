@@ -157,11 +157,26 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
+          type: 'classic',
+          suppressWarnings: true,
         },
       }),
     ],
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'lucide-react',
+        'recharts',
+        'katex',
+        'motion/react',
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+        'firebase/storage',
+      ],
+    },
     resolve: {
       // `@` points at the project root (matches the tsconfig `paths` mapping).
       alias: {

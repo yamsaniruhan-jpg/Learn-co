@@ -14,6 +14,8 @@ import {
   MessageSquare,
   Sparkles,
   Lock,
+  Mail,
+  ExternalLink,
 } from 'lucide-react';
 import { MentorProfile } from '../../types/mentorship';
 import { SubjectId } from '../../types';
@@ -21,33 +23,58 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 
+export interface MentorshipRequestSubmitResult {
+  emailDispatched?: boolean;
+  mentorEmail?: string | null;
+  mailtoUrl?: string;
+}
+
 interface MentorProfileModalProps {
   mentor: MentorProfile | null;
+  learnerEmailDefault?: string;
   isOpen: boolean;
   onClose: () => void;
-  onRequestSubmitted: (data: any) => Promise<void>;
+  onRequestSubmitted: (data: any) => Promise<MentorshipRequestSubmitResult | void>;
 }
 
 export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
   mentor,
+  learnerEmailDefault,
   isOpen,
   onClose,
   onRequestSubmitted,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'request'>('overview');
   const [selectedSubject, setSelectedSubject] = useState<SubjectId>('math');
+  const [learnerEmail, setLearnerEmail] = useState(learnerEmailDefault || '');
   const [targetTrack, setTargetTrack] = useState('');
   const [goalDescription, setGoalDescription] = useState('');
   const [initialMessage, setInitialMessage] = useState('');
   const [preferredCadence, setPreferredCadence] = useState<'weekly' | 'biweekly' | 'on_demand'>('weekly');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitResult, setSubmitResult] = useState<MentorshipRequestSubmitResult | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen && mentor) {
+      setSelectedSubject((mentor.subjects?.[0] as SubjectId) || 'math');
+      setSubmitResult(null);
+      setSubmitError(null);
+      if (learnerEmailDefault) {
+        setLearnerEmail(learnerEmailDefault);
+      }
+    }
+  }, [isOpen, mentor?.id, learnerEmailDefault]);
 
   if (!isOpen || !mentor) return null;
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanEmail = learnerEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setSubmitError('Please provide a valid contact email address so the mentor can reply and receive your request.');
+      return;
+    }
     if (!goalDescription.trim() || !initialMessage.trim()) {
       setSubmitError('Please describe your target goal and write an initial introduction message.');
       return;
@@ -57,20 +84,16 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
     setSubmitError(null);
 
     try {
-      await onRequestSubmitted({
+      const result = await onRequestSubmitted({
         mentorId: mentor.id,
+        learnerEmail: cleanEmail,
         subjectId: selectedSubject || mentor.subjects[0],
         targetTrack: targetTrack || mentor.supportedTracks[0] || 'General STEM',
         goalDescription,
         initialMessage,
         preferredCadence,
       });
-      setSubmitSuccess(true);
-      setTimeout(() => {
-        setSubmitSuccess(false);
-        setActiveTab('overview');
-        onClose();
-      }, 1800);
+      setSubmitResult(result || { emailDispatched: false, mentorEmail: mentor.email || null });
     } catch (err: any) {
       setSubmitError(err.message || 'Failed to submit mentorship request');
     } finally {
@@ -169,7 +192,7 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
             <Send className="w-4 h-4" />
             <span>Apply for Mentorship</span>
             {mentor.acceptingNewMentees && (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
             )}
           </button>
         </div>
@@ -271,7 +294,7 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleSubmitRequest} className="space-y-4">
-              {submitSuccess ? (
+              {submitResult ? (
                 <div className="p-6 text-center space-y-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-in zoom-in-95">
                   <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto shadow-md">
                     <CheckCircle2 className="w-6 h-6" />
@@ -279,9 +302,23 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     Mentorship Request Submitted!
                   </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                    {mentor.name} has been notified and will review your conceptual goal and schedule availability.
+                  <p className="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto leading-relaxed">
+                    {submitResult.emailDispatched
+                      ? `Your request form has been emailed directly to ${submitResult.mentorEmail || mentor.name} with a one-click "Yes, Accept Student" button.`
+                      : `Your request has been saved to ${mentor.name}'s Educator Portal queue${submitResult.mentorEmail ? ` (${submitResult.mentorEmail})` : ''}. Because no outbound mail relay is configured on this server, an automatic inbox email was not sent — you can send the pre-filled email directly using the button below.`}
                   </p>
+                  {!submitResult.emailDispatched && submitResult.mailtoUrl && (
+                    <div className="pt-1">
+                      <a
+                        href={submitResult.mailtoUrl}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>Email Request to {submitResult.mentorEmail || mentor.name}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -290,6 +327,33 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
                       {submitError}
                     </div>
                   )}
+
+                  {/* Email Routing Header */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                        Your Contact Email
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        id="input-request-learner-email"
+                        value={learnerEmail}
+                        onChange={(e) => setLearnerEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="w-full text-xs px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                        Mentor Email Recipient
+                      </label>
+                      <div className="w-full text-xs px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center gap-1.5 truncate">
+                        <Mail className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="truncate">{mentor.email || 'Educator Portal Inbox'}</span>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Subject selector */}
                   <div>
@@ -422,12 +486,26 @@ export const MentorProfileModal: React.FC<MentorProfileModalProps> = ({
               <span>Apply for Mentorship</span>
               <Send className="w-3.5 h-3.5" />
             </Button>
+          ) : submitResult ? (
+            <Button
+              id="btn-done-mentorship-request"
+              variant="primary"
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              onClick={() => {
+                setSubmitResult(null);
+                setActiveTab('overview');
+                onClose();
+              }}
+            >
+              Done
+            </Button>
           ) : (
             <Button
               id="btn-submit-mentorship-request"
               variant="primary"
               size="sm"
-              disabled={isSubmitting || submitSuccess}
+              disabled={isSubmitting}
               className="bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5"
               onClick={handleSubmitRequest}
             >

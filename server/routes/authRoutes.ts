@@ -5,9 +5,10 @@ import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
 import { verifyFirebaseIdTokenSafely } from '../services/verifyFirebaseToken';
-import { sendMail, isMailerConfigured, buildPasswordResetMessage } from '../services/mailer';
+import { sendMail, isMailerConfigured, getMailerStatus, buildPasswordResetMessage } from '../services/mailer';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
+import { findAccountByEmailFromSql, persistAccountToSql } from '../../src/db/persistence';
 
 const router = Router();
 
@@ -78,7 +79,7 @@ router.post('/signup', (req, res: Response) => {
 });
 
 // POST /api/auth/signin
-router.post('/signin', signinLimiter, (req, res: Response) => {
+router.post('/signin', signinLimiter, async (req, res: Response) => {
   try {
     const { email, password, idToken } = req.body;
 
@@ -92,7 +93,14 @@ router.post('/signin', signinLimiter, (req, res: Response) => {
       return;
     }
 
-    const user = Database.findUserByEmail(email);
+    let user = Database.findUserByEmail(email);
+    if (!user) {
+      const sqlUser = await findAccountByEmailFromSql(email);
+      if (sqlUser) {
+        await Database.hydrateFromSql();
+        user = Database.findUserByEmail(email) || sqlUser;
+      }
+    }
 
     // Avoid exposing whether an email exists or which provider an account uses.
     if (!user || !user.passwordHash) {
@@ -122,6 +130,7 @@ router.post('/signin', signinLimiter, (req, res: Response) => {
     const settings = Database.getSettings(user.id);
 
     Database.saveToDisk();
+    void persistAccountToSql(user);
 
     if (profile && gamification) {
       void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
@@ -185,12 +194,20 @@ router.post('/google', async (req, res: Response) => {
       }
       verifiedEmail = decoded.email.trim().toLowerCase();
       decodedUid = decoded.uid;
-    } catch {
+    } catch (err: any) {
+      console.warn('[auth/google] Google ID token verification failure:', err?.code || err?.message || err);
       res.status(401).json({ error: 'Invalid or expired Google ID token.' });
       return;
     }
 
     let user = Database.findUserByEmail(verifiedEmail);
+    if (!user) {
+      const sqlUser = await findAccountByEmailFromSql(verifiedEmail);
+      if (sqlUser) {
+        await Database.hydrateFromSql();
+        user = Database.findUserByEmail(verifiedEmail) || sqlUser;
+      }
+    }
     let token: string;
     let profile: any;
 
@@ -220,6 +237,7 @@ router.post('/google', async (req, res: Response) => {
       token = Database.createSession(user.id);
       profile = Database.getProfile(user.id);
       Database.saveToDisk();
+      void persistAccountToSql(user);
     }
 
     if (isOwnerEmail(user.email)) {
@@ -377,6 +395,14 @@ const resetLimiter = rateLimit({
 function isValidEmail(email: string): boolean {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
+
+/**
+ * GET /api/auth/mail-status
+ * Truthfully reports whether an outbound email relay (Resend or SMTP) is configured.
+ */
+router.get('/mail-status', (_req, res: Response) => {
+  res.json({ success: true, ...getMailerStatus() });
+});
 
 /**
  * POST /api/auth/forgot-password

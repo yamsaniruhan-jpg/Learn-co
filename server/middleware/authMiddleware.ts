@@ -4,6 +4,7 @@ import { UserAccount, UserRole } from '../../src/types/auth';
 import { adminAuth } from '../services/firebaseAdmin';
 import { verifyFirebaseIdTokenSafely } from '../services/verifyFirebaseToken';
 import { isOwnerEmail } from '../../src/db/users';
+import { resolveSessionFromSql } from '../../src/db/persistence';
 
 export interface AuthenticatedRequest extends Request {
   user?: UserAccount | any;
@@ -13,6 +14,21 @@ export interface AuthenticatedRequest extends Request {
 
 type AuthIdentity = { user: UserAccount | any; verifiedOwner: boolean };
 const tokenCache = new Map<string, AuthIdentity & { expires: number }>();
+const MAX_TOKEN_CACHE_ENTRIES = 1000;
+
+function setBoundedTokenCache(token: string, entry: AuthIdentity & { expires: number }) {
+  const now = Date.now();
+  if (tokenCache.size >= MAX_TOKEN_CACHE_ENTRIES && !tokenCache.has(token)) {
+    for (const [k, v] of tokenCache.entries()) {
+      if (v.expires <= now) tokenCache.delete(k);
+    }
+    if (tokenCache.size >= MAX_TOKEN_CACHE_ENTRIES) {
+      const oldestKey = tokenCache.keys().next().value;
+      if (oldestKey !== undefined) tokenCache.delete(oldestKey);
+    }
+  }
+  tokenCache.set(token, entry);
+}
 
 async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<AuthIdentity | null> {
   const authHeader = req.headers.authorization;
@@ -31,6 +47,16 @@ async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<Auth
     return { user: sessionUser, verifiedOwner: isOwnerEmail(sessionUser.email) && Database.isVerifiedOwnerSession(token) };
   }
 
+  // 1b. Cloud SQL fallback for persistent bearer tokens across restarts/workers
+  const sqlResolved = await resolveSessionFromSql(token);
+  if (sqlResolved) {
+    Database.cacheResolvedSqlIdentity({ ...sqlResolved, token });
+    return {
+      user: sqlResolved.user,
+      verifiedOwner: isOwnerEmail(sqlResolved.user.email) && Boolean(sqlResolved.session.verifiedOwner),
+    };
+  }
+
   // 2. Check cached verified Firebase ID token
   const cached = tokenCache.get(token);
   if (cached && cached.expires > Date.now()) {
@@ -44,17 +70,21 @@ async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<Auth
       // Privileged owner identity must also pass Firebase revocation checking when available.
       if (isOwnerEmail(decodedToken.email)) decodedToken = await verifyFirebaseIdTokenSafely(adminAuth, token, true);
       const uid = decodedToken.uid;
-      const resolvedUser = Database.findUserById(uid) || {
-        id: uid,
-        uid,
-        email: decodedToken.email || '',
-        subscription: (decodedToken as any).subscription || 'free',
-        authProvider: 'google',
-      };
+      const verifiedTokenEmail =
+        decodedToken.email && decodedToken.email_verified ? decodedToken.email : undefined;
+      const resolvedUser =
+        Database.findUserById(uid) ||
+        (verifiedTokenEmail ? Database.findUserByEmail(verifiedTokenEmail) : null) || {
+          id: uid,
+          uid,
+          email: decodedToken.email || '',
+          subscription: (decodedToken as any).subscription || 'free',
+          authProvider: 'google',
+        };
       const verifiedOwner = isOwnerEmail(decodedToken.email) && decodedToken.email_verified === true &&
         decodedToken.firebase?.sign_in_provider === 'google.com' && isOwnerEmail(resolvedUser.email);
       const expires = Math.min(Date.now() + 5 * 60 * 1000, (decodedToken.exp || 0) * 1000);
-      if (!verifiedOwner && expires > Date.now()) tokenCache.set(token, { user: resolvedUser, verifiedOwner, expires });
+      if (!verifiedOwner && expires > Date.now()) setBoundedTokenCache(token, { user: resolvedUser, verifiedOwner, expires });
       return { user: resolvedUser, verifiedOwner };
     } catch {
       return null;

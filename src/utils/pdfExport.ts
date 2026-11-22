@@ -1,4 +1,5 @@
 import { CreatorResource, SlideItem } from '../types/creator';
+import { ConceptDetail } from '../types/curriculum';
 import { MistakeRecord } from '../types/auth';
 import { toCleanDocumentText, resourceToPlainText } from './textSanitizer';
 
@@ -312,5 +313,123 @@ export function printCleanMistakeNotebookPdf(mistakes: MistakeRecord[]): boolean
     `${mistakes.length} Diagnostic Item${mistakes.length === 1 ? '' : 's'}`,
     bodyHtml
   );
+  return printHtmlViaHiddenFrame(html);
+}
+
+export function conceptToMarkdown(
+  concept: ConceptDetail,
+  context?: { subjectName?: string; chapterTitle?: string; topicTitle?: string }
+): string {
+  const lines: string[] = [
+    `# ${toCleanDocumentText(concept.title)}`,
+    '',
+    `**Subject**: ${context?.subjectName || concept.subjectId.toUpperCase()} | **Difficulty**: ${concept.difficulty.replace('_', ' ')} | **Read Time**: ${concept.estimatedMinutes} mins`,
+  ];
+
+  if (context?.chapterTitle || context?.topicTitle) {
+    lines.push(
+      `**Path**: ${[context.chapterTitle, context.topicTitle].filter(Boolean).join(' > ')}`
+    );
+  }
+
+  lines.push('', '## Summary', '', toCleanDocumentText(concept.summary), '');
+
+  if (concept.intuitiveExplanation) {
+    lines.push('## Core Intuition', '', toCleanDocumentText(concept.intuitiveExplanation), '');
+  }
+
+  if (concept.formalDefinition) {
+    lines.push('## Formal Definition', '', toCleanDocumentText(concept.formalDefinition), '');
+  }
+
+  if (concept.keyFormulas && concept.keyFormulas.length > 0) {
+    lines.push('## Key Formulas', '');
+    concept.keyFormulas.forEach((f) => {
+      lines.push(`- **${toCleanDocumentText(f.label)}**: \`${f.latex}\`${f.explanation ? ` — ${toCleanDocumentText(f.explanation)}` : ''}`);
+    });
+    lines.push('');
+  }
+
+  if (concept.workedExamples && concept.workedExamples.length > 0) {
+    lines.push('## Worked Examples', '');
+    concept.workedExamples.forEach((ex, i) => {
+      lines.push(`### Example ${i + 1}: ${toCleanDocumentText(ex.title || ex.problemStatement)}`);
+      lines.push(toCleanDocumentText(ex.problemStatement), '');
+      ex.stepByStepSolution?.forEach((step, si) => {
+        lines.push(`${si + 1}. ${toCleanDocumentText(step)}`);
+      });
+      lines.push('', `**Final Answer**: ${toCleanDocumentText(ex.finalAnswer)}`);
+      if (ex.keyTakeaway) lines.push(`*Takeaway*: ${toCleanDocumentText(ex.keyTakeaway)}`);
+      lines.push('');
+    });
+  }
+
+  if (concept.commonPitfalls && concept.commonPitfalls.length > 0) {
+    lines.push('## Common Pitfalls', '');
+    concept.commonPitfalls.forEach((p, i) => {
+      lines.push(`- **Trap #${i + 1}: ${toCleanDocumentText(p.trapTitle)}**`);
+      lines.push(`  - *Flawed*: ${toCleanDocumentText(p.flawedReasoning)}`);
+      lines.push(`  - *Invariant*: ${toCleanDocumentText(p.correctConcept)}`);
+    });
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+export function printCleanConceptPdf(
+  concept: ConceptDetail,
+  context?: { subjectName?: string; chapterTitle?: string; topicTitle?: string }
+): boolean {
+  const formulasHtml =
+    concept.keyFormulas && concept.keyFormulas.length > 0
+      ? `<div class="card"><div class="card-badge">Key Formulas</div>${concept.keyFormulas
+          .map(
+            (f) =>
+              `<div class="formula-box"><span class="label">${escapeHtml(toCleanDocumentText(f.label))}</span>${escapeHtml(f.latex)}${
+                f.explanation ? `<br/><small>${escapeHtml(toCleanDocumentText(f.explanation))}</small>` : ''
+              }</div>`
+          )
+          .join('')}</div>`
+      : '';
+
+  const examplesHtml =
+    concept.workedExamples && concept.workedExamples.length > 0
+      ? concept.workedExamples
+          .map(
+            (ex, idx) => `<div class="card">
+              <div class="card-badge">Worked Example ${idx + 1}</div>
+              ${ex.title ? `<h2>${escapeHtml(toCleanDocumentText(ex.title))}</h2>` : ''}
+              <p><strong>Problem:</strong> ${escapeHtml(toCleanDocumentText(ex.problemStatement))}</p>
+              <ul>${(ex.stepByStepSolution || [])
+                .map((s) => `<li>${escapeHtml(toCleanDocumentText(s))}</li>`)
+                .join('')}</ul>
+              <div class="answer-right"><span class="label">Final Answer</span>${escapeHtml(toCleanDocumentText(ex.finalAnswer))}</div>
+            </div>`
+          )
+          .join('')
+      : '';
+
+  const bodyHtml = `
+    <div class="card">
+      <div class="card-badge">Core Summary &amp; Theory</div>
+      <p>${escapeHtml(toCleanDocumentText(concept.summary))}</p>
+      ${concept.intuitiveExplanation ? `<div class="notes-box"><span class="label">Core Intuition</span>${escapeHtml(toCleanDocumentText(concept.intuitiveExplanation))}</div>` : ''}
+      ${concept.formalDefinition ? `<p><strong>Formal Definition:</strong> ${escapeHtml(toCleanDocumentText(concept.formalDefinition))}</p>` : ''}
+    </div>
+    ${formulasHtml}
+    ${examplesHtml}
+  `;
+
+  const subtitle = [
+    context?.subjectName || concept.subjectId.toUpperCase(),
+    context?.chapterTitle,
+    context?.topicTitle,
+    `${concept.estimatedMinutes} mins read`,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  const html = renderDocumentShell(toCleanDocumentText(concept.title), subtitle, bodyHtml);
   return printHtmlViaHiddenFrame(html);
 }

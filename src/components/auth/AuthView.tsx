@@ -152,6 +152,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
       const result = await signInWithGoogle(undefined, undefined, undefined, 'auto');
       if (result === 'signed-in') handleGoogleSuccess();
     } catch (err: any) {
+      if (err?.isRedirecting) {
+        setSuccessMessage('Redirecting to Google Sign-In...');
+        return;
+      }
       setLocalError(err?.message || 'Google sign-in failed. Please try again.');
     } finally {
       setIsGoogleSubmitting(false);
@@ -275,7 +279,18 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 <span>Open App in New Tab for Google Sign-In</span>
               </a>
             )}
-          {accountNotFoundPrompt && activeMode === 'signin' && (
+          {activeMode === 'signin' && /uses Google Sign-In/i.test(localError || authError || '') && (
+            <button
+              type="button"
+              onClick={handleDirectGoogleAuth}
+              disabled={isGoogleSubmitting}
+              className="mt-1 w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>{isGoogleSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</span>
+            </button>
+          )}
+          {accountNotFoundPrompt && activeMode === 'signin' && !/uses Google Sign-In/i.test(localError || authError || '') && (
             <button
               type="button"
               onClick={() => {
@@ -288,6 +303,20 @@ export const AuthView: React.FC<AuthViewProps> = ({
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Create New Account with {email || 'this email'}</span>
+            </button>
+          )}
+          {activeMode === 'signup' && /already exists/i.test(localError || authError || '') && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('signin');
+                setLocalError(null);
+                clearAuthError();
+              }}
+              className="mt-1 w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In to Existing Account ({email || 'Enter Password'})</span>
             </button>
           )}
         </div>
@@ -346,6 +375,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 Specific email &rarr;
               </button>
             </div>
+            {typeof window !== 'undefined' && window.self !== window.top && (
+              <div className="text-right">
+                <a
+                  href={window.location.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Open in new tab if preview blocks Google popup</span>
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

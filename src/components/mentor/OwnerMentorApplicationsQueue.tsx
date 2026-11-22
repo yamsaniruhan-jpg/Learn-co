@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { MentorApplicationRecord, MentorApplicationStatus } from '../../types/mentorship';
 import { MentorshipClient } from '../../services/mentorshipClient';
+import {
+  fetchOwnerMentorApplicationsFromFirestore,
+  syncOwnerApplicationDecisionToFirestore,
+} from '../../services/clientFirestoreSync';
 import { Button } from '../ui/Button';
 
 interface OwnerMentorApplicationsQueueProps {
@@ -43,9 +47,23 @@ export const OwnerMentorApplicationsQueue: React.FC<OwnerMentorApplicationsQueue
     setIsLoading(true);
     setError(null);
     try {
-      const data = await MentorshipClient.getAllMentorApplications();
-      setApplications(data.applications);
-      setCounts(data.counts);
+      const [data, fsApps] = await Promise.all([
+        MentorshipClient.getAllMentorApplications(),
+        fetchOwnerMentorApplicationsFromFirestore(),
+      ]);
+      const merged = new Map<string, MentorApplicationRecord>();
+      for (const app of fsApps) merged.set(app.id, app);
+      for (const app of data.applications) merged.set(app.id, app);
+      const sorted = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+      setApplications(sorted);
+      setCounts({
+        total: sorted.length,
+        pending: sorted.filter((a) => a.status === 'PENDING').length,
+        approved: sorted.filter((a) => a.status === 'APPROVED').length,
+        rejected: sorted.filter((a) => a.status === 'REJECTED').length,
+      });
       setRoutedToEmail(data.routedToEmail || 'yamsaniruhan@gmail.com');
       if (data.storage) setStorageMode(data.storage);
     } catch (err: any) {
@@ -59,30 +77,40 @@ export const OwnerMentorApplicationsQueue: React.FC<OwnerMentorApplicationsQueue
     loadApplications();
   }, [loadApplications]);
 
+  const [decisionMailtoUrl, setDecisionMailtoUrl] = useState<string | null>(null);
+
   const handleDecision = async (appId: string, action: 'APPROVE' | 'REJECT') => {
     setProcessingId(appId);
     setError(null);
+    setDecisionMailtoUrl(null);
     try {
       const note = notesByAppId[appId]?.trim() || undefined;
       const result = await MentorshipClient.decideMentorApplication(appId, action, note);
-      setApplications((prev) =>
-        prev.map((a) => (a.id === appId ? result.application : a))
-      );
-      setCounts((prev) => {
-        const nextList = applications.map((a) => (a.id === appId ? result.application : a));
-        return {
+      await syncOwnerApplicationDecisionToFirestore(result.application, result.mentorProfile);
+
+      setApplications((prev) => {
+        const nextList = prev.map((a) => (a.id === appId ? result.application : a));
+        setCounts({
           total: nextList.length,
           pending: nextList.filter((a) => a.status === 'PENDING').length,
           approved: nextList.filter((a) => a.status === 'APPROVED').length,
           rejected: nextList.filter((a) => a.status === 'REJECTED').length,
-        };
+        });
+        return nextList;
       });
+
+      const mailNote = result.emailDispatched
+        ? ` Notification email sent to ${result.application.applicantEmail}.`
+        : ` Saved in Firestore & database (email relay not configured on server; use Notify via Email App if desired).`;
+      if (!result.emailDispatched && result.mailtoUrl) {
+        setDecisionMailtoUrl(result.mailtoUrl);
+      }
+
       setFeedbackBanner(
         action === 'APPROVE'
-          ? `Approved ${result.application.fullName} (${result.application.applicantEmail}). Mentor profile is now live in Discover Mentors.`
-          : `Declined application from ${result.application.fullName}.`
+          ? `Approved ${result.application.fullName} (${result.application.applicantEmail}). Mentor profile is now live in Discover Mentors.${mailNote}`
+          : `Declined application from ${result.application.fullName}.${mailNote}`
       );
-      setTimeout(() => setFeedbackBanner(null), 5000);
       if (onApplicationDecided) {
         await onApplicationDecided();
       }
@@ -215,9 +243,20 @@ export const OwnerMentorApplicationsQueue: React.FC<OwnerMentorApplicationsQueue
       </div>
 
       {feedbackBanner && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{feedbackBanner}</span>
+        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-200 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{feedbackBanner}</span>
+          </div>
+          {decisionMailtoUrl && (
+            <a
+              href={decisionMailtoUrl}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 inline-flex items-center gap-1"
+            >
+              <Mail className="w-3 h-3" />
+              <span>Notify via Email App</span>
+            </a>
+          )}
         </div>
       )}
 

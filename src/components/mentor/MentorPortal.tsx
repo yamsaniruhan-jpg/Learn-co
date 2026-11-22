@@ -63,6 +63,15 @@ export const MentorPortal: React.FC<MentorPortalProps> = ({
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
 
+  React.useEffect(() => {
+    if (mentorProfile) {
+      setHeadline(mentorProfile.headline || '');
+      setBio(mentorProfile.bio || '');
+      setMentoringStyle(mentorProfile.mentoringStyle || '');
+      setAcceptingMentees(mentorProfile.acceptingNewMentees ?? true);
+    }
+  }, [mentorProfile]);
+
   const handleResponse = async (requestId: string, action: 'ACCEPT' | 'DECLINE') => {
     setIsResponding(requestId);
     try {
@@ -285,6 +294,7 @@ export const MentorPortal: React.FC<MentorPortalProps> = ({
                       </h4>
                       <p className="text-xs text-slate-500">
                         Subject: <strong className="text-slate-700 dark:text-slate-300">{req.subjectId.toUpperCase()}</strong> • Target: {req.targetTrack}
+                        {req.learnerEmail ? ` • ${req.learnerEmail}` : ''}
                       </p>
                     </div>
                   </div>
@@ -340,7 +350,7 @@ export const MentorPortal: React.FC<MentorPortalProps> = ({
                     onClick={() => handleResponse(req.id, 'ACCEPT')}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Accept Learner Application</span>
+                    <span>Yes, Accept Student</span>
                   </Button>
                 </div>
               </Card>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   SubjectId,
   PracticeSessionConfig,
@@ -12,12 +12,15 @@ import { useAuth } from '../../context/AuthContext';
 import { PracticeArena } from './PracticeArena';
 import { ConfidenceSummary } from './ConfidenceSummary';
 import { useLocalPractice } from '../../utils/localPractice';
+import { OfflineStorageManager } from '../../utils/offlineStorage';
 import { creatorPracticeTransferKey, readCreatorPracticeTransfer } from '../../utils/creatorPracticeTransfer';
 import { PracticeResultsView } from './PracticeResultsView';
 import { PracticeConfigModal } from '../learn/PracticeConfigModal';
 import { RecommendedPracticeView } from './RecommendedPracticeView';
 import { WeakTopicsView } from './WeakTopicsView';
 import { PracticeHistoryView } from './PracticeHistoryView';
+import { OlympiadContestView } from './OlympiadContestView';
+import { ICTCodeRunnerLab } from './ICTCodeRunnerLab';
 import { FormattedMathText } from '../common/FormattedMathText';
 import {
   Target,
@@ -32,6 +35,8 @@ import {
   Bot,
   ShieldCheck,
   Award,
+  Trophy,
+  Code2,
 } from 'lucide-react';
 
 export interface PracticeNavigationContext {
@@ -54,7 +59,9 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
 }) => {
   const { gamification, refreshUserData, user } = useAuth();
   const { attempts: localAttempts } = useLocalPractice(user?.id || null);
-  const [activeTab, setActiveTab] = useState<'hub' | 'recommendations' | 'weak_topics' | 'history' | 'bank'>('hub');
+  const [activeTab, setActiveTab] = useState<
+    'hub' | 'contest' | 'ict_runner' | 'recommendations' | 'weak_topics' | 'history' | 'bank'
+  >('hub');
   
   // Practice Session State
   const [activePracticeSession, setActivePracticeSession] = useState<{
@@ -164,11 +171,80 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
     }
   };
 
+  const seenQuestionIdsRef = useRef<Set<string>>(new Set());
+
+  // Cross-device solved ID sync from backend / Cloud SQL
+  useEffect(() => {
+    let active = true;
+    LearningClient.syncSolvedQuestionIds()
+      .then((ids) => {
+        if (!active) return;
+        for (const id of ids) {
+          if (id) seenQuestionIdsRef.current.add(id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  // Offline Olympiad Pack launch listener & handoff consumer
+  useEffect(() => {
+    const startPackSession = (packQuestions: QuestionBankItem[]) => {
+      if (!packQuestions || packQuestions.length === 0) return;
+      setSessionResults(null);
+      setActivePracticeSession({
+        config: {
+          sessionTitle: 'Offline Olympiad Study Pack',
+          examTrack: 'stem_olympiad',
+          questionCount: packQuestions.length,
+          timed: false,
+          mode: 'standard',
+        },
+        questions: packQuestions,
+      });
+    };
+
+    const pendingPack = OfflineStorageManager.consumeOfflinePackLaunch();
+    if (pendingPack) {
+      startPackSession(pendingPack.questions);
+    }
+
+    const handleOfflineLaunch = (ev: Event) => {
+      const pack = (ev as CustomEvent<{ questions?: QuestionBankItem[] }>).detail || OfflineStorageManager.getOlympiadPack();
+      if (pack?.questions?.length) {
+        OfflineStorageManager.consumeOfflinePackLaunch();
+        startPackSession(pack.questions);
+      }
+    };
+
+    window.addEventListener('learnco-launch-offline-olympiad-pack', handleOfflineLaunch);
+    return () => window.removeEventListener('learnco-launch-offline-olympiad-pack', handleOfflineLaunch);
+  }, []);
+
+  useEffect(() => {
+    for (const att of localAttempts) {
+      if (att.questionId) seenQuestionIdsRef.current.add(att.questionId);
+    }
+  }, [localAttempts]);
+
   const handleLaunchSession = async (config: PracticeSessionConfig) => {
     setIsConfigModalOpen(false);
     try {
-      const session = await LearningClient.startPracticeSession(config);
+      const mergedExcluded = Array.from(
+        new Set([
+          ...seenQuestionIdsRef.current,
+          ...localAttempts.map((a) => a.questionId).filter(Boolean),
+          ...(config.excludeQuestionIds ?? []),
+        ])
+      );
+      const session = await LearningClient.startPracticeSession({
+        ...config,
+        excludeQuestionIds: mergedExcluded,
+      });
       if (session && session.questions && session.questions.length > 0) {
+        session.questions.forEach((q) => seenQuestionIdsRef.current.add(q.id));
         setActivePracticeSession({
           config,
           questions: session.questions,
@@ -252,14 +328,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 </span>
                 <div className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Server-checked bank questions</span>
+                  <span>Server-checked bank &amp; non-repeating Olympiad sets</span>
                 </div>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Practice & Diagnostic Engine
+                Practice &amp; Diagnostic Engine
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Practice across Mathematics, CS & AI, Physics, Chemistry, and Biology. Eligible correct bank answers can earn server XP; custom and offline answers may be unverified or provisional.
+                Practice across Mathematics, CS &amp; AI, Physics, Chemistry, Biology, IPhO/IChO/IBHO/IJSO, and ICT Coding. Solved items sync across devices so problem ladders never repeat.
               </p>
 
               {/* Quick Actions */}
@@ -267,7 +343,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
-                  className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
                 >
                   <Zap className="w-3.5 h-3.5 fill-current text-slate-950" />
                   <span>60s Flash Check (+15 XP)</span>
@@ -275,7 +351,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('learnco-toggle-zen-mode'))}
-                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <span>Zen Study Mode</span>
                 </button>
@@ -287,7 +363,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
               <div className="text-[11px] uppercase tracking-wider text-slate-300 font-semibold mb-1">
                 Daily Limit Quota
               </div>
-              <div className="text-2xl font-mono font-bold text-white">
+              <div className="text-2xl font-mono font-bold text-white tabular-nums">
                 <span className="text-amber-400">{dailyQuotaRemaining}</span> / 25
               </div>
               <div className="text-[10px] text-slate-400 mt-1">Questions remaining today</div>
@@ -355,6 +431,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto pb-1">
             {[
               { id: 'hub', label: 'Practice Hub & Ladders', icon: Target },
+              { id: 'contest', label: 'Olympiad Mock Contest', icon: Trophy },
+              { id: 'ict_runner', label: 'ICT Code Runner', icon: Code2 },
               { id: 'recommendations', label: `Recommended (${recommendations.length})`, icon: Sparkles },
               { id: 'weak_topics', label: `Weak Topics (${weakTopics.length})`, icon: ShieldAlert },
               { id: 'history', label: 'Attempt History', icon: History },
@@ -366,7 +444,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                     isActive
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
@@ -383,13 +461,59 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           {activeTab === 'hub' && (
             <div className="space-y-6">
               <ConfidenceSummary attempts={localAttempts} />
+
+              {/* Olympiad & ICT Dedicated Launch Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('contest')}
+                  className="min-h-[44px] p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 text-left shadow-sm flex items-center justify-between gap-4 transition-all cursor-pointer"
+                >
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                      Timed Simulation &middot; IPhO &middot; IChO &middot; IBHO &middot; IJSO &middot; ICT
+                    </div>
+                    <div className="text-base font-black text-slate-900 dark:text-white">
+                      Launch Olympiad Mock Contest
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      30 / 60 / 120 min timed papers with question flagging palette, sealed keys until submission, and medal standing.
+                    </p>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center shrink-0">
+                    <Trophy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('ict_runner')}
+                  className="min-h-[44px] p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500 text-left shadow-sm flex items-center justify-between gap-4 transition-all cursor-pointer"
+                >
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      ICT Coding Lab &middot; Isolated Web Worker Sandbox
+                    </div>
+                    <div className="text-base font-black text-slate-900 dark:text-white">
+                      Open ICT In-Browser Code Runner
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Write JavaScript solutions for Kadane DP, Rotated Binary Search, Knapsack, Dijkstra &amp; Fenwick Tree and run hidden test suites offline.
+                    </p>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center shrink-0">
+                    <Code2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                </button>
+              </div>
+
               {/* Subject 5-Question Ladder Starters */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                     Launch Calibrated 5-Question Ladders by Subject
                   </h3>
-                  <span className="text-xs text-slate-400">Easy → Medium → Hard progression</span>
+                  <span className="text-xs text-slate-400">Easy &rarr; Medium &rarr; Hard progression</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
@@ -472,6 +596,12 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
             </div>
           )}
 
+          {/* TAB: OLYMPIAD MOCK CONTEST */}
+          {activeTab === 'contest' && <OlympiadContestView />}
+
+          {/* TAB: ICT CODE RUNNER */}
+          {activeTab === 'ict_runner' && <ICTCodeRunnerLab />}
+
           {/* TAB 2: RECOMMENDATIONS */}
           {activeTab === 'recommendations' && (
             <RecommendedPracticeView
@@ -508,6 +638,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                     <option value="physics">Physics</option>
                     <option value="chemistry">Chemistry</option>
                     <option value="biology">Biology</option>
+                    <option value="english">English</option>
+                    <option value="data_science">Data Science</option>
                   </select>
                 </div>
 

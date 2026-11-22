@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   auth: { app: {}, currentUser: null as null | { email: string } },
   firebaseSignIn: vi.fn(), firebaseSignOut: vi.fn(async () => {}),
   popup: vi.fn(), redirect: vi.fn(), redirectResult: vi.fn(async (): Promise<any> => null), google: vi.fn(), signUp: vi.fn(),
+  onAuthStateChanged: vi.fn(),
 }));
 vi.mock('../src/services/authClient', () => ({ AuthClient: { ...mocks, signInWithGoogle: mocks.google } }));
 vi.mock('../src/services/clientFirestoreSync', () => ({
@@ -19,6 +20,7 @@ vi.mock('../src/services/firebaseClient', () => ({
   auth: mocks.auth, googleProvider: {}, signInWithPopup: mocks.popup,
   signInWithRedirect: mocks.redirect, getRedirectResult: mocks.redirectResult,
   signInWithEmailAndPassword: mocks.firebaseSignIn, createUserWithEmailAndPassword: vi.fn(), signOut: mocks.firebaseSignOut,
+  onAuthStateChanged: mocks.onAuthStateChanged,
 }));
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 
@@ -30,8 +32,11 @@ let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
+  sessionStorage.clear();
   mocks.getToken.mockReset(); mocks.getMe.mockReset(); mocks.removeToken.mockReset(); mocks.signIn.mockReset();
+  mocks.google.mockReset();
   mocks.setCurrentUser.mockReset();
+  mocks.onAuthStateChanged.mockReset();
   mocks.firebaseSignIn.mockReset(); mocks.firebaseSignOut.mockClear(); mocks.auth.currentUser = null;
   mocks.popup.mockReset(); mocks.redirect.mockReset(); mocks.google.mockReset(); mocks.signUp.mockReset();
   mocks.updateProfile.mockReset(); mocks.updateSettings.mockReset(); mocks.uploadAvatar.mockReset(); mocks.saveOnboarding.mockReset(); mocks.signOut.mockClear();
@@ -190,5 +195,16 @@ describe('session refresh failures', () => {
     token = 'new-session';
     await act(async () => { reject(Object.assign(new Error('unauthorized'), { status: 401 })); });
     expect(mocks.removeToken).not.toHaveBeenCalled();
+  });
+
+  it('does not exchange a persisted Firebase identity when a pending redirect has no result', async () => {
+    mocks.getToken.mockReturnValue(null);
+    mocks.auth.currentUser = { email: 'alice@example.test' };
+    sessionStorage.setItem('learnco_google_redirect_pending', JSON.stringify({ intent: 'signin' }));
+    await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
+    expect(mocks.google).not.toHaveBeenCalled();
+    expect(snapshot.isAuthenticated).toBe(false);
+    expect(snapshot.authError).toMatch(/could not be completed/i);
+    expect(sessionStorage.getItem('learnco_google_redirect_pending')).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* Semantic utilities resolve the existing light/dark variables at the element. */
 @theme inline {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePWAInstall } from './usePWAInstall';
+import { OfflineStorageManager } from '../../utils/offlineStorage';
 import {
   Download,
   Smartphone,
@@ -45,10 +46,10 @@ function buildDesktopFile(os: ShortcutOS, appUrl: string): {
   switch (os) {
     case 'windows':
       return {
-        filename: 'LearnCo-Windows-App.bat',
-        mimeType: 'text/plain',
-        label: 'Windows Desktop App (.bat)',
-        content: `@echo off\ntitle LearnCo Desktop App\nstart "" "${safeUrl}"\n`,
+        filename: 'LearnCo-Windows-App.url',
+        mimeType: 'application/internet-shortcut',
+        label: 'Windows Shortcut (.url)',
+        content: `[InternetShortcut]\r\nURL=${safeUrl}\r\nIconIndex=0\r\n`,
       };
     case 'macos':
       return {
@@ -176,6 +177,8 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [downloadedFile, setDownloadedFile] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [syncingPack, setSyncingPack] = useState(false);
+  const [packMessage, setPackMessage] = useState<string | null>(null);
 
   const detectedOS = useMemo(() => detectDesktopOS(), []);
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -332,7 +335,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
                   <Download className="w-4 h-4 shrink-0 text-[#00B8A9]" />
                   <span>
                     {detectedOS === 'windows'
-                      ? 'Windows (.bat)'
+                      ? 'Windows (.url)'
                       : detectedOS === 'macos'
                       ? 'macOS (.webloc)'
                       : 'Linux (.desktop)'}
@@ -429,6 +432,29 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact }) =
               </div>
             )}
 
+            <div className="space-y-2 text-xs text-[#2D2A4A] dark:text-[#F1EFFF]">
+              <button
+                type="button"
+                disabled={syncingPack}
+                onClick={async () => {
+                  setSyncingPack(true);
+                  setPackMessage(null);
+                  try {
+                    const pack = await OfflineStorageManager.downloadOlympiadPack();
+                    setPackMessage(`Cached ${pack.questions.length} problems (${pack.approxSizeKb} KB) on this device.`);
+                  } catch {
+                    setPackMessage('Could not cache the study pack. Please check storage and try again.');
+                  } finally {
+                    setSyncingPack(false);
+                  }
+                }}
+                className="w-full min-h-[44px] rounded-xl bg-[#00B8A9] px-4 py-2 font-bold text-white disabled:opacity-60"
+              >
+                {syncingPack ? 'Caching study pack...' : 'Cache offline study pack'}
+              </button>
+              {packMessage && <p role="status">{packMessage}</p>}
+              <p>Saved practice may need a connection and an active session to sync.</p>
+            </div>
             <button
               type="button"
               onClick={() => setShowInstallGuide(false)}

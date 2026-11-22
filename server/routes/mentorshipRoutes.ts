@@ -6,7 +6,20 @@ import { AdaptiveAnalyticsEngine } from '../services/adaptiveAnalyticsEngine';
 // Legacy CommonJS service (its folder is marked "type": "commonjs").
 import mentorshipService from '../../services/mentorshipService';
 import { adminDb } from '../services/firebaseAdmin';
-import { sendMail, isMailerConfigured } from '../services/mailer';
+import {
+  sendMail,
+  isMailerConfigured,
+  getMailerStatus,
+  getConfiguredAppOrigin,
+  buildMailtoUrl,
+  isValidEmailAddress,
+  createMentorshipEmailActionToken,
+  verifyMentorshipEmailActionToken,
+  buildMentorApplicationMessage,
+  buildMentorApplicationDecisionMessage,
+  buildMentorshipRequestMessage,
+  buildMentorshipResponseToStudentMessage,
+} from '../services/mailer';
 import {
   createSqlMentorApplication,
   listSqlMentorApplications,
@@ -22,6 +35,45 @@ export const mentorshipRouter = Router();
 
 function isPlatformOwnerOrAdmin(req: AuthenticatedRequest): boolean {
   return getEffectiveRole(req) === 'admin';
+}
+
+function escapeHtmlSafe(value: string): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderEmailActionHtml(params: {
+  title: string;
+  subtitle: string;
+  bodyHtml: string;
+  accent?: string;
+}): string {
+  const accent = params.accent || '#059669';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>${escapeHtmlSafe(params.title)} — Learn.co</title>
+</head>
+<body style="margin:0;padding:32px 16px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;">
+  <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;padding:28px;box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+    <div style="display:inline-block;padding:4px 10px;border-radius:999px;background:${accent}1a;color:${accent};font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px;">
+      Learn.co Mentorship
+    </div>
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0f172a;">${escapeHtmlSafe(params.title)}</h1>
+    <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.5;">${escapeHtmlSafe(params.subtitle)}</p>
+    ${params.bodyHtml}
+    <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;">
+      You can close this tab or <a href="/" style="color:#4f46e5;font-weight:600;text-decoration:none;">open Learn.co</a>.
+    </p>
+  </div>
+</body>
+</html>`;
 }
 
 // Public mentor directory endpoints are declared first; all routes below require auth.
@@ -56,6 +108,206 @@ mentorshipRouter.get('/mentors/:id', (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// 2a. GET /api/mentorship/mail-status - Truthful email relay capability check
+mentorshipRouter.get('/mail-status', (_req: Request, res: Response) => {
+  res.json({ success: true, ...getMailerStatus() });
+});
+
+// 2b. GET /api/mentorship/requests/:id/email-respond - Signed confirmation page from mentor's email click
+mentorshipRouter.get('/requests/:id/email-respond', (req: Request, res: Response) => {
+  const token = String(req.query?.token || '').trim();
+  const verified = verifyMentorshipEmailActionToken(token, req.params.id);
+  if (verified.valid === false) {
+    const reason = (verified as { valid: false; reason: string }).reason;
+    return res
+      .status(400)
+      .type('html')
+      .send(
+        renderEmailActionHtml({
+          title: 'Invalid or Expired Mentorship Link',
+          subtitle: reason,
+          accent: '#e11d48',
+          bodyHtml:
+            '<p style="font-size:13px;color:#475569;">Please sign in to Learn.co and open <strong>Mentorship → Educator Portal</strong> to respond to pending requests.</p>',
+        })
+      );
+  }
+
+  const request = Database.getMentorshipRequestById(req.params.id);
+  if (!request) {
+    return res
+      .status(404)
+      .type('html')
+      .send(
+        renderEmailActionHtml({
+          title: 'Mentorship Request Not Found',
+          subtitle: 'This request may have been cancelled by the student.',
+          accent: '#e11d48',
+          bodyHtml: '',
+        })
+      );
+  }
+
+  if (request.status !== 'PENDING') {
+    return res
+      .status(200)
+      .type('html')
+      .send(
+        renderEmailActionHtml({
+          title: `Request Already ${request.status}`,
+          subtitle: `You already responded to ${request.learnerName}'s mentorship request.`,
+          accent: request.status === 'ACCEPTED' ? '#059669' : '#64748b',
+          bodyHtml: `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;font-size:13px;">
+            <div><strong>Student:</strong> ${escapeHtmlSafe(request.learnerName)}</div>
+            <div><strong>Subject:</strong> ${escapeHtmlSafe(request.subjectId.toUpperCase())}</div>
+            <div><strong>Status:</strong> ${escapeHtmlSafe(request.status)}</div>
+          </div>`,
+        })
+      );
+  }
+
+  const isAccept = verified.action === 'ACCEPT';
+  return res
+    .status(200)
+    .type('html')
+    .send(
+      renderEmailActionHtml({
+        title: isAccept ? 'Confirm Accepting Student?' : 'Confirm Declining Request?',
+        subtitle: `${request.learnerName}${request.learnerEmail ? ` (${request.learnerEmail})` : ''} requested mentorship in ${request.subjectId.toUpperCase()}.`,
+        accent: isAccept ? '#059669' : '#e11d48',
+        bodyHtml: `
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:18px;font-size:13px;line-height:1.6;">
+            <div><strong>Track:</strong> ${escapeHtmlSafe(request.targetTrack)}</div>
+            <div><strong>Cadence:</strong> ${escapeHtmlSafe(request.preferredCadence)}</div>
+            <div><strong>Goal:</strong> ${escapeHtmlSafe(request.goalDescription)}</div>
+            <div style="margin-top:8px;"><strong>Message:</strong> ${escapeHtmlSafe(request.initialMessage)}</div>
+          </div>
+          <form method="POST" action="/api/mentorship/requests/${encodeURIComponent(req.params.id)}/email-respond" style="space-y:12px;">
+            <input type="hidden" name="token" value="${escapeHtmlSafe(token)}" />
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:#334155;">Optional Note to Student</label>
+            <textarea name="note" rows="3" placeholder="Write a quick welcome or scheduling note..." style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;margin-bottom:14px;"></textarea>
+            <button type="submit" style="width:100%;padding:12px 18px;border:none;border-radius:12px;background:${isAccept ? '#059669' : '#e11d48'};color:#ffffff;font-weight:700;font-size:14px;cursor:pointer;">
+              ${isAccept ? 'Yes, Accept Student as Mentee' : 'Confirm Decline Request'}
+            </button>
+          </form>
+        `,
+      })
+    );
+});
+
+// 2c. POST /api/mentorship/requests/:id/email-respond - Executes mentor's signed email click Yes/Decline
+mentorshipRouter.post('/requests/:id/email-respond', async (req: Request, res: Response) => {
+  const token = String(req.body?.token || req.query?.token || '').trim();
+  const note = typeof req.body?.note === 'string' && req.body.note.trim() ? req.body.note.trim() : undefined;
+  const wantsJson = Boolean(req.headers.accept?.includes('application/json'));
+
+  const verified = verifyMentorshipEmailActionToken(token, req.params.id);
+  if (verified.valid === false) {
+    const reason = (verified as { valid: false; reason: string }).reason;
+    if (wantsJson) {
+      return res.status(400).json({ success: false, error: reason });
+    }
+    return res
+      .status(400)
+      .type('html')
+      .send(
+        renderEmailActionHtml({
+          title: 'Invalid or Expired Link',
+          subtitle: reason,
+          accent: '#e11d48',
+          bodyHtml: '',
+        })
+      );
+  }
+
+  const result = Database.respondMentorshipRequestByEmailAction(
+    req.params.id,
+    verified.mentorId,
+    verified.action,
+    note
+  );
+
+  if (result.error && !result.alreadyProcessed) {
+    if (wantsJson) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+    return res
+      .status(400)
+      .type('html')
+      .send(
+        renderEmailActionHtml({
+          title: 'Could Not Process Request',
+          subtitle: result.error,
+          accent: '#e11d48',
+          bodyHtml: '',
+        })
+      );
+  }
+
+  let emailDispatched = false;
+  if (result.request && !result.alreadyProcessed) {
+    if (adminDb) {
+      try {
+        await adminDb.collection('mentorship_requests').doc(result.request.id).set(result.request, { merge: true });
+        if (result.relationship) {
+          await adminDb.collection('mentorship_relationships').doc(result.relationship.id).set(result.relationship);
+        }
+      } catch (fbErr) {
+        console.warn('[Firestore] Email-action mentorship mirror skipped:', fbErr);
+      }
+    }
+
+    const studentEmail = result.request.learnerEmail;
+    if (studentEmail && isValidEmailAddress(studentEmail) && isMailerConfigured()) {
+      const mailRes = await sendMail(
+        buildMentorshipResponseToStudentMessage({
+          studentEmail,
+          studentName: result.request.learnerName,
+          mentorName: result.request.mentorName,
+          mentorEmail: result.request.mentorEmail,
+          subjectId: result.request.subjectId,
+          action: verified.action,
+          note,
+        })
+      );
+      emailDispatched = mailRes.delivered;
+    }
+  }
+
+  if (wantsJson) {
+    return res.json({
+      success: true,
+      request: result.request,
+      relationship: result.relationship,
+      alreadyProcessed: !!result.alreadyProcessed,
+      emailDispatched,
+    });
+  }
+
+  const isAccept = verified.action === 'ACCEPT';
+  return res
+    .status(200)
+    .type('html')
+    .send(
+      renderEmailActionHtml({
+        title: result.alreadyProcessed
+          ? `Request Already ${result.request?.status}`
+          : isAccept
+          ? 'Student Accepted!'
+          : 'Request Declined',
+        subtitle: result.alreadyProcessed
+          ? 'No duplicate changes were made.'
+          : isAccept
+          ? `${result.request?.learnerName} is now in your active mentee cohort.`
+          : `You declined ${result.request?.learnerName}'s request.`,
+        accent: isAccept ? '#059669' : '#64748b',
+        bodyHtml: `<p style="font-size:13px;color:#475569;line-height:1.6;">
+          ${emailDispatched ? 'An acceptance email has also been delivered to the student.' : 'Your response has been saved in Learn.co.'}
+        </p>`,
+      })
+    );
 });
 
 // All private and mutating mentorship routes require authentication
@@ -160,11 +412,8 @@ mentorshipRouter.post('/applications', async (req: AuthenticatedRequest, res: Re
         bio: cleanBio,
       });
     } catch (sqlErr: any) {
-      console.error('[Mentorship] Cloud SQL application insert error:', sqlErr?.message || sqlErr);
-      return res.status(503).json({
-        success: false,
-        error: 'Unable to save application to PostgreSQL right now. Please try again shortly.',
-      });
+      console.warn('[Mentorship] Cloud SQL application insert fallback:', sqlErr?.message || sqlErr);
+      record = null;
     }
 
     if (!record) {
@@ -195,6 +444,7 @@ mentorshipRouter.post('/applications', async (req: AuthenticatedRequest, res: Re
     Database.saveMentorApplication(record);
 
     // Mirror to Firebase Firestore console
+    let firestoreSynced = false;
     if (adminDb) {
       try {
         await adminDb.collection('mentor_applications').doc(record.id).set({
@@ -211,6 +461,7 @@ mentorshipRouter.post('/applications', async (req: AuthenticatedRequest, res: Re
           read: false,
           createdAt: record.submittedAt,
         });
+        firestoreSynced = true;
       } catch (fbErr: any) {
         console.warn('[Firestore] Mentor application sync skipped:', fbErr?.message || fbErr);
       }
@@ -237,28 +488,33 @@ mentorshipRouter.post('/applications', async (req: AuthenticatedRequest, res: Re
       { applicationId: record.id, routedTo: PLATFORM_OWNER_EMAIL, subjectId: record.subjectId }
     );
 
+    const appMessage = buildMentorApplicationMessage({
+      ownerEmail: PLATFORM_OWNER_EMAIL,
+      applicationId: record.id,
+      fullName: record.fullName,
+      applicantEmail: record.applicantEmail,
+      degree: record.degree,
+      institution: record.institution,
+      subjectId: record.subjectId,
+      experienceYears: record.experienceYears,
+      capacity: record.capacity,
+      hourlyRate: record.hourlyRate,
+      bio: record.bio,
+    });
+    const mailtoUrl = buildMailtoUrl(PLATFORM_OWNER_EMAIL, appMessage.subject, appMessage.text);
+
     // Send email notification directly to platform owner if SMTP/Resend is configured
     let emailDispatched = false;
+    let emailProvider: string = 'none';
+    let emailReason: string | undefined = isMailerConfigured() ? undefined : 'not_configured';
+
     if (isMailerConfigured()) {
-      const mailResult = await sendMail({
-        to: PLATFORM_OWNER_EMAIL,
-        subject: `[Learn.co] New Mentor Application from ${record.fullName}`,
-        text: [
-          `A new mentor application has been submitted on Learn.co and saved to PostgreSQL.`,
-          '',
-          `Application ID: ${record.id}`,
-          `Applicant: ${record.fullName} (${record.applicantEmail})`,
-          `Credentials: ${record.degree} — ${record.institution}`,
-          `Subject: ${record.subjectId.toUpperCase()}`,
-          `Experience: ${record.experienceYears} year(s) | Capacity: ${record.capacity} mentees | Rate: $${record.hourlyRate}/hr`,
-          '',
-          `Statement:`,
-          record.bio,
-          '',
-          `Review & approve/decline in Learn.co -> Mentorship -> Mentor Access & Approvals (or Admin Studio).`,
-        ].join('\n'),
-      });
+      const mailResult = await sendMail(appMessage);
       emailDispatched = mailResult.delivered;
+      emailProvider = mailResult.provider;
+      if (mailResult.delivered === false) {
+        emailReason = mailResult.reason;
+      }
     }
 
     res.status(201).json({
@@ -266,6 +522,10 @@ mentorshipRouter.post('/applications', async (req: AuthenticatedRequest, res: Re
       application: record,
       routedToEmail: PLATFORM_OWNER_EMAIL,
       emailDispatched,
+      emailProvider,
+      emailReason,
+      firestoreSynced,
+      mailtoUrl,
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message || 'Failed to submit mentor application.' });
@@ -321,10 +581,8 @@ mentorshipRouter.get('/applications', async (req: AuthenticatedRequest, res: Res
     try {
       sqlApps = await listSqlMentorApplications();
     } catch (sqlErr: any) {
-      return res.status(503).json({
-        success: false,
-        error: sqlErr?.message || 'Unable to fetch applications from PostgreSQL.',
-      });
+      console.warn('[Mentorship] Cloud SQL list applications fallback:', sqlErr?.message || sqlErr);
+      sqlApps = null;
     }
 
     const localApps = Database.listMentorApplicationsLocal();
@@ -389,8 +647,8 @@ mentorshipRouter.post('/applications/:id/decision', async (req: AuthenticatedReq
     }
 
     let updated = await decideSqlMentorApplication(appId, decision, reviewerEmail, note).catch((err) => {
-      console.error('[CloudSQL] Application decision update error:', err);
-      throw err;
+      console.warn('[CloudSQL] Application decision update fallback:', err?.message || err);
+      return null;
     });
 
     if (!updated) {
@@ -416,6 +674,7 @@ mentorshipRouter.post('/applications/:id/decision', async (req: AuthenticatedReq
       await updateSqlUserRole(updated.applicantUid, applicantProfile?.role === 'admin' ? 'admin' : 'educator').catch(() => null);
 
       publishedMentorProfile = Database.createOrUpdateMentorProfile(updated.applicantUid, {
+        email: updated.applicantEmail,
         name: updated.fullName,
         education: `${updated.degree}, ${updated.institution}`,
         subjects: [updated.subjectId as any],
@@ -447,6 +706,7 @@ mentorshipRouter.post('/applications/:id/decision', async (req: AuthenticatedReq
           await adminDb.collection('mentors').doc(publishedMentorProfile.id).set({
             id: publishedMentorProfile.id,
             userId: updated.applicantUid,
+            email: updated.applicantEmail,
             name: updated.fullName,
             status: 'active',
             subjects: publishedMentorProfile.subjects,
@@ -479,24 +739,32 @@ mentorshipRouter.post('/applications/:id/decision', async (req: AuthenticatedReq
       { applicationId: updated.id, applicantUid: updated.applicantUid }
     );
 
-    if (isMailerConfigured() && updated.applicantEmail) {
-      void sendMail({
-        to: updated.applicantEmail,
-        subject:
-          decision === 'APPROVED'
-            ? '[Learn.co] Your Mentor Application Has Been Approved'
-            : '[Learn.co] Update on Your Mentor Application',
-        text:
-          decision === 'APPROVED'
-            ? `Congratulations ${updated.fullName}! Your Learn.co Mentor Application has been approved. Your Educator Portal and public Mentor profile are now active.`
-            : `Hello ${updated.fullName}, thank you for applying to mentor on Learn.co. Your application was not approved at this time.${updated.reviewerNote ? `\n\nReviewer Note: ${updated.reviewerNote}` : ''}`,
+    let emailDispatched = false;
+    let emailReason: string | undefined = isMailerConfigured() ? undefined : 'not_configured';
+    let mailtoUrl: string | undefined;
+
+    if (updated.applicantEmail && isValidEmailAddress(updated.applicantEmail)) {
+      const decisionMsg = buildMentorApplicationDecisionMessage({
+        applicantEmail: updated.applicantEmail,
+        fullName: updated.fullName,
+        decision,
+        reviewerNote: updated.reviewerNote,
       });
+      mailtoUrl = buildMailtoUrl(updated.applicantEmail, decisionMsg.subject, decisionMsg.text);
+      if (isMailerConfigured()) {
+        const mailResult = await sendMail(decisionMsg);
+        emailDispatched = mailResult.delivered;
+        if (mailResult.delivered === false) emailReason = mailResult.reason;
+      }
     }
 
     res.json({
       success: true,
       application: updated,
       mentorProfile: publishedMentorProfile,
+      emailDispatched,
+      emailReason,
+      mailtoUrl,
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message || 'Failed to record decision.' });
@@ -529,16 +797,36 @@ mentorshipRouter.get('/recommendations', (req: Request, res: Response) => {
   }
 });
 
-// 5. POST /api/mentorship/requests - Submit mentorship request
-mentorshipRouter.post('/requests', (req: Request, res: Response) => {
+// 5. POST /api/mentorship/requests - Submit mentorship request & email mentor with signed Yes/Decline form
+mentorshipRouter.post('/requests', async (req: Request, res: Response) => {
   try {
-    const userId = (req as AuthenticatedRequest).userId!;
-    const { mentorId, subjectId, targetTrack, goalDescription, initialMessage, preferredCadence } = req.body;
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.userId!;
+    const {
+      mentorId,
+      subjectId,
+      targetTrack,
+      goalDescription,
+      initialMessage,
+      preferredCadence,
+      learnerEmail,
+    } = req.body || {};
 
     if (!mentorId || !subjectId || !goalDescription || !initialMessage) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: mentorId, subjectId, goalDescription, initialMessage',
+      });
+    }
+
+    const cleanLearnerEmail = typeof learnerEmail === 'string' && learnerEmail.trim()
+      ? learnerEmail.trim().toLowerCase()
+      : (authReq.user?.email || '').trim().toLowerCase();
+
+    if (!isValidEmailAddress(cleanLearnerEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid contact email address for your mentorship request.',
       });
     }
 
@@ -549,13 +837,81 @@ mentorshipRouter.post('/requests', (req: Request, res: Response) => {
       goalDescription,
       initialMessage,
       preferredCadence,
+      learnerEmail: cleanLearnerEmail,
     });
 
     if (error) {
       return res.status(400).json({ success: false, error });
     }
 
-    res.status(201).json({ success: true, request });
+    const mentor = Database.getMentor(request.mentorId);
+    const mentorEmail = (request.mentorEmail || mentor?.email || '').trim().toLowerCase();
+
+    if (adminDb) {
+      try {
+        await adminDb.collection('mentorship_requests').doc(request.id).set(request);
+        if (mentor?.userId) {
+          await adminDb.collection('notifications').add({
+            userId: mentor.userId,
+            type: 'mentorship_request',
+            requestId: request.id,
+            message: `${request.learnerName} (${cleanLearnerEmail}) requested mentorship in ${String(subjectId).toUpperCase()}.`,
+            read: false,
+            createdAt: request.createdAt,
+          });
+        }
+      } catch (fbErr) {
+        console.warn('[Firestore] Mentorship request mirror skipped:', fbErr);
+      }
+    }
+
+    let emailDispatched = false;
+    let emailProvider: string = 'none';
+    let emailReason: string | undefined = isMailerConfigured() ? undefined : 'not_configured';
+    let mailtoUrl: string | undefined;
+
+    if (mentorEmail && isValidEmailAddress(mentorEmail)) {
+      const origin = getConfiguredAppOrigin();
+      const acceptToken = createMentorshipEmailActionToken(request.id, request.mentorId, 'ACCEPT');
+      const declineToken = createMentorshipEmailActionToken(request.id, request.mentorId, 'DECLINE');
+      const acceptUrl = `${origin}/api/mentorship/requests/${encodeURIComponent(request.id)}/email-respond?token=${encodeURIComponent(acceptToken)}`;
+      const declineUrl = `${origin}/api/mentorship/requests/${encodeURIComponent(request.id)}/email-respond?token=${encodeURIComponent(declineToken)}`;
+
+      const requestMail = buildMentorshipRequestMessage({
+        mentorEmail,
+        mentorName: request.mentorName,
+        learnerName: request.learnerName,
+        learnerEmail: cleanLearnerEmail,
+        subjectId: String(request.subjectId),
+        targetTrack: request.targetTrack,
+        preferredCadence: request.preferredCadence,
+        goalDescription: request.goalDescription,
+        initialMessage: request.initialMessage,
+        acceptUrl,
+        declineUrl,
+      });
+
+      mailtoUrl = buildMailtoUrl(mentorEmail, requestMail.subject, requestMail.text);
+
+      if (isMailerConfigured()) {
+        const mailRes = await sendMail(requestMail);
+        emailDispatched = mailRes.delivered;
+        emailProvider = mailRes.provider;
+        if (mailRes.delivered === false) emailReason = mailRes.reason;
+      }
+    } else {
+      emailReason = 'mentor_email_missing';
+    }
+
+    res.status(201).json({
+      success: true,
+      request,
+      mentorEmail: mentorEmail || null,
+      emailDispatched,
+      emailProvider,
+      emailReason,
+      mailtoUrl,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -572,22 +928,67 @@ mentorshipRouter.get('/requests', (req: Request, res: Response) => {
   }
 });
 
-// 7. POST /api/mentorship/requests/:id/respond - Accept/decline request
-mentorshipRouter.post('/requests/:id/respond', (req: Request, res: Response) => {
+// 7. POST /api/mentorship/requests/:id/respond - Mentor clicks Yes (ACCEPT) or DECLINE
+mentorshipRouter.post('/requests/:id/respond', async (req: Request, res: Response) => {
   try {
-    const userId = (req as AuthenticatedRequest).userId!;
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.userId!;
     const { action, note } = req.body;
 
     if (action !== 'ACCEPT' && action !== 'DECLINE') {
       return res.status(400).json({ success: false, error: 'Action must be ACCEPT or DECLINE' });
     }
 
-    const result = Database.respondMentorshipRequest(userId, req.params.id, action, note);
+    const result = Database.respondMentorshipRequest(userId, req.params.id, action, note, {
+      allowAdminOverride: isPlatformOwnerOrAdmin(authReq),
+    });
     if (result.error) {
-      return res.status(400).json({ success: false, error: result.error });
+      return res.status(result.forbidden ? 403 : 400).json({ success: false, error: result.error });
     }
 
-    res.json({ success: true, request: result.request, relationship: result.relationship });
+    if (adminDb && result.request) {
+      try {
+        await adminDb.collection('mentorship_requests').doc(result.request.id).set(result.request, { merge: true });
+        if (result.relationship) {
+          await adminDb.collection('mentorship_relationships').doc(result.relationship.id).set(result.relationship);
+        }
+      } catch (fbErr) {
+        console.warn('[Firestore] Mentorship decision mirror skipped:', fbErr);
+      }
+    }
+
+    let emailDispatched = false;
+    let emailReason: string | undefined = isMailerConfigured() ? undefined : 'not_configured';
+    let mailtoUrl: string | undefined;
+    const studentEmail = result.request?.learnerEmail;
+
+    if (result.request && studentEmail && isValidEmailAddress(studentEmail)) {
+      const msg = buildMentorshipResponseToStudentMessage({
+        studentEmail,
+        studentName: result.request.learnerName,
+        mentorName: result.request.mentorName,
+        mentorEmail: result.request.mentorEmail,
+        subjectId: String(result.request.subjectId),
+        action,
+        note,
+      });
+      mailtoUrl = buildMailtoUrl(studentEmail, msg.subject, msg.text);
+      if (isMailerConfigured()) {
+        const mailRes = await sendMail(msg);
+        emailDispatched = mailRes.delivered;
+        if (mailRes.delivered === false) emailReason = mailRes.reason;
+      }
+    }
+
+    res.json({
+      success: true,
+      request: result.request,
+      relationship: result.relationship,
+      studentEmail: studentEmail || null,
+      emailDispatched,
+      emailReason,
+      mailtoUrl,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

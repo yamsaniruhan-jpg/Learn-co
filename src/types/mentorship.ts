@@ -24,6 +24,7 @@ export interface MentorAvailability {
 export interface MentorProfile {
   id: string;
   userId: string;
+  email?: string;
   name: string;
   avatarUrl: string;
   headline: string;
@@ -64,10 +65,12 @@ export interface MentorshipRequest {
   id: string;
   learnerId: string;
   learnerName: string;
+  learnerEmail?: string;
   learnerAvatar: string;
   learnerTargetExam?: string;
   mentorId: string;
   mentorName: string;
+  mentorEmail?: string;
   mentorAvatar: string;
   subjectId: SubjectId;
   targetTrack: string;

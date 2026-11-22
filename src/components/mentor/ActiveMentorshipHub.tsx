@@ -86,6 +86,11 @@ export const ActiveMentorshipHub: React.FC<ActiveMentorshipHubProps> = ({
   const [sessionTime, setSessionTime] = useState('16:00');
   const [sessionDuration, setSessionDuration] = useState(45);
 
+  const [showNewTaskForm, setShowNewTaskForm] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+
   const handleCreateGoalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGoalTitle.trim() || !newGoalDate) return;
@@ -99,6 +104,20 @@ export const ActiveMentorshipHub: React.FC<ActiveMentorshipHubProps> = ({
     setNewGoalDescription('');
     setNewGoalDate('');
     setShowNewGoalForm(false);
+  };
+
+  const handleCreateTaskSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim() || !newTaskDueDate) return;
+    await onCreateTask({
+      title: newTaskTitle.trim(),
+      description: newTaskDescription.trim(),
+      dueDate: newTaskDueDate,
+    });
+    setNewTaskTitle('');
+    setNewTaskDescription('');
+    setNewTaskDueDate('');
+    setShowNewTaskForm(false);
   };
 
   const handleCreateSessionSubmit = async (e: React.FormEvent) => {
@@ -470,7 +489,7 @@ export const ActiveMentorshipHub: React.FC<ActiveMentorshipHubProps> = ({
 
           {/* Assigned Tasks & Drills Section */}
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Assigned Actions & Practice Drills
@@ -479,7 +498,55 @@ export const ActiveMentorshipHub: React.FC<ActiveMentorshipHubProps> = ({
                   Remediation tasks and active recall exercises
                 </p>
               </div>
+              <Button
+                id="btn-add-task"
+                variant="outline"
+                size="sm"
+                className="text-xs flex items-center gap-1"
+                onClick={() => setShowNewTaskForm((v) => !v)}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Task</span>
+              </Button>
             </div>
+
+            {showNewTaskForm && (
+              <form onSubmit={handleCreateTaskSubmit} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 animate-in fade-in">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Assign Practice Drill / Action Item
+                </h4>
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="e.g. Solve 12 Stokes Theorem contour boundary drills"
+                  className="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none"
+                  required
+                />
+                <input
+                  type="text"
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
+                  placeholder="Optional instructions or rubric focus..."
+                  className="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={newTaskDueDate}
+                    onChange={(e) => setNewTaskDueDate(e.target.value)}
+                    className="text-xs px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    required
+                  />
+                  <Button type="submit" variant="primary" size="sm" className="bg-emerald-600 text-white text-xs">
+                    Assign Task
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setShowNewTaskForm(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
 
             <div className="space-y-2">
               {tasks.length === 0 ? (

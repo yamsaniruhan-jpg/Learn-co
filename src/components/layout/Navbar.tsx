@@ -69,9 +69,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] transition-colors shadow-[0_1px_3px_rgba(45,42,74,0.05)]">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-x-3 gap-y-1">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-x-2 sm:gap-x-3 gap-y-1">
         {/* Left: Brand Logo */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('dashboard')}
@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right: Gamification Status, Quota, Notifications, Theme, and Profile */}
-        <div className="flex min-w-0 flex-wrap 2xl:flex-nowrap items-center justify-end gap-2 sm:gap-2.5">
+        <div className="flex min-w-0 flex-wrap 2xl:flex-nowrap items-center justify-end gap-1 sm:gap-2.5">
           {/* Mobile Search Icon Trigger */}
           <button
             onClick={onOpenSearch}
@@ -171,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Daily Allowance Quota Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold border border-[#E3DFF5] dark:border-[#3D3861] min-h-[40px]">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold border border-[#E3DFF5] dark:border-[#3D3861] min-h-[40px] tabular-nums">
             <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] font-semibold">Quota:</span>
             <span className="text-[#6C5CE7] dark:text-[#8577ED] font-black">
               {allowanceRemaining}/{DAILY_PRACTICE_LIMIT}
@@ -209,7 +209,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Theme Toggle (Dark/Light) */}
           <button
             onClick={onToggleTheme}
-            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+            className="flex p-2.5 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
             {isDarkMode ? (

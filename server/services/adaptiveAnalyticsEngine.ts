@@ -23,9 +23,40 @@ import {
 } from '../../src/types/analytics';
 import { GoogleGenAI } from '@google/genai';
 
-// In-memory cache for fast analytics responses (invalidated on attempt/mistake mutations)
+// In-memory cache for fast analytics responses (bounded & invalidated on attempt/mistake mutations)
 const analyticsCache: Map<string, { data: LearnerAnalyticsDashboardData; timestamp: number }> = new Map();
 const CACHE_TTL_MS = 60 * 1000; // 1 minute TTL
+export const MAX_ANALYTICS_CACHE_ENTRIES = 500;
+
+function setBoundedAnalyticsCache(userId: string, data: LearnerAnalyticsDashboardData) {
+  const now = Date.now();
+  if (analyticsCache.size >= MAX_ANALYTICS_CACHE_ENTRIES && !analyticsCache.has(userId)) {
+    for (const [k, v] of analyticsCache.entries()) {
+      if (now - v.timestamp >= CACHE_TTL_MS) {
+        analyticsCache.delete(k);
+      }
+    }
+    if (analyticsCache.size >= MAX_ANALYTICS_CACHE_ENTRIES) {
+      const oldestKey = analyticsCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        analyticsCache.delete(oldestKey);
+      }
+    }
+  }
+  analyticsCache.set(userId, { data, timestamp: now });
+}
+
+export function getAnalyticsCacheStats() {
+  return {
+    size: analyticsCache.size,
+    maxSize: MAX_ANALYTICS_CACHE_ENTRIES,
+    ttlMs: CACHE_TTL_MS,
+  };
+}
+
+export function clearAnalyticsCache() {
+  analyticsCache.clear();
+}
 
 export function invalidateUserAnalyticsCache(userId: string) {
   analyticsCache.delete(userId);
@@ -999,7 +1030,7 @@ export class AdaptiveAnalyticsEngine {
       generatedAt: new Date().toISOString(),
     };
 
-    analyticsCache.set(userId, { data: dashboard, timestamp: Date.now() });
+    setBoundedAnalyticsCache(userId, dashboard);
     return dashboard;
   }
 
@@ -1057,7 +1088,7 @@ Produce a concise JSON response with:
 }
 Return STRICT JSON only.`;
 
-      const candidateModels = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+      const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
       let text = '';
 
       for (const model of candidateModels) {

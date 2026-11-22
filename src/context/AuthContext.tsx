@@ -242,6 +242,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return;
               }
             }
+          } else if (active && operation === authOperation.current && !redirectResult?.user) {
+            // A persisted Firebase identity is not proof of a completed redirect.
+            try {
+              if (sessionStorage.getItem('learnco_google_redirect_pending')) {
+                sessionStorage.removeItem('learnco_google_redirect_pending');
+                setAuthError('Google sign-in could not be completed. Please try again.');
+              }
+            } catch {}
           }
         }
       } catch (err: any) {
@@ -513,6 +521,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     ++authOperation.current;
+    try { sessionStorage.removeItem('learnco_google_redirect_pending'); } catch {}
     setAuthError(null);
     setIsLoading(false);
     // Clear this browser session before waiting for either network provider.

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Flame, ShieldCheck, Zap, Calendar, AlertCircle, CheckCircle2, Trophy, Clock } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { loadUserStreak, getWeeklyStreakPills, StreakData } from '../../utils/streakManager';
+import { StreakHeatmapCard } from '../dashboard/StreakHeatmapCard';
 import { useAuth } from '../../context/AuthContext';
 
 interface StreakModalProps {
@@ -12,7 +13,17 @@ interface StreakModalProps {
 
 export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => {
   const { user, gamification } = useAuth();
-  const streakData: StreakData = loadUserStreak(user?.id || 'guest');
+  const [streakData, setStreakData] = useState<StreakData>(() =>
+    loadUserStreak(user?.id || 'default_user')
+  );
+
+  useEffect(() => {
+    const refresh = () => setStreakData(loadUserStreak(user?.id || 'default_user'));
+    refresh();
+    window.addEventListener('learnco_streak_updated', refresh);
+    return () => window.removeEventListener('learnco_streak_updated', refresh);
+  }, [user?.id, isOpen]);
+
   const weeklyPills = getWeeklyStreakPills(streakData);
 
   const currentCount = streakData.currentStreak || gamification?.currentStreak || 1;
@@ -30,7 +41,7 @@ export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => 
         {/* Main Fire Card */}
         <div className="p-6 rounded-3xl bg-[#FFFFFF] dark:bg-[#1E1B33] border-2 border-[#FFB84D] flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left shadow-[0_4px_16px_rgba(255,184,77,0.12)]">
           <div className="relative flex items-center justify-center w-20 h-20 rounded-2xl bg-[#FFB84D] text-[#2D2A4A] shadow-md shrink-0">
-            <Flame className="w-10 h-10 animate-bounce" />
+            <Flame className="w-10 h-10" />
             <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full bg-[#2D2A4A] text-[10px] font-black text-[#FFB84D] border border-[#FFB84D]">
               ACTIVE
             </span>
@@ -38,7 +49,7 @@ export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => 
 
           <div className="flex-1 space-y-1">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] font-display tabular-nums">
                 {currentCount} {currentCount === 1 ? 'Day' : 'Days'} Streak
               </span>
               <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-[#4CAF8E] text-white flex items-center gap-1 shadow-xs">
@@ -54,6 +65,9 @@ export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => 
           </div>
         </div>
 
+        {/* 12-Week Activity Heatmap & Milestones */}
+        <StreakHeatmapCard streakData={streakData} compact />
+
         {/* 7-Day Weekly Calendar Tracker */}
         <div className="p-5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-3">
           <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -61,7 +75,7 @@ export const StreakModal: React.FC<StreakModalProps> = ({ isOpen, onClose }) => 
               <Calendar className="w-4 h-4 text-indigo-500" />
               <span>Past 7 Days Consistency</span>
             </span>
-            <span className="text-slate-400 font-normal">
+            <span className="text-slate-400 font-normal tabular-nums">
               Longest: <strong className="text-slate-700 dark:text-slate-200">{longestCount}d</strong>
             </span>
           </div>

@@ -14,6 +14,8 @@ import copilotRoutes from "./server/routes/copilotRoutes";
 import { mentorshipRouter } from "./server/routes/mentorshipRoutes";
 import plannerRoutes from "./server/routes/plannerRoutes";
 import { analyticsRouter } from "./server/routes/analyticsRoutes";
+import studyRoomRoutes from "./server/routes/studyRoomRoutes";
+import { studyRoomHub } from "./server/services/studyRoomHub";
 // Legacy CommonJS routers. Their folders are marked `"type": "commonjs"`, so
 // these default imports resolve in dev (ESM + tsx) and in the bundled CJS build.
 import subscriptionRoutes from "./routes/subscription";
@@ -81,7 +83,7 @@ export async function createApp() {
 
   const redactResetToken = (url: string) => url
     .replace(/(\/api\/auth\/reset-password\/)[^/?]+/i, '$1[REDACTED]')
-    .replace(/([?&]reset_token=)[^&]*/gi, '$1[REDACTED]');
+    .replace(/([?&](?:reset_token|token|ticket)=)[^&]*/gi, '$1[REDACTED]');
   app.use((req, res, next) => {
     if (req.url.startsWith("/api")) {
       console.log(`[API Request] ${req.method} ${redactResetToken(req.url)}`);
@@ -125,6 +127,13 @@ export async function createApp() {
   // /api/auth/signin|signup against the application session store.
   setSessionResolver((token: string) => Database.getSessionUser(token));
 
+  // Hydrate users, sessions, profiles, gamification, and solved question history from Cloud SQL
+  try {
+    await Database.hydrateFromSql();
+  } catch (err) {
+    console.warn("[CloudSQL] Startup hydration skipped:", (err as Error)?.message || err);
+  }
+
   // Mount API Endpoints
   app.use("/api/auth", authRoutes);
   app.use("/api/user", userRoutes);
@@ -140,6 +149,7 @@ export async function createApp() {
   app.use("/api/marketplace", marketplaceRoutes);
   app.use("/api/planner", plannerRoutes);
   app.use("/api/analytics", analyticsRouter);
+  app.use("/api/study-rooms", studyRoomRoutes);
 
   // Unknown API paths must return JSON, never the SPA shell.
   app.use("/api", (_req, res) => {
@@ -204,6 +214,7 @@ export async function startServer() {
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Learn.co Server running on http://0.0.0.0:${PORT}`);
   });
+  studyRoomHub.attachWebSocketServer(server);
 
   server.on("error", (err: any) => {
     console.error(`[Server] Error on port ${PORT}:`, err);

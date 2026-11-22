@@ -80,6 +80,18 @@ import {
   SEED_STUDY_TASKS,
   SEED_PLAN_VERSIONS,
 } from './data/plannerSeedData';
+import {
+  hydrateDatabaseFromSql,
+  persistAccountToSql,
+  persistProfileToSql,
+  persistGamificationToSql,
+  persistSettingsToSql,
+  persistFullUserRecordToSql,
+  persistSessionToSql,
+  revokeSessionInSql,
+  revokeUserSessionsInSql,
+  persistSolvedQuestionToSql,
+} from '../src/db/persistence';
 
 export interface AuditLogEntry {
   id: string;
@@ -459,6 +471,34 @@ export class Database {
     saveDbToDisk();
   }
 
+  static async hydrateFromSql(): Promise<void> {
+    await hydrateDatabaseFromSql(memoryDb);
+  }
+
+  static persistAttemptToSql(attempt: QuestionAttemptRecord, gamification?: UserGamification | null): void {
+    void persistSolvedQuestionToSql(attempt);
+    if (gamification) {
+      void persistGamificationToSql(gamification);
+    }
+  }
+
+  static cacheResolvedSqlIdentity(resolved: {
+    user: UserAccount;
+    profile?: UserProfile;
+    gamification?: UserGamification;
+    settings?: UserSettings;
+    session?: { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean };
+    token?: string;
+  }): void {
+    const { user, profile, gamification, settings, session, token } = resolved;
+    memoryDb.users[user.id] = user;
+    memoryDb.usersByEmail[user.email.toLowerCase().trim()] = user.id;
+    if (profile) memoryDb.profiles[user.id] = profile;
+    if (gamification) memoryDb.gamification[user.id] = gamification;
+    if (settings) memoryDb.settings[user.id] = settings;
+    if (token && session) memoryDb.sessions[token.trim()] = session;
+  }
+
   static findUserByEmail(email: string): UserAccount | null {
     const norm = email.toLowerCase().trim();
     const userId = memoryDb.usersByEmail[norm];
@@ -785,6 +825,8 @@ export class Database {
     }
 
     saveDbToDisk();
+    void persistAccountToSql(user);
+    void revokeUserSessionsInSql(user.id);
     return { userId: user.id };
   }
 
@@ -792,8 +834,10 @@ export class Database {
     const token = generateToken();
     const createdAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-    memoryDb.sessions[token] = { userId, createdAt, expiresAt, ...(verifiedOwner ? { verifiedOwner: true } : {}) };
+    const session = { userId, createdAt, expiresAt, ...(verifiedOwner ? { verifiedOwner: true } : {}) };
+    memoryDb.sessions[token] = session;
     saveDbToDisk();
+    void persistSessionToSql(token, session);
     return token;
   }
 
@@ -811,6 +855,7 @@ export class Database {
     if (new Date(session.expiresAt) < new Date()) {
       delete memoryDb.sessions[cleanToken];
       saveDbToDisk();
+      void revokeSessionInSql(cleanToken);
       return null;
     }
 
@@ -825,6 +870,7 @@ export class Database {
     if (memoryDb.sessions[token]) {
       delete memoryDb.sessions[token];
       saveDbToDisk();
+      void revokeSessionInSql(token);
       return true;
     }
     return false;
@@ -927,6 +973,7 @@ export class Database {
     memoryDb.settings[userId] = newSettings;
 
     saveDbToDisk();
+    void persistFullUserRecordToSql(newUser, newProfile, newGamification, newSettings);
 
     const token = this.createSession(userId);
 
@@ -961,6 +1008,7 @@ export class Database {
 
     Object.assign(profile, safeUpdates);
     saveDbToDisk();
+    void persistProfileToSql(profile);
     return profile;
   }
 
@@ -981,6 +1029,7 @@ export class Database {
       user.subscriptionExpiresAt = expiresAt;
     }
     saveDbToDisk();
+    void persistAccountToSql(user);
     return user;
   }
 
@@ -996,6 +1045,7 @@ export class Database {
     if (updates.learningPreferences) Object.assign(current.learningPreferences, updates.learningPreferences);
 
     saveDbToDisk();
+    void persistSettingsToSql(current);
     return current;
   }
 
@@ -1800,7 +1850,7 @@ export class Database {
     page?: number;
     limit?: number;
   }): { mentors: MentorProfile[]; total: number; page: number; totalPages: number } {
-    let list = Object.values(memoryDb.mentorProfiles);
+    let list = Object.values(memoryDb.mentorProfiles).filter((m) => m.isVerified !== false);
     const { search, subjectId, track, format, sortBy = 'recommended', page = 1, limit = 12 } = options || {};
 
     if (subjectId) {
@@ -1872,11 +1922,14 @@ export class Database {
     let existing = this.getMentorByUserId(userId);
     const userProfile = memoryDb.profiles[userId];
 
+    const resolvedEmail = (data.email || userProfile?.email || memoryDb.users[userId]?.email || '').trim().toLowerCase() || undefined;
+
     if (!existing) {
       const mentorId = `mentor-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       existing = {
         id: mentorId,
         userId,
+        email: resolvedEmail,
         name: data.name || userProfile?.fullName || 'Educator',
         avatarUrl: data.avatarUrl || userProfile?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
         headline: data.headline || 'STEM Educator & Specialist',
@@ -1904,12 +1957,13 @@ export class Database {
         sessionsCompleted: 0,
         responseRatePercent: 100,
         format: data.format || ['one_on_one', 'weekly_checkin'],
-        pricingType: 'free_community',
+        pricingType: data.pricingType || 'free_community',
         createdAt: now,
         updatedAt: now,
       };
       memoryDb.mentorProfiles[mentorId] = existing;
     } else {
+      if (resolvedEmail) existing.email = resolvedEmail;
       if (data.name) existing.name = data.name;
       if (data.avatarUrl) existing.avatarUrl = data.avatarUrl;
       if (data.headline) existing.headline = data.headline;
@@ -1926,6 +1980,7 @@ export class Database {
       if (data.acceptingNewMentees !== undefined) existing.acceptingNewMentees = data.acceptingNewMentees;
       if (data.maxMentees !== undefined) existing.maxMentees = data.maxMentees;
       if (data.format) existing.format = data.format;
+      if (data.pricingType) existing.pricingType = data.pricingType;
       existing.updatedAt = now;
     }
 
@@ -1980,13 +2035,19 @@ export class Database {
       goalDescription: string;
       initialMessage: string;
       preferredCadence?: 'weekly' | 'biweekly' | 'on_demand';
+      learnerEmail?: string;
     }
   ): { request: MentorshipRequest; error?: string } {
     const learnerProfile = memoryDb.profiles[learnerId];
+    const learnerUser = memoryDb.users[learnerId];
     const mentor = memoryDb.mentorProfiles[data.mentorId];
 
     if (!mentor) {
       return { request: null as any, error: 'Mentor profile not found.' };
+    }
+
+    if (mentor.isVerified === false) {
+      return { request: null as any, error: 'This mentor has not yet been approved by the platform owner.' };
     }
 
     // Prevent duplicate active pending requests to same mentor
@@ -2002,17 +2063,27 @@ export class Database {
       return { request: null as any, error: 'Cannot request mentorship from yourself.' };
     }
 
+    const learnerEmail = (data.learnerEmail || learnerUser?.email || learnerProfile?.email || '').trim().toLowerCase() || undefined;
+    const mentorEmail = (
+      mentor.email ||
+      memoryDb.users[mentor.userId]?.email ||
+      memoryDb.profiles[mentor.userId]?.email ||
+      ''
+    ).trim().toLowerCase() || undefined;
+
     const now = new Date().toISOString();
     const reqId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
     const newRequest: MentorshipRequest = {
       id: reqId,
       learnerId,
-      learnerName: learnerProfile?.fullName || 'Learner',
+      learnerName: learnerProfile?.fullName || learnerProfile?.displayName || 'Learner',
+      learnerEmail,
       learnerAvatar: learnerProfile?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       learnerTargetExam: learnerProfile?.targetExam,
       mentorId: mentor.id,
       mentorName: mentor.name,
+      mentorEmail,
       mentorAvatar: mentor.avatarUrl,
       subjectId: data.subjectId,
       targetTrack: data.targetTrack || learnerProfile?.targetExam || 'General STEM',
@@ -2025,7 +2096,12 @@ export class Database {
     };
 
     memoryDb.mentorshipRequests[reqId] = newRequest;
+    saveDbToDisk();
     return { request: newRequest };
+  }
+
+  static getMentorshipRequestById(requestId: string): MentorshipRequest | null {
+    return memoryDb.mentorshipRequests[requestId] || null;
   }
 
   static listMentorshipRequests(userId: string): {
@@ -2044,23 +2120,24 @@ export class Database {
     };
   }
 
-  static respondMentorshipRequest(
-    userId: string,
-    requestId: string,
+  private static finalizeMentorshipRequestDecision(
+    request: MentorshipRequest,
+    mentor: MentorProfile | undefined,
     action: 'ACCEPT' | 'DECLINE',
     note?: string
-  ): { request: MentorshipRequest | null; relationship: MentorshipRelationship | null; error?: string } {
-    const request = memoryDb.mentorshipRequests[requestId];
-    if (!request) {
-      return { request: null, relationship: null, error: 'Request not found' };
-    }
-
-    const mentor = memoryDb.mentorProfiles[request.mentorId];
-    if (!mentor || mentor.userId !== userId) {
-      // In demo mode, permit if user has demo admin role or matches
-      if (mentor?.userId !== userId && userId !== 'user-alex-001') {
-        return { request: null, relationship: null, error: 'Unauthorized to respond to this request' };
-      }
+  ): { request: MentorshipRequest; relationship: MentorshipRelationship | null; error?: string } {
+    if (request.status !== 'PENDING') {
+      const existingRel =
+        request.status === 'ACCEPTED'
+          ? Object.values(memoryDb.mentorshipRelationships).find(
+              (r) => r.learnerId === request.learnerId && r.mentorId === request.mentorId
+            ) || null
+          : null;
+      return {
+        request,
+        relationship: existingRel,
+        error: `Request was already marked ${request.status}.`,
+      };
     }
 
     const now = new Date().toISOString();
@@ -2070,6 +2147,7 @@ export class Database {
 
     if (action === 'DECLINE') {
       request.status = 'DECLINED';
+      saveDbToDisk();
       return { request, relationship: null };
     }
 
@@ -2077,11 +2155,17 @@ export class Database {
 
     // Create permanent MentorshipRelationship
     const relId = `rel-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const learnerEmail =
+      request.learnerEmail ||
+      memoryDb.users[request.learnerId]?.email ||
+      memoryDb.profiles[request.learnerId]?.email;
+
     const newRel: MentorshipRelationship = {
       id: relId,
       learnerId: request.learnerId,
       learnerName: request.learnerName,
       learnerAvatar: request.learnerAvatar,
+      learnerEmail,
       mentorId: request.mentorId,
       mentorName: request.mentorName,
       mentorAvatar: request.mentorAvatar,
@@ -2109,12 +2193,10 @@ export class Database {
 
     memoryDb.mentorshipRelationships[relId] = newRel;
 
-    // Increment mentor active count
     if (mentor) {
       mentor.activeMenteesCount += 1;
     }
 
-    // Auto-create initial goal from request goalDescription
     const initialGoal: MentorshipGoal = {
       id: `goal-${Date.now()}-init`,
       mentorshipId: relId,
@@ -2132,7 +2214,6 @@ export class Database {
     };
     memoryDb.mentorshipGoals[initialGoal.id] = initialGoal;
 
-    // Send welcome message from mentor
     const welcomeMsg: MentorshipMessage = {
       id: `msg-${Date.now()}-welcome`,
       mentorshipId: relId,
@@ -2141,13 +2222,77 @@ export class Database {
       senderName: request.mentorName,
       senderAvatar: request.mentorAvatar,
       recipientId: request.learnerId,
-      content: note || `Hello ${request.learnerName}! I have accepted your mentorship request. Let's work together to master ${request.subjectId} and achieve your goal: "${request.goalDescription}". Feel free to schedule our first session.`,
+      content:
+        note ||
+        `Hello ${request.learnerName}! I clicked Yes and accepted your mentorship request. Let's work together to master ${request.subjectId} and achieve your goal: "${request.goalDescription}". Feel free to schedule our first session.`,
       isRead: false,
       createdAt: now,
     };
     memoryDb.mentorshipMessages[relId] = [welcomeMsg];
 
+    saveDbToDisk();
     return { request, relationship: newRel };
+  }
+
+  static respondMentorshipRequest(
+    userId: string,
+    requestId: string,
+    action: 'ACCEPT' | 'DECLINE',
+    note?: string,
+    options?: { allowAdminOverride?: boolean }
+  ): { request: MentorshipRequest | null; relationship: MentorshipRelationship | null; error?: string; forbidden?: boolean } {
+    const request = memoryDb.mentorshipRequests[requestId];
+    if (!request) {
+      return { request: null, relationship: null, error: 'Request not found' };
+    }
+
+    if (request.learnerId === userId) {
+      return {
+        request: null,
+        relationship: null,
+        error: 'Students cannot accept or decline their own mentorship request.',
+        forbidden: true,
+      };
+    }
+
+    const mentor = memoryDb.mentorProfiles[request.mentorId];
+    const isTargetMentor = Boolean(mentor && mentor.userId === userId);
+    if (!isTargetMentor && !options?.allowAdminOverride) {
+      return {
+        request: null,
+        relationship: null,
+        error: 'Unauthorized: only the requested mentor can accept or decline this request.',
+        forbidden: true,
+      };
+    }
+
+    return this.finalizeMentorshipRequestDecision(request, mentor, action, note);
+  }
+
+  static respondMentorshipRequestByEmailAction(
+    requestId: string,
+    mentorId: string,
+    action: 'ACCEPT' | 'DECLINE',
+    note?: string
+  ): { request: MentorshipRequest | null; relationship: MentorshipRelationship | null; error?: string; alreadyProcessed?: boolean } {
+    const request = memoryDb.mentorshipRequests[requestId];
+    if (!request) {
+      return { request: null, relationship: null, error: 'Mentorship request not found.' };
+    }
+    if (request.mentorId !== mentorId) {
+      return { request: null, relationship: null, error: 'Action link does not match this mentor.' };
+    }
+    const mentor = memoryDb.mentorProfiles[request.mentorId];
+    if (request.status !== 'PENDING') {
+      const existingRel =
+        request.status === 'ACCEPTED'
+          ? Object.values(memoryDb.mentorshipRelationships).find(
+              (r) => r.learnerId === request.learnerId && r.mentorId === request.mentorId
+            ) || null
+          : null;
+      return { request, relationship: existingRel, alreadyProcessed: true };
+    }
+    return this.finalizeMentorshipRequestDecision(request, mentor, action, note);
   }
 
   static cancelMentorshipRequest(
@@ -2160,6 +2305,7 @@ export class Database {
     }
     request.status = 'CANCELLED';
     request.updatedAt = new Date().toISOString();
+    saveDbToDisk();
     return true;
   }
 
@@ -2202,6 +2348,7 @@ export class Database {
 
     rel.status = status;
     rel.updatedAt = new Date().toISOString();
+    saveDbToDisk();
     return rel;
   }
 
@@ -2220,6 +2367,7 @@ export class Database {
       ...settings,
     };
     rel.updatedAt = new Date().toISOString();
+    saveDbToDisk();
     return rel.privacySettings;
   }
 
@@ -2355,6 +2503,7 @@ export class Database {
     rel.lastInteractionDate = now;
     rel.notesCount += 1;
     rel.updatedAt = now;
+    saveDbToDisk();
 
     return newMsg;
   }
@@ -2372,6 +2521,7 @@ export class Database {
         updated = true;
       }
     }
+    if (updated) saveDbToDisk();
     return updated;
   }
 
@@ -2426,6 +2576,7 @@ export class Database {
     memoryDb.mentorshipGoals[id] = goal;
     rel.goalsCount += 1;
     rel.updatedAt = now;
+    saveDbToDisk();
     return goal;
   }
 
@@ -2451,6 +2602,7 @@ export class Database {
       }
     }
     goal.updatedAt = new Date().toISOString();
+    saveDbToDisk();
     return goal;
   }
 
@@ -2497,6 +2649,7 @@ export class Database {
     };
 
     memoryDb.mentorshipTasks[id] = task;
+    saveDbToDisk();
     return task;
   }
 
@@ -2521,6 +2674,7 @@ export class Database {
     if (updates.description) task.description = updates.description;
     if (updates.dueDate) task.dueDate = updates.dueDate;
 
+    saveDbToDisk();
     return task;
   }
 
@@ -2585,6 +2739,7 @@ export class Database {
     memoryDb.mentorshipSessions[id] = session;
     rel.sessionsCount += 1;
     rel.updatedAt = now;
+    saveDbToDisk();
     return session;
   }
 
@@ -2614,6 +2769,7 @@ export class Database {
     }
 
     session.updatedAt = new Date().toISOString();
+    saveDbToDisk();
     return session;
   }
 
@@ -2670,6 +2826,7 @@ export class Database {
       mentor.reviewCount = allRatings.length;
     }
 
+    saveDbToDisk();
     return fb;
   }
 
@@ -2694,6 +2851,7 @@ export class Database {
     };
 
     memoryDb.mentorshipReports.push(report);
+    saveDbToDisk();
     return report;
   }
 
@@ -2710,13 +2868,15 @@ export class Database {
     const mentorProfile = this.getMentorByUserId(userId);
     const mentorId = mentorProfile?.id || '';
 
-    const requests = Object.values(memoryDb.mentorshipRequests).filter(
-      (r) => (r.mentorId === mentorId || userId === 'user-alex-001') && r.status === 'PENDING'
-    );
+    const requests = mentorId
+      ? Object.values(memoryDb.mentorshipRequests).filter(
+          (r) => r.mentorId === mentorId && r.status === 'PENDING'
+        )
+      : [];
 
-    const relationships = Object.values(memoryDb.mentorshipRelationships).filter(
-      (r) => r.mentorId === mentorId || userId === 'user-alex-001'
-    );
+    const relationships = mentorId
+      ? Object.values(memoryDb.mentorshipRelationships).filter((r) => r.mentorId === mentorId)
+      : [];
 
     const activeMentees = relationships.map((rel) => {
       const msgs = memoryDb.mentorshipMessages[rel.id] || [];
@@ -2729,9 +2889,11 @@ export class Database {
       };
     });
 
-    const sessions = Object.values(memoryDb.mentorshipSessions)
-      .filter((s) => (s.mentorId === mentorId || userId === 'user-alex-001') && s.status === 'SCHEDULED')
-      .sort((a, b) => new Date(`${a.scheduledDate}T${a.startTime}`).getTime() - new Date(`${b.scheduledDate}T${b.startTime}`).getTime());
+    const sessions = mentorId
+      ? Object.values(memoryDb.mentorshipSessions)
+          .filter((s) => s.mentorId === mentorId && s.status === 'SCHEDULED')
+          .sort((a, b) => new Date(`${a.scheduledDate}T${a.startTime}`).getTime() - new Date(`${b.scheduledDate}T${b.startTime}`).getTime())
+      : [];
 
     return {
       mentorProfile,

@@ -45,6 +45,18 @@ export const PasswordResetFlow: React.FC<PasswordResetFlowProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [mailStatus, setMailStatus] = useState<{ configured: boolean; provider: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (step !== 'request') return;
+    AuthClient.getMailStatus().then((status) => {
+      if (!cancelled) setMailStatus(status);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
 
   // Arriving from a reset link: verify the token before showing the form, so a
   // stale link is reported immediately instead of after typing a new password.
@@ -250,6 +262,18 @@ export const PasswordResetFlow: React.FC<PasswordResetFlowProps> = ({
       </div>
 
       {errorBox}
+
+      {mailStatus && !mailStatus.configured && !notice && (
+        <div
+          role="status"
+          className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Live inbox delivery is currently disabled because no email relay (<code>RESEND_API_KEY</code> or <code>SMTP_URL</code>) is configured on this server. Submitting will log the reset link to the server console for the administrator instead of emailing your inbox.
+          </span>
+        </div>
+      )}
 
       {notice && (
         <div

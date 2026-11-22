@@ -11,6 +11,13 @@ import { GoogleGenAI } from '@google/genai';
 // Legacy CommonJS service (its folder is marked "type": "commonjs").
 import progressService from '../../services/progressService';
 import { adminDb } from '../services/firebaseAdmin';
+import { getSolvedQuestionIdsFromSql } from '../../src/db/persistence';
+import {
+  OlympiadDiscipline,
+  resolveParameterizedQuestionById,
+} from '../services/parameterizedQuestionGenerator';
+import { gradeQuestionAnswer, isValidSubmittedAnswer } from '../../src/utils/gradeAnswer';
+import { invalidateUserAnalyticsCache } from '../services/adaptiveAnalyticsEngine';
 
 const router = Router();
 const userImportedQuestions = new Map<string, QuestionBankItem[]>();
@@ -96,13 +103,23 @@ router.get('/concept/:conceptId', (req, res: Response) => {
 });
 
 // POST /api/learning/session/start
-router.post('/session/start', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+router.post('/session/start', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const config: PracticeSessionConfig = req.body.config || {
+    const rawConfig = req.body.config || {
       questionCount: 5,
       difficultyMode: 'calibrated_ladder',
       timed: false,
+    };
+    const sqlSolvedIds = await getSolvedQuestionIdsFromSql(userId);
+    const clientExcluded = Array.isArray(rawConfig.excludeQuestionIds)
+      ? rawConfig.excludeQuestionIds
+          .filter((id: unknown): id is string => typeof id === 'string')
+          .slice(0, 20000)
+      : [];
+    const config: PracticeSessionConfig = {
+      ...rawConfig,
+      excludeQuestionIds: Array.from(new Set([...clientExcluded, ...sqlSolvedIds])).slice(0, 25000),
     };
 
     // Check user daily quota before starting
@@ -128,6 +145,193 @@ router.post('/session/start', requireAuth, (req: AuthenticatedRequest, res: Resp
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to generate practice session.' });
+  }
+});
+
+// ============================================
+// TIMED OLYMPIAD MOCK CONTEST ENDPOINTS
+// ============================================
+const activeContests = new Map<string, {
+  contestId: string;
+  userId: string;
+  track: OlympiadDiscipline;
+  title: string;
+  durationSeconds: number;
+  questionIds: string[];
+  startedAt: string;
+}>();
+
+const CONTEST_TITLES: Record<OlympiadDiscipline, string> = {
+  ipho: 'IPhO Physics Olympiad Mock Contest',
+  icho: 'IChO Chemistry Olympiad Mock Contest',
+  ibho: 'IBHO / IBO Biology Olympiad Mock Contest',
+  ijso: 'IJSO Junior Science Olympiad Mock Contest',
+  ict: 'ICT International Coding & Informatics Mock Contest',
+  mixed: 'All-Olympiad Multi-Discipline Mock Contest',
+};
+
+// POST /api/learning/contest/start
+router.post('/contest/start', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const rawTrack = String(req.body?.track || 'mixed').toLowerCase() as OlympiadDiscipline;
+    const track: OlympiadDiscipline = ['ipho', 'icho', 'ibho', 'ijso', 'ict', 'mixed'].includes(rawTrack)
+      ? rawTrack
+      : 'mixed';
+    const rawCount = Number(req.body?.questionCount || 10);
+    const questionCount = Math.min(25, Math.max(5, Number.isFinite(rawCount) ? Math.round(rawCount) : 10));
+    const rawDurationMin = Number(req.body?.durationMinutes || 30);
+    const durationSeconds = Math.min(180 * 60, Math.max(10 * 60, Math.round(rawDurationMin * 60)));
+
+    const sqlSolvedIds = await getSolvedQuestionIdsFromSql(userId);
+    const clientExcluded = Array.isArray(req.body?.excludeQuestionIds)
+      ? req.body.excludeQuestionIds.filter((id: unknown): id is string => typeof id === 'string')
+      : [];
+
+    const selected = QuestionSelectionEngine.selectOlympiadContest(
+      userId,
+      track,
+      questionCount,
+      Array.from(new Set([...sqlSolvedIds, ...clientExcluded]))
+    );
+
+    const contestId = `contest-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const title = CONTEST_TITLES[track];
+    activeContests.set(contestId, {
+      contestId,
+      userId,
+      track,
+      title,
+      durationSeconds,
+      questionIds: selected.map((q) => q.id),
+      startedAt: new Date().toISOString(),
+    });
+    if (activeContests.size > 500) {
+      const oldest = activeContests.keys().next().value;
+      if (oldest) activeContests.delete(oldest);
+    }
+
+    // Delayed grading: strip answer keys and step-by-step solutions until contest submission
+    const sanitizedQuestions = selected.map(({ correctAnswer: _ca, explanation: _ex, stepByStepSolution: _st, ...rest }) => ({
+      ...rest,
+    }));
+
+    res.json({
+      success: true,
+      contestId,
+      track,
+      title,
+      durationSeconds,
+      questions: sanitizedQuestions,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to launch Olympiad contest.' });
+  }
+});
+
+// POST /api/learning/contest/submit
+router.post('/contest/submit', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const { contestId, track = 'mixed', questionIds, answers = {}, timeSpentSeconds = 0 } = req.body || {};
+    const record = typeof contestId === 'string' ? activeContests.get(contestId) : undefined;
+    if (record && record.userId !== userId) {
+      res.status(403).json({ error: 'Contest belongs to a different account.' });
+      return;
+    }
+
+    const orderedIds: string[] = record?.questionIds || (Array.isArray(questionIds) ? questionIds.filter((id: unknown): id is string => typeof id === 'string') : []);
+    if (orderedIds.length === 0) {
+      res.status(400).json({ error: 'No contest questions provided.' });
+      return;
+    }
+
+    let correctCount = 0;
+    let totalXpEarned = 0;
+    const perQuestionReviews: any[] = [];
+    const safeTotalTime = Math.max(orderedIds.length, Number(timeSpentSeconds) || 0);
+    const avgTime = Math.max(5, Math.round(safeTotalTime / orderedIds.length));
+
+    for (let idx = 0; idx < orderedIds.length; idx++) {
+      const qId = orderedIds[idx];
+      const bankQ =
+        MASTER_QUESTION_BANK.find((q) => q.id === qId) ||
+        resolveParameterizedQuestionById(qId);
+      if (!bankQ) continue;
+
+      const rawUserAnswer = answers && typeof answers === 'object' ? (answers as Record<string, any>)[qId] : undefined;
+      const hasAnswer = isValidSubmittedAnswer(rawUserAnswer);
+      const isCorrect = hasAnswer ? gradeQuestionAnswer(bankQ, rawUserAnswer) : false;
+      if (isCorrect) correctCount++;
+
+      let xpAwarded = 0;
+      if (hasAnswer) {
+        try {
+          const attemptRes = await XpEngine.submitAttempt(userId, {
+            attemptId: `cnt-${contestId || 'ad'}-${idx}-${qId.slice(0, 20)}`,
+            questionId: bankQ.id,
+            subjectId: bankQ.subjectId,
+            topicId: bankQ.topicId,
+            subtopicId: bankQ.subtopicId,
+            conceptId: bankQ.conceptId,
+            difficulty: bankQ.difficulty,
+            questionText: bankQ.questionText,
+            selectedAnswer: rawUserAnswer,
+            correctAnswer: Array.isArray(bankQ.correctAnswer)
+              ? bankQ.correctAnswer.join(', ')
+              : bankQ.correctAnswer,
+            explanation: bankQ.explanation,
+            stepByStepSolution: bankQ.stepByStepSolution,
+            solvingTimeSeconds: avgTime,
+            hintsRevealedCount: 0,
+          });
+          xpAwarded = attemptRes.xpAwarded;
+          totalXpEarned += xpAwarded;
+        } catch {
+          // If daily practice quota is reached mid-contest, preserve authoritative grading without losing contest results
+        }
+      }
+
+      perQuestionReviews.push({
+        question: bankQ,
+        userAnswer: hasAnswer ? rawUserAnswer : null,
+        isCorrect,
+        xpAwarded,
+        timeSpent: avgTime,
+      });
+    }
+
+    invalidateUserAnalyticsCache(userId);
+    if (record) activeContests.delete(record.contestId);
+
+    const totalQuestions = perQuestionReviews.length;
+    const accuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+    const medalTier =
+      accuracy >= 85 ? 'Gold Medal Standing'
+      : accuracy >= 70 ? 'Silver Medal Standing'
+      : accuracy >= 50 ? 'Bronze Medal Standing'
+      : 'Honorable Participant';
+
+    const gamification = Database.getGamification(userId);
+    const quota = XpEngine.getDailyQuota(userId);
+
+    res.json({
+      success: true,
+      contestId: contestId || null,
+      track: record?.track || track,
+      title: record?.title || CONTEST_TITLES[(track as OlympiadDiscipline) || 'mixed'],
+      totalQuestions,
+      correctCount,
+      accuracy,
+      medalTier,
+      totalXpEarned,
+      timeSpentSeconds: safeTotalTime,
+      reviews: perQuestionReviews,
+      gamification,
+      quota,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to grade Olympiad contest.' });
   }
 });
 
@@ -256,7 +460,7 @@ router.post('/socratic-hint', requireAuth, async (req: AuthenticatedRequest, res
       return;
     }
 
-    const models = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
     let hint = '';
 
     for (const model of models) {

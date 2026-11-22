@@ -25,13 +25,145 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Calculus3DLab } from './Calculus3DLab';
+import { PhysicsWaveOpticsLab } from './PhysicsWaveOpticsLab';
+import { ChemistryElectroEquilibriumLab } from './ChemistryElectroEquilibriumLab';
+import { CSAlgorithmVisualizerLab } from './CSAlgorithmVisualizerLab';
+import { BiologyEnzymeKineticsLab } from './BiologyEnzymeKineticsLab';
+import { DataScienceBayesROCLab } from './DataScienceBayesROCLab';
+import { EnglishRhetoricScansionLab } from './EnglishRhetoricScansionLab';
 
 interface SimulationsHubViewProps {
   onNavigateToTab: (tabId: string, context?: any) => void;
 }
 
+type SimId =
+  | 'calculus'
+  | 'gradient'
+  | 'chemistry'
+  | 'pendulum'
+  | 'quantum'
+  | 'optics'
+  | 'electro'
+  | 'algorithms'
+  | 'enzyme'
+  | 'bayes'
+  | 'scansion';
+
+type SimSubjectFilter = 'all' | 'math' | 'physics' | 'chemistry' | 'biology' | 'cs' | 'data_science' | 'english';
+
+const SIMULATION_CATALOG: Array<{
+  id: SimId;
+  subject: Exclude<SimSubjectFilter, 'all'>;
+  title: string;
+  subtitle: string;
+  tag: string;
+  activeClass: string;
+  activeSubClass: string;
+}> = [
+  {
+    id: 'calculus',
+    subject: 'math',
+    title: 'Calculus 3D Lab',
+    subtitle: 'Tangent Plane & Gradient ∇f',
+    tag: '3D WebGL',
+    activeClass: 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-indigo-400/50',
+    activeSubClass: 'text-indigo-100',
+  },
+  {
+    id: 'optics',
+    subject: 'physics',
+    title: 'Wave Optics Lab',
+    subtitle: 'IPhO Thin-Film & Double-Slit',
+    tag: 'IPhO Optics',
+    activeClass: 'bg-sky-600 text-white border-sky-500 shadow-md ring-2 ring-sky-400/50',
+    activeSubClass: 'text-sky-100',
+  },
+  {
+    id: 'pendulum',
+    subject: 'physics',
+    title: 'Harmonic Phase Lab',
+    subtitle: 'Pendulum & (θ, ω) Orbits',
+    tag: 'Dynamics',
+    activeClass: 'bg-amber-600 text-white border-amber-500 shadow-md ring-2 ring-amber-400/50',
+    activeSubClass: 'text-amber-100',
+  },
+  {
+    id: 'quantum',
+    subject: 'physics',
+    title: 'Quantum Well Lab',
+    subtitle: 'Wavefunction ψₙ(x) & |ψ|²',
+    tag: 'Quantum',
+    activeClass: 'bg-cyan-600 text-white border-cyan-500 shadow-md ring-2 ring-cyan-400/50',
+    activeSubClass: 'text-cyan-100',
+  },
+  {
+    id: 'electro',
+    subject: 'chemistry',
+    title: 'Van ’t Hoff & Nernst',
+    subtitle: 'IChO Equilibrium & Galvanic Cell',
+    tag: 'IChO Electro',
+    activeClass: 'bg-amber-700 text-white border-amber-600 shadow-md ring-2 ring-amber-400/50',
+    activeSubClass: 'text-amber-100',
+  },
+  {
+    id: 'chemistry',
+    subject: 'chemistry',
+    title: 'SN2 Stereochemistry',
+    subtitle: 'Walden Umbrella Inversion',
+    tag: 'Stereo Lab',
+    activeClass: 'bg-rose-600 text-white border-rose-500 shadow-md ring-2 ring-rose-400/50',
+    activeSubClass: 'text-rose-100',
+  },
+  {
+    id: 'algorithms',
+    subject: 'cs',
+    title: 'Graph & Segment Tree',
+    subtitle: 'ICT Dijkstra/BFS & O(log N) RMQ',
+    tag: 'ICT Coding',
+    activeClass: 'bg-emerald-600 text-white border-emerald-500 shadow-md ring-2 ring-emerald-400/50',
+    activeSubClass: 'text-emerald-100',
+  },
+  {
+    id: 'gradient',
+    subject: 'data_science',
+    title: 'Loss Landscape',
+    subtitle: 'Gradient Descent & Momentum',
+    tag: 'Optimizer',
+    activeClass: 'bg-purple-600 text-white border-purple-500 shadow-md ring-2 ring-purple-400/50',
+    activeSubClass: 'text-purple-100',
+  },
+  {
+    id: 'bayes',
+    subject: 'data_science',
+    title: 'Bayes & ROC Threshold',
+    subtitle: 'Beta Posterior & Confusion Matrix',
+    tag: 'Stats & ML',
+    activeClass: 'bg-teal-600 text-white border-teal-500 shadow-md ring-2 ring-teal-400/50',
+    activeSubClass: 'text-teal-100',
+  },
+  {
+    id: 'enzyme',
+    subject: 'biology',
+    title: 'Enzyme Kinetics Lab',
+    subtitle: 'IBHO/IJSO Michaelis-Menten',
+    tag: 'IBHO Bio',
+    activeClass: 'bg-rose-700 text-white border-rose-600 shadow-md ring-2 ring-rose-400/50',
+    activeSubClass: 'text-rose-100',
+  },
+  {
+    id: 'scansion',
+    subject: 'english',
+    title: 'Scansion & Rhetoric',
+    subtitle: 'Syllable Meter & Clause Balance',
+    tag: 'Prosody Lab',
+    activeClass: 'bg-violet-600 text-white border-violet-500 shadow-md ring-2 ring-violet-400/50',
+    activeSubClass: 'text-violet-100',
+  },
+];
+
 export const SimulationsHubView: React.FC<SimulationsHubViewProps> = ({ onNavigateToTab }) => {
-  const [selectedSim, setSelectedSim] = useState<'calculus' | 'gradient' | 'chemistry' | 'pendulum' | 'quantum'>('calculus');
+  const [selectedSim, setSelectedSim] = useState<SimId>('calculus');
+  const [subjectFilter, setSubjectFilter] = useState<SimSubjectFilter>('all');
 
   // Calculus View Mode
   const [calculusMode, setCalculusMode] = useState<'3d_spatial' | 'analytical_slice'>('3d_spatial');
@@ -331,15 +463,15 @@ export const SimulationsHubView: React.FC<SimulationsHubViewProps> = ({ onNaviga
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-15 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-300 border border-white/15">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-300">
               <FlaskConical className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Interactive STEM Laboratories & Real-Time Simulations</span>
+              <span>11 Interactive Laboratories · STEM, Olympiads &amp; Humanities</span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display tracking-tight text-white">
-              Virtual Simulations & 3D Labs
+              Virtual Simulations &amp; Quantitative Labs
             </h1>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Experience multivariable calculus in 3D WebGL, watch machine learning optimizers navigate loss landscapes, witness Walden inversion in organic chemistry, investigate mechanical phase space, and examine quantum wavefunctions.
+              Explore 3D WebGL multivariable surfaces, IPhO wave optics, IChO Van ’t Hoff cells, ICT Dijkstra &amp; Segment Trees, IBHO enzyme kinetics, Bayesian ROC thresholds, and English prosody scansion.
             </p>
           </div>
 
@@ -364,117 +496,74 @@ export const SimulationsHubView: React.FC<SimulationsHubViewProps> = ({ onNaviga
         </div>
       </div>
 
-      {/* Simulation Selector Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <button
-          onClick={() => setSelectedSim('calculus')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-            selectedSim === 'calculus'
-              ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-indigo-400/50'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">📈</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedSim === 'calculus' ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-              3D WebGL
-            </span>
-          </div>
-          <div>
-            <h3 className="font-black text-xs sm:text-sm">Calculus 3D Lab</h3>
-            <p className={`text-[11px] mt-0.5 ${selectedSim === 'calculus' ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Tangent Plane & ∇f
-            </p>
-          </div>
-        </button>
+      {/* Subject Filter Strip */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { id: 'all', label: 'All 11 Labs' },
+          { id: 'physics', label: 'Physics (3)' },
+          { id: 'chemistry', label: 'Chemistry (2)' },
+          { id: 'cs', label: 'CS / ICT (1)' },
+          { id: 'data_science', label: 'Data Science (2)' },
+          { id: 'math', label: 'Math (1)' },
+          { id: 'biology', label: 'Biology (1)' },
+          { id: 'english', label: 'English (1)' },
+        ].map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => {
+              const nextFilter = f.id as SimSubjectFilter;
+              setSubjectFilter(nextFilter);
+              if (nextFilter !== 'all') {
+                const firstMatch = SIMULATION_CATALOG.find((s) => s.subject === nextFilter);
+                if (firstMatch && !SIMULATION_CATALOG.some((s) => s.id === selectedSim && s.subject === nextFilter)) {
+                  setSelectedSim(firstMatch.id);
+                }
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+              subjectFilter === f.id
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-indigo-400'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-        <button
-          onClick={() => setSelectedSim('gradient')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-            selectedSim === 'gradient'
-              ? 'bg-purple-600 text-white border-purple-500 shadow-md ring-2 ring-purple-400/50'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">🤖</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedSim === 'gradient' ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-              AI Engine
-            </span>
-          </div>
-          <div>
-            <h3 className="font-black text-xs sm:text-sm">Loss Landscape</h3>
-            <p className={`text-[11px] mt-0.5 ${selectedSim === 'gradient' ? 'text-purple-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Gradient Descent & Momentum
-            </p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setSelectedSim('chemistry')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-            selectedSim === 'chemistry'
-              ? 'bg-rose-600 text-white border-rose-500 shadow-md ring-2 ring-rose-400/50'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">⚗️</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedSim === 'chemistry' ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-              Stereo Lab
-            </span>
-          </div>
-          <div>
-            <h3 className="font-black text-xs sm:text-sm">SN2 Organic Lab</h3>
-            <p className={`text-[11px] mt-0.5 ${selectedSim === 'chemistry' ? 'text-rose-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Walden Umbrella Inversion
-            </p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setSelectedSim('pendulum')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-            selectedSim === 'pendulum'
-              ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-2 ring-amber-400/50'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">⚡</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedSim === 'pendulum' ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-              Dynamics
-            </span>
-          </div>
-          <div>
-            <h3 className="font-black text-xs sm:text-sm">Physics Mechanics</h3>
-            <p className={`text-[11px] mt-0.5 ${selectedSim === 'pendulum' ? 'text-amber-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Harmonic Phase Space
-            </p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setSelectedSim('quantum')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between col-span-2 sm:col-span-1 ${
-            selectedSim === 'quantum'
-              ? 'bg-cyan-600 text-white border-cyan-500 shadow-md ring-2 ring-cyan-400/50'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xl">🌌</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedSim === 'quantum' ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-              Quantum
-            </span>
-          </div>
-          <div>
-            <h3 className="font-black text-xs sm:text-sm">Wavefunction Lab</h3>
-            <p className={`text-[11px] mt-0.5 ${selectedSim === 'quantum' ? 'text-cyan-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Particle in a Box & |ψ|²
-            </p>
-          </div>
-        </button>
+      {/* Simulation Selector Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+        {SIMULATION_CATALOG.filter((sim) => subjectFilter === 'all' || sim.subject === subjectFilter).map((sim) => {
+          const isActive = selectedSim === sim.id;
+          return (
+            <button
+              key={sim.id}
+              type="button"
+              onClick={() => setSelectedSim(sim.id)}
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                isActive
+                  ? sim.activeClass
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? sim.activeSubClass : 'text-slate-500 dark:text-slate-400'}`}>
+                  {sim.subject.replace('_', ' ')}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isActive ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                  {sim.tag}
+                </span>
+              </div>
+              <div>
+                <h3 className="font-black text-xs sm:text-sm leading-snug">{sim.title}</h3>
+                <p className={`text-[11px] mt-0.5 line-clamp-2 ${isActive ? sim.activeSubClass : 'text-slate-500 dark:text-slate-400'}`}>
+                  {sim.subtitle}
+                </p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Active Simulation Container */}
@@ -1304,6 +1393,24 @@ export const SimulationsHubView: React.FC<SimulationsHubViewProps> = ({ onNaviga
             </div>
           </div>
         )}
+
+        {/* 6. WAVE OPTICS LAB */}
+        {selectedSim === 'optics' && <PhysicsWaveOpticsLab />}
+
+        {/* 7. ICHO VAN 'T HOFF & NERNST LAB */}
+        {selectedSim === 'electro' && <ChemistryElectroEquilibriumLab />}
+
+        {/* 8. ICT ALGORITHMS & SEGMENT TREE LAB */}
+        {selectedSim === 'algorithms' && <CSAlgorithmVisualizerLab />}
+
+        {/* 9. IBHO/IJSO ENZYME KINETICS LAB */}
+        {selectedSim === 'enzyme' && <BiologyEnzymeKineticsLab />}
+
+        {/* 10. DATA SCIENCE BAYES & ROC LAB */}
+        {selectedSim === 'bayes' && <DataScienceBayesROCLab />}
+
+        {/* 11. ENGLISH PROSODY SCANSION LAB */}
+        {selectedSim === 'scansion' && <EnglishRhetoricScansionLab />}
       </div>
     </div>
   );

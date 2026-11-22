@@ -22,13 +22,25 @@ import { Badge } from '../ui/Badge';
 import { Progress } from '../ui/Progress';
 import { Avatar } from '../ui/Avatar';
 import { Leaderboard } from '../leaderboard/Leaderboard';
+import { loadUserStreak, StreakData } from '../../utils/streakManager';
+import { StreakHeatmapCard } from '../dashboard/StreakHeatmapCard';
 
 export const GamificationView: React.FC = () => {
-  const { gamification } = useAuth();
+  const { user, gamification } = useAuth();
+  const [streakData, setStreakData] = useState<StreakData>(() =>
+    loadUserStreak(user?.id || 'default_user')
+  );
+
+  useEffect(() => {
+    const refresh = () => setStreakData(loadUserStreak(user?.id || 'default_user'));
+    refresh();
+    window.addEventListener('learnco_streak_updated', refresh);
+    return () => window.removeEventListener('learnco_streak_updated', refresh);
+  }, [user?.id]);
 
   const xp = gamification?.xp ?? 0;
-  const currentStreak = gamification?.currentStreak ?? 0;
-  const longestStreak = gamification?.longestStreak ?? 0;
+  const currentStreak = Math.max(streakData.currentStreak || 0, gamification?.currentStreak ?? 0);
+  const longestStreak = Math.max(streakData.longestStreak || 0, gamification?.longestStreak ?? 0, currentStreak);
 
   const levelInfo = calculateLevelFromXp(xp);
   const currentTier =
@@ -160,6 +172,9 @@ export const GamificationView: React.FC = () => {
           </div>
         </div>
       </Card>
+
+      {/* 12-Week Consistency Heatmap */}
+      <StreakHeatmapCard streakData={streakData} />
 
       {/* Main 2-Column Layout: Badges vs Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

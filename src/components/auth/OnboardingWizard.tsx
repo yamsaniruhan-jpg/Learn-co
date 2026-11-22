@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   GraduationCap,
   Layers,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { SubjectId } from '../../types/auth';
@@ -365,7 +366,12 @@ export const OnboardingWizard: React.FC = () => {
                     onChange={(e) => setGoalInput(e.target.value)}
                     placeholder="e.g. Master Linear Operators & Hilbert Spaces"
                     className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddGoal()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddGoal();
+                      }
+                    }}
                   />
                   <Button variant="outline" size="sm" onClick={handleAddGoal}>
                     Add

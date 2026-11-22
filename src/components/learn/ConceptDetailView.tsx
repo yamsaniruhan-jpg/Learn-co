@@ -16,7 +16,10 @@ import {
   ChevronRight,
   HelpCircle,
   XCircle,
+  Download,
+  Printer,
 } from 'lucide-react';
+import { conceptToMarkdown, printCleanConceptPdf } from '../../utils/pdfExport';
 
 interface ConceptDetailViewProps {
   concept: ConceptDetail;
@@ -51,12 +54,25 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
     concept.miniCheckQuestion &&
     selectedMiniAnswer === concept.miniCheckQuestion.correctIndex;
 
+  const handleDownloadMarkdown = () => {
+    const md = conceptToMarkdown(concept, { subjectName, chapterTitle, topicTitle });
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${concept.title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb & Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <button onClick={onBack} className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">
+          <button onClick={onBack} className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium cursor-pointer">
             Curriculum
           </button>
           <ChevronRight className="w-3.5 h-3.5" />
@@ -75,13 +91,34 @@ export const ConceptDetailView: React.FC<ConceptDetailViewProps> = ({
           )}
         </div>
 
-        <button
-          onClick={() => onStartPractice(concept.id, concept.subjectId, topicTitle)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <Zap className="w-3.5 h-3.5 fill-current" />
-          <span>Practice This Concept (5 Questions)</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadMarkdown}
+            title="Download clean Markdown study sheet"
+            className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Export .md</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => printCleanConceptPdf(concept, { subjectName, chapterTitle, topicTitle })}
+            title="Print or Save Clean Study Sheet PDF"
+            className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Print / PDF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onStartPractice(concept.id, concept.subjectId, topicTitle)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>Practice This Concept (5 Questions)</span>
+          </button>
+        </div>
       </div>
 
       {/* Header Banner */}

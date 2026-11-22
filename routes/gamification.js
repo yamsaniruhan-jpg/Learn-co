@@ -22,15 +22,12 @@ router.get('/leaderboard', verifyFirebaseAuth, async (req, res) => {
   }
 });
 
-// Internal endpoint — called by other services after actions
-router.post('/award-xp', verifyFirebaseAuth, async (req, res) => {
-  try {
-    const { action, metadata } = req.body;
-    const result = await gamification.awardXP(req.user.uid, action, metadata);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to award XP.' });
-  }
+// XP awards are server-authoritative and must only be triggered by verified backend workflows.
+router.post('/award-xp', verifyFirebaseAuth, (_req, res) => {
+  res.status(403).json({
+    error: 'Direct client XP awards are disabled. XP is awarded automatically by verified server actions.',
+    code: 'FORBIDDEN_CLIENT_XP_AWARD',
+  });
 });
 
 module.exports = router;

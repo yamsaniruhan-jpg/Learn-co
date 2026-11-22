@@ -240,6 +240,80 @@
         "createdAt": { "type": "string" }
       },
       "required": ["userId", "rating", "comment"]
+    },
+    "StreakSummary": {
+      "title": "StreakSummary",
+      "description": "Synchronized daily study streak history, heatmap activity log, and freeze shields",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "currentStreak": { "type": "number" },
+        "longestStreak": { "type": "number" },
+        "lastActiveDate": { "type": "string", "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "freezeDaysRemaining": { "type": "number" },
+        "streakHistory": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["userId", "currentStreak", "longestStreak", "lastActiveDate"]
+    },
+    "StudyRoom": {
+      "title": "StudyRoom",
+      "description": "Public or private collaborative STEM study room metadata, timer state, and polls (never stores plaintext passwords or hashes)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "topic": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "color": { "type": "string", "enum": ["indigo", "amber", "rose", "purple", "emerald"] },
+        "visibility": { "type": "string", "enum": ["public", "private"] },
+        "roomCode": { "type": "string", "minLength": 4, "maxLength": 16, "pattern": "^[A-Z0-9\\-]+$" },
+        "hostUid": { "type": "string", "maxLength": 128 },
+        "hostName": { "type": "string", "maxLength": 80 },
+        "memberCount": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 40 },
+        "updatedAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "title", "topic", "color", "visibility", "roomCode", "hostUid", "createdAt"]
+    },
+    "StudyRoomInvite": {
+      "title": "StudyRoomInvite",
+      "description": "Opaque SHA-256 keyed lookup mapping (normalized roomCode + password) to private roomId; list queries are denied",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "roomCode": { "type": "string", "minLength": 4, "maxLength": 16, "pattern": "^[A-Z0-9\\-]+$" },
+        "hostUid": { "type": "string", "maxLength": 128 },
+        "visibility": { "type": "string", "enum": ["private"] },
+        "createdAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["roomId", "roomCode", "hostUid", "visibility", "createdAt"]
+    },
+    "StudyRoomMember": {
+      "title": "StudyRoomMember",
+      "description": "Verified study room membership record proving inviteKey authorization for private rooms",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "inviteKey": { "type": "string", "maxLength": 128 },
+        "joinedAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["userId", "displayName", "joinedAt"]
+    },
+    "StudyRoomMessage": {
+      "title": "StudyRoomMessage",
+      "description": "Persistent chat message inside a collaborative study room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "roomId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderUid": { "type": "string", "maxLength": 128 },
+        "user": { "type": "string", "maxLength": 80 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 600 },
+        "visibility": { "type": "string", "enum": ["public", "private"] },
+        "createdAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "roomId", "senderUid", "user", "text", "visibility", "createdAt"]
     }
   },
   "firestore": {
@@ -250,6 +324,10 @@
     "/users/{userId}/gamification": {
       "schema": "UserGamification",
       "description": "Private gamification status, lifetime XP, streak, and badges"
+    },
+    "/users/{userId}/streak/{docId}": {
+      "schema": "StreakSummary",
+      "description": "User streak history, heatmap daily activities, and freeze shield sync state"
     },
     "/gamification/xpRules": {
       "schema": "XpRules",
@@ -298,6 +376,22 @@
     "/marketplace/{courseId}/reviews/{reviewId}": {
       "schema": "MarketplaceReview",
       "description": "Ratings and reviews for published marketplace courses"
+    },
+    "/study_rooms/{roomId}": {
+      "schema": "StudyRoom",
+      "description": "Public and private STEM collaborative study rooms synced with Firestore"
+    },
+    "/study_room_invites/{inviteKey}": {
+      "schema": "StudyRoomInvite",
+      "description": "Hash-keyed private room invite verification records (get-only, never listable)"
+    },
+    "/study_rooms/{roomId}/members/{userId}": {
+      "schema": "StudyRoomMember",
+      "description": "Verified study room member access records"
+    },
+    "/study_rooms/{roomId}/messages/{messageId}": {
+      "schema": "StudyRoomMessage",
+      "description": "Study room collaboration chat messages"
     }
   }
 }

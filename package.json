@@ -30,6 +30,7 @@
     "@types/pg": "^8.23.1",
     "@types/three": "^0.186.0",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^5.0.4",
     "canvas-confetti": "^1.9.4",
     "cookie-parser": "^1.4.7",
@@ -61,7 +62,8 @@
     "three": "^0.186.1",
     "undici": "^7.30.2",
     "uuid": "^14.0.3",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "ws": "^8.23.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
