@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -13,7 +13,12 @@ interface State {
   error: Error | null;
   errorInfo: ErrorInfo | null;
   showDetails: boolean;
+  isChunkError: boolean;
 }
+
+const CHUNK_RELOAD_GUARD_KEY = 'learnco_chunk_reload_at';
+const CHUNK_ERROR_RE =
+  /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|Outdated Optimize Dep/i;
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
@@ -21,19 +26,41 @@ export class ErrorBoundary extends Component<Props, State> {
     error: null,
     errorInfo: null,
     showDetails: false,
+    isChunkError: false,
   };
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
-    return { hasError: true, error };
+    const isChunkError = CHUNK_ERROR_RE.test(error?.message || '');
+    return { hasError: true, error, isChunkError };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error caught by ErrorBoundary:', error, errorInfo);
-    this.setState({ errorInfo });
+    const isChunkError = CHUNK_ERROR_RE.test(error?.message || '');
+    this.setState({ errorInfo, isChunkError });
+
+    // If a lazy module failed after a server/build update, automatically trigger a single
+    // guarded refresh (at most once per 15s) so stale Vite module caches recover cleanly.
+    if (isChunkError && typeof window !== 'undefined') {
+      try {
+        const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY) || '0');
+        const now = Date.now();
+        if (!lastReload || now - lastReload > 15000) {
+          sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, String(now));
+          window.location.reload();
+        }
+      } catch {
+        // Ignore storage errors in sandboxed frames
+      }
+    }
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    if (this.state.isChunkError && typeof window !== 'undefined') {
+      window.location.reload();
+      return;
+    }
+    this.setState({ hasError: false, error: null, errorInfo: null, isChunkError: false });
     if (this.props.onReset) {
       this.props.onReset();
     }
@@ -49,25 +76,42 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
-                {this.props.fallbackTitle || 'Component Rendering Recovered'}
+                {this.state.isChunkError
+                  ? 'Module Refresh Needed'
+                  : this.props.fallbackTitle || 'Component Rendering Recovered'}
               </h3>
               <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed font-medium">
-                {this.props.fallbackMessage ||
-                  'An unexpected issue occurred while rendering this module. You can reload this component without losing your global progress.'}
+                {this.state.isChunkError
+                  ? 'A newer version of this workspace module is available after a server update. Refreshing reloads the updated bundle without losing your saved progress.'
+                  : this.props.fallbackMessage ||
+                    'An unexpected issue occurred while rendering this module. You can reload this component without losing your global progress.'}
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <button
+                  type="button"
                   onClick={this.handleReset}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reload Component</span>
+                  <span>{this.state.isChunkError ? 'Refresh App Bundle' : 'Reload Component'}</span>
                 </button>
 
+                {!this.state.isChunkError && typeof window !== 'undefined' && (
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-semibold border border-[#E3DFF5] dark:border-[#3D3861] hover:opacity-90 transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Full Reload</span>
+                  </button>
+                )}
+
                 <button
+                  type="button"
                   onClick={() => this.setState((prev) => ({ showDetails: !prev.showDetails }))}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
                 >
                   <span>{this.state.showDetails ? 'Hide Error Details' : 'View Error Details'}</span>
                   {this.state.showDetails ? (

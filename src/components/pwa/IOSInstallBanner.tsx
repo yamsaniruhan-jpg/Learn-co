@@ -20,7 +20,7 @@ export const IOSInstallBanner: React.FC = () => {
     if (!isMobile || isInstalled || dismissed) return;
     const timer = window.setTimeout(() => {
       setDwellElapsed(true);
-    }, 2500);
+    }, 10500);
     return () => window.clearTimeout(timer);
   }, [isMobile, isInstalled, dismissed]);
 

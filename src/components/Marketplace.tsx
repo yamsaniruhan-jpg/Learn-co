@@ -8,6 +8,8 @@ import {
   MarketplaceCourseProgress,
   fetchCourseProgressFromFirestore,
   syncCourseProgressToFirestore,
+  syncPublishedCourseToFirestore,
+  fetchPublishedCoursesFromFirestore,
 } from '../services/marketplaceFirestore';
 import {
   BookOpen,
@@ -122,7 +124,22 @@ export default function Marketplace() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Marketplace request failed (${res.status})`);
       if (requestId === searchRequest.current) {
-        setCourses(data.courses || []);
+        let combined: any[] = data.courses || [];
+        try {
+          const fsCourses = await fetchPublishedCoursesFromFirestore();
+          if (fsCourses.length > 0) {
+            const byId = new Map<string, any>();
+            for (const c of combined) byId.set(c.id, c);
+            for (const fc of fsCourses) {
+              const prev = byId.get(fc.id);
+              byId.set(fc.id, prev ? { ...fc, ...prev } : fc);
+            }
+            combined = Array.from(byId.values());
+          }
+        } catch {
+          // Ignore optional Firestore merge failure
+        }
+        setCourses(combined);
         setCatalogSource(data.catalogSource || null);
       }
     } catch (error: any) {
@@ -422,7 +439,24 @@ export default function Marketplace() {
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
+      const publishedToClientFirestore = res.ok && data.success
+        ? await syncPublishedCourseToFirestore(data.course || { id: courseId, ...payload })
+        : res.status === 503
+        ? await syncPublishedCourseToFirestore({
+            id: courseId,
+            ...payload,
+            creatorName: user?.name || user?.email?.split('@')[0] || 'Scholar Educator',
+            totalLessons: payload.lessons.length,
+            totalModules: payload.modules.length,
+            estimatedHours: Math.max(2, payload.lessons.length * 2),
+            rating: 0,
+            ratingCount: 0,
+            enrolledCount: 0,
+            publishedAt: new Date().toISOString(),
+          })
+        : false;
+
+      if ((res.ok && data.success) || publishedToClientFirestore) {
         setShowPublishModal(false);
         setPubTitle('');
         setPubDescription('');

@@ -609,17 +609,17 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       {/* 6. Main Leaderboard List Card */}
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* List Table Header */}
-        <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
+        <div className="grid grid-cols-12 gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
           <div className="col-span-2 sm:col-span-1 text-center">Rank</div>
           <div className="col-span-6 sm:col-span-4 md:col-span-5">Scholar</div>
-          <div className="hidden sm:block sm:col-span-3 md:col-span-3 text-left">Division & Zone</div>
+          <div className="hidden sm:block sm:col-span-3 md:col-span-3 text-left">Division &amp; Zone</div>
           <div className="hidden md:block md:col-span-1 text-center">Streak</div>
-          <div className="col-span-4 sm:col-span-4 md:col-span-2 text-right">XP Earned</div>
+          <div className="col-span-4 sm:col-span-4 md:col-span-2 text-right">XP</div>
         </div>
 
         {/* Loading Spinner */}
         {isLoading && (
-          <div className="p-12 flex flex-col items-center justify-center text-center space-y-3">
+          <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-3">
             <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Synchronizing verified cohort records...
@@ -652,9 +652,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 <div
                   key={scholar.userId}
                   onClick={() => onSelectScholar && onSelectScholar(scholar)}
-                  className={`grid grid-cols-12 gap-2 items-center px-4 py-3.5 transition-colors ${
+                  className={`grid grid-cols-12 gap-1.5 sm:gap-2 items-center px-3 sm:px-4 py-2.5 sm:py-3 transition-colors ${
                     isUser
-                      ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-l-4 border-l-indigo-600 font-medium'
+                      ? 'bg-[#F0EDFA] dark:bg-[#1E1B33] font-medium'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   } ${onSelectScholar ? 'cursor-pointer' : ''}`}
                 >

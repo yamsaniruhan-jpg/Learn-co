@@ -171,12 +171,12 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
         {/* Question Count Selection */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Session Length</label>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[5, 10, 15, 20].map((cnt) => (
               <button
                 key={cnt}
                 onClick={() => setQuestionCount(cnt)}
-                className={`py-2 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   questionCount === cnt
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                     : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'

@@ -10,7 +10,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { awardXp } from './utils/xpManager';
 import { useLocalPractice } from './utils/localPractice';
 import { useLocalNotifications } from './utils/localNotifications';
-import { lazyNamed } from './utils/lazyNamed';
+import { lazyNamed, lazyWithRetry } from './utils/lazyNamed';
 import {
   Sparkles,
   ShieldCheck,
@@ -51,7 +51,7 @@ const ZenFocusCanvas = lazy(() =>
 const FloatingGuideButton = lazy(() =>
   import('./components/common/FloatingGuideButton').then((m) => ({ default: m.FloatingGuideButton }))
 );
-const OmniCopilot = lazy(() => import('./components/OmniCopilot'));
+const OmniCopilot = lazyWithRetry(() => import('./components/OmniCopilot'));
 const IOSInstallBanner = lazy(() =>
   import('./components/pwa/IOSInstallBanner').then((m) => ({ default: m.IOSInstallBanner }))
 );
@@ -168,7 +168,7 @@ const NotificationCenter = lazyNamed(
   () => import('./components/layout/NotificationCenter'),
   'NotificationCenter'
 );
-const Marketplace = lazy(() => import('./components/Marketplace'));
+const Marketplace = lazyWithRetry(() => import('./components/Marketplace'));
 
 export default function App() {
   const { user, profile, gamification, settings, isLoading, isAuthenticated } = useAuth();
@@ -600,7 +600,7 @@ export default function App() {
       )}
 
       {/* Main Body Workspace */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-w-0 w-full overflow-x-clip">
         {/* Desktop Left Nav Sidebar */}
         <Suspense fallback={null}>
           <Sidebar
@@ -616,7 +616,7 @@ export default function App() {
         {/* Dynamic Center Stage Canvas with Zen Focus Canvas */}
         <Suspense fallback={<div className="flex-1" />}>
           <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
+          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-3 py-3 sm:p-5 lg:p-6 pb-20 md:pb-8">
             <ErrorBoundary
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Zap,
   Flame,
@@ -7,30 +7,35 @@ import {
   Calendar,
   Sparkles,
   ArrowRight,
-  TrendingUp,
   Clock,
   CheckCircle2,
   AlertCircle,
   Play,
   Compass,
-  ChevronRight,
-  BarChart2,
   Trophy,
-  Shield,
   Download,
   Smartphone,
   RefreshCw,
+  Bot,
+  FlaskConical,
+  Users,
+  Mic,
+  TrendingUp,
+  BarChart3,
+  Library,
+  BookMarked,
+  Award,
+  HelpCircle,
+  User,
+  ShoppingBag,
+  ShieldCheck,
+  ChevronRight,
 } from 'lucide-react';
 import { UserProfile, ConceptMastery, QuestionAttempt, SubjectId } from '../../types';
 import { calculateLevelFromXp } from '../../types/auth';
-import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
-import { Progress } from '../ui/Progress';
-import { Badge } from '../ui/Badge';
-import { XPIndicator, StreakIndicator, MasteryIndicator } from '../ui/GamificationIndicators';
 import { SEED_SUBJECTS } from '../../data/seedData';
 import { Leaderboard } from '../leaderboard/Leaderboard';
-import { loadUserStreak, getWeeklyStreakPills, getRecentStudyMinutes, StreakData } from '../../utils/streakManager';
+import { loadUserStreak, getRecentStudyMinutes, StreakData } from '../../utils/streakManager';
 import { StreakHeatmapCard } from './StreakHeatmapCard';
 import { StreakModal } from '../common/StreakModal';
 import { OfflineStorageManager } from '../../utils/offlineStorage';
@@ -53,13 +58,46 @@ interface DashboardViewProps {
   onSelectSubject?: (subjectId: SubjectId) => void;
 }
 
+type NavGroup = 'popular' | 'study' | 'ai' | 'track' | 'all';
+
+interface QuickDestination {
+  id: string;
+  label: string;
+  brief: string;
+  group: Exclude<NavGroup, 'popular' | 'all'>;
+  popular?: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const DESTINATIONS: QuickDestination[] = [
+  { id: 'learn', label: 'Learn', brief: 'Chapters & visual proofs', group: 'study', popular: true, icon: BookOpen },
+  { id: 'practice', label: 'Practice Arena', brief: 'Adaptive drills & XP', group: 'study', popular: true, icon: Target },
+  { id: 'copilot', label: 'Omni Copilot', brief: 'Step-by-step AI tutor', group: 'ai', popular: true, icon: Bot },
+  { id: 'create', label: 'Creator Studio', brief: 'PDF or URL to quizzes', group: 'ai', popular: true, icon: Sparkles },
+  { id: 'marketplace', label: 'Courses', brief: 'Enrolled & live courses', group: 'study', popular: true, icon: ShoppingBag },
+  { id: 'simulations', label: 'Simulations', brief: 'Interactive STEM labs', group: 'ai', popular: true, icon: FlaskConical },
+  { id: 'study-rooms', label: 'Study Rooms', brief: 'Public & private rooms', group: 'study', popular: true, icon: Users },
+  { id: 'voice-exam', label: 'Voice Exam', brief: 'Live mic oral defense', group: 'ai', popular: true, icon: Mic },
+  { id: 'planner', label: 'Study Planner', brief: 'Daily tasks & timetable', group: 'track', popular: true, icon: Calendar },
+  { id: 'mentor', label: '1-on-1 Mentor', brief: 'Goals, tasks & coaching', group: 'track', popular: true, icon: Compass },
+  { id: 'intelligence', label: 'Mistake Log', brief: 'Weak areas & review', group: 'track', popular: true, icon: BarChart3 },
+  { id: 'forecaster', label: 'Forecaster', brief: 'Exam readiness range', group: 'track', popular: true, icon: TrendingUp },
+  { id: 'concepts', label: 'Concept Matrix', brief: 'Topic dependency graph', group: 'study', icon: Library },
+  { id: 'digital-archive', label: 'Archive', brief: 'Free books & papers', group: 'study', icon: BookMarked },
+  { id: 'focus', label: 'Zen Focus', brief: 'Timer & focus sounds', group: 'study', icon: Clock },
+  { id: 'gamification', label: 'XP & Badges', brief: 'Milestones & rewards', group: 'track', icon: Award },
+  { id: 'leaderboard', label: 'Leaderboard', brief: 'Cohort XP rankings', group: 'track', icon: Trophy },
+  { id: 'offline-sync', label: 'Offline Sync', brief: 'Mobile pack & queue', group: 'track', icon: RefreshCw },
+  { id: 'user-guide', label: 'User Guide', brief: 'Manual & workflows', group: 'study', icon: HelpCircle },
+  { id: 'profile', label: 'Profile', brief: 'Targets & settings', group: 'track', icon: User },
+];
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   user,
   masteries,
   attempts = [],
   onNavigate,
   onLaunchPractice = () => onNavigate('practice'),
-  onSelectSubject,
 }) => {
   const [streakData, setStreakData] = useState<StreakData>(() =>
     loadUserStreak(user.id || 'default_user')
@@ -70,6 +108,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const { isInstalled, isInstallable, install } = usePWAInstall();
   const [upcomingTasks, setUpcomingTasks] = useState<StudyTask[]>([]);
   const [sm2Tick, setSm2Tick] = useState(0);
+  const [navGroup, setNavGroup] = useState<NavGroup>('popular');
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -99,7 +138,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [user.id]);
 
-  const weeklyPills = getWeeklyStreakPills(streakData);
   const recentStudyMinutes = getRecentStudyMinutes(streakData);
   const xpProgress = calculateLevelFromXp(user.xp);
   const activeStreakCount = streakData.currentStreak ?? user.currentStreak ?? 0;
@@ -109,30 +147,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     0,
     user.dailyAllowanceLimit - user.dailyQuestionsSolvedToday
   );
-  const dailyProgressPercent = Math.min(
-    100,
-    (user.dailyQuestionsSolvedToday / user.dailyAllowanceLimit) * 100
-  );
 
   const hasStartedPractice = attempts.length > 0;
 
-  const averageMastery = hasStartedPractice && masteries.length > 0
-    ? Math.round(
-        masteries.reduce((acc, m) => acc + m.masteryScore, 0) / Math.max(1, masteries.length)
-      )
-    : 0;
+  const averageMastery =
+    hasStartedPractice && masteries.length > 0
+      ? Math.round(
+          masteries.reduce((acc, m) => acc + m.masteryScore, 0) / Math.max(1, masteries.length)
+        )
+      : 0;
 
   const weakConcepts = hasStartedPractice
     ? masteries.filter((m) => m.isWeakArea || m.masteryScore < 60)
     : [];
 
   const mentorNote = !hasStartedPractice
-    ? 'Complete a practice drill to start building a device-local estimate of your strengths and areas to review.'
+    ? 'Complete one drill to calibrate your local mastery estimate.'
     : weakConcepts.length > 0
-    ? `Your device-local practice estimate is ${averageMastery}%. Consider reviewing "${weakConcepts[0].conceptTitle}" (${weakConcepts[0].masteryScore}%).`
-    : `Your device-local practice estimate is ${averageMastery}% across ${attempts.length} recorded attempts. Challenge yourself with more practice.`;
+    ? `Estimated mastery ${averageMastery}%. Review "${weakConcepts[0].conceptTitle}" (${weakConcepts[0].masteryScore}%).`
+    : `Estimated mastery ${averageMastery}% across ${attempts.length} recorded attempts.`;
 
-  const { dueCards, totalDueCount } = React.useMemo(
+  const { dueCards, totalDueCount } = useMemo(
     () => getDueReviewQueue(user.id || 'default_user', masteries, attempts, new Date(), 4),
     [user.id, masteries, attempts, sm2Tick]
   );
@@ -143,155 +178,165 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   const quickPrompts = [
-    { title: 'Derive First Derivative Test', category: 'Math', tab: 'copilot', prompt: 'Derive the first derivative test for local extrema from first principles.' },
-    { title: 'Explain Gradient Descent Divergence', category: 'CS', tab: 'copilot', prompt: 'Why does learning rate step size cause oscillation in ravines?' },
-    { title: 'Stereochemistry of Walden Inversion', category: 'Chemistry', tab: 'copilot', prompt: 'Why does SN2 always invert tetrahedral chiral center geometry?' },
+    {
+      title: 'Derive First Derivative Test',
+      category: 'Math',
+      prompt: 'Derive the first derivative test for local extrema from first principles.',
+    },
+    {
+      title: 'Gradient Descent Oscillation',
+      category: 'CS',
+      prompt: 'Why does learning rate step size cause oscillation in ravines?',
+    },
+    {
+      title: 'Walden Inversion Geometry',
+      category: 'Chemistry',
+      prompt: 'Why does SN2 always invert tetrahedral chiral center geometry?',
+    },
   ];
 
+  const allDestinations = useMemo(() => {
+    if (user.role === 'admin') {
+      return [
+        ...DESTINATIONS,
+        {
+          id: 'admin',
+          label: 'Admin Studio',
+          brief: 'Approvals & metrics',
+          group: 'track' as const,
+          icon: ShieldCheck,
+        },
+      ];
+    }
+    return DESTINATIONS;
+  }, [user.role]);
+
+  const visibleDestinations = useMemo(() => {
+    if (navGroup === 'all') return allDestinations;
+    if (navGroup === 'popular') return allDestinations.filter((d) => d.popular);
+    return allDestinations.filter((d) => d.group === navGroup);
+  }, [allDestinations, navGroup]);
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-      {/* Top Welcome Banner & Goal Hero Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-[#2D2A4A] dark:bg-[#1E1B33] text-white p-6 sm:p-8 lg:p-10 shadow-[0_8px_24px_rgba(45,42,74,0.14)] border border-[#E3DFF5] dark:border-[#3D3861]">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="px-3.5 py-1 rounded-full bg-[#6C5CE7] text-xs font-black text-white">
-                Level {user.level} Scholar
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-200">
+      {/* 1. Compact Header Command & Telemetry Strip */}
+      <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-5 shadow-[0_1px_4px_rgba(45,42,74,0.05)] space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#6B6890] dark:text-[#B4B0D5]">
+              <span className="font-bold text-[#6C5CE7] dark:text-[#A497F7]">
+                Level {user.level}
               </span>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFB84D] text-[#2D2A4A] text-xs font-black shadow-xs">
-                <Flame className="w-4 h-4 fill-[#2D2A4A] text-[#2D2A4A]" />
-                <span>{activeStreakCount > 0 ? `${activeStreakCount}-Day Active Streak` : '0-Day Streak (Start Today)'}</span>
-              </div>
-              <span className="text-xs text-[#E3DFF5] font-bold">
-                Target: {user.targetExam || 'Advanced STEM Mastery'}
-              </span>
+              <span aria-hidden="true">·</span>
+              <span className="truncate">{user.targetExam || 'STEM Mastery'}</span>
+              <span aria-hidden="true">·</span>
+              <span className="tabular-nums">{allowanceRemaining} quota left</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display tracking-tight text-white">
+            <h1 className="text-lg sm:text-2xl font-black font-display tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
               Welcome back, {user.fullName.split(' ')[0]}
             </h1>
-            <p className="text-sm sm:text-base text-[#F1EFFF]/90 leading-relaxed font-medium">
+            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
               {activeStreakCount > 0
-                ? `Your ${activeStreakCount}-day device-local activity streak is active. Try a practice session to keep learning.`
-                : `Ready to begin your journey? Complete your first diagnostic practice session today to ignite your study streak.`}
+                ? `${activeStreakCount}-day streak active. Solve a quick set or pick any tool below.`
+                : 'Start a quick practice drill today to ignite your study streak.'}
             </p>
-
-            {/* Streak Week Visualizer */}
-            <div className="pt-2 flex items-center gap-2">
-              <span className="text-xs text-[#E3DFF5] font-bold mr-1">Weekly Streak:</span>
-              <div className="flex items-center gap-1.5">
-                {weeklyPills.map((pill) => (
-                  <div
-                    key={pill.dateKey}
-                    title={`${pill.dayName} (${pill.dateKey}): ${pill.isCompleted ? 'Active' : 'No activity'}`}
-                    className={`flex flex-col items-center justify-center w-8 h-8 rounded-xl text-[10px] font-black border transition-all ${
-                      pill.isCompleted
-                        ? 'bg-[#FFB84D] text-[#2D2A4A] border-[#e09d3b] shadow-xs'
-                        : pill.isToday
-                        ? 'bg-[#6C5CE7] text-white border-white'
-                        : 'bg-[#1E1B33] text-white/50 border-[#3D3861]'
-                    }`}
-                  >
-                    <span>{pill.dayName.slice(0, 1)}</span>
-                    {pill.isCompleted && <Flame className="w-2.5 h-2.5 fill-current" />}
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
-          {/* Quick Launch Practice CTA Box */}
-          <div className="bg-[#FFFFFF] dark:bg-[#2A2647] p-6 rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row items-center gap-4 shrink-0 shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
-            <div className="text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-black text-[#FFB84D] mb-0.5">
-                <Flame className="w-4 h-4 fill-[#FFB84D]" />
-                <span>Daily Quota</span>
-              </div>
-              <p className="text-xl font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
-                {allowanceRemaining} Problems Left
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
-                className="px-4 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
-                title="60-second sample flash check (device-local activity points)"
-              >
-                <Zap className="w-4 h-4 fill-current text-slate-950" />
-                <span>60s Flash Check</span>
-              </button>
-              <Button
-                onClick={onLaunchPractice}
-                variant="xp"
-                size="lg"
-                leftIcon={<Play className="w-4 h-4 fill-current" />}
-                className="w-full sm:w-auto shadow-lg shadow-amber-500/25"
-              >
-                Start Arena
-              </Button>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
+              className="flex-1 sm:flex-none px-3 py-2 min-h-[38px] rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EFEBFD] dark:hover:bg-[#353057] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              title="60-second flash check"
+            >
+              <Zap className="w-3.5 h-3.5 text-[#FFB84D] fill-[#FFB84D] shrink-0" />
+              <span>60s Check</span>
+            </button>
+            <button
+              type="button"
+              onClick={onLaunchPractice}
+              className="flex-1 sm:flex-none px-3.5 py-2 min-h-[38px] rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
+              <span>Start Practice</span>
+            </button>
           </div>
         </div>
 
-        {/* Hero Goal Progress Bar */}
-        <div className="mt-8 pt-6 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <div className="flex items-center justify-between text-xs text-indigo-200/70 mb-0.5">
-              <span title="Includes sign-ins and recorded activity">Activity Streak</span>
-              <span className="text-[10px] text-amber-300 font-bold">Best: {longestStreakCount}d</span>
+        {/* 4 Compact Micro Metrics (No Nested Cards) */}
+        <div className="pt-3 border-t border-[#E3DFF5] dark:border-[#3D3861] grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+              <span className="font-semibold">Streak</span>
+              <span className="tabular-nums">Best {longestStreakCount}d</span>
             </div>
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              <Flame className="w-4 h-4 fill-orange-400 text-orange-400 inline shrink-0 self-center" />
-              <span className="text-xl font-black text-amber-300">{activeStreakCount}</span>
-              <span className="text-xs text-indigo-200">consecutive days</span>
+            <div className="flex items-baseline gap-1 tabular-nums">
+              <Flame className="w-3.5 h-3.5 text-[#FFB84D] fill-[#FFB84D] self-center shrink-0" />
+              <span className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+                {activeStreakCount}d
+              </span>
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] truncate">active</span>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
+            <div className="w-full h-1.5 rounded-full bg-[#F0EDFA] dark:bg-[#1E1B33] overflow-hidden">
               <div
-                className="bg-orange-400 h-1.5 rounded-full"
+                className="h-full rounded-full bg-[#FFB84D]"
                 style={{ width: `${Math.min(100, (activeStreakCount / 7) * 100)}%` }}
               />
             </div>
           </div>
 
-          <div>
-            <span className="text-xs text-indigo-200/70 block">Average Mastery</span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-black text-emerald-400">{averageMastery}%</span>
-              <span className="text-xs text-indigo-200">
-                {hasStartedPractice ? 'device-local estimate' : 'not started yet'}
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+              <span className="font-semibold">Mastery</span>
+              <span className="tabular-nums truncate">
+                {hasStartedPractice ? `${attempts.length} Qs` : 'Local'}
               </span>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
+            <div className="flex items-baseline gap-1.5 tabular-nums">
+              <span className="text-base font-black text-[#4CAF8E]">{averageMastery}%</span>
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] truncate">
+                {hasStartedPractice ? 'estimate' : 'ready'}
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-[#F0EDFA] dark:bg-[#1E1B33] overflow-hidden">
               <div
-                className="bg-emerald-400 h-1.5 rounded-full"
+                className="h-full rounded-full bg-[#4CAF8E]"
                 style={{ width: `${averageMastery}%` }}
               />
             </div>
           </div>
 
-          <div>
-            <span className="text-xs text-indigo-200/70 block">Study Time · Last 7 Days</span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-black text-white">{recentStudyMinutes}m</span>
-              <span className="text-xs text-indigo-200">of 240m · this device</span>
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+              <span className="font-semibold">Study (7d)</span>
+              <span className="tabular-nums">Goal 240m</span>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
+            <div className="flex items-baseline gap-1 tabular-nums">
+              <span className="text-base font-black text-[#00B8A9]">{recentStudyMinutes}m</span>
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] truncate">logged</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-[#F0EDFA] dark:bg-[#1E1B33] overflow-hidden">
               <div
-                className="bg-cyan-400 h-1.5 rounded-full"
+                className="h-full rounded-full bg-[#00B8A9]"
                 style={{ width: `${Math.min(100, (recentStudyMinutes / 240) * 100)}%` }}
               />
             </div>
           </div>
 
-          <div>
-            <span className="text-xs text-indigo-200/70 block" title="Server practice XP plus this device's activity points. Leaderboard XP excludes local points.">Experience · local &amp; practice</span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-black text-amber-300">{user.xp.toLocaleString()}</span>
-              <span className="text-xs text-indigo-200">XP</span>
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+              <span className="font-semibold">Experience</span>
+              <span className="tabular-nums">{xpProgress.progressPercent}% Lv {xpProgress.level}</span>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
+            <div className="flex items-baseline gap-1 tabular-nums">
+              <span className="text-base font-black text-[#6C5CE7] dark:text-[#A497F7]">
+                {user.xp.toLocaleString()}
+              </span>
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">XP</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-[#F0EDFA] dark:bg-[#1E1B33] overflow-hidden">
               <div
-                className="bg-amber-400 h-1.5 rounded-full"
+                className="h-full rounded-full bg-[#6C5CE7]"
                 style={{ width: `${xpProgress.progressPercent}%` }}
                 role="progressbar"
                 aria-label="Progress to next level"
@@ -302,40 +347,111 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 12-Week Activity Heatmap & Streak Milestones */}
+      {/* 2. Intuitive Streak Progress Bar + Interactive Calendar */}
       <StreakHeatmapCard
         streakData={streakData}
         onOpenStreakModal={() => setShowStreakModal(true)}
       />
 
-      {/* Main Grid: Core STEM Tracks & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-        {/* Left 2 Columns: STEM Curriculum Progress & Weak Topics */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* STEM Subject Exploration Cards */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+      {/* 3. Navigate Anywhere Directory (Compact Small Tiles + Brief Explanation) */}
+      <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-5 space-y-3 shadow-[0_1px_4px_rgba(45,42,74,0.05)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
+              Workspace Hub
+            </h2>
+            <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+              Jump directly to any learning studio, AI tool, or tracker.
+            </p>
+          </div>
+
+          <div
+            role="tablist"
+            aria-label="Filter dashboard tools"
+            className="flex items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {(
+              [
+                { id: 'popular', label: 'Popular' },
+                { id: 'study', label: 'Study' },
+                { id: 'ai', label: 'AI & Labs' },
+                { id: 'track', label: 'Progress' },
+                { id: 'all', label: `All (${allDestinations.length})` },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={navGroup === tab.id}
+                onClick={() => setNavGroup(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                  navGroup === tab.id
+                    ? 'bg-[#6C5CE7] text-white'
+                    : 'bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {visibleDestinations.map((dest) => {
+            const Icon = dest.icon;
+            return (
+              <button
+                key={dest.id}
+                type="button"
+                onClick={() => onNavigate(dest.id)}
+                className="group p-2.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EFEBFD] dark:hover:bg-[#332E56] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7] text-left flex items-center gap-2.5 transition-colors cursor-pointer min-w-0"
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#6C5CE7] dark:text-[#A497F7] flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate group-hover:text-[#6C5CE7] dark:group-hover:text-[#A497F7]">
+                    {dest.label}
+                  </div>
+                  <div className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5] truncate">
+                    {dest.brief}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 4. Compact Two-Column Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+        {/* Left 2 Columns */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* STEM Curriculum Tracks (Compact) */}
+          <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-5 space-y-3 shadow-[0_1px_4px_rgba(45,42,74,0.05)]">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-display">
-                  STEM Curriculum Tracks
+                <h2 className="text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
+                  STEM Subjects
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Concept decks, derivations, and interactive visual proofs
+                <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+                  Core concept decks, derivations, and visual proofs.
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                rightIcon={<ArrowRight className="w-4 h-4" />}
+              <button
+                type="button"
                 onClick={() => onNavigate('learn')}
+                className="text-xs font-bold text-[#6C5CE7] dark:text-[#A497F7] hover:underline inline-flex items-center gap-1 shrink-0 cursor-pointer"
               >
-                View all curriculum
-              </Button>
+                <span>All tracks</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {SEED_SUBJECTS.map((subject) => {
                 const subjectAttempts = attempts.filter((a) => a.subjectId === subject.id);
                 const subjectMasteries = masteries.filter((m) => m.subjectId === subject.id);
@@ -348,202 +464,168 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 0;
 
                 return (
-                  <Card
+                  <button
                     key={subject.id}
-                    variant="interactive"
-                    padding="md"
+                    type="button"
                     onClick={() => onNavigate('learn', { subjectId: subject.id })}
-                    className="group relative overflow-hidden"
+                    className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EFEBFD] dark:hover:bg-[#332E56] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7] text-left space-y-2 transition-colors cursor-pointer min-w-0"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-xs shrink-0"
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black text-white shrink-0"
                           style={{ backgroundColor: subject.color }}
                         >
                           {subject.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
                             {subject.name}
-                          </h3>
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {subject.courseCount} courses • {subject.conceptCount} concepts
-                          </span>
+                          </div>
+                          <div className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5] tabular-nums">
+                            {subject.courseCount} courses · {subject.conceptCount} concepts
+                          </div>
                         </div>
                       </div>
-                      <Badge variant="default" size="sm">
-                        {actualMastery}% Mastered
-                      </Badge>
+                      <span className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF] tabular-nums shrink-0">
+                        {actualMastery}%
+                      </span>
                     </div>
 
-                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-                      {subject.description}
-                    </p>
-
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                    <div className="w-full bg-[#E3DFF5] dark:bg-[#2A2647] rounded-full h-1.5 overflow-hidden">
                       <div
-                        className="h-1.5 rounded-full transition-all duration-300"
+                        className="h-full rounded-full transition-all duration-300"
                         style={{
                           width: `${actualMastery}%`,
                           backgroundColor: subject.color,
                         }}
                       />
                     </div>
-                  </Card>
+                  </button>
                 );
               })}
             </div>
-          </div>
+          </section>
 
-          {/* Weak Topics or Fresh Onboarding Status */}
+          {/* Compact Remediation / Calibration Bar */}
           {hasStartedPractice && weakConcepts.length > 0 ? (
-            <Card
-              variant="subtle"
-              padding="md"
-              className="rounded-3xl border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertCircle className="w-5 h-5" />
+            <div className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-rose-200 dark:border-rose-900/60 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <AlertCircle className="w-4 h-4 text-[#F25F5C] shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">
+                    {weakConcepts.length} Weak Area{weakConcepts.length === 1 ? '' : 's'} to Review
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                      Cognitive Weak Areas Identified ({weakConcepts.length})
-                    </h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
-                      {weakConcepts[0].conceptTitle} has a low device-local practice estimate. Consider a targeted drill.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {weakConcepts.map((w) => (
-                        <span
-                          key={w.conceptId}
-                          className="text-[11px] font-semibold px-3 py-1 rounded-full bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-1.5"
-                        >
-                          <span>{w.conceptTitle}</span>
-                          <span className="font-bold opacity-80">({w.masteryScore}%)</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => onNavigate('practice')}
-                  className="shrink-0 rounded-full"
-                >
-                  Remediate
-                </Button>
-              </div>
-            </Card>
-          ) : !hasStartedPractice ? (
-            <Card
-              variant="subtle"
-              padding="md"
-              className="rounded-3xl border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                      Mastery Profile: Ready to Calibrate
-                    </h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
-                      You haven't attempted any questions on this device yet. Start a practice session to build a local estimate.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => onNavigate('practice')}
-                  className="shrink-0 rounded-full"
-                >
-                  Start First Session
-                </Button>
-              </div>
-            </Card>
-          ) : null}
-
-          {/* SM-2 Spaced Repetition Due-for-Review Queue */}
-          <Card variant="default" padding="md" className="space-y-3.5">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Due for Spaced Review (SM-2)
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {totalDueCount > 0
-                      ? `${totalDueCount} concept${totalDueCount === 1 ? '' : 's'} ready for active recall today`
-                      : 'All scheduled concept intervals are up to date'}
+                  <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] truncate">
+                    Lowest: {weakConcepts[0].conceptTitle} ({weakConcepts[0].masteryScore}%) — run a targeted drill.
                   </p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => onNavigate('practice')}
-                className="text-xs rounded-full"
+                className="px-3 py-1.5 rounded-xl bg-[#F25F5C] hover:bg-[#dc4b48] text-white text-xs font-bold shrink-0 cursor-pointer"
               >
-                Open Arena
-              </Button>
+                Remediate
+              </button>
+            </div>
+          ) : !hasStartedPractice ? (
+            <div className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <Target className="w-4 h-4 text-[#6C5CE7] shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">
+                    Calibrate Mastery Profile
+                  </div>
+                  <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+                    Complete a short practice set to build your device-local mastery breakdown.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('practice')}
+                className="px-3 py-1.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold shrink-0 cursor-pointer"
+              >
+                Start First Session
+              </button>
+            </div>
+          ) : null}
+
+          {/* SM-2 Spaced Repetition Queue (Compact) */}
+          <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-5 space-y-3 shadow-[0_1px_4px_rgba(45,42,74,0.05)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF] font-display flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#6C5CE7] shrink-0" />
+                  <span>Spaced Review (SM-2)</span>
+                </h2>
+                <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+                  {totalDueCount > 0
+                    ? `${totalDueCount} concept${totalDueCount === 1 ? '' : 's'} due for active recall.`
+                    : 'All scheduled recall intervals are up to date.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('practice')}
+                className="px-2.5 py-1 rounded-lg border border-[#E3DFF5] dark:border-[#3D3861] text-[11px] font-bold text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] shrink-0 cursor-pointer"
+              >
+                Arena
+              </button>
             </div>
 
             {dueCards.length === 0 ? (
-              <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-3 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>You&apos;ve cleared today&apos;s spaced repetition queue! Come back tomorrow or explore new concepts.</span>
+              <div className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] flex items-center gap-2 text-xs text-[#4CAF8E] font-semibold">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Spaced review queue cleared for today.</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {dueCards.map((card) => (
                   <div
                     key={card.conceptId}
-                    className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/70 flex flex-col justify-between gap-3"
+                    className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                          {card.subjectId.toUpperCase()} &middot; EF {card.easeFactor.toFixed(1)}
+                        <span className="text-[10px] font-bold text-[#6C5CE7] dark:text-[#A497F7] tabular-nums">
+                          {card.subjectId.toUpperCase()} · EF {card.easeFactor.toFixed(1)}
                         </span>
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                        <h4 className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
                           {card.conceptTitle}
                         </h4>
                       </div>
                       <button
                         type="button"
-                        onClick={() => onNavigate('practice', { subjectId: card.subjectId, conceptId: card.conceptId })}
-                        className="px-2.5 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shrink-0 cursor-pointer"
+                        onClick={() =>
+                          onNavigate('practice', {
+                            subjectId: card.subjectId,
+                            conceptId: card.conceptId,
+                          })
+                        }
+                        className="px-2 py-1 rounded-lg bg-[#6C5CE7] text-white text-[10px] font-bold shrink-0 cursor-pointer"
                       >
                         Drill
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-200/70 dark:border-slate-700/60">
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Rate recall:</span>
+                    <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-[#E3DFF5] dark:border-[#3D3861]">
+                      <span className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5]">Recall:</span>
                       <div className="flex items-center gap-1">
                         {(
                           [
-                            { label: 'Again', quality: 0, cls: 'hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-950/60' },
-                            { label: 'Hard', quality: 2, cls: 'hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-950/60' },
-                            { label: 'Good', quality: 4, cls: 'hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-950/60' },
-                            { label: 'Easy', quality: 5, cls: 'hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-950/60' },
-                          ] as Array<{ label: string; quality: SM2Quality; cls: string }>
+                            { label: 'Again', quality: 0 },
+                            { label: 'Hard', quality: 2 },
+                            { label: 'Good', quality: 4 },
+                            { label: 'Easy', quality: 5 },
+                          ] as Array<{ label: string; quality: SM2Quality }>
                         ).map((opt) => (
                           <button
                             type="button"
                             key={opt.label}
                             onClick={() => handleSM2Grade(card, opt.quality)}
-                            className={`px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition cursor-pointer ${opt.cls}`}
+                            className="px-1.5 py-0.5 rounded-md bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7] text-[10px] font-bold text-[#2D2A4A] dark:text-[#F1EFFF] cursor-pointer"
                           >
                             {opt.label}
                           </button>
@@ -554,160 +636,145 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 ))}
               </div>
             )}
-          </Card>
+          </section>
 
-          {/* Quick First-Principles Inquiries for Copilot */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 font-display flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-500" />
-              <span>Socratic First-Principles Prompts</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Compact Socratic Prompts */}
+          <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-4 space-y-2.5 shadow-[0_1px_4px_rgba(45,42,74,0.05)]">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-[#6C5CE7]" />
+                <span>Quick Copilot Prompts</span>
+              </h3>
+              <span className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5]">
+                Tap to ask step-by-step
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {quickPrompts.map((item, idx) => (
                 <button
                   key={idx}
-                  onClick={() => onNavigate(item.tab, { initialPrompt: item.prompt })}
-                  className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 text-left transition-all hover:shadow-xs group cursor-pointer"
+                  type="button"
+                  onClick={() => onNavigate('copilot', { initialPrompt: item.prompt })}
+                  className="p-2.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] border border-[#E3DFF5] dark:border-[#3D3861] text-left transition-colors cursor-pointer"
                 >
-                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block mb-1">
+                  <span className="text-[10px] font-bold text-[#6C5CE7] dark:text-[#A497F7] block">
                     {item.category}
                   </span>
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2">
+                  <span className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] line-clamp-1">
                     {item.title}
-                  </p>
+                  </span>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         </div>
 
-        {/* Right 1 Column: Timetable, AI Studio Quick Links & Mentor Summary */}
-        <div className="space-y-6">
-          {/* Upcoming Study Schedule */}
-          <Card variant="default" padding="md" className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Study Timetable
-                </h3>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
+        {/* Right Column (Compact Summary Cards) */}
+        <div className="space-y-4">
+          {/* Upcoming Study Timetable */}
+          <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-4 space-y-2.5 shadow-[0_1px_4px_rgba(45,42,74,0.05)]">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[#6C5CE7]" />
+                <span>Study Timetable</span>
+              </h3>
+              <button
+                type="button"
                 onClick={() => onNavigate('planner')}
-                className="text-xs p-1"
+                className="text-[11px] font-bold text-[#6C5CE7] dark:text-[#A497F7] hover:underline cursor-pointer"
               >
-                Full schedule
-              </Button>
+                Open Planner
+              </button>
             </div>
 
-            <div className="space-y-2.5">
-              {upcomingTasks.length === 0 ? (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-2">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    No upcoming tasks scheduled yet.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onNavigate('planner')}
-                    className="text-xs"
-                  >
-                    Create a study schedule in Planner
-                  </Button>
-                </div>
-              ) : (
-                upcomingTasks.map((task) => (
+            {upcomingTasks.length === 0 ? (
+              <div className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-dashed border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between gap-2">
+                <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+                  No study tasks scheduled yet.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('planner')}
+                  className="text-[11px] font-bold text-[#6C5CE7] shrink-0 cursor-pointer"
+                >
+                  + Add
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {upcomingTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-1.5"
+                    className="p-2.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-between gap-2"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
                         {task.title}
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 shrink-0">
-                        {task.scheduledStartTime || task.scheduledDate}
-                      </span>
+                      </div>
+                      <div className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5] truncate">
+                        {task.conceptTitle || task.subjectId.toUpperCase()} · {task.estimatedDurationMinutes}m
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="truncate">{task.conceptTitle || task.subjectId.toUpperCase()}</span>
-                      <span className="shrink-0">{task.estimatedDurationMinutes} mins</span>
-                    </div>
+                    <span className="text-[10px] font-bold text-[#6C5CE7] dark:text-[#A497F7] shrink-0 tabular-nums">
+                      {task.scheduledStartTime || task.scheduledDate}
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          {/* AI Creator Studio Spotlight */}
-          <Card
-            variant="default"
-            padding="md"
-            className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-500/30"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-500 text-white shadow-xs flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5" />
+                ))}
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  AI Creator Studio
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Turn lecture PDFs, textbook chapters, or Markdown notes into interactive flashcards and calibrated quizzes.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onNavigate('create')}
-                  className="mt-2 text-xs"
-                >
-                  Open Creator Studio
-                </Button>
-              </div>
-            </div>
-          </Card>
+            )}
+          </section>
 
-          {/* Personal Mentor Snapshot */}
-          <Card variant="default" padding="md" className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-emerald-500" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Personal Mentor Note
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-              "{mentorNote}"
-            </p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full text-xs"
+          {/* Compact Mentor & Creator Studio Actions */}
+          <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] divide-y divide-[#E3DFF5] dark:divide-[#3D3861] shadow-[0_1px_4px_rgba(45,42,74,0.05)] overflow-hidden">
+            <button
+              type="button"
               onClick={() => onNavigate('mentor')}
+              className="w-full p-3.5 text-left hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors flex items-start justify-between gap-2 cursor-pointer"
             >
-              Open Retention Diagnostics
-            </Button>
-          </Card>
-
-          {/* Quick Cohort Leaderboard Preview */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Cohort Rankings
-                </h3>
+              <div className="min-w-0 space-y-0.5">
+                <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-[#00B8A9] shrink-0" />
+                  <span>Mentor Insight</span>
+                </div>
+                <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] leading-snug">
+                  {mentorNote}
+                </p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
+              <ChevronRight className="w-4 h-4 text-[#8E8BAF] shrink-0 mt-0.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('create')}
+              className="w-full p-3.5 text-left hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors flex items-start justify-between gap-2 cursor-pointer"
+            >
+              <div className="min-w-0 space-y-0.5">
+                <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#FFB84D] shrink-0" />
+                  <span>Creator Studio</span>
+                </div>
+                <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] leading-snug">
+                  Turn PDFs, links, or notes into flashcards and practice quizzes.
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#8E8BAF] shrink-0 mt-0.5" />
+            </button>
+          </section>
+
+          {/* Compact Cohort Leaderboard */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-0.5">
+              <h3 className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-[#FFB84D]" />
+                <span>Cohort Rankings</span>
+              </h3>
+              <button
+                type="button"
                 onClick={() => onNavigate('leaderboard')}
-                className="text-xs p-1"
+                className="text-[11px] font-bold text-[#6C5CE7] dark:text-[#A497F7] hover:underline cursor-pointer"
               >
                 View all
-              </Button>
+              </button>
             </div>
             <Leaderboard
               compact
@@ -719,39 +786,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             />
           </div>
 
-          {/* Mobile App & Offline Pack Card */}
-          <Card variant="default" padding="md" className="space-y-3">
+          {/* Mobile App & Offline Sync (Compact) */}
+          <section className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-3.5 sm:p-4 space-y-2.5 shadow-[0_1px_4px_rgba(45,42,74,0.05)]">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-[#6C5CE7]" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Mobile App &amp; Offline Sync
-                </h3>
-              </div>
-              <span className="px-2 py-0.5 rounded-lg bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A497F7] text-[10px] font-black">
-                {packReady ? 'Pack Ready' : 'PWA'}
+              <h3 className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
+                <Smartphone className="w-3.5 h-3.5 text-[#6C5CE7]" />
+                <span>Mobile App &amp; Sync</span>
+              </h3>
+              <span className="text-[10px] font-bold text-[#4CAF8E]">
+                {packReady ? 'Pack Ready' : 'PWA Ready'}
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Save LearnCo to your phone Home Screen and cache Olympiad drills for offline practice with automatic cloud sync.
+            <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] leading-snug">
+              Add to your phone Home Screen and cache drills for offline study with automatic sync.
             </p>
             <div className="flex flex-wrap gap-2">
               {!isInstalled && isInstallable && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    void install();
-                  }}
-                  leftIcon={<Download className="w-3.5 h-3.5" />}
-                  className="text-xs"
+                <button
+                  type="button"
+                  onClick={() => void install()}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#6C5CE7] text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                 >
-                  Add to Home Screen
-                </Button>
+                  <Download className="w-3 h-3" />
+                  <span>Add App</span>
+                </button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 disabled={packDownloading}
                 onClick={async () => {
                   setPackDownloading(true);
@@ -763,21 +824,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     setPackDownloading(false);
                   }
                 }}
-                leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${packDownloading ? 'animate-spin' : ''}`} />}
-                className="text-xs"
+                className="px-2.5 py-1.5 rounded-lg bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer disabled:opacity-60"
               >
-                {packDownloading ? 'Downloading...' : packReady ? 'Sync & Refresh Pack' : 'Download Offline Pack'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+                <RefreshCw className={`w-3 h-3 ${packDownloading ? 'animate-spin' : ''}`} />
+                <span>{packDownloading ? 'Syncing...' : packReady ? 'Sync Pack' : 'Download Pack'}</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => onNavigate('offline-sync')}
-                className="text-xs"
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-[#6C5CE7] dark:text-[#A497F7] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] cursor-pointer"
               >
                 Sync Center
-              </Button>
+              </button>
             </div>
-          </Card>
+          </section>
         </div>
       </div>
 
