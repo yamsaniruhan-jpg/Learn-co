@@ -33,8 +33,8 @@ router.post('/signup', (req, res: Response) => {
       return;
     }
 
-    if (typeof password !== 'string' || password.length < 6 || password.length > 1024) {
-      res.status(400).json({ error: 'Password must be between 6 and 1024 characters in length.' });
+    if (typeof password !== 'string' || password.length < 8 || password.length > 1024 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      res.status(400).json({ error: 'Password must be 8 to 1024 characters and include a letter and a number.' });
       return;
     }
 
@@ -43,6 +43,7 @@ router.post('/signup', (req, res: Response) => {
       password,
       fullName: fullName || email.split('@')[0],
       authProvider: 'email',
+      avatarUrl: '/logo-mark.png',
       timezone: timezone || 'UTC',
     });
 
@@ -101,30 +102,15 @@ router.post('/signin', signinLimiter, async (req, res: Response) => {
       }
     }
 
-    if (!user) {
-      res.status(404).json({
-        error: `No Learn.co account found for "${email.trim().toLowerCase()}". Please sign up to create an account.`,
-        notFound: true,
-      });
-      return;
-    }
-
-    if (user.authProvider === 'google' && !user.passwordHash) {
-      res.status(401).json({
-        error: 'This account uses Google Sign-In. Please continue with Google.',
-        googleOnly: true,
-      });
-      return;
-    }
-
-    if (!user.passwordHash) {
-      res.status(401).json({ error: 'Invalid credentials. Please use your configured sign-in method.' });
+    // Avoid exposing whether an email exists or which provider an account uses.
+    if (!user || !user.passwordHash) {
+      res.status(401).json({ error: 'Invalid email or password. Try again or use your sign-in provider.' });
       return;
     }
 
     const { valid, needsRehash } = verifyPassword(password, user.passwordHash);
     if (!valid) {
-      res.status(401).json({ error: 'Incorrect password for this account. Please try again.' });
+      res.status(401).json({ error: 'Invalid email or password. Try again or use your sign-in provider.' });
       return;
     }
 
@@ -143,16 +129,11 @@ router.post('/signin', signinLimiter, async (req, res: Response) => {
     const gamification = Database.getGamification(user.id);
     const settings = Database.getSettings(user.id);
 
-    if (settings && settings.privacy) {
-      settings.privacy.leaderboardVisibility = true;
-    }
-
     Database.saveToDisk();
     void persistAccountToSql(user);
 
     if (profile && gamification) {
       void FirestoreSyncService.syncUserOnAuth(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Auth sync failed:', error));
-      void FirestoreSyncService.syncLeaderboardEntry(user, profile, gamification).catch((error) => console.warn('[FirestoreSync] Leaderboard sync failed:', error));
     }
     void getOrCreateSqlUser({
       uid: user.id,
@@ -244,7 +225,7 @@ router.post('/google', async (req, res: Response) => {
         email: verifiedEmail,
         fullName: name || verifiedEmail.split('@')[0],
         authProvider: 'google',
-        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(verifiedEmail)}`,
+        avatarUrl: avatarUrl || '/logo-mark.png',
         timezone: timezone || 'UTC',
       });
       user = created.user;
@@ -426,23 +407,16 @@ router.get('/mail-status', (_req, res: Response) => {
 /**
  * POST /api/auth/forgot-password
  *
- * Always answers with the same shape and status so the endpoint cannot be used to
- * discover which addresses have accounts. The only variation is `delivery`:
- *   - `"email"`          a real message was handed to the mail provider
- *   - `"link"`           no provider configured; `resetUrl` is returned for the
- *                        operator (self-hosted installs) — never claims an email went out
+ * Answers identically for known and unknown addresses. If email is unavailable
+ * for the whole deployment, return a generic 503 before issuing any token.
  */
 router.post('/forgot-password', resetLimiter, async (req, res: Response) => {
-  // The response is identical whether or not the address has an account. The only
-  // field that varies describes the deployment's delivery capability, which is
-  // constant server-wide and therefore reveals nothing about any account.
-  const respond = (transport: 'email' | 'operator-console') =>
-    res.json({
-      success: true,
-      message: 'If an account exists for that address, a reset link has been sent.',
-      transport,
-      expiresInMinutes: 30,
-    });
+  const respond = () => res.json({
+    success: true,
+    message: 'If an account exists for that address, a reset link will be sent if delivery is available.',
+    transport: 'email',
+    expiresInMinutes: 30,
+  });
 
   try {
     const email = String(req.body?.email || '').trim();
@@ -455,14 +429,19 @@ router.post('/forgot-password', resetLimiter, async (req, res: Response) => {
       return;
     }
 
-    const usesEmail = isMailerConfigured();
+    if (!isMailerConfigured()) {
+      // This is a deployment-wide condition, independent of account existence.
+      // Do not generate a credential that cannot be delivered securely.
+      res.status(503).json({ error: 'Password reset email is currently unavailable. Please contact support.' });
+      return;
+    }
     const ttlMinutes = 30;
     const issued = Database.createPasswordReset(email, ttlMinutes);
 
     // Unknown address, or an OAuth-only account with no password to reset.
     // Do nothing further, and answer exactly as we would for a real account.
     if (!issued) {
-      respond(usesEmail ? 'email' : 'operator-console');
+      respond();
       return;
     }
 
@@ -479,27 +458,16 @@ router.post('/forgot-password', resetLimiter, async (req, res: Response) => {
     }
     const resetUrl = `${origin}/?reset_token=${issued.token}`;
 
-    if (!usesEmail) {
-      // No provider configured. Never pretend an email was sent: the link is
-      // written to the operator's server log instead of the HTTP response, so the
-      // API cannot be used to discover which addresses are registered.
-      console.warn(
-        `[auth] Password reset for ${email} generated, but no mail provider is configured ` +
-          `(set RESEND_API_KEY or SMTP_URL). Link (valid ${ttlMinutes}m): ${resetUrl}`,
-      );
-      respond('operator-console');
-      return;
-    }
-
     const result = await sendMail(buildPasswordResetMessage(email, resetUrl, ttlMinutes));
     if (result.delivered === false) {
       // Log loudly for the operator, but still answer generically so a delivery
       // failure cannot be used as an account-existence signal.
       console.error('[auth] Password reset email could not be delivered:', result.reason);
     }
-    respond('email');
-  } catch (err: any) {
-    console.error('[auth] forgot-password failed:', err?.message || err);
+    respond();
+  } catch {
+    // Avoid logging provider errors that may contain recovery links or addresses.
+    console.error('[auth] forgot-password failed.');
     res.status(500).json({ error: 'Could not process the reset request.' });
   }
 });

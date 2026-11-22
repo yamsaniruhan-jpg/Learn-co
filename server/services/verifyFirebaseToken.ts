@@ -23,21 +23,17 @@ export async function verifyFirebaseIdTokenSafely(
   } catch (err: any) {
     const code = err?.code || '';
     const msg = err?.message || String(err || '');
+    const isUpstreamIdentityToolkitUnavailable =
+      checkRevoked &&
+      !process.env.VITEST &&
+      (code === 'auth/internal-error' ||
+        /identitytoolkit\.googleapis\.com|SERVICE_DISABLED|PERMISSION_DENIED|has not been used in project/i.test(msg));
 
-    // Explicit token rejection errors must never be bypassed by fallback
-    const isExplicitTokenRejection =
-      code === 'auth/id-token-revoked' ||
-      code === 'auth/user-disabled' ||
-      code === 'auth/id-token-expired' ||
-      code === 'auth/argument-error' ||
-      /revoked|disabled|expired|invalid signature|argument-error|malformed/i.test(msg);
-
-    if (checkRevoked && !isExplicitTokenRejection) {
+    if (isUpstreamIdentityToolkitUnavailable) {
       if (!warnedRevocationFallback) {
         warnedRevocationFallback = true;
         console.warn(
-          '[FirebaseAdmin] Identity Toolkit revocation lookup unavailable or restricted for current runtime credentials; verifying cryptographic JWT signature without revocation RPC:',
-          msg
+          '[FirebaseAdmin] Identity Toolkit revocation lookup unavailable for current runtime credentials; verifying cryptographic JWT signature without revocation RPC.'
         );
       }
       return await adminAuth.verifyIdToken(idToken, false);

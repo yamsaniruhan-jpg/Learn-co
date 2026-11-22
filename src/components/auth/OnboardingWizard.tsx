@@ -47,7 +47,7 @@ export const OnboardingWizard: React.FC = () => {
   const { profile, saveOnboarding } = useAuth();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Form State
   const [displayName, setDisplayName] = useState<string>(
@@ -96,7 +96,7 @@ export const OnboardingWizard: React.FC = () => {
   };
 
   const handleComplete = async () => {
-    setError(null);
+    setSaveError(null);
     setIsSubmitting(true);
     try {
       await saveOnboarding({
@@ -120,9 +120,8 @@ export const OnboardingWizard: React.FC = () => {
         spread: 70,
         origin: { y: 0.6 },
       });
-    } catch (err: any) {
-      console.error('Failed to complete onboarding', err);
-      setError(err?.message || 'Could not save your setup. Please check your connection and try again.');
+    } catch {
+      setSaveError('Could not save your setup. Check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -399,11 +398,10 @@ export const OnboardingWizard: React.FC = () => {
             </div>
           )}
 
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
+          {saveError && (
+            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-200">
+              {saveError}
+            </p>
           )}
 
           {/* Navigation Controls */}

@@ -107,7 +107,7 @@ export const ICT_CODING_PROBLEMS: ICTCodingProblem[] = [
     starterCode: `function solve(input) {
   const { nums } = input;
   // Implement Kadane's O(N) DP recurrence
-  
+
 }`,
     referenceSolution: `function solve(input) {
   const { nums } = input;

@@ -1,5 +1,7 @@
 import { doc, getDoc, getDocs, setDoc, collection } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebaseClient';
+import { AuthClient } from './authClient';
+import { hasMatchingFirebaseIdentity } from './clientFirestoreSync';
 
 export interface MarketplaceCourseProgress {
   courseId: string;
@@ -10,7 +12,11 @@ export interface MarketplaceCourseProgress {
 }
 
 function getAuthenticatedUid(): string | null {
-  return auth?.currentUser?.uid || null;
+  const local = AuthClient.getCurrentUser();
+  const firebaseUser = auth?.currentUser;
+  if (!AuthClient.getToken() || !local?.id || !firebaseUser?.emailVerified ||
+      !hasMatchingFirebaseIdentity(firebaseUser.email, local.email)) return null;
+  return firebaseUser.uid;
 }
 
 export async function syncCourseProgressToFirestore(
@@ -51,6 +57,7 @@ export async function fetchCourseProgressFromFirestore(): Promise<Record<string,
   const path = `users/${uid}/progress`;
   try {
     const snap = await getDocs(collection(db, 'users', uid, 'progress'));
+    if (getAuthenticatedUid() !== uid) return {};
     const out: Record<string, MarketplaceCourseProgress> = {};
     snap.docs.forEach((d) => {
       const data = d.data() || {};
@@ -110,7 +117,7 @@ export async function fetchSingleCourseProgressFromFirestore(
   const path = `users/${uid}/progress/${courseId}`;
   try {
     const snap = await getDoc(doc(db, 'users', uid, 'progress', courseId));
-    if (!snap.exists()) return null;
+    if (getAuthenticatedUid() !== uid || !snap.exists()) return null;
     const data = snap.data() || {};
     return {
       courseId,

@@ -52,7 +52,8 @@ describe('Google identity verification', () => {
 
     const signinAttempt = await request(app).post('/api/auth/signin').send({ email, password: 'AttackerPassword123!' });
     expect(signinAttempt.status).toBe(401);
-    expect(signinAttempt.body.googleOnly).toBe(true);
+    // Do not reveal the account's authentication provider to an unauthenticated caller.
+    expect(signinAttempt.body.googleOnly).toBeUndefined();
     expect(signinAttempt.body.token).toBeUndefined();
 
     const signupAttempt = await request(app).post('/api/auth/signup').send({ email, password: 'AttackerPassword123!', fullName: 'Attacker' });
@@ -62,7 +63,9 @@ describe('Google identity verification', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const resetRes = await request(app).post('/api/auth/forgot-password').send({ email });
-      expect(resetRes.status).toBe(200);
+      // Without a mail provider the reset endpoint fails uniformly rather than
+      // issuing a link that cannot be delivered.
+      expect(resetRes.status).toBe(503);
       const leakedReset = warnSpy.mock.calls.map((c) => c.join(' ')).some((line) => line.includes(email) && line.includes('reset_token='));
       expect(leakedReset).toBe(false);
     } finally {

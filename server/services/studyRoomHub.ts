@@ -202,6 +202,7 @@ interface ClientConnection {
   ws: WebSocket;
   peer: StudyRoomPeer;
   roomId: string | null;
+  accessTicket: string | null;
 }
 
 class StudyRoomHubService {
@@ -255,7 +256,6 @@ class StudyRoomHubService {
     if (!room) return false;
     if (room.visibility === 'public') return true;
     if (!peerId) return false;
-    if (room.hostPeerId === peerId || room.authorizedPeers.has(peerId)) return true;
     return verifyAccessTicket(roomId, peerId, ticket);
   }
 
@@ -356,8 +356,8 @@ class StudyRoomHubService {
     this.rooms.set(id, room);
     this.roomPeers.set(id, new Map());
 
-    const serialized = this.serializeRoom(room, hostPeerId);
     const accessTicket = visibility === 'private' ? createAccessTicket(id, hostPeerId) : null;
+    const serialized = this.serializeRoom(room, hostPeerId, accessTicket);
     // Broadcast global room list with private room details redacted for peers
     this.broadcastRoomsCatalog();
     return { room: serialized, accessTicket };
@@ -427,10 +427,7 @@ class StudyRoomHubService {
 
     const authorized =
       room.visibility === 'public' ||
-      (Boolean(viewerPeerId) &&
-        (room.hostPeerId === viewerPeerId ||
-          room.authorizedPeers.has(viewerPeerId!) ||
-          verifyAccessTicket(room.id, viewerPeerId!, ticket)));
+      (Boolean(viewerPeerId) && verifyAccessTicket(room.id, viewerPeerId!, ticket));
 
     if (!authorized) {
       return {
@@ -494,7 +491,7 @@ class StudyRoomHubService {
       this.roomPeers.set(roomId, peersMap);
     }
     peersMap.set(peer.peerId, peer);
-    const state = this.serializeRoom(room, peer.peerId);
+    const state = this.serializeRoom(room, peer.peerId, accessTicket);
     this.broadcastToRoom(roomId, {
       type: 'room:presence',
       roomId,
@@ -713,6 +710,7 @@ class StudyRoomHubService {
       const conn: ClientConnection = {
         ws,
         roomId: null,
+        accessTicket: null,
         peer: {
           peerId,
           displayName,
@@ -756,6 +754,7 @@ class StudyRoomHubService {
               conn.peer.displayName = sanitizeText(data.displayName, 40);
             }
             conn.roomId = targetRoomId;
+            conn.accessTicket = accessTicket;
             const state = this.joinPeer(targetRoomId, conn.peer, accessTicket);
             if (state) {
               this.sendSafe(ws, { type: 'room:state', room: state });
@@ -766,13 +765,14 @@ class StudyRoomHubService {
             if (conn.roomId) {
               this.leavePeer(conn.roomId, conn.peer.peerId);
               conn.roomId = null;
+              conn.accessTicket = null;
             }
             break;
           }
           case 'chat:send': {
             const targetRoomId = sanitizeText(data.roomId, 80) || conn.roomId;
             if (!targetRoomId || !this.rooms.has(targetRoomId)) return;
-            if (!this.canAccessRoom(targetRoomId, conn.peer.peerId)) {
+            if (!this.canAccessRoom(targetRoomId, conn.peer.peerId, targetRoomId === conn.roomId ? conn.accessTicket : null)) {
               this.sendSafe(ws, {
                 type: 'room:error',
                 code: 'PRIVATE_ROOM_LOCKED',
@@ -786,7 +786,7 @@ class StudyRoomHubService {
           }
           case 'timer:control': {
             const targetRoomId = sanitizeText(data.roomId, 80) || conn.roomId;
-            if (!targetRoomId || !this.canAccessRoom(targetRoomId, conn.peer.peerId)) return;
+            if (!targetRoomId || !this.canAccessRoom(targetRoomId, conn.peer.peerId, targetRoomId === conn.roomId ? conn.accessTicket : null)) return;
             if (['start', 'pause', 'reset', 'set_mode'].includes(data.action)) {
               this.controlTimer(targetRoomId, data.action, conn.peer.displayName, data.mode);
             }
@@ -794,13 +794,13 @@ class StudyRoomHubService {
           }
           case 'poll:create': {
             const targetRoomId = sanitizeText(data.roomId, 80) || conn.roomId;
-            if (!targetRoomId || !this.canAccessRoom(targetRoomId, conn.peer.peerId)) return;
+            if (!targetRoomId || !this.canAccessRoom(targetRoomId, conn.peer.peerId, targetRoomId === conn.roomId ? conn.accessTicket : null)) return;
             this.createPoll(targetRoomId, data.id, data.question, data.options, conn.peer.displayName);
             break;
           }
           case 'poll:vote': {
             const targetRoomId = sanitizeText(data.roomId, 80) || conn.roomId;
-            if (!targetRoomId || !this.canAccessRoom(targetRoomId, conn.peer.peerId)) return;
+            if (!targetRoomId || !this.canAccessRoom(targetRoomId, conn.peer.peerId, targetRoomId === conn.roomId ? conn.accessTicket : null)) return;
             this.votePoll(targetRoomId, data.pollId, Number(data.optionIndex), conn.peer.peerId);
             break;
           }

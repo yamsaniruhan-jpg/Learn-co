@@ -433,4 +433,3 @@ export function printCleanConceptPdf(
   const html = renderDocumentShell(toCleanDocumentText(concept.title), subtitle, bodyHtml);
   return printHtmlViaHiddenFrame(html);
 }
-

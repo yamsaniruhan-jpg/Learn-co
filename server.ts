@@ -29,6 +29,18 @@ import securityHeaders from "./server/middleware/securityHeaders";
 import { requireAuth } from "./server/middleware/authMiddleware";
 import aiRateLimiter from "./server/middleware/aiRateLimit";
 
+/** Serve built public files without turning unknown URLs into soft 404s. */
+export function mountProductionStatic(app: express.Express, distPath: string) {
+  app.get('/404.html', (_req, res) => res.status(404).sendFile(path.join(distPath, '404.html')));
+  app.use(express.static(distPath));
+  app.use((req, res) => {
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.accepts('html')) {
+      return res.status(404).sendFile(path.join(distPath, '404.html'));
+    }
+    res.status(404).type('text').send('Not found');
+  });
+}
+
 /**
  * Builds the fully-wired Express application without binding a port.
  * Exported so integration tests can exercise the real route stack.
@@ -40,22 +52,18 @@ export async function createApp() {
   // ORDER MATTERS — security first
   app.use(securityHeaders);
 
-  // CORS configuration
+  // Same-origin requests need no CORS permission. Cross-origin browser clients
+  // must be listed explicitly; do not trust entire shared hosting domains.
+  const allowedOrigins = new Set([
+    "https://learn-co.ai.studio",
+    ...(process.env.CORS_ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean),
+    ...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000", "http://127.0.0.1:3000"] : []),
+  ]);
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, or same-origin)
         if (!origin) return callback(null, true);
-        if (
-          origin === "https://learn-co.ai.studio" ||
-          origin === "http://localhost:3000" ||
-          origin.endsWith(".run.app") ||
-          origin.endsWith(".google.com") ||
-          origin.endsWith(".aistudio.google.com")
-        ) {
-          return callback(null, true);
-        }
-        return callback(null, true); // Permissive fallback for preview environments
+        return callback(null, allowedOrigins.has(origin));
       },
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
@@ -73,13 +81,12 @@ export async function createApp() {
   // Cookie parser
   app.use(cookieParser());
 
+  const redactResetToken = (url: string) => url
+    .replace(/(\/api\/auth\/reset-password\/)[^/?]+/i, '$1[REDACTED]')
+    .replace(/([?&](?:reset_token|token|ticket)=)[^&]*/gi, '$1[REDACTED]');
   app.use((req, res, next) => {
     if (req.url.startsWith("/api")) {
-      const safeUrl = req.url
-        .replace(/(\/api\/auth\/reset-password\/)[^/?]+/i, '$1[REDACTED]')
-        .replace(/([?&]reset_token=)[^&]*/gi, '$1[REDACTED]')
-        .replace(/([?&]token=)[^&]*/gi, '$1[REDACTED]');
-      console.log(`[API Request] ${req.method} ${safeUrl}`);
+      console.log(`[API Request] ${req.method} ${redactResetToken(req.url)}`);
     }
     next();
   });
@@ -159,7 +166,7 @@ export async function createApp() {
     const isClientError = status >= 400 && status < 500;
 
     if (!isClientError) {
-      console.error(`[API Error] ${req.method} ${req.originalUrl}:`, err?.message || err);
+      console.error(`[API Error] ${req.method} ${redactResetToken(req.originalUrl)}:`, redactResetToken(String(err?.message || err)));
     }
 
     // Avoid leaking internals for 5xx responses.
@@ -188,11 +195,7 @@ export async function createApp() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    mountProductionStatic(app, path.join(process.cwd(), "dist"));
   }
 
   return app;

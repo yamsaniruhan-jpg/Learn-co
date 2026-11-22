@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { studyRoomHub } from '../services/studyRoomHub';
 import { adminDb } from '../services/firebaseAdmin';
+import { rateLimit } from 'express-rate-limit';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // POST /api/study-rooms/join-private - verify roomCode + password and issue an HMAC accessTicket
-router.post('/join-private', (req: Request, res: Response) => {
+router.post('/join-private', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }), (req: Request, res: Response) => {
   try {
     const { roomCode, password, roomId, peerId, displayName } = req.body || {};
     const result = studyRoomHub.joinPrivateRoom({

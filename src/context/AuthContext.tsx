@@ -14,13 +14,8 @@ import {
   calculateLevelFromXp,
 } from '../types/auth';
 import { getCurrentXp, syncLocalXpOnly } from '../utils/xpManager';
-import { loadUserStreak, saveUserStreak, StreakData } from '../utils/streakManager';
-import { OfflineStorageManager } from '../utils/offlineStorage';
+import { loadUserStreak } from '../utils/streakManager';
 import { hasMatchingFirebaseIdentity, syncClientToFirestore } from '../services/clientFirestoreSync';
-import {
-  pullAndMergeStreakFromFirestore,
-  pushStreakToFirestore,
-} from '../services/streakFirestoreSync';
 import {
   auth,
   googleProvider,
@@ -31,7 +26,6 @@ import {
   createUserWithEmailAndPassword,
   updateFirebaseProfile,
   signOut as fbSignOut,
-  onAuthStateChanged,
 } from '../services/firebaseClient';
 
 interface AuthContextType {
@@ -51,7 +45,7 @@ interface AuthContextType {
     avatarUrl?: string,
     intent?: 'signin' | 'signup' | 'auto',
     idToken?: string
-  ) => Promise<void>;
+  ) => Promise<'signed-in' | 'redirecting'>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<UserProfile>;
   updateSettings: (updates: Partial<UserSettings>) => Promise<UserSettings>;
@@ -61,9 +55,6 @@ interface AuthContextType {
   updateGamificationState: (newGamification: Partial<UserGamification>) => void;
   clearAuthError: () => void;
 }
-
-const REDIRECT_PENDING_KEY = 'learnco_google_redirect_pending';
-let firebaseEmailPasswordDisabled = false;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -98,64 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const authOperationInFlightRef = useRef<boolean>(false);
-  const bootCheckInFlightRef = useRef<boolean>(true);
-
-  const applyAuthenticatedSession = useCallback(
-    (res: {
-      user: any;
-      profile: UserProfile | null;
-      gamification?: UserGamification | null;
-      settings: UserSettings | null;
-    }) => {
-      setAuthError(null);
-      setUser(res.user);
-      setProfile(res.profile);
-      if (res.user) {
-        AuthClient.setCurrentUser(res.user);
-      }
-      if (res.gamification) {
-        const displayXp = syncLocalXpOnly(res.gamification.xp ?? 0, res.user?.id);
-        const uidKey = res.user?.id || 'default_user';
-        const userStreak = loadUserStreak(uidKey);
-        setGamification({
-          ...res.gamification,
-          xp: displayXp,
-          level: calculateLevelFromXp(displayXp).level,
-          currentStreak: userStreak.currentStreak,
-          longestStreak: userStreak.longestStreak,
-        });
-        pullAndMergeStreakFromFirestore(userStreak)
-          .then((merged) => {
-            if (merged) {
-              saveUserStreak(uidKey, merged);
-              setGamification((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      currentStreak: merged.currentStreak,
-                      longestStreak: merged.longestStreak,
-                      lastActiveDate: merged.lastActiveDate,
-                    }
-                  : prev
-              );
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('learnco_streak_updated', { detail: merged }));
-              }
-            }
-          })
-          .catch(() => {});
-      } else {
-        setGamification(res.gamification ?? null);
-      }
-      setSettings(res.settings);
-      syncClientToFirestore(res.user, res.profile, res.gamification ?? null).catch(() => {});
-      if (typeof navigator === 'undefined' || navigator.onLine) {
-        OfflineStorageManager.syncPendingAttemptsToServer().catch(() => {});
-      }
-    },
-    []
-  );
+  const authOperation = useRef(0);
+  const ensureCurrentOperation = (operation: number) => {
+    if (operation !== authOperation.current) throw new Error('Your session changed while this request was in progress. Please try again.');
+  };
 
   // Initialize session on mount
   const refreshUserData = useCallback(async () => {
@@ -195,7 +132,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await AuthClient.getMe();
       // An in-flight refresh must not overwrite a newer sign-in/sign-out.
       if (AuthClient.getToken() !== token) return;
-      applyAuthenticatedSession(res);
+      setAuthError(null);
+      setUser(res.user);
+      setProfile(res.profile);
+      AuthClient.setCurrentUser(res.user);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user.id);
+      const userStreak = loadUserStreak(res.user.id || 'default_user');
+      setGamification({
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+        currentStreak: userStreak.currentStreak,
+        longestStreak: userStreak.longestStreak,
+      });
+      setSettings(res.settings);
+      syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
       if (AuthClient.getToken() !== token) return;
       // A temporary network/server failure is not proof that the session is
@@ -235,40 +186,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  }, [applyAuthenticatedSession]);
+  }, []);
 
   useEffect(() => {
     let active = true;
-    bootCheckInFlightRef.current = true;
+    const operation = authOperation.current;
     (async () => {
-      let redirectHandled = false;
-      let redirectFailed = false;
       try {
         if (auth?.app && typeof getRedirectResult === 'function') {
-          let pendingRaw: string | null = null;
-          try {
-            pendingRaw = sessionStorage.getItem(REDIRECT_PENDING_KEY);
-          } catch {}
-          const redirectTimeoutMs = pendingRaw ? 10000 : 800;
-
-          let redirectTimeout: ReturnType<typeof setTimeout> | undefined;
-          const redirectResult = await Promise.race([
-            getRedirectResult(auth).catch((err) => {
-              if (pendingRaw) throw err;
-              return null;
-            }),
-            new Promise<null>((resolve) => {
-              redirectTimeout = setTimeout(() => resolve(null), redirectTimeoutMs);
-            }),
-          ]);
-          if (redirectTimeout) clearTimeout(redirectTimeout);
-
-          if (active && redirectResult?.user) {
+          const redirectResult = await getRedirectResult(auth);
+          if (active && operation === authOperation.current && redirectResult?.user) {
             let pendingIntent: 'signin' | 'signup' | 'auto' = 'auto';
             let expectedEmail: string | undefined;
             try {
-              const raw = pendingRaw || sessionStorage.getItem(REDIRECT_PENDING_KEY);
-              sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+              const raw = sessionStorage.getItem('learnco_google_redirect_pending');
+              sessionStorage.removeItem('learnco_google_redirect_pending');
               if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed?.intent) pendingIntent = parsed.intent;
@@ -281,13 +213,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               redirectResult.user.providerData?.find((p) => p?.email)?.email ||
               '';
             if (expectedEmail && resolvedEmail.trim().toLowerCase() !== expectedEmail.trim().toLowerCase()) {
-              redirectFailed = true;
               setAuthError(
                 `You signed into Google as ${resolvedEmail || 'another account'}, which does not match ${expectedEmail}.`
               );
               try { await fbSignOut(auth); } catch {}
             } else {
               const firebaseToken = await redirectResult.user.getIdToken();
+              if (!active || operation !== authOperation.current) return;
               const res = await AuthClient.signInWithGoogle({
                 email: resolvedEmail,
                 name: redirectResult.user.displayName || '',
@@ -295,109 +227,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 intent: pendingIntent,
                 idToken: firebaseToken,
               });
-              if (active) {
-                applyAuthenticatedSession(res);
-                redirectHandled = true;
+              if (active && operation === authOperation.current) {
+                setUser(res.user);
+                setProfile(res.profile);
+                const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+                setGamification(res.gamification ? {
+                  ...res.gamification,
+                  xp: displayXp,
+                  level: calculateLevelFromXp(displayXp).level,
+                } : res.gamification);
+                setSettings(res.settings);
+                await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
                 setIsLoading(false);
                 return;
               }
             }
+          } else if (active && operation === authOperation.current && !redirectResult?.user) {
+            // A persisted Firebase identity is not proof of a completed redirect.
+            try {
+              if (sessionStorage.getItem('learnco_google_redirect_pending')) {
+                sessionStorage.removeItem('learnco_google_redirect_pending');
+                setAuthError('Google sign-in could not be completed. Please try again.');
+              }
+            } catch {}
           }
         }
       } catch (err: any) {
-        if (active) {
-          redirectFailed = true;
-          try { sessionStorage.removeItem(REDIRECT_PENDING_KEY); } catch {}
+        try { sessionStorage.removeItem('learnco_google_redirect_pending'); } catch {}
+        if (active && operation === authOperation.current) {
           setAuthError(err?.message || 'Google redirect sign-in could not be completed.');
         }
-      } finally {
-        bootCheckInFlightRef.current = false;
       }
-
-      if (active && !redirectHandled) {
-        if (redirectFailed) {
-          setIsLoading(false);
-        } else {
-          await refreshUserData();
-        }
+      if (active && operation === authOperation.current) {
+        await refreshUserData();
       }
     })();
     return () => {
       active = false;
     };
-  }, [refreshUserData, applyAuthenticatedSession]);
-
-  // Complete a pending Google redirect login via onAuthStateChanged if browser
-  // storage partitioning caused getRedirectResult() to return null on mobile/iframe.
-  // Never race explicit popup, email/password, or sign-out operations.
-  useEffect(() => {
-    if (!auth || !auth.app || typeof onAuthStateChanged !== 'function') return;
-    let cancelled = false;
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (cancelled || !firebaseUser) return;
-      if (authOperationInFlightRef.current || bootCheckInFlightRef.current) return;
-      if (AuthClient.getToken()) return;
-
-      let pendingRaw: string | null = null;
-      try {
-        pendingRaw = sessionStorage.getItem(REDIRECT_PENDING_KEY);
-      } catch {}
-      if (!pendingRaw) return;
-
-      const isGoogleUser =
-        Boolean(firebaseUser.providerData?.some((p) => p?.providerId === 'google.com'));
-      if (!isGoogleUser) return;
-
-      let pendingIntent: 'signin' | 'signup' | 'auto' = 'auto';
-      let expectedEmail: string | undefined;
-      try {
-        sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-        const parsed = JSON.parse(pendingRaw);
-        if (parsed?.intent) pendingIntent = parsed.intent;
-        if (parsed?.expectedEmail) expectedEmail = parsed.expectedEmail;
-      } catch {}
-
-      const resolvedEmail =
-        firebaseUser.email ||
-        firebaseUser.providerData?.find((p) => p?.email)?.email ||
-        '';
-      if (expectedEmail && resolvedEmail.trim().toLowerCase() !== expectedEmail.trim().toLowerCase()) {
-        setAuthError(
-          `You signed into Google as ${resolvedEmail || 'another account'}, which does not match ${expectedEmail}.`
-        );
-        try { await fbSignOut(auth); } catch {}
-        return;
-      }
-
-      authOperationInFlightRef.current = true;
-      try {
-        const idToken = await firebaseUser.getIdToken();
-        const res = await AuthClient.signInWithGoogle({
-          email: resolvedEmail,
-          name: firebaseUser.displayName || '',
-          avatarUrl: firebaseUser.photoURL || undefined,
-          intent: pendingIntent,
-          idToken,
-        });
-        if (!cancelled) {
-          applyAuthenticatedSession(res);
-          setIsLoading(false);
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setAuthError(e?.message || 'Google redirect sign-in could not be completed.');
-        }
-      } finally {
-        authOperationInFlightRef.current = false;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      if (typeof unsubscribe === 'function') unsubscribe();
-    };
-  }, [applyAuthenticatedSession]);
+  }, [refreshUserData]);
 
   // Listen to global XP awarded events
   useEffect(() => {
@@ -439,29 +307,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    const handleStreakUpdated = (e: Event) => {
-      const detail = (e as CustomEvent<StreakData>).detail;
-      if (!detail) return;
-      setGamification((prev) =>
-        prev
-          ? {
-              ...prev,
-              currentStreak: detail.currentStreak,
-              longestStreak: detail.longestStreak,
-              lastActiveDate: detail.lastActiveDate,
-            }
-          : prev
-      );
-      if (user) {
-        pushStreakToFirestore(detail).catch(() => {});
-      }
-    };
-
     window.addEventListener('learnco_xp_awarded', handleXpAwarded);
-    window.addEventListener('learnco_streak_updated', handleStreakUpdated);
     return () => {
       window.removeEventListener('learnco_xp_awarded', handleXpAwarded);
-      window.removeEventListener('learnco_streak_updated', handleStreakUpdated);
     };
   }, [user, profile]);
 
@@ -472,118 +320,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password?: string) => {
+    const operation = ++authOperation.current;
     setAuthError(null);
-    authOperationInFlightRef.current = true;
     let firebaseSignedIn = false;
     try {
-      let firebaseIdToken: string | undefined;
-
-      // Attempt Firebase Authentication sign-in to obtain ID token when available
-      if (password && !firebaseEmailPasswordDisabled) {
-        try {
-          if (auth && auth.app) {
-            const cred = await signInWithEmailAndPassword(auth, email, password);
-            firebaseSignedIn = true;
-            firebaseIdToken = await cred.user.getIdToken();
-          }
-        } catch (fbInitErr: any) {
-          if (fbInitErr?.code === 'auth/operation-not-allowed') {
-            firebaseEmailPasswordDisabled = true;
-          }
-          // Backend password verification remains authoritative if Firebase client auth fails
-          console.debug('Firebase client email sign-in skipped:', fbInitErr);
-        }
-      }
-
-      // Complete backend flow with Firebase ID Token
-      const res = await AuthClient.signIn(email, password, firebaseIdToken);
+      // The local backend verifies the password. Do not create a separate
+      // Firebase identity during sign-in when the provider is unavailable.
+      const res = await AuthClient.signIn(email, password);
+      ensureCurrentOperation(operation);
       await clearMismatchedFirebaseIdentity(res.user?.email);
-
-      // Sync to Firebase Auth only if Email/Password provider is enabled
-      if (
-        !firebaseSignedIn &&
-        !firebaseEmailPasswordDisabled &&
-        password &&
-        auth?.app &&
-        typeof createUserWithEmailAndPassword === 'function'
-      ) {
+      ensureCurrentOperation(operation);
+      if (password && auth?.app) {
         try {
-          const createdCred = await createUserWithEmailAndPassword(auth, email, password);
-          if (createdCred?.user) {
-            firebaseSignedIn = true;
-            const preferredName = res.profile?.displayName || res.profile?.fullName;
-            if (preferredName && typeof updateFirebaseProfile === 'function') {
-              await updateFirebaseProfile(createdCred.user, { displayName: preferredName }).catch(() => {});
-            }
-          }
-        } catch (fbSyncErr: any) {
-          if (fbSyncErr?.code === 'auth/operation-not-allowed') {
-            firebaseEmailPasswordDisabled = true;
-          }
+          await signInWithEmailAndPassword(auth, email, password);
+          firebaseSignedIn = true;
+        } catch {
+          // Local sign-in is valid even if Firebase sync is unavailable.
         }
       }
 
-      applyAuthenticatedSession(res);
+      ensureCurrentOperation(operation);
+      setUser(res.user);
+      setProfile(res.profile);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+      setGamification(res.gamification ? {
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+      } : res.gamification);
+      setSettings(res.settings);
+      await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
-      if (firebaseSignedIn) {
+      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getToken())) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-in error */ }
       }
-      setAuthError(err.message || 'Sign in failed.');
+      if (operation === authOperation.current) setAuthError(err.message || 'Sign in failed.');
       throw err;
-    } finally {
-      authOperationInFlightRef.current = false;
     }
   };
 
   const signUpWithEmail = async (email: string, password?: string, fullName?: string) => {
+    const operation = ++authOperation.current;
     setAuthError(null);
-    authOperationInFlightRef.current = true;
     let firebaseSignedIn = false;
     try {
-      let firebaseIdToken: string | undefined;
-
-      // Register with Firebase Authentication when Email/Password provider is enabled
-      if (password && !firebaseEmailPasswordDisabled) {
+      // Create the authoritative local account first. A rejected backend
+      // signup must not leave an unintended Firebase account behind.
+      const res = await AuthClient.signUp({ email, password, fullName });
+      ensureCurrentOperation(operation);
+      await clearMismatchedFirebaseIdentity(res.user?.email);
+      ensureCurrentOperation(operation);
+      if (password && auth?.app && typeof createUserWithEmailAndPassword === 'function') {
         try {
-          if (auth && auth.app) {
-            try {
-              const cred = await createUserWithEmailAndPassword(auth, email, password);
-              if (cred?.user) {
-                firebaseSignedIn = true;
-                if (fullName && typeof updateFirebaseProfile === 'function') {
-                  await updateFirebaseProfile(cred.user, { displayName: fullName }).catch(() => {});
-                }
-                firebaseIdToken = await cred.user.getIdToken();
-              }
-            } catch (fbErr: any) {
-              if (fbErr?.code === 'auth/operation-not-allowed') {
-                firebaseEmailPasswordDisabled = true;
-              } else if (fbErr?.code === 'auth/email-already-in-use') {
-                const cred = await signInWithEmailAndPassword(auth, email, password);
-                if (cred?.user) {
-                  firebaseSignedIn = true;
-                  firebaseIdToken = await cred.user.getIdToken();
-                }
-              }
-            }
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          firebaseSignedIn = true;
+          if (fullName && typeof updateFirebaseProfile === 'function') {
+            await updateFirebaseProfile(cred.user, { displayName: fullName }).catch(() => {});
           }
-        } catch (fbInitErr) {
-          console.warn('Firebase client sign-up fallback to backend auth', fbInitErr);
+        } catch {
+          // The account exists locally. Firebase provisioning is best-effort;
+          // never claim cloud sync succeeded without verifying it separately.
         }
       }
-
-      // Complete backend flow with Firebase ID Token
-      const res = await AuthClient.signUp({ email, password, fullName, idToken: firebaseIdToken });
-      await clearMismatchedFirebaseIdentity(res.user?.email);
-      applyAuthenticatedSession(res);
+      ensureCurrentOperation(operation);
+      setUser(res.user);
+      setProfile(res.profile);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+      setGamification(res.gamification ? {
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+      } : res.gamification);
+      setSettings(res.settings);
+      await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
-      if (firebaseSignedIn) {
+      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getToken())) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-up error */ }
       }
-      setAuthError(err.message || 'Sign up failed.');
+      if (operation === authOperation.current) setAuthError(err.message || 'Sign up failed.');
       throw err;
-    } finally {
-      authOperationInFlightRef.current = false;
     }
   };
 
@@ -594,8 +409,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     intent: 'signin' | 'signup' | 'auto' = 'auto',
     idToken?: string
   ) => {
+    const operation = ++authOperation.current;
     setAuthError(null);
-    authOperationInFlightRef.current = true;
     let firebaseSignedIn = false;
     try {
       // 1. Use Firebase Google Auth popup if not already provided via idToken
@@ -629,15 +444,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             code === 'auth/web-storage-unsupported'
           ) {
             if (!isInIframe && typeof signInWithRedirect === 'function') {
+              ensureCurrentOperation(operation);
               try {
                 sessionStorage.setItem(
-                  REDIRECT_PENDING_KEY,
+                  'learnco_google_redirect_pending',
                   JSON.stringify({ intent, expectedEmail: email || undefined })
                 );
               } catch {}
               await signInWithRedirect(auth, googleProvider);
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              throw Object.assign(new Error('Redirecting to Google Sign-In...'), { isRedirecting: true });
+              return 'redirecting' as const;
             }
             throw new Error(
               'Google sign-in popup was blocked or restricted inside this embedded preview frame. Open the app in a new browser tab to complete Google Sign-In, or sign in with Email & Password.'
@@ -646,7 +461,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw popupErr;
         }
         firebaseSignedIn = true;
+        ensureCurrentOperation(operation);
         firebaseToken = await result.user.getIdToken();
+        ensureCurrentOperation(operation);
         const resolvedEmail =
           result.user.email ||
           result.user.providerData?.find((p) => p?.email)?.email ||
@@ -663,6 +480,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // 2. Pass the Firebase ID token to the backend
+      ensureCurrentOperation(operation);
       const res = await AuthClient.signInWithGoogle({
         email: email || '',
         name: name || '',
@@ -670,8 +488,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         intent,
         idToken: firebaseToken,
       });
+      ensureCurrentOperation(operation);
       await clearMismatchedFirebaseIdentity(res.user?.email);
-      applyAuthenticatedSession(res);
+      ensureCurrentOperation(operation);
+      setUser(res.user);
+      setProfile(res.profile);
+      const displayXp = syncLocalXpOnly(res.gamification?.xp ?? 0, res.user?.id);
+      setGamification(res.gamification ? {
+        ...res.gamification,
+        xp: displayXp,
+        level: calculateLevelFromXp(displayXp).level,
+      } : res.gamification);
+      setSettings(res.settings);
       if (res.user?.email) {
         try {
           localStorage.setItem('learnco_last_google_email', res.user.email);
@@ -680,35 +508,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (_) {}
       }
+      await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
+      return 'signed-in' as const;
     } catch (err: any) {
-      if (err?.isRedirecting) {
-        throw err;
-      }
-      if (firebaseSignedIn) {
+      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getToken())) {
         try { await fbSignOut(auth); } catch { /* retain the original Google sign-in error */ }
       }
-      setAuthError(err.message || 'Google sign in failed.');
+      if (operation === authOperation.current) setAuthError(err.message || 'Google sign in failed.');
       throw err;
-    } finally {
-      authOperationInFlightRef.current = false;
     }
   };
 
   const signOut = async () => {
+    ++authOperation.current;
+    try { sessionStorage.removeItem('learnco_google_redirect_pending'); } catch {}
     setAuthError(null);
-    authOperationInFlightRef.current = true;
-    try {
-      try { sessionStorage.removeItem(REDIRECT_PENDING_KEY); } catch {}
-      try {
-        if (auth && auth.app) {
-          await fbSignOut(auth);
-        }
-      } catch (fbErr) {
-        console.warn('Firebase sign-out warning:', fbErr);
-      }
-      await AuthClient.signOut();
-    } finally {
-      authOperationInFlightRef.current = false;
+    setIsLoading(false);
+    // Clear this browser session before waiting for either network provider.
+    const localRevocation = AuthClient.signOut();
+    const firebaseRevocation = auth?.app ? fbSignOut(auth).catch(() => {}) : Promise.resolve();
+    {
       const guestXp = getCurrentXp(0, null);
       setUser(null);
       setProfile(null);
@@ -735,10 +554,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         dailyAiPlansLimit: DAILY_AI_PLANS_LIMIT,
       });
     }
+    await Promise.allSettled([localRevocation, firebaseRevocation]);
+  };
+
+  const assertSessionUnchanged = (token: string | null) => {
+    if (!token || AuthClient.getToken() !== token) {
+      throw new Error('Your session changed while this request was in progress. Please try again.');
+    }
   };
 
   const updateProfile = async (updates: Partial<UserProfile>): Promise<UserProfile> => {
+    const token = AuthClient.getToken();
     const res = await AuthClient.updateProfile(updates);
+    assertSessionUnchanged(token);
     setProfile(res.profile);
     if (
       auth?.currentUser &&
@@ -757,13 +585,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateSettings = async (updates: Partial<UserSettings>): Promise<UserSettings> => {
+    const token = AuthClient.getToken();
     const res = await AuthClient.updateSettings(updates);
+    assertSessionUnchanged(token);
     setSettings(res.settings);
     return res.settings;
   };
 
   const uploadAvatar = async (imageData: string): Promise<string> => {
+    const token = AuthClient.getToken();
     const res = await AuthClient.uploadAvatar(imageData);
+    assertSessionUnchanged(token);
     setProfile(res.profile);
     if (user) {
       await syncClientToFirestore(user, res.profile, gamification).catch(() => {});
@@ -772,7 +604,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const saveOnboarding = async (data: any) => {
+    const token = AuthClient.getToken();
     const res = await AuthClient.saveOnboarding(data);
+    assertSessionUnchanged(token);
     setProfile(res.profile);
     if (res.settings) setSettings(res.settings);
     if (user) {

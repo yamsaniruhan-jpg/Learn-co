@@ -11,9 +11,8 @@ import { AuthClient } from '../../services/authClient';
  * reads as part of the existing portal rather than a bolted-on screen.
  *
  * Honesty rule: the API answers identically for known and unknown addresses, so
- * this UI never says "we found your account". When the deployment has no mail
- * provider the response's `transport` is `operator-console` and we say plainly
- * that an email was not sent.
+ * this UI never says "we found your account". An unconfigured mail provider is
+ * reported as unavailable without issuing or logging a recovery link.
  */
 
 interface PasswordResetFlowProps {
@@ -93,12 +92,8 @@ export const PasswordResetFlow: React.FC<PasswordResetFlowProps> = ({
 
     setSending(true);
     try {
-      const result = await AuthClient.requestPasswordReset(email.trim());
-      setNotice(
-        result.transport === 'email'
-          ? `If an account exists for ${email.trim()}, a reset link is on its way. Check your inbox and spam folder.`
-          : "Request received. This deployment has no email provider configured, so no email was sent — the reset link has been written to the server log for the administrator.",
-      );
+      await AuthClient.requestPasswordReset(email.trim());
+      setNotice(`If an account exists for ${email.trim()}, a reset link will be sent if delivery is available. Check your inbox and spam folder.`);
     } catch (err: any) {
       setError(err?.message || 'Could not send the reset link. Please try again.');
     } finally {

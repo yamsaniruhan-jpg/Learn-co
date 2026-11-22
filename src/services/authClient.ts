@@ -15,6 +15,9 @@ import {
 const TOKEN_STORAGE_KEY = 'learnco_auth_token';
 
 export class AuthClient {
+  // Prevent a slow sign-in/reset response from replacing a newer session.
+  private static authAttempt = 0;
+
   static getToken(): string | null {
     try {
       return localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -26,8 +29,8 @@ export class AuthClient {
   static setToken(token: string): void {
     try {
       localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } catch (e) {
-      console.error('Failed to store auth token', e);
+    } catch {
+      throw new Error('Your browser could not save the session. Enable browser storage and try again.');
     }
   }
 
@@ -42,7 +45,7 @@ export class AuthClient {
 
   static getCurrentUser(): any | null {
     try {
-      const userStr = localStorage.getItem('learnco_user') || localStorage.getItem('auth_user');
+      const userStr = localStorage.getItem('learnco_user');
       if (userStr) {
         return JSON.parse(userStr);
       }
@@ -54,6 +57,17 @@ export class AuthClient {
     try {
       localStorage.setItem('learnco_user', JSON.stringify(user));
     } catch (_) {}
+  }
+
+  private static saveAuthResponse(data: any, attempt: number): void {
+    if (attempt !== this.authAttempt) {
+      throw new Error('Your session changed while this request was in progress. Please try again.');
+    }
+    if (typeof data?.token !== 'string' || !data.token || typeof data?.user?.id !== 'string' || !data.user.id) {
+      throw new Error('The server returned an invalid sign-in response. Please try again.');
+    }
+    this.setToken(data.token);
+    this.setCurrentUser(data.user);
   }
 
   private static getHeaders(): HeadersInit {
@@ -80,6 +94,7 @@ export class AuthClient {
     gamification: UserGamification;
     settings: UserSettings;
   }> {
+    const attempt = ++this.authAttempt;
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -91,12 +106,7 @@ export class AuthClient {
       throw new Error(data.error || `Failed to create account (HTTP ${res.status}).`);
     }
 
-    if (data.token) {
-      this.setToken(data.token);
-    }
-    if (data.user || data.profile) {
-      this.setCurrentUser(data.user || data.profile);
-    }
+    this.saveAuthResponse(data, attempt);
 
     return data;
   }
@@ -108,6 +118,7 @@ export class AuthClient {
     gamification: UserGamification;
     settings: UserSettings;
   }> {
+    const attempt = ++this.authAttempt;
     const res = await fetch('/api/auth/signin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -123,12 +134,7 @@ export class AuthClient {
       throw err;
     }
 
-    if (data.token) {
-      this.setToken(data.token);
-    }
-    if (data.user || data.profile) {
-      this.setCurrentUser(data.user || data.profile);
-    }
+    this.saveAuthResponse(data, attempt);
 
     return data;
   }
@@ -148,6 +154,7 @@ export class AuthClient {
     gamification: UserGamification;
     settings: UserSettings;
   }> {
+    const attempt = ++this.authAttempt;
     const res = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -163,12 +170,7 @@ export class AuthClient {
       throw err;
     }
 
-    if (data.token) {
-      this.setToken(data.token);
-    }
-    if (data.user || data.profile) {
-      this.setCurrentUser(data.user || data.profile);
-    }
+    this.saveAuthResponse(data, attempt);
 
     return data;
   }
@@ -184,26 +186,30 @@ export class AuthClient {
       headers: this.getHeaders(),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => null);
     if (!res.ok) {
-      const error = new Error(data.error || `Session verification failed (HTTP ${res.status}).`) as Error & { status?: number };
+      const error = new Error(data?.error || 'Session verification failed.') as Error & { status?: number };
       error.status = res.status;
       throw error;
     }
-
+    if (!data?.user?.id) throw new Error('Invalid session response.');
     return data;
   }
 
   static async signOut(): Promise<void> {
+    ++this.authAttempt;
+    // Remove the current browser session immediately. A late network response
+    // must never remove a newer session created while revocation is in flight.
+    const token = this.getToken();
+    this.removeToken();
+    if (!token) return;
     try {
       await fetch('/api/auth/signout', {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
     } catch {
-      // Ignore network errors on signout
-    } finally {
-      this.removeToken();
+      // Local sign-out still succeeds; server-side revocation is unconfirmed.
     }
   }
 
@@ -211,15 +217,13 @@ export class AuthClient {
    * Request a password-reset link.
    *
    * The API responds identically whether or not the address is registered, so the
-   * UI must not imply that a real account was found. `transport` describes how the
-   * deployment delivers mail: `"email"` means a provider is configured,
-   * `"operator-console"` means it is not and the operator has the link in the
-   * server log.
+   * UI must not imply that a real account was found. An unconfigured mail
+   * provider returns a deployment-wide error without issuing a reset link.
    */
   static async requestPasswordReset(email: string): Promise<{
     success: boolean;
     message: string;
-    transport: 'email' | 'operator-console';
+    transport: 'email';
     expiresInMinutes: number;
   }> {
     const res = await fetch('/api/auth/forgot-password', {
@@ -270,6 +274,7 @@ export class AuthClient {
 
   /** Complete the reset. On success the user is signed in with a fresh session. */
   static async resetPassword(token: string, password: string): Promise<void> {
+    const attempt = ++this.authAttempt;
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -279,12 +284,7 @@ export class AuthClient {
     if (!res.ok) {
       throw new Error(data?.error || 'Could not reset your password.');
     }
-    if (data?.token) {
-      this.setToken(data.token);
-    }
-    if (data?.user) {
-      this.setCurrentUser(data.user);
-    }
+    this.saveAuthResponse(data, attempt);
   }
 
   static async saveOnboarding(data: {

@@ -40,8 +40,8 @@ export const IOSInstallBanner: React.FC = () => {
 
   const handlePrimaryAction = async () => {
     if (isInstallable) {
-      const ok = await install();
-      if (ok) return;
+      const result = await install();
+      if (result === 'accepted' || result === 'dismissed') return;
     }
     setShowStepsModal(true);
   };
@@ -184,4 +184,3 @@ export const IOSInstallBanner: React.FC = () => {
     </>
   );
 };
-

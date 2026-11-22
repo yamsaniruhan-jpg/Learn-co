@@ -13,10 +13,7 @@ import { AuthClient } from './authClient';
 
 export class AnalyticsClient {
   private static getHeaders(): HeadersInit {
-    const token =
-      AuthClient.getToken() ||
-      localStorage.getItem('learnco_auth_token') ||
-      localStorage.getItem('auth_token');
+    const token = AuthClient.getToken();
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

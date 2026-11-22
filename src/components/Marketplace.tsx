@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiCall } from '../client/firebase';
 import { useAuth } from '../context/AuthContext';
+import { AuthClient } from '../services/authClient';
 import { FormattedMathText } from './common/FormattedMathText';
 import { recordDailyActivity } from '../utils/streakManager';
 import {
   MarketplaceCourseProgress,
   fetchCourseProgressFromFirestore,
   syncCourseProgressToFirestore,
-  syncPublishedCourseToFirestore,
 } from '../services/marketplaceFirestore';
 import {
   BookOpen,
@@ -62,6 +62,7 @@ interface CourseLesson {
 export default function Marketplace() {
   const { isAuthenticated, user } = useAuth();
   const [courses, setCourses] = useState<any[]>([]);
+  const [catalogSource, setCatalogSource] = useState<string | null>(null);
   const searchRequest = useRef(0);
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('');
@@ -122,6 +123,7 @@ export default function Marketplace() {
       if (!res.ok) throw new Error(data.error || `Marketplace request failed (${res.status})`);
       if (requestId === searchRequest.current) {
         setCourses(data.courses || []);
+        setCatalogSource(data.catalogSource || null);
       }
     } catch (error: any) {
       if (requestId === searchRequest.current) {
@@ -220,9 +222,12 @@ export default function Marketplace() {
       // Ensure enrollment if not yet enrolled
       if (!enrolledCourses[course.id]) {
         const eRes = await apiCall(`/marketplace/enroll/${course.id}`, { method: 'POST' });
-        if (eRes.ok) {
-          setEnrolledCourses((prev) => ({ ...prev, [course.id]: true }));
+        if (!eRes.ok) {
+          const failed = await eRes.json().catch(() => ({}));
+          showToast(failed.error || 'Could not enroll in this course.', 'error');
+          return;
         }
+        setEnrolledCourses((prev) => ({ ...prev, [course.id]: true }));
       }
 
       const res = await apiCall(`/marketplace/course/${course.id}`);
@@ -274,7 +279,9 @@ export default function Marketplace() {
             prev && prev.id === courseId ? { ...prev, enrolledCount: (prev.enrolledCount || 0) + 1 } : prev
           );
         }
-        showToast(data.alreadyEnrolled ? 'Course ready! Launching workspace.' : 'Enrolled! Opening course classroom.');
+        showToast(data.persistence === 'memory'
+          ? 'Enrollment is stored only for this server session and may disappear after restart.'
+          : data.alreadyEnrolled ? 'Course ready! Launching workspace.' : 'Enrolled! Opening course classroom.');
         if (openImmediately) {
           const target = courses.find((c) => c.id === courseId) || selectedCourse;
           if (target) await launchCoursePlayer(target, 0);
@@ -291,6 +298,8 @@ export default function Marketplace() {
 
   const handleSaveLessonAction = async (lessonId: string, completed = true, quizChoiceIndex: number | null = null) => {
     if (!activePlayerCourse) return;
+    const token = AuthClient.getToken();
+    const accountId = user?.id;
     setSavingProgress(true);
     try {
       const res = await apiCall(`/marketplace/progress/${activePlayerCourse.id}`, {
@@ -300,7 +309,9 @@ export default function Marketplace() {
       const data = res.ok ? await res.json() : null;
       if (res.ok && data?.progress) {
         setProgressByCourse((prev) => ({ ...prev, [activePlayerCourse.id]: data.progress }));
-        void syncCourseProgressToFirestore(activePlayerCourse.id, data.progress);
+        if (token && token === AuthClient.getToken() && accountId === AuthClient.getCurrentUser()?.id) {
+          void syncCourseProgressToFirestore(activePlayerCourse.id, data.progress);
+        }
         if (data.quizEvaluation) {
           setQuizFeedback({
             correct: Boolean(data.quizEvaluation.correct),
@@ -323,6 +334,9 @@ export default function Marketplace() {
             sessionsCompleted: 1,
           });
           showToast('Lesson completed (+15 XP).');
+        }
+        if (data.persistence === 'memory') {
+          showToast('Progress is stored only for this server session and may disappear after restart.');
         }
       } else {
         showToast(data?.error || 'Could not save lesson progress.', 'error');
@@ -409,9 +423,6 @@ export default function Marketplace() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        if (data.course) {
-          void syncPublishedCourseToFirestore(data.course);
-        }
         setShowPublishModal(false);
         setPubTitle('');
         setPubDescription('');
@@ -454,7 +465,9 @@ export default function Marketplace() {
       const data = contentType.includes('application/json') ? await res.json() : {};
       if (res.ok && data.success) {
         setReviewComment('');
-        showToast('Review submitted!');
+        showToast(data.review?.persistence === 'memory'
+          ? 'Review is stored only for this server session and may disappear after restart.'
+          : 'Review submitted!');
         const revRes = await apiCall(`/marketplace/reviews/${selectedCourse.id}`);
         if (revRes.ok && (revRes.headers.get('content-type') || '').includes('application/json')) {
           const revData = await revRes.json();
@@ -506,7 +519,7 @@ export default function Marketplace() {
         </div>
         <div className="flex flex-wrap items-center gap-2.5 text-xs font-bold">
           <span className="px-3 py-2 rounded-xl bg-[#F0EDFA] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] tabular-nums">
-            {courses.length} Course{courses.length === 1 ? '' : 's'} Live
+            {courses.length} Course{courses.length === 1 ? '' : 's'}{catalogSource === 'sample' ? ' (sample)' : ''}
           </span>
           {isAuthenticated && (
             <button
@@ -520,6 +533,12 @@ export default function Marketplace() {
           )}
         </div>
       </div>
+
+      {catalogSource === 'sample' && (
+        <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          Showing sample courses while the live catalog is unavailable. Names, ratings and enrollment counts are illustrative.
+        </div>
+      )}
 
       {/* Search Bar & Filters */}
       <div className="bg-white dark:bg-[#2A2647] p-4 sm:p-6 rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-4">
@@ -747,7 +766,7 @@ export default function Marketplace() {
               </div>
               <div>
                 <p className="text-[10px] uppercase font-black text-[#6B6890] dark:text-[#B4B0D5]">Enrolled</p>
-                <p className="text-lg font-black text-[#2D2A4A] dark:text-[#F1EFFF] mt-0.5">{selectedCourse.enrolledCount || 340}</p>
+                <p className="text-lg font-black text-[#2D2A4A] dark:text-[#F1EFFF] mt-0.5">{selectedCourse.enrolledCount ?? 0}</p>
               </div>
             </div>
 
@@ -1279,7 +1298,7 @@ function CourseCard({
   onSelect: () => void;
   onLaunch: (e: React.MouseEvent) => void;
 }) {
-  const ratingVal = course.rating || 4.8;
+  const ratingVal = course.rating ?? 0;
   const roundedStars = Math.min(5, Math.max(0, Math.round(ratingVal)));
   const stars = '★'.repeat(roundedStars) + '☆'.repeat(5 - roundedStars);
   const lessonsCount = course.lessons?.length || course.totalLessons || 4;
@@ -1333,7 +1352,7 @@ function CourseCard({
             <span className="text-[#6B6890] dark:text-[#B4B0D5]">({course.ratingCount || 42})</span>
             <span className="text-[#E3DFF5] dark:text-[#3D3861]">·</span>
             <span className="text-[#6B6890] dark:text-[#B4B0D5] flex items-center gap-1">
-              <Users className="w-3 h-3" /> {course.enrolledCount || 340}
+              <Users className="w-3 h-3" /> {course.enrolledCount ?? 0}
             </span>
           </div>
           <div className="flex justify-between items-center gap-2">

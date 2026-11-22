@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { Database } from '../db';
 import { requireAuth, optionalAuth, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { safeAvatarUrl } from '../../src/utils/avatarSafety';
 
 const router = Router();
 
@@ -32,6 +33,9 @@ router.get('/', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
     const entries = Database.getLeaderboard(currentUserId, 'all_time');
     const leaderboard = entries.map(entry => ({
       ...entry,
+      // Legacy default avatars encode email addresses; never expose them in
+      // this public API or send those URLs to a third-party avatar service.
+      avatarUrl: safeAvatarUrl(entry.avatarUrl) || '',
       // Preserve legacy all-time balances; filtered views use recorded ledger
       // entries, not fabricated fractions or question-count estimates.
       xp: selectedTimeframe === 'all_time' && selectedSubject === 'all'

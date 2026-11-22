@@ -60,8 +60,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     clearAuthError();
     setIsGoogleSubmitting(true);
     try {
-      await signInWithGoogle(undefined, undefined, undefined, 'auto');
-      onClose();
+      const result = await signInWithGoogle(undefined, undefined, undefined, 'auto');
+      if (result === 'signed-in') onClose();
     } catch (err: any) {
       if (err?.isRedirecting) {
         return;
@@ -84,8 +84,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (!password || password.length < 6) {
-      setLocalError('Password must be at least 6 characters.');
+    if (!password || (mode === 'signup' && (password.length < 8 || password.length > 1024 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)))) {
+      setLocalError(mode === 'signup' ? 'Use 8 to 1024 characters, including a letter and a number.' : 'Please enter your password.');
       return;
     }
 
@@ -99,9 +99,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onClose();
     } catch (err: any) {
       const errMsg = err.message || 'Authentication failed.';
-      if (mode === 'signin' && (errMsg.toLowerCase().includes('invalid email') || errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('credentials'))) {
-        setAccountNotFoundPrompt(true);
-      }
       setLocalError(errMsg);
     } finally {
       setIsSubmitting(false);
@@ -375,7 +372,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="•••••••• (min 6 characters)"
+                    placeholder="8+ characters, a letter and a number"
                     className="w-full pl-9 pr-9 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                   />
                   <button

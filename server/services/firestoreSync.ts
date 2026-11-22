@@ -1,5 +1,6 @@
 import { adminDb } from './firebaseAdmin';
 import { UserAccount, UserProfile, UserGamification, LeaderboardEntry } from '../../src/types/auth';
+import { safeAvatarUrl } from '../../src/utils/avatarSafety';
 
 let isAdminDbAvailable = true;
 
@@ -44,7 +45,9 @@ export class FirestoreSyncService {
     try {
       await adminDb.collection('public_profiles').doc(profile.userId).set(
         {
-          ...profile,
+          userId: profile.userId,
+          displayName: profile.displayName || profile.fullName || 'Scholar',
+          avatarUrl: safeAvatarUrl(profile.avatarUrl) || '/logo-mark.png',
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -73,7 +76,7 @@ export class FirestoreSyncService {
       const entry: Partial<LeaderboardEntry> = {
         userId: user.id,
         displayName,
-        avatarUrl: profile.avatarUrl,
+        avatarUrl: safeAvatarUrl(profile.avatarUrl) || '/logo-mark.png',
         xp: gamification?.xp ?? 0,
         level: gamification?.level ?? 1,
         streak: gamification?.currentStreak ?? 0,
@@ -83,7 +86,6 @@ export class FirestoreSyncService {
       await adminDb.collection('leaderboard').doc(user.id).set(
         {
           ...entry,
-          email: user.email,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -107,12 +109,9 @@ export class FirestoreSyncService {
     gamification: UserGamification | null
   ): Promise<void> {
     if (!isAdminDbAvailable || !adminDb) return;
-    Promise.allSettled([
-      this.syncUserAccount(user),
-      this.syncUserProfile(profile),
-      this.syncLeaderboardEntry(user, profile, gamification),
-    ]).catch(() => {
-      // Background sync handled gracefully
-    });
+    // Public Firestore collections do not enforce local visibility preferences.
+    // Do not publish profiles or scores on sign-in; the app leaderboard reads
+    // the authenticated backend instead. Existing cloud documents are untouched.
+    await this.syncUserAccount(user);
   }
 }

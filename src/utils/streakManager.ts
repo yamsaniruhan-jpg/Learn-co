@@ -536,4 +536,3 @@ export function mergeStreakData(
     streakStatus: currentStreak > 1 ? 'EXTENDED' : 'ACTIVE_TODAY',
   };
 }
-

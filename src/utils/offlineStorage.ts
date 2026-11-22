@@ -382,4 +382,3 @@ export function useNetworkStatus(): {
 
   return { isOnline, pendingOfflineCount: pendingCount, lastSyncedAt, triggerSync };
 }
-

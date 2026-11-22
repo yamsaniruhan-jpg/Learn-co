@@ -405,9 +405,7 @@ export default function App() {
       profile?.fullName ||
       (user?.email ? user.email.split('@')[0] : 'Guest Scholar'),
     email: user?.email || profile?.email || 'guest@learn.co',
-    avatarUrl:
-      profile?.avatarUrl ||
-      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user?.email || 'guest-scholar')}`,
+    avatarUrl: profile?.avatarUrl || '',
     role: (isAdmin ? 'admin' : profile?.role || user?.role || 'student') as any,
     joinedDate: profile?.joinedDate || new Date().toISOString().split('T')[0],
     xp: gamification?.xp ?? 0,
@@ -751,7 +749,7 @@ export default function App() {
 
               {activeTab === 'planner' && <PlannerView />}
 
-              {activeTab === 'marketplace' && <Marketplace />}
+              {activeTab === 'marketplace' && <Marketplace key={practiceAccountId} />}
 
               {activeTab === 'leaderboard' && (
                 <div className="max-w-5xl mx-auto animate-in fade-in duration-200">

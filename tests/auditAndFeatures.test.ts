@@ -43,6 +43,25 @@ describe('Security, Analytics Cache, SM-2, and Real-Time Study Rooms', () => {
     expect(res.body.code).toBe('FORBIDDEN_CLIENT_XP_AWARD');
   });
 
+  it('requires the private room ticket even when an attacker knows the host peer id', async () => {
+    const app = await createApp();
+    const created = await request(app).post('/api/study-rooms').send({
+      title: 'Private', topic: 'Study', visibility: 'private',
+      roomCode: 'PRIVATE-1', password: 'long-password', peerId: 'known-host',
+    });
+    expect(created.status).toBe(201);
+    const { room, accessTicket } = created.body;
+    const withoutTicket = await request(app).get(`/api/study-rooms/${room.id}`).query({ peerId: 'known-host' });
+    expect(withoutTicket.status).toBe(403);
+    const catalog = await request(app).get('/api/study-rooms').query({ peerId: 'known-host' });
+    expect(catalog.body.rooms.find((entry: any) => entry.id === room.id).isLocked).toBe(true);
+    const withTicket = await request(app).get(`/api/study-rooms/${room.id}`).query({ peerId: 'known-host' }).set('x-room-ticket', accessTicket);
+    expect(withTicket.status).toBe(200);
+    expect(withTicket.body.room.isLocked).toBe(false);
+    expect(studyRoomHub.joinPeer(room.id, { peerId: 'known-host', displayName: 'Spoof', color: '#000', joinedAt: '' })).toBeNull();
+    expect(studyRoomHub.joinPeer(room.id, { peerId: 'known-host', displayName: 'Host', color: '#000', joinedAt: '' }, accessTicket)?.isLocked).toBe(false);
+  });
+
   it('bounds analyticsCache to MAX_ANALYTICS_CACHE_ENTRIES without unbounded heap growth', () => {
     // Populate beyond MAX_ANALYTICS_CACHE_ENTRIES using distinct user IDs
     const totalCalls = MAX_ANALYTICS_CACHE_ENTRIES + 25;

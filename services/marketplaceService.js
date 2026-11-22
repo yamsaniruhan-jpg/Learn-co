@@ -13,8 +13,7 @@ function getDb() {
   return db;
 }
 
-// Runtime stores ensure live enrollment, published courses, progress, counters, and reviews
-// continue working reliably even if Admin Firestore IAM is unavailable across projects.
+// Runtime fallback state is temporary and is lost when the process restarts.
 const localPublishedCourses = new Map(); // courseId -> course
 const localEnrollments = new Map(); // uid -> Set<courseId>
 const localCourseCounters = new Map(); // courseId -> { enrolledDelta, rating, ratingCount }
@@ -725,7 +724,7 @@ function applyLocalStats(course) {
 }
 
 /**
- * Publish a course to the marketplace (Firestore + resilient local persistence)
+ * Publish only after the Firestore transaction commits.
  */
 async function publishCourse(uid, courseId, courseData) {
   const existingLocal = localPublishedCourses.get(courseId);
@@ -783,18 +782,21 @@ async function publishCourse(uid, courseId, courseData) {
     estimatedHours: Number(courseData.estimatedHours) || Math.max(2, lessons.length * 2),
     difficulty: (courseData.difficulty || 'beginner').toLowerCase(),
     price: Number(courseData.price) || 0,
-    rating: existingLocal?.rating ?? 5.0,
-    ratingCount: existingLocal?.ratingCount ?? 1,
-    enrolledCount: existingLocal?.enrolledCount ?? 1,
+    rating: 0,
+    ratingCount: 0,
+    enrolledCount: 0,
     status: 'published',
     publishedAt: existingLocal?.publishedAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  localPublishedCourses.set(courseId, baseCourse);
-
   const firestore = getDb();
-  if (firestore) {
+  if (!firestore) {
+    const error = new Error('Publishing is unavailable until persistent storage is configured.');
+    error.statusCode = 503;
+    throw error;
+  }
+  {
     try {
       const marketplaceRef = firestore.collection('marketplace').doc(courseId);
       const userCourseRef = firestore.collection('users').doc(uid).collection('courses').doc(courseId);
@@ -811,6 +813,17 @@ async function publishCourse(uid, courseId, courseData) {
         };
         if (!existing.exists) {
           payload.publishedAt = admin.firestore.FieldValue.serverTimestamp();
+        } else {
+          // Counters and initial publication time are server-owned.
+          const current = existing.data();
+          baseCourse.rating = current.rating ?? 0;
+          baseCourse.ratingCount = current.ratingCount ?? 0;
+          baseCourse.enrolledCount = current.enrolledCount ?? 0;
+          baseCourse.publishedAt = current.publishedAt || baseCourse.publishedAt;
+          delete payload.rating;
+          delete payload.ratingCount;
+          delete payload.enrolledCount;
+          delete payload.publishedAt;
         }
         transaction.set(marketplaceRef, payload, { merge: true });
         transaction.set(
@@ -821,7 +834,9 @@ async function publishCourse(uid, courseId, courseData) {
       });
     } catch (err) {
       if (err?.statusCode === 403) throw err;
-      console.warn('Firestore Admin publishCourse fallback to runtime store:', err?.message || err);
+      const error = new Error('Publishing is temporarily unavailable.');
+      error.statusCode = 503;
+      throw error;
     }
   }
 
@@ -848,18 +863,17 @@ async function searchCourses({ query, subject, difficulty, sort, limit } = {}) {
         q = q.where('difficulty', '==', difficulty.toLowerCase());
       }
       const snap = await q.limit(pageSize).get();
-      if (!snap.empty) {
-        courses = snap.docs.map((d) => applyLocalStats({ ...d.data(), id: d.id })).filter((c) => c.status === 'published');
-        fetchedFromFirestore = true;
-      }
+      courses = snap.docs.map((d) => applyLocalStats({ ...d.data(), id: d.id })).filter((c) => c.status === 'published');
+      fetchedFromFirestore = true;
     } catch {
       fetchedFromFirestore = false;
     }
   }
 
-  // Merge local published courses + curated catalog so published courses & full interactive lessons are always present
+  // Show the illustrative sample catalog only when Firestore is unavailable.
+  // Never blend samples into a successful query as though they were real courses.
   const mergedMap = new Map();
-  for (const c of SEED_COURSES) mergedMap.set(c.id, applyLocalStats(c));
+  if (!fetchedFromFirestore) for (const c of SEED_COURSES) mergedMap.set(c.id, applyLocalStats(c));
   for (const c of courses) {
     const existing = mergedMap.get(c.id);
     mergedMap.set(c.id, existing ? { ...existing, ...c, lessons: c.lessons?.length ? c.lessons : existing.lessons } : applyLocalStats(c));
@@ -907,7 +921,7 @@ async function searchCourses({ query, subject, difficulty, sort, limit } = {}) {
 
   return {
     courses: list.slice(0, pageSize),
-    catalogSource: fetchedFromFirestore ? 'firebase' : 'curated',
+    catalogSource: fetchedFromFirestore ? 'firebase' : 'sample',
   };
 }
 
@@ -989,7 +1003,7 @@ async function enrollCourse(uid, courseId) {
   }
   const userSet = localEnrollments.get(uid);
   if (userSet.has(courseId)) {
-    return { success: true, alreadyEnrolled: true, persistence: firestore ? 'firebase' : 'server' };
+    return { success: true, alreadyEnrolled: true, persistence: 'memory' };
   }
 
   let persistedToFirebase = false;
@@ -1022,10 +1036,12 @@ async function enrollCourse(uid, courseId) {
   }
 
   userSet.add(courseId);
-  const prev = localCourseCounters.get(courseId) || { enrolledDelta: 0 };
-  localCourseCounters.set(courseId, { ...prev, enrolledDelta: (prev.enrolledDelta || 0) + 1 });
+  if (!persistedToFirebase) {
+    const prev = localCourseCounters.get(courseId) || { enrolledDelta: 0 };
+    localCourseCounters.set(courseId, { ...prev, enrolledDelta: (prev.enrolledDelta || 0) + 1 });
+  }
 
-  return { success: true, alreadyEnrolled: false, persistence: persistedToFirebase ? 'firebase' : 'server' };
+  return { success: true, alreadyEnrolled: false, persistence: persistedToFirebase ? 'firebase' : 'memory' };
 }
 
 /**
@@ -1177,9 +1193,11 @@ async function saveLessonProgress(uid, courseId, { lessonId, completed = true, q
   userMap.set(courseId, updated);
 
   const firestore = getDb();
+  let progressPersisted = false;
   if (firestore) {
     try {
       await firestore.collection('users').doc(uid).collection('progress').doc(courseId).set(updated, { merge: true });
+      progressPersisted = true;
       await firestore
         .collection('users')
         .doc(uid)
@@ -1191,7 +1209,7 @@ async function saveLessonProgress(uid, courseId, { lessonId, completed = true, q
     }
   }
 
-  return { progress: updated, quizEvaluation };
+  return { progress: updated, quizEvaluation, persistence: progressPersisted ? 'firebase' : 'memory' };
 }
 
 /**
@@ -1282,7 +1300,7 @@ async function submitReview(uid, userName, courseId, rating, comment) {
   const prev = localCourseCounters.get(courseId) || { enrolledDelta: 0 };
   localCourseCounters.set(courseId, { ...prev, rating: avg, ratingCount: totalCount });
 
-  return { ...cleanReview, persistence: persistedToFirebase ? 'firebase' : 'server' };
+  return { ...cleanReview, persistence: persistedToFirebase ? 'firebase' : 'memory' };
 }
 
 async function recalculateRating(courseId) {

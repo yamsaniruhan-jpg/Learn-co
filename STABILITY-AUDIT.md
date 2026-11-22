@@ -38,7 +38,7 @@ Audit of branch `arena/eb116c01-learn-co`, based on `630d4c7`. This report recor
 - `npm run build`: passed. The frontend entry is about 1.57 MB before gzip; this is a performance concern, not a failed build. esbuild also prints its size marker for the 1.2 MB server bundle.
 - Dev server: started with the hosting platform's `--port` / `--host` style arguments, remained running during the test/build checks, and returned 200 for the root, health, readiness and transformed entry files. An unauthenticated profile request returned 401. This is a short smoke/soak check, not continuous-production proof.
 - Production server: started from the compiled build and returned 200 for the root and health/readiness endpoints. An isolated HTTP smoke run exercised sign-up, protected profile and settings, analytics, curriculum, leaderboard, planner, Creator text intake and invalid-PDF handling, reset request, and unknown-API 404. A separate production restart retained a test user, Creator source and XP history.
-- Tests verify reset links use a configured origin and request logs redact reset tokens. With no mail provider, reset links are still logged for the server operator, as explicitly indicated to users.
+- At the time of this historical audit, tests verified configured reset origins and path-log redaction, but the no-mail fallback logged reset links. A later working-branch change removes that fallback and returns 503 before issuing a token; it is not proof of a deployed change.
 
 ## 5. Remaining issues and limits
 
