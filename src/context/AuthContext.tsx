@@ -198,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           hasPendingRedirect = Boolean(sessionStorage.getItem('learnco_google_redirect_pending'));
         } catch {}
         if (auth?.app && typeof getRedirectResult === 'function') {
-          const redirectTimeoutMs = hasPendingRedirect ? 2500 : 500;
+          const redirectTimeoutMs = hasPendingRedirect ? 8000 : 1200;
           const redirectResult = await Promise.race([
             getRedirectResult(auth),
             new Promise<null>((resolve) => setTimeout(() => resolve(null), redirectTimeoutMs)),
@@ -435,6 +435,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const code = popupErr?.code || '';
           if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
             throw new Error('Google sign-in was cancelled before completing. Click the button again to choose your Google account.');
+          }
+          if (code === 'auth/account-exists-with-different-credential' || code === 'auth/credential-already-in-use') {
+            throw new Error(
+              'An account with this email already uses Email & Password sign-in. Sign in with your email and password below, or link Google from Firebase Console.'
+            );
           }
           if (code === 'auth/unauthorized-domain') {
             throw new Error('This domain is not authorized for Google Sign-In in Firebase Console. Open the live app URL or sign in with Email & Password.');

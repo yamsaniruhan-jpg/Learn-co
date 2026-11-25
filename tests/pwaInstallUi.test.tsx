@@ -48,5 +48,7 @@ describe('mobile install guidance', () => {
     expect(container.textContent).not.toContain('Desktop File (.html)');
     expect(container.textContent).not.toContain('Save Clickable App File');
     expect(container.textContent).toContain('Install LearnCo');
+    const iconImg = container.querySelector('img[alt="LearnCo Home Screen Icon"]') as HTMLImageElement | null;
+    expect(iconImg?.getAttribute('src')).toBe('/icons/icon-192.png');
   });
 });

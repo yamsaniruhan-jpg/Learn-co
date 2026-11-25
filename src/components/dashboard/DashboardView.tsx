@@ -29,7 +29,7 @@ import {
   ShieldCheck,
   Flame,
   CloudCheck,
-  ChevronDown,
+  Layers,
 } from 'lucide-react';
 import { UserProfile, ConceptMastery, QuestionAttempt, SubjectId } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -81,27 +81,27 @@ interface QuickDestination {
 }
 
 const DESTINATIONS: QuickDestination[] = [
-  { id: 'learn', label: 'Learn', brief: 'Chapters & concepts', group: 'study', popular: true, icon: BookOpen },
-  { id: 'practice', label: 'Practice', brief: 'Drills & diagnostic sets', group: 'study', popular: true, icon: Target },
-  { id: 'copilot', label: 'Doubts', brief: 'Step-by-step AI tutor', group: 'ai', popular: true, icon: Bot },
-  { id: 'create', label: 'Create', brief: 'Notes to quizzes', group: 'ai', popular: true, icon: Sparkles },
-  { id: 'planner', label: 'Plan', brief: 'Daily timetable', group: 'track', popular: true, icon: Calendar },
-  { id: 'focus', label: 'Focus', brief: 'Deep work timer', group: 'study', popular: true, icon: Clock },
-  { id: 'mentor', label: 'Mentor', brief: 'Coaching & guidance', group: 'track', popular: true, icon: Compass },
-  { id: 'leaderboard', label: 'Ranks', brief: 'Cohort standings', group: 'track', popular: true, icon: Trophy },
-  { id: 'simulations', label: 'Simulations', brief: 'Interactive STEM labs', group: 'ai', icon: FlaskConical },
-  { id: 'study-rooms', label: 'Study Rooms', brief: 'Peer collaboration', group: 'study', icon: Users },
-  { id: 'voice-exam', label: 'Voice Exam', brief: 'Oral concept defense', group: 'ai', icon: Mic },
-  { id: 'marketplace', label: 'Courses', brief: 'Structured modules', group: 'study', icon: ShoppingBag },
-  { id: 'intelligence', label: 'Mistakes', brief: 'Error log & review', group: 'track', icon: BarChart3 },
-  { id: 'forecaster', label: 'Forecaster', brief: 'Exam readiness range', group: 'track', icon: TrendingUp },
-  { id: 'concepts', label: 'Concepts', brief: 'Topic dependency graph', group: 'study', icon: Library },
-  { id: 'digital-archive', label: 'Archive', brief: 'Open textbooks', group: 'study', icon: BookMarked },
-  { id: 'saved', label: 'Saved', brief: 'Bookmarked Q&A', group: 'study', icon: BookMarked },
-  { id: 'gamification', label: 'Badges', brief: 'Rewards & milestones', group: 'track', icon: Award },
-  { id: 'offline-sync', label: 'Offline Sync', brief: 'Mobile pack & queue', group: 'track', icon: RefreshCw },
-  { id: 'user-guide', label: 'Guide', brief: 'Platform walkthroughs', group: 'study', icon: HelpCircle },
-  { id: 'profile', label: 'Profile', brief: 'Goals & preferences', group: 'track', icon: User },
+  { id: 'learn', label: 'Learn', brief: 'Chapters', group: 'study', popular: true, icon: BookOpen },
+  { id: 'practice', label: 'Practice', brief: 'Drills', group: 'study', popular: true, icon: Target },
+  { id: 'copilot', label: 'Doubts', brief: 'AI Tutor', group: 'ai', popular: true, icon: Bot },
+  { id: 'create', label: 'Create', brief: 'Quizzes', group: 'ai', popular: true, icon: Sparkles },
+  { id: 'planner', label: 'Plan', brief: 'Timetable', group: 'track', popular: true, icon: Calendar },
+  { id: 'focus', label: 'Focus', brief: 'Deep work', group: 'study', popular: true, icon: Clock },
+  { id: 'mentor', label: 'Mentor', brief: 'Coaching', group: 'track', popular: true, icon: Compass },
+  { id: 'leaderboard', label: 'Ranks', brief: 'Standings', group: 'track', popular: true, icon: Trophy },
+  { id: 'simulations', label: 'Labs', brief: 'STEM labs', group: 'ai', icon: FlaskConical },
+  { id: 'study-rooms', label: 'Rooms', brief: 'Collab', group: 'study', icon: Users },
+  { id: 'voice-exam', label: 'Voice Exam', brief: 'Oral defense', group: 'ai', icon: Mic },
+  { id: 'marketplace', label: 'Courses', brief: 'Modules', group: 'study', icon: ShoppingBag },
+  { id: 'intelligence', label: 'Mistakes', brief: 'Error log', group: 'track', icon: BarChart3 },
+  { id: 'forecaster', label: 'Forecast', brief: 'Readiness', group: 'track', icon: TrendingUp },
+  { id: 'concepts', label: 'Graph', brief: 'Dependency', group: 'study', icon: Library },
+  { id: 'digital-archive', label: 'Archive', brief: 'Textbooks', group: 'study', icon: BookMarked },
+  { id: 'saved', label: 'Saved', brief: 'Bookmarks', group: 'study', icon: BookMarked },
+  { id: 'gamification', label: 'Badges', brief: 'Rewards', group: 'track', icon: Award },
+  { id: 'offline-sync', label: 'Offline', brief: 'Sync pack', group: 'track', icon: RefreshCw },
+  { id: 'user-guide', label: 'Guide', brief: 'Tutorials', group: 'study', icon: HelpCircle },
+  { id: 'profile', label: 'Profile', brief: 'Settings', group: 'track', icon: User },
 ];
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -173,11 +173,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     void loadPlannerOverview();
   }, [loadPlannerOverview, user.id]);
 
-  const xpProgress = calculateLevelFromXp(user.xp);
-  const solvedToday = gamification?.dailyQuestionsSolvedToday ?? user.dailyQuestionsSolvedToday ?? 0;
+  // Robust Unified XP & Streak calculations to prevent glitches
+  const uAny = user as unknown as Record<string, any>;
+  const totalUserXp = Math.max(
+    Number(uAny?.xp ?? 0),
+    Number(gamification?.xp ?? 0),
+    Number(authProfile?.xp ?? 0)
+  );
+  const xpProgress = calculateLevelFromXp(totalUserXp);
+  const solvedToday = Math.max(
+    gamification?.dailyQuestionsSolvedToday ?? 0,
+    Number(uAny?.dailyQuestionsSolvedToday ?? 0)
+  );
   const dailyGoalTarget = 10;
   const dailyGoalPercent = Math.min(100, Math.round((solvedToday / dailyGoalTarget) * 100));
-  const currentStreakDays = gamification?.currentStreak ?? streakData.currentStreak ?? user.currentStreak ?? 0;
+  
+  const currentStreakDays = Math.max(
+    gamification?.currentStreak ?? 0,
+    streakData.currentStreak ?? 0,
+    Number(uAny?.currentStreak ?? 1),
+    Number(authProfile?.currentStreak ?? 0)
+  );
+  const longestStreakDays = Math.max(
+    Number(uAny?.longestStreak ?? 1),
+    Number(streakData.longestStreak ?? 1),
+    currentStreakDays
+  );
 
   const { dueCards, totalDueCount } = useMemo(
     () => getDueReviewQueue(user.id || 'default_user', masteries, attempts, new Date(), 3),
@@ -225,8 +246,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         ...DESTINATIONS,
         {
           id: 'admin',
-          label: 'Admin Studio',
-          brief: 'Approvals & metrics',
+          label: 'Admin',
+          brief: 'Metrics',
           group: 'track' as const,
           icon: ShieldCheck,
         },
@@ -262,13 +283,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       setSyncStatusMsg(
         !isOnline
-          ? `Offline: saved ${pack.questions.length} questions (${pack.approxSizeKb} KB).`
+          ? `Offline: saved ${pack.questions.length} questions.`
           : syncedCount > 0
-          ? `Synced ${syncedCount} attempt${syncedCount === 1 ? '' : 's'} & cached ${pack.questions.length} questions.`
-          : `Study pack ready (${pack.questions.length} questions cached).`
+          ? `Synced ${syncedCount} attempt${syncedCount === 1 ? '' : 's'} & cached ${pack.questions.length} Qs.`
+          : `Study pack ready (${pack.questions.length} Qs cached).`
       );
     } catch {
-      setSyncStatusMsg('Sync failed — check browser storage settings and retry.');
+      setSyncStatusMsg('Sync failed — check browser storage settings.');
     } finally {
       setPackDownloading(false);
     }
@@ -276,23 +297,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-200">
-      {/* 1. Calm Hero Card: Greeting + Big "Ask a doubt" Primary CTA */}
-      <Card variant="elevated" padding="lg" className="space-y-6">
+      {/* 1. TOP: Luminous Aurora Hero Card & Gemstone Essentials */}
+      <Card
+        variant="elevated"
+        padding="lg"
+        className="space-y-6 bg-gradient-to-br from-[#EEF2FF] via-[#F5F3FF] to-[#E0F7FA] dark:from-[#211C4A] dark:via-[#2B225A] dark:to-[#123246] border-[#C7D2FE] dark:border-[#493E8A]"
+      >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="primary" size="sm">
+              <Badge
+                variant="primary"
+                size="sm"
+                className="bg-gradient-to-r from-[#5B4CE0] to-[#0891B2] border-transparent text-white font-black"
+              >
                 Level {xpProgress.level}
               </Badge>
-              <span className="text-xs font-semibold text-[#6B6890] dark:text-[#B4B0D5] truncate">
-                {user.targetExam || 'Daily STEM Study'}
+              <span className="text-xs font-bold text-[#4338CA] dark:text-[#A5B4FC] truncate">
+                {user.targetExam || 'Daily STEM Mastery'}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+            <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-[#1E1B4B] dark:text-[#F5F3FF] truncate">
               Welcome back, {user.fullName.split(' ')[0]}
             </h1>
-            <p className="text-sm text-[#6B6890] dark:text-[#B4B0D5]">
-              Pick up your next lesson, keep your streak steady, or clear a doubt in seconds.
+            <p className="text-sm font-medium text-[#475569] dark:text-[#C7D2FE]">
+              Your personalized AI study headquarters &amp; rapid workspace.
             </p>
           </div>
 
@@ -302,85 +331,189 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             size="lg"
             onClick={() => onNavigate('copilot')}
             leftIcon={<Bot className="w-5 h-5" />}
-            className="w-full md:w-auto min-h-[52px] px-7 text-base font-black shrink-0"
+            className="w-full md:w-auto min-h-[52px] px-7 text-base font-black shrink-0 bg-gradient-to-r from-[#5B4CE0] via-[#7C3AED] to-[#0891B2] hover:from-[#4C3FD0] hover:via-[#6D28D9] hover:to-[#0E7490] text-white border-0 shadow-[0_6px_18px_rgba(91,76,224,0.28)]"
           >
-            Ask a doubt
+            Ask AI Doubt
           </Button>
         </div>
 
-        {/* 2. Three Calm Essentials: Today's Goal, Streak, XP */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 border-t border-[#E3DFF5] dark:border-[#3D3861]">
-          {/* Today's Goal */}
-          <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-bold text-[#6B6890] dark:text-[#B4B0D5]">
-              <span>Today&apos;s goal</span>
-              <span className="tabular-nums text-[#2D2A4A] dark:text-[#F1EFFF]">
+        {/* Three Gemstone Essentials: Goal, Streak, XP */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 border-t border-[#C7D2FE]/70 dark:border-[#433A7D]">
+          {/* Today's Goal — Emerald Mint */}
+          <div className="p-4 rounded-2xl bg-[#ECFDF5] dark:bg-[#102E28] border border-[#A7F3D0] dark:border-[#1E5C4E] space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-[#065F46] dark:text-[#A7F3D0]">
+              <span>Daily Goal</span>
+              <span className="tabular-nums text-[#064E3B] dark:text-[#ECFDF5]">
                 {solvedToday}/{dailyGoalTarget} Qs
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4.5 h-4.5 text-[#00B8A9] shrink-0" />
-              <span className="text-xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] tabular-nums">
+              <CheckCircle2 className="w-4.5 h-4.5 text-[#059669] dark:text-[#34D399] shrink-0" />
+              <span className="text-xl font-black text-[#064E3B] dark:text-[#ECFDF5] tabular-nums">
                 {dailyGoalPercent}%
               </span>
             </div>
-            <Progress value={dailyGoalPercent} variant="secondary" size="sm" aria-label="Today's goal progress" />
+            <Progress value={dailyGoalPercent} variant="secondary" size="sm" aria-label="Daily goal progress" />
           </div>
 
-          {/* Streak */}
+          {/* Streak — Solar Amber */}
           <button
             type="button"
             onClick={() => setShowStreakModal(true)}
-            className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-left space-y-2 transition-colors cursor-pointer min-h-[44px]"
+            className="p-4 rounded-2xl bg-[#FFFBEB] dark:bg-[#332216] border border-[#FDE68A] dark:border-[#6B4221] hover:border-[#F59E0B] dark:hover:border-[#FBBF24] text-left space-y-2 transition-colors cursor-pointer min-h-[44px]"
           >
-            <div className="flex items-center justify-between text-xs font-bold text-[#6B6890] dark:text-[#B4B0D5]">
-              <span>Study streak</span>
-              <span className="text-[#6C5CE7] dark:text-[#A594FF]">View log</span>
+            <div className="flex items-center justify-between text-xs font-bold text-[#92400E] dark:text-[#FDE68A]">
+              <span>Streak</span>
+              <span className="text-[#C2410C] dark:text-[#FDBA74] font-extrabold">Log</span>
             </div>
             <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-[#FFB84D] fill-[#FFB84D] shrink-0" />
-              <span className="text-xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] tabular-nums">
+              <Flame className="w-5 h-5 text-[#EA580C] fill-[#F59E0B] dark:text-[#FBBF24] dark:fill-[#F97316] shrink-0" />
+              <span className="text-xl font-black text-[#78350F] dark:text-[#FEF3C7] tabular-nums">
                 {currentStreakDays} day{currentStreakDays === 1 ? '' : 's'}
               </span>
             </div>
-            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
-              Best: {user.longestStreak} days
+            <p className="text-xs font-semibold text-[#92400E] dark:text-[#FDE68A]">
+              Best: {longestStreakDays} days
             </p>
           </button>
 
-          {/* XP */}
-          <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-bold text-[#6B6890] dark:text-[#B4B0D5]">
+          {/* XP — Electric Orchid Violet */}
+          <div className="p-4 rounded-2xl bg-[#F5F3FF] dark:bg-[#2A1D47] border border-[#DDD6FE] dark:border-[#53388F] space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-[#5B21B6] dark:text-[#DDD6FE]">
               <span>Experience</span>
-              <span className="tabular-nums text-[#2D2A4A] dark:text-[#F1EFFF]">
+              <span className="tabular-nums text-[#4C1D95] dark:text-[#F5F3FF]">
                 Lv {xpProgress.level}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Zap className="w-4.5 h-4.5 text-[#FFB84D] fill-[#FFB84D] shrink-0" />
-              <span className="text-xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] tabular-nums">
-                {user.xp.toLocaleString()} XP
+              <Zap className="w-4.5 h-4.5 text-[#7C3AED] fill-[#A855F7] dark:text-[#E879F9] dark:fill-[#C084FC] shrink-0" />
+              <span className="text-xl font-black text-[#4C1D95] dark:text-[#F5F3FF] tabular-nums">
+                {totalUserXp.toLocaleString()} XP
               </span>
             </div>
-            <Progress value={xpProgress.progressPercent} variant="primary" size="sm" aria-label="Progress to next level" />
+            <Progress value={xpProgress.progressPercent} variant="primary" size="sm" aria-label="XP level progress" />
           </div>
         </div>
       </Card>
 
-      {/* 3. Next Lesson & Today's Focus (with Loading / Empty / Error States) */}
+      {/* 2. SECOND TOP: Workspace Hub (Prominent Logo-First Grid with category tabs) */}
+      <Card
+        variant="default"
+        padding="lg"
+        className="space-y-4 bg-gradient-to-br from-[#FFFFFF] via-[#FAF8FF] to-[#F0FDFA] dark:from-[#242040] dark:via-[#201D38] dark:to-[#122D31] border-[#C7D2FE] dark:border-[#433A7D]"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5B4CE0] to-[#0891B2] flex items-center justify-center text-white shadow-md">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-[#1E1B4B] dark:text-[#F1EFFF] font-display tracking-tight">
+                Workspace Hub
+              </h2>
+              <p className="text-xs font-semibold text-[#57537A] dark:text-[#B4B0D5]">
+                Tap any tool logo for instant access across all study, practice &amp; AI studios.
+              </p>
+            </div>
+          </div>
+
+          <div
+            role="tablist"
+            aria-label="Filter workspace tools"
+            className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {(
+              [
+                { id: 'popular', label: 'Core' },
+                { id: 'study', label: 'Study' },
+                { id: 'ai', label: 'AI & Labs' },
+                { id: 'track', label: 'Progress' },
+                { id: 'all', label: `All (${allDestinations.length})` },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={navGroup === tab.id}
+                onClick={() => setNavGroup(tab.id)}
+                className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                  navGroup === tab.id
+                    ? 'bg-gradient-to-r from-[#5B4CE0] to-[#0891B2] text-white shadow-md scale-[1.02]'
+                    : 'bg-[#F5F3FF] dark:bg-[#1E1B33] text-[#57537A] dark:text-[#B4B0D5] hover:bg-[#EDE9FE] dark:hover:bg-[#2A2447] hover:text-[#1E1B4B] dark:hover:text-[#F1EFFF]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Logo-First Destination Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-2">
+          {visibleDestinations.map((dest) => {
+            const Icon = dest.icon;
+            const groupPalette =
+              dest.group === 'study'
+                ? {
+                    tile: 'bg-[#F0F7FF] dark:bg-[#1A2842] hover:bg-[#E0EFFF] dark:hover:bg-[#223557] border-[#D6E6FF] dark:border-[#2C446B] hover:border-[#3B82F6]',
+                    iconBox: 'bg-[#DBEAFE] dark:bg-[#223B61] border-[#BFDBFE] dark:border-[#355A8F] text-[#1D4ED8] dark:text-[#60A5FA]',
+                  }
+                : dest.group === 'ai'
+                ? {
+                    tile: 'bg-[#FAF5FF] dark:bg-[#2B1D42] hover:bg-[#F3E8FF] dark:hover:bg-[#382557] border-[#E9D5FF] dark:border-[#4B3173] hover:border-[#8B5CF6]',
+                    iconBox: 'bg-[#F3E8FF] dark:bg-[#3B245C] border-[#DDD6FE] dark:border-[#5D3C8F] text-[#7E22CE] dark:text-[#D8B4FE]',
+                  }
+                : {
+                    tile: 'bg-[#FFFBEB] dark:bg-[#2E2417] hover:bg-[#FEF3C7] dark:hover:bg-[#3D2F1D] border-[#FDE68A] dark:border-[#594322] hover:border-[#F59E0B]',
+                    iconBox: 'bg-[#FEF3C7] dark:bg-[#473419] border-[#FCD34D] dark:border-[#705327] text-[#B45309] dark:text-[#FCD34D]',
+                  };
+            return (
+              <button
+                key={dest.id}
+                type="button"
+                onClick={() => onNavigate(dest.id)}
+                className={`group min-h-[64px] p-3 rounded-2xl border text-left flex items-center gap-3 transition-all hover:scale-[1.02] cursor-pointer min-w-0 ${groupPalette.tile}`}
+              >
+                <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-110 ${groupPalette.iconBox}`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-black text-[#1E1B4B] dark:text-[#F1EFFF] truncate">
+                    {dest.label}
+                  </div>
+                  <div className="text-[10px] font-semibold text-[#57537A] dark:text-[#C7C3E6] truncate">
+                    {dest.brief}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* 3. THIRD SECTION: Next Lesson & Spaced Review / Study Progress */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-7 space-y-5">
-          <Card variant="default" padding="lg" className="space-y-4">
+          <Card
+            variant="default"
+            padding="lg"
+            className="space-y-4 bg-[#FFFFFF] dark:bg-[#242040] border-[#D8E2FA] dark:border-[#39426E]"
+          >
             <div className="flex items-center justify-between gap-2">
               <div>
-                <h2 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
-                  Next Lesson
+                <h2 className="text-base font-black text-[#1E1B4B] dark:text-[#F1EFFF] font-display">
+                  Next Scheduled Lesson
                 </h2>
-                <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
-                  Goal Progress · Stay on track with one focused step
+                <p className="text-xs font-medium text-[#475569] dark:text-[#B4B0D5]">
+                  Stay on track with your personalized curriculum roadmap
                 </p>
               </div>
-              <Badge variant="secondary" size="sm">
+              <Badge
+                variant="secondary"
+                size="sm"
+                className="bg-[#DBEAFE] dark:bg-[#1E3A5F] text-[#1D4ED8] dark:text-[#93C5FD] border-[#BFDBFE] dark:border-[#2E5082]"
+              >
                 {nextLesson.label}
               </Badge>
             </div>
@@ -400,12 +533,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 }
               />
             ) : (
-              <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#EFF6FF] via-[#F0F9FF] to-[#ECFEFF] dark:from-[#192847] dark:via-[#17304D] dark:to-[#123340] border border-[#BFDBFE] dark:border-[#2C4E78] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1 min-w-0">
-                  <div className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+                  <div className="text-base font-black text-[#0F172A] dark:text-[#F8FAFC] truncate">
                     {nextLesson.title}
                   </div>
-                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
+                  <p className="text-xs font-semibold text-[#1D4ED8] dark:text-[#7DD3FC]">
                     {nextLesson.subtitle}
                   </p>
                 </div>
@@ -416,7 +549,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     variant="outline"
                     size="md"
                     onClick={onLaunchPractice}
-                    leftIcon={<Play className="w-4 h-4" />}
+                    leftIcon={<Play className="w-4 h-4 text-[#2563EB] dark:text-[#60A5FA]" />}
+                    className="border-[#93C5FD] dark:border-[#3B6496] hover:bg-[#DBEAFE] dark:hover:bg-[#1E3A5F]"
                   >
                     Quick Drill
                   </Button>
@@ -426,6 +560,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     size="md"
                     onClick={() => onNavigate(nextLesson.tab, nextLesson.context)}
                     rightIcon={<ArrowRight className="w-4 h-4" />}
+                    className="bg-gradient-to-r from-[#0891B2] to-[#0D9488] hover:from-[#0E7490] hover:to-[#0F766E] text-white border-0"
                   >
                     Open Lesson
                   </Button>
@@ -434,21 +569,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </Card>
 
-          {/* Spaced Review / Schedule Section */}
-          <Card variant="default" padding="md" className="space-y-3">
+          {/* Spaced Review / Active Recall Section */}
+          <Card
+            variant="default"
+            padding="md"
+            className="space-y-3 bg-[#FFFFFF] dark:bg-[#242040] border-[#CCEFE9] dark:border-[#255259]"
+          >
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#00B8A9]" />
+              <h2 className="text-sm font-black text-[#1E1B4B] dark:text-[#F1EFFF] font-display flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF]" />
                 <span>Spaced Review ({totalDueCount} due)</span>
               </h2>
-              <Button variant="ghost" size="sm" onClick={() => onNavigate('practice')} className="min-h-[44px]">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onNavigate('practice')}
+                className="min-h-[44px] text-[#0F766E] dark:text-[#5EEAD4] hover:bg-[#CCFBF1]/60 dark:hover:bg-[#13383B]"
+              >
                 Open Practice
               </Button>
             </div>
 
             {dueCards.length === 0 ? (
               <EmptyState
-                icon={<CheckCircle2 className="w-6 h-6" />}
+                icon={<CheckCircle2 className="w-6 h-6 text-[#059669] dark:text-[#34D399]" />}
                 title="Reviews caught up"
                 description="No spaced repetition concepts are due right now. Try a new practice set to queue tomorrow's review."
                 actionLabel="Browse Practice"
@@ -460,14 +604,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {dueCards.map((card) => (
                   <div
                     key={card.conceptId}
-                    className="p-3.5 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-2.5"
+                    className="p-3.5 rounded-2xl bg-[#F0FDFA] dark:bg-[#132E33] border border-[#99F6E4] dark:border-[#23545B] space-y-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="text-[11px] font-bold text-[#00B8A9] uppercase">
+                        <span className="text-[11px] font-extrabold text-[#0F766E] dark:text-[#5EEAD4] uppercase">
                           {card.subjectId}
                         </span>
-                        <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+                        <h3 className="text-xs font-black text-[#134E4A] dark:text-[#F0FDFA] truncate">
                           {card.conceptTitle}
                         </h3>
                       </div>
@@ -480,25 +624,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             conceptId: card.conceptId,
                           })
                         }
-                        className="min-h-[44px]"
+                        className="min-h-[44px] bg-[#0D9488] hover:bg-[#0F766E] dark:bg-[#14B8A6] dark:hover:bg-[#0D9488] dark:text-[#042F2E]"
                       >
                         Drill
                       </Button>
                     </div>
-                    <div className="flex items-center gap-1 pt-2 border-t border-[#E3DFF5] dark:border-[#3D3861]">
+                    <div className="flex items-center gap-1 pt-2 border-t border-[#99F6E4]/80 dark:border-[#23545B]">
                       {(
                         [
-                          { label: 'Again', quality: 0 },
-                          { label: 'Hard', quality: 2 },
-                          { label: 'Good', quality: 4 },
-                          { label: 'Easy', quality: 5 },
-                        ] as Array<{ label: string; quality: SM2Quality }>
+                          {
+                            label: 'Again',
+                            quality: 0,
+                            tone: 'text-[#BE123C] dark:text-[#FDA4AF] hover:bg-[#FFF1F2] dark:hover:bg-[#4C1D2A] hover:border-[#F43F5E]',
+                          },
+                          {
+                            label: 'Hard',
+                            quality: 2,
+                            tone: 'text-[#B45309] dark:text-[#FCD34D] hover:bg-[#FFFBEB] dark:hover:bg-[#452B12] hover:border-[#F59E0B]',
+                          },
+                          {
+                            label: 'Good',
+                            quality: 4,
+                            tone: 'text-[#0E7490] dark:text-[#67E8F9] hover:bg-[#ECFEFF] dark:hover:bg-[#153B46] hover:border-[#06B6D4]',
+                          },
+                          {
+                            label: 'Easy',
+                            quality: 5,
+                            tone: 'text-[#047857] dark:text-[#6EE7B7] hover:bg-[#ECFDF5] dark:hover:bg-[#123B2F] hover:border-[#10B981]',
+                          },
+                        ] as Array<{ label: string; quality: SM2Quality; tone: string }>
                       ).map((opt) => (
                         <button
                           key={opt.label}
                           type="button"
                           onClick={() => handleSM2Grade(card, opt.quality)}
-                          className="flex-1 min-h-[36px] rounded-lg bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7] text-[11px] font-bold text-[#2D2A4A] dark:text-[#F1EFFF] cursor-pointer"
+                          className={`flex-1 min-h-[36px] rounded-lg bg-[#FFFFFF] dark:bg-[#1D3C42] border border-[#CCFBF1] dark:border-[#2D626A] text-[11px] font-extrabold transition-colors cursor-pointer ${opt.tone}`}
                         >
                           {opt.label}
                         </button>
@@ -511,153 +671,82 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </Card>
         </div>
 
-        {/* Right Column: Workspace Hub Directory */}
+        {/* Right Column: Standings & Offline Sync */}
         <div className="lg:col-span-5 space-y-5">
-          <Card variant="default" padding="md" className="space-y-3.5">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
-                  Workspace Hub
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowMoreCards((prev) => !prev)}
-                  className="text-xs font-bold text-[#6C5CE7] dark:text-[#A594FF] flex items-center gap-1 min-h-[44px] px-2 cursor-pointer"
-                >
-                  <span>{showMoreCards ? 'Fewer extras' : 'Sync & Ranks'}</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMoreCards ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-
-              <div
-                role="tablist"
-                aria-label="Filter dashboard tools"
-                className="flex items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {(
-                  [
-                    { id: 'popular', label: 'Core' },
-                    { id: 'study', label: 'Study' },
-                    { id: 'ai', label: 'AI & Labs' },
-                    { id: 'track', label: 'Progress' },
-                    { id: 'all', label: `All (${allDestinations.length})` },
-                  ] as const
-                ).map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={navGroup === tab.id}
-                    onClick={() => setNavGroup(tab.id)}
-                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
-                      navGroup === tab.id
-                        ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white'
-                        : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+          {/* Cohort Standings Card */}
+          <Card
+            variant="default"
+            padding="md"
+            className="space-y-2.5 bg-[#FFFDF5] dark:bg-[#292238] border-[#FDE68A] dark:border-[#5C441E]"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-[#78350F] dark:text-[#FEF3C7] flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-[#D97706] dark:text-[#FBBF24]" />
+                <span>Cohort Standings</span>
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('leaderboard')} className="min-h-[44px] text-[#B45309] dark:text-[#FCD34D]">
+                Ranks
+              </Button>
             </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {visibleDestinations.map((dest) => {
-                const Icon = dest.icon;
-                return (
-                  <button
-                    key={dest.id}
-                    type="button"
-                    onClick={() => onNavigate(dest.id)}
-                    className="min-h-[52px] p-2.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#F0EDFA] dark:hover:bg-[#24203E] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7] text-left flex items-center gap-2.5 transition-colors cursor-pointer min-w-0"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#6C5CE7] dark:text-[#A594FF] flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
-                        {dest.label}
-                      </div>
-                      <div className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5] truncate">
-                        {dest.brief}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <Leaderboard
+              compact
+              limit={4}
+              showPodium={false}
+              showSearch={false}
+              showPrivacyNotice={false}
+              onSelectScholar={() => onNavigate('leaderboard')}
+            />
           </Card>
 
-          {showMoreCards && (
-            <>
-              {/* Cohort Standings */}
-              <Card variant="default" padding="md" className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
-                    <Trophy className="w-4 h-4 text-[#FFB84D]" />
-                    <span>Cohort Standings</span>
-                  </h3>
-                  <Button variant="ghost" size="sm" onClick={() => onNavigate('leaderboard')} className="min-h-[44px]">
-                    Ranks
-                  </Button>
-                </div>
-                <Leaderboard
-                  compact
-                  limit={4}
-                  showPodium={false}
-                  showSearch={false}
-                  showPrivacyNotice={false}
-                  onSelectScholar={() => onNavigate('leaderboard')}
+          {/* Home Screen Install & Sync Card */}
+          <Card
+            variant="subtle"
+            padding="md"
+            className="space-y-3 bg-gradient-to-br from-[#ECFDF5] to-[#F0FDFA] dark:from-[#122D2A] dark:to-[#122B36] border-[#A7F3D0] dark:border-[#245A52]"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-black text-[#064E3B] dark:text-[#ECFDF5] flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-[#059669] dark:text-[#34D399]" />
+                <span>Offline Pack &amp; App</span>
+              </h3>
+              <Badge variant="success" size="sm">
+                <CloudCheck className="w-3 h-3 mr-1" />
+                {olympiadPack ? `${olympiadPack.questions.length} Qs` : 'Ready'}
+              </Badge>
+            </div>
+            <div className="text-[11px] font-bold text-[#065F46] dark:text-[#A7F3D0]">
+              {pendingOfflineCount} queued ·{' '}
+              {lastSyncedAt
+                ? `Synced ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : isOnline
+                ? 'Online'
+                : 'Offline'}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {!isInstalled && (
+                <PWAInstallButton
+                  label="Add to Home Screen"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#5B4CE0] to-[#0891B2] hover:from-[#4C3FD0] hover:to-[#0E7490] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                 />
-              </Card>
-
-              {/* Home Screen Install & Sync */}
-              <Card variant="subtle" padding="md" className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-[#00B8A9]" />
-                    <span>Offline Pack &amp; App</span>
-                  </h3>
-                  <Badge variant="success" size="sm">
-                    <CloudCheck className="w-3 h-3 mr-1" />
-                    {olympiadPack ? `${olympiadPack.questions.length} Qs` : 'Ready'}
-                  </Badge>
-                </div>
-                <div className="text-[11px] font-semibold text-[#6B6890] dark:text-[#B4B0D5]">
-                  {pendingOfflineCount} queued ·{' '}
-                  {lastSyncedAt
-                    ? `Synced ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : isOnline
-                    ? 'Online'
-                    : 'Offline'}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {!isInstalled && (
-                    <PWAInstallButton
-                      label="Add to Home Screen"
-                      className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#6C5CE7] hover:bg-[#5b4bc4] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                    />
-                  )}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={packDownloading}
-                    onClick={() => void handleSyncPackAndCloud()}
-                    leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${packDownloading ? 'animate-spin' : ''}`} />}
-                    className="min-h-[44px]"
-                  >
-                    {packDownloading ? 'Syncing...' : olympiadPack ? 'Sync Pack' : 'Cache Study Pack'}
-                  </Button>
-                </div>
-                {syncStatusMsg && (
-                  <p role="status" className="text-xs font-semibold text-[#00B8A9]">
-                    {syncStatusMsg}
-                  </p>
-                )}
-              </Card>
-            </>
-          )}
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={packDownloading}
+                onClick={() => void handleSyncPackAndCloud()}
+                leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${packDownloading ? 'animate-spin' : ''}`} />}
+                className="min-h-[44px] bg-[#059669] hover:bg-[#047857] text-white"
+              >
+                {packDownloading ? 'Syncing...' : olympiadPack ? 'Sync Pack' : 'Cache Study Pack'}
+              </Button>
+            </div>
+            {syncStatusMsg && (
+              <p role="status" className="text-xs font-bold text-[#047857] dark:text-[#6EE7B7]">
+                {syncStatusMsg}
+              </p>
+            )}
+          </Card>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Share, PlusSquare, X, CheckCircle2, Smartphone, MoreVertical, Download } from 'lucide-react';
+import { Share, PlusSquare, X, CheckCircle2, MoreVertical, Download } from 'lucide-react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import { OfflineStorageManager } from '../../utils/offlineStorage';
 
 const DISMISS_STORAGE_KEY = 'learnco_ios_install_banner_dismissed_v1';
 
@@ -39,6 +40,7 @@ export const IOSInstallBanner: React.FC = () => {
   };
 
   const handlePrimaryAction = async () => {
+    void OfflineStorageManager.prepareMobileHomeScreenPackage();
     if (isInstallable) {
       const result = await install();
       if (result === 'accepted' || result === 'dismissed') return;
@@ -55,9 +57,11 @@ export const IOSInstallBanner: React.FC = () => {
       >
         <div className="max-w-lg mx-auto pointer-events-auto rounded-2xl bg-[#2D2A4A] text-white border border-[#4B4578] shadow-xl px-3.5 py-2 flex items-center justify-between gap-2.5 max-h-[15vh]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-[#6C5CE7] flex items-center justify-center shrink-0">
-              <Smartphone className="w-4 h-4 text-white" />
-            </div>
+            <img
+              src="/icons/icon-192.png"
+              alt="LearnCo Home Screen Icon"
+              className="w-9 h-9 rounded-xl border border-[#6C5CE7]/50 shrink-0 object-cover"
+            />
             <div className="min-w-0">
               <div className="text-xs font-bold truncate">Add LearnCo to Home Screen</div>
               <div className="text-[11px] text-slate-300 truncate flex items-center gap-1">
@@ -107,9 +111,16 @@ export const IOSInstallBanner: React.FC = () => {
         >
           <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
-                {isIOS ? 'Install on iPhone & iPad' : 'Install on Android Phone'}
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/icons/icon-192.png"
+                  alt="LearnCo Home Screen Icon"
+                  className="w-9 h-9 rounded-xl border border-[#6C5CE7]/40 shrink-0 object-cover"
+                />
+                <h3 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+                  {isIOS ? 'Install on iPhone & iPad' : 'Install on Android Phone'}
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowStepsModal(false)}

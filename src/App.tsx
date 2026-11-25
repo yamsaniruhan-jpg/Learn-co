@@ -973,25 +973,33 @@ export default function App() {
 
       {/* Floating Guide Icon beside Floating Omni Copilot Widget */}
       {!isZenMode && (
-        <Suspense fallback={null}>
-          <FloatingGuideButton
-            activeTab={activeTab}
-            onNavigate={handleNavigateWithContext}
-            copilotVisible={activeTab !== 'copilot'}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <FloatingGuideButton
+              activeTab={activeTab}
+              onNavigate={handleNavigateWithContext}
+              copilotVisible={activeTab !== 'copilot'}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {activeTab !== 'copilot' && !isZenMode && (
-        <Suspense fallback={null}>
-          <OmniCopilot />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <OmniCopilot />
+          </Suspense>
+        </ErrorBoundary>
       )}
-      <Suspense fallback={null}>
-        <IOSInstallBanner />
-      </Suspense>
-      <Suspense fallback={null}>
-        <OfflineIndicator onOpenOfflineSync={() => setActiveTab('offline-sync')} />
-      </Suspense>
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <IOSInstallBanner />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <OfflineIndicator onOpenOfflineSync={() => setActiveTab('offline-sync')} />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

@@ -284,7 +284,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     try {
       setIntakeError('');
       let sourceId = prefillSource?.sourceType === sourceType ? prefillSource?.sourceId : undefined;
+      let effectiveSourceType: SourceType = sourceType;
       if (sourceType === 'pdf' && uploadedFile) {
+        effectiveSourceType = uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'text';
         try {
           sourceId = await uploadSelectedFile();
         } catch (err: any) {
@@ -299,7 +301,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
 
       const payload: GenerateResourceRequest = {
         sourceId,
-        sourceType,
+        sourceType: effectiveSourceType,
         sourceText: sourceType === 'text' ? textContent : undefined,
         sourceUrl: sourceType === 'url' ? urlInput : undefined,
         resourceType: selectedResourceType,

@@ -273,7 +273,11 @@ export const AiPlanWizardModal: React.FC<AiPlanWizardModalProps> = ({
         goal: previewGoal,
         summaryText: 'Generated AI Study Plan',
       });
-      onPlanGeneratedAndApplied(data.plan, (previewTasks as StudyTask[]) || []);
+      const appliedTasks =
+        Array.isArray(data.tasks) && data.tasks.length > 0
+          ? data.tasks
+          : (previewTasks as StudyTask[]) || [];
+      onPlanGeneratedAndApplied(data.plan, appliedTasks);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error applying plan.');
@@ -766,13 +770,24 @@ export const AiPlanWizardModal: React.FC<AiPlanWizardModalProps> = ({
                   previewPlan && (
                     <div className="space-y-4">
                       <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861]">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <h4 className="text-sm font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
                             {previewPlan.title}
                           </h4>
-                          <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-[#6C5CE7]/15 text-[#6C5CE7] dark:text-[#A598FF]">
-                            {previewPlan.totalTasksCount} Scheduled Tasks
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                previewPlan.aiGenerated
+                                  ? 'bg-[#00B8A9]/15 text-[#00897B] dark:text-[#2DD4BF]'
+                                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                              }`}
+                            >
+                              {previewPlan.aiGenerated ? 'AI Generated' : 'Structured Fallback'}
+                            </span>
+                            <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-[#6C5CE7]/15 text-[#6C5CE7] dark:text-[#A598FF]">
+                              {previewPlan.totalTasksCount} Scheduled Tasks
+                            </span>
+                          </div>
                         </div>
                         <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1">
                           {previewPlan.description}

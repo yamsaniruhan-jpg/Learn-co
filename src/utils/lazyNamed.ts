@@ -23,6 +23,15 @@ export async function retryDynamicImport<T>(
         await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
         continue;
       }
+      if (attempt === retries && RECOVERABLE_IMPORT_RE.test(msg) && typeof window !== 'undefined') {
+        const reloadKey = 'learnco_chunk_reload_' + window.location.pathname;
+        const lastReload = sessionStorage.getItem(reloadKey);
+        if (!lastReload || Date.now() - Number(lastReload) > 10000) {
+          sessionStorage.setItem(reloadKey, String(Date.now()));
+          window.location.reload();
+          return new Promise(() => {}) as unknown as T;
+        }
+      }
       throw error;
     }
   }

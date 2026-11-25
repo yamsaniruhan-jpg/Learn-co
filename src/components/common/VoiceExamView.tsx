@@ -14,6 +14,7 @@ import {
   Headphones,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
 import { VOICE_EXAM_BANK } from '../../data/voiceExamBank';
 import { awardXp } from '../../utils/xpManager';
 import { recordDailyActivity } from '../../utils/streakManager';
@@ -119,9 +120,13 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
   const [recordedSeconds, setRecordedSeconds] = useState<number>(0);
   const [audioVolumeLevel, setAudioVolumeLevel] = useState<number>(0);
 
-  // Free Browser SpeechSynthesis ("Read Question Aloud")
+  // Browser SpeechSynthesis ("Voiceover Talent")
   const [isReadingAloud, setIsReadingAloud] = useState<boolean>(false);
   const [autoReadQuestions, setAutoReadQuestions] = useState<boolean>(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceUri, setSelectedVoiceUri] = useState<string>('');
+  const [speechRate, setSpeechRate] = useState<number>(0.98);
+  const recordedUrlRef = useRef<string | null>(null);
 
   // Evaluation & Results State
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
@@ -149,7 +154,50 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
     return matchesSubject && matchesSearch;
   });
 
-  const activeQuestion = filteredQuestions[currentQIndex] || VOICE_EXAM_BANK[0];
+  const hasFilteredQuestions = filteredQuestions.length > 0;
+  const safeQIndex = hasFilteredQuestions ? Math.min(currentQIndex, filteredQuestions.length - 1) : 0;
+  const activeQuestion = hasFilteredQuestions ? filteredQuestions[safeQIndex] : null;
+
+  const replaceRecordedAudioUrl = (nextUrl: string | null) => {
+    if (recordedUrlRef.current && recordedUrlRef.current !== nextUrl) {
+      try {
+        URL.revokeObjectURL(recordedUrlRef.current);
+      } catch {
+        // Ignore revoke errors
+      }
+    }
+    recordedUrlRef.current = nextUrl;
+    setRecordedAudioUrl(nextUrl);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const loadVoices = () => {
+      try {
+        const list = window.speechSynthesis.getVoices() || [];
+        const sorted = [...list].sort((a, b) => {
+          const aEn = a.lang.startsWith('en') ? 0 : 1;
+          const bEn = b.lang.startsWith('en') ? 0 : 1;
+          return aEn - bEn || a.name.localeCompare(b.name);
+        });
+        setAvailableVoices(sorted);
+        if (sorted.length > 0 && !selectedVoiceUri) {
+          const preferred =
+            sorted.find((v) => v.lang.startsWith('en') && /natural|microsoft|google/i.test(v.name)) ||
+            sorted.find((v) => v.lang.startsWith('en')) ||
+            sorted[0];
+          if (preferred) setSelectedVoiceUri(preferred.voiceURI);
+        }
+      } catch {
+        // Ignore browser voice enumeration errors
+      }
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener?.('voiceschanged', loadVoices);
+    };
+  }, []);
 
   const stopSpeechSynthesis = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -163,6 +211,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
   };
 
   const readQuestionAloud = (questionText: string) => {
+    if (!activeQuestion) return;
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setSpeechError('Text-to-speech playback is not supported in this browser.');
       return;
@@ -171,12 +220,13 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
     const utterance = new SpeechSynthesisUtterance(
       `${activeQuestion.subject} oral examination prompt: ${questionText}`
     );
-    const voices = window.speechSynthesis.getVoices();
+    const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
     const preferredVoice =
+      voices.find((v) => v.voiceURI === selectedVoiceUri) ||
       voices.find((v) => v.lang.startsWith('en') && /natural|microsoft|google/i.test(v.name)) ||
       voices.find((v) => v.lang.startsWith('en'));
     if (preferredVoice) utterance.voice = preferredVoice;
-    utterance.rate = 0.98;
+    utterance.rate = speechRate;
     utterance.onstart = () => setIsReadingAloud(true);
     utterance.onend = () => setIsReadingAloud(false);
     utterance.onerror = () => setIsReadingAloud(false);
@@ -193,7 +243,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
     setConstraintsText('');
     setEvaluation(null);
     setSpeechError(null);
-    setRecordedAudioUrl(null);
+    replaceRecordedAudioUrl(null);
     setRecordedSeconds(0);
     setHasAwardedXp(false);
   };
@@ -208,6 +258,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
     return () => {
       stopAllAudio();
       stopSpeechSynthesis();
+      replaceRecordedAudioUrl(null);
     };
   }, []);
 
@@ -331,10 +382,18 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
       // Visualizer optional
     }
 
-    // MediaRecorder voice recording
+    // MediaRecorder voice recording (pick browser-supported audio MIME type)
     try {
       audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
+      const supportedMime =
+        typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function'
+          ? ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((m) =>
+              MediaRecorder.isTypeSupported(m)
+            )
+          : undefined;
+      const mediaRecorder = supportedMime
+        ? new MediaRecorder(stream, { mimeType: supportedMime })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -343,9 +402,10 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
 
       mediaRecorder.onstop = () => {
         if (audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const blobType = mediaRecorder.mimeType || supportedMime || 'audio/webm';
+          const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
           const url = URL.createObjectURL(audioBlob);
-          setRecordedAudioUrl(url);
+          replaceRecordedAudioUrl(url);
         }
       };
 
@@ -425,8 +485,9 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
     }
   };
 
-  // Zero-cost deterministic local grading
+  // Deterministic local rubric grading
   const handleEvaluateFree = () => {
+    if (!activeQuestion) return;
     stopAllAudio();
 
     if (!spokenTranscript.trim() && !thesisText.trim() && !derivationText.trim()) {
@@ -471,14 +532,14 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
         <div className="space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-[#8577ED] border border-white/15">
             <Mic className="w-3.5 h-3.5 text-[#00B8A9]" />
-            <span>Live Microphone Reading & Voice Recording • Zero Cost API</span>
+            <span>Voiceover Talent &amp; Live Speech Recorder</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             STEM Voice Oral Examination
           </h1>
           <p className="text-sm text-slate-300 leading-relaxed">
-            Listen to each prompt via free browser voice synthesis, speak directly into your microphone for live
-            speech reading and audio recording, and receive instant offline rubric grading with 0 API token usage.
+            Choose a voiceover narrator to hear each prompt aloud, speak directly into your microphone for live
+            transcription and playback, and receive instant structured rubric feedback.
           </p>
         </div>
 
@@ -542,7 +603,9 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2 border-t border-[#E3DFF5] dark:border-[#3D3861]">
           <span className="font-semibold text-[#6B6890] dark:text-[#B4B0D5] tabular-nums">
-            Question {currentQIndex + 1} of {filteredQuestions.length} ({activeQuestion.subject})
+            {hasFilteredQuestions && activeQuestion
+              ? `Question ${safeQIndex + 1} of ${filteredQuestions.length} (${activeQuestion.subject})`
+              : '0 matching questions'}
           </span>
           <div className="flex items-center gap-2">
             <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#6B6890] dark:text-[#B4B0D5] cursor-pointer mr-2">
@@ -556,22 +619,25 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
             </label>
             <button
               type="button"
-              onClick={() => handleSelectQuestion((currentQIndex - 1 + filteredQuestions.length) % filteredQuestions.length)}
-              className="px-2.5 py-1 rounded-lg border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] text-[11px] font-bold cursor-pointer"
+              disabled={!hasFilteredQuestions || filteredQuestions.length <= 1}
+              onClick={() => handleSelectQuestion((safeQIndex - 1 + filteredQuestions.length) % filteredQuestions.length)}
+              className="px-2.5 py-1 rounded-lg border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] disabled:opacity-40 text-[11px] font-bold cursor-pointer"
             >
               Previous
             </button>
             <button
               type="button"
+              disabled={!hasFilteredQuestions || filteredQuestions.length <= 1}
               onClick={() => handleSelectQuestion(Math.floor(Math.random() * filteredQuestions.length))}
-              className="px-2.5 py-1 rounded-lg bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#8577ED] font-bold text-[11px] cursor-pointer"
+              className="px-2.5 py-1 rounded-lg bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#8577ED] disabled:opacity-40 font-bold text-[11px] cursor-pointer"
             >
               Random
             </button>
             <button
               type="button"
-              onClick={() => handleSelectQuestion((currentQIndex + 1) % filteredQuestions.length)}
-              className="px-2.5 py-1 rounded-lg border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] text-[11px] font-bold cursor-pointer"
+              disabled={!hasFilteredQuestions || filteredQuestions.length <= 1}
+              onClick={() => handleSelectQuestion((safeQIndex + 1) % filteredQuestions.length)}
+              className="px-2.5 py-1 rounded-lg border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] disabled:opacity-40 text-[11px] font-bold cursor-pointer"
             >
               Next
             </button>
@@ -580,6 +646,27 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
       </div>
 
       {/* Main Examination Stage */}
+      {!activeQuestion ? (
+        <EmptyState
+          icon={<Search className="w-6 h-6" />}
+          title="No matching oral exam prompts"
+          description="Try clearing your search filter or picking another STEM subject."
+          action={
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={() => {
+                setSelectedSubject('All');
+                setSearchQuery('');
+                setCurrentQIndex(0);
+              }}
+            >
+              Show All Prompts
+            </Button>
+          }
+        />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Examiner Prompt & Microphone Recorder Station */}
         <div className="space-y-4">
@@ -595,14 +682,54 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
               {activeQuestion.question}
             </h2>
 
-            {/* Free Voice Synthesis Question Reader */}
+            {/* Voiceover Talent Narrator Settings */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#6B6890] dark:text-[#B4B0D5] mb-1">
+                  Voiceover Talent
+                </label>
+                <select
+                  aria-label="Select voiceover talent voice"
+                  value={selectedVoiceUri}
+                  onChange={(e) => setSelectedVoiceUri(e.target.value)}
+                  className="w-full min-h-[38px] px-2.5 py-1.5 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]"
+                >
+                  {availableVoices.length === 0 ? (
+                    <option value="">Default System Voice</option>
+                  ) : (
+                    availableVoices.map((v) => (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {v.name} ({v.lang})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#6B6890] dark:text-[#B4B0D5] mb-1">
+                  Pace
+                </label>
+                <select
+                  aria-label="Select voiceover speed"
+                  value={speechRate}
+                  onChange={(e) => setSpeechRate(Number(e.target.value))}
+                  className="w-full min-h-[38px] px-2.5 py-1.5 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]"
+                >
+                  <option value={0.85}>0.85x Slow</option>
+                  <option value={0.98}>1.0x Clear</option>
+                  <option value={1.15}>1.15x Brisk</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Voice Synthesis Question Reader */}
             <button
               type="button"
               onClick={() => (isReadingAloud ? stopSpeechSynthesis() : readQuestionAloud(activeQuestion.question))}
               className="w-full min-h-[44px] px-4 py-2 rounded-2xl bg-[#F0EDFA] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-[#6C5CE7] dark:text-[#8577ED] text-xs font-bold flex items-center justify-center gap-2 hover:border-[#6C5CE7] cursor-pointer transition"
             >
               {isReadingAloud ? <VolumeX className="w-4 h-4" /> : <Headphones className="w-4 h-4" />}
-              <span>{isReadingAloud ? 'Stop Question Audio' : 'Read Question Aloud (Free Voice)'}</span>
+              <span>{isReadingAloud ? 'Stop Question Audio' : 'Read Question Aloud'}</span>
             </button>
 
             <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] space-y-1.5">
@@ -786,7 +913,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
               </div>
             </details>
 
-            {/* Free Zero-Cost Action Bar */}
+            {/* Rubric Grading Action Bar */}
             <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-[#E3DFF5] dark:border-[#3D3861]">
               <Button
                 type="button"
@@ -796,7 +923,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
                 onClick={handleEvaluateFree}
                 className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
               >
-                {isEvaluating ? 'Grading...' : 'Grade Oral Defense (Free • Zero API Cost)'}
+                {isEvaluating ? 'Grading...' : 'Grade Oral Defense'}
               </Button>
 
               <Button
@@ -810,7 +937,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
                   setDerivationText('');
                   setConstraintsText('');
                   setEvaluation(null);
-                  setRecordedAudioUrl(null);
+                  replaceRecordedAudioUrl(null);
                   setRecordedSeconds(0);
                 }}
                 leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
@@ -841,7 +968,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
                       {evaluation.verdict === 'PASS' ? 'Oral Rubric Passed!' : 'Oral Practice Feedback'}
                     </h4>
                     <span className="text-xs opacity-75">
-                      Evaluated offline against STEM benchmark rubric (0 paid API calls)
+                      Evaluated instantaneously against STEM benchmark rubric
                     </span>
                   </div>
                 </div>
@@ -902,6 +1029,7 @@ export const VoiceExamView: React.FC<VoiceExamViewProps> = ({ onNavigateToTab })
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };

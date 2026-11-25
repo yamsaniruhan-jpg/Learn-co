@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw, ChevronDown, ChevronUp, RotateCcw } from 'luc
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
   fallbackTitle?: string;
   fallbackMessage?: string;
   onReset?: () => void;
@@ -68,6 +69,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback !== undefined) {
+        return this.props.fallback;
+      }
       return (
         <div className="p-6 my-4 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border-2 border-[#F25F5C] text-[#2D2A4A] dark:text-[#F1EFFF] shadow-[0_4px_16px_rgba(242,95,92,0.12)] animate-in fade-in duration-200">
           <div className="flex items-start gap-4">

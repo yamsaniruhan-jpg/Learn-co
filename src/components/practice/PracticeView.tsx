@@ -273,10 +273,9 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
       const mergedExcluded = Array.from(
         new Set([
           ...seenQuestionIdsRef.current,
-          ...localAttempts.map((a) => a.questionId).filter(Boolean),
           ...(config.excludeQuestionIds ?? []),
         ])
-      );
+      ).slice(-1200);
       const session = await LearningClient.startPracticeSession({
         ...config,
         excludeQuestionIds: mergedExcluded,
@@ -487,7 +486,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                   onClick={() => {
                     setActivePracticeSession({
                       config: {
-                        subjectId: 'math',
+                        subjectId: creatorImportSession.questions[0]?.subjectId || 'math',
                         questionTypes: ['single_choice'],
                         difficultyMode: 'easy',
                         timed: false,

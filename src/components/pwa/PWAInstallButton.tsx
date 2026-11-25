@@ -26,14 +26,37 @@ export const PWAInstallButton: React.FC<{
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [syncingPack, setSyncingPack] = useState(false);
-  const [packMessage, setPackMessage] = useState<string | null>(null);
+  const [packMessage, setPackMessage] = useState<string | null>(() => {
+    const existing = OfflineStorageManager.getMobileHomeScreenPackageStatus();
+    if (!existing) return null;
+    const filesLabel = existing.filesCachedCount > 0 ? `${existing.filesCachedCount} app files & ` : '';
+    return `Stored ${filesLabel}${existing.questionsCount} problems (${existing.approxSizeKb} KB) + Home Screen icon on device.`;
+  });
   const [swReady, setSwReady] = useState(false);
+  const preparedThisSessionRef = useRef(false);
 
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
   const swSupported =
     typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
   const appOriginUrl =
     typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://learn-co.ai.studio/';
+
+  const runHomeScreenFileSync = async (alsoSyncAttempts = false) => {
+    setSyncingPack(true);
+    try {
+      const status = await OfflineStorageManager.prepareMobileHomeScreenPackage();
+      const synced = alsoSyncAttempts ? await OfflineStorageManager.syncPendingAttemptsToServer() : 0;
+      const filesLabel = status.filesCachedCount > 0 ? `${status.filesCachedCount} app files & ` : '';
+      setPackMessage(
+        `Stored ${filesLabel}${status.questionsCount} problems (${status.approxSizeKb} KB) + Home Screen icon on device${synced > 0 ? ` • synced ${synced} attempts` : ''}.`
+      );
+      preparedThisSessionRef.current = true;
+    } catch {
+      setPackMessage('Could not cache the study pack. Please check storage and try again.');
+    } finally {
+      setSyncingPack(false);
+    }
+  };
 
   useEffect(() => {
     if (!showInstallGuide) return;
@@ -50,6 +73,10 @@ export const PWAInstallButton: React.FC<{
         .catch(() => setSwReady(false));
     }
 
+    if (!preparedThisSessionRef.current) {
+      void runHomeScreenFileSync(false);
+    }
+
     return () => {
       window.removeEventListener('keydown', handleKey);
       triggerRef.current?.focus();
@@ -57,6 +84,9 @@ export const PWAInstallButton: React.FC<{
   }, [showInstallGuide, swSupported]);
 
   const handleClick = async () => {
+    if (!preparedThisSessionRef.current) {
+      void runHomeScreenFileSync(false);
+    }
     if (isInstallable) {
       const result = await install();
       if (result === 'accepted' || result === 'dismissed') return;
@@ -111,11 +141,11 @@ export const PWAInstallButton: React.FC<{
           <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#2A2647] p-6 shadow-2xl border border-[#E3DFF5] dark:border-[#3D3861] space-y-5 text-left">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#01000E] flex items-center justify-center border border-[#6C5CE7]/50 p-1 shrink-0 shadow-xs">
+                <div className="w-12 h-12 rounded-2xl bg-[#01000E] flex items-center justify-center border border-[#6C5CE7]/50 overflow-hidden shrink-0 shadow-sm">
                   <img
-                    src="/logo-mark.png"
-                    alt="LearnCo"
-                    className="w-full h-full object-contain"
+                    src="/icons/icon-192.png"
+                    alt="LearnCo Home Screen Icon"
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 <div>
@@ -123,7 +153,7 @@ export const PWAInstallButton: React.FC<{
                     {isMobile ? 'Add LearnCo to your mobile' : 'Add LearnCo to Home Screen'}
                   </h3>
                   <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
-                    Installs directly as a standalone app (no file download needed)
+                    Stores app files &amp; places the LearnCo icon on your Home Screen
                   </p>
                 </div>
               </div>
@@ -243,23 +273,12 @@ export const PWAInstallButton: React.FC<{
                 type="button"
                 disabled={syncingPack}
                 onClick={async () => {
-                  setSyncingPack(true);
                   setPackMessage(null);
-                  try {
-                    const pack = await OfflineStorageManager.downloadOlympiadPack();
-                    const synced = await OfflineStorageManager.syncPendingAttemptsToServer();
-                    setPackMessage(
-                      `Cached ${pack.questions.length} problems (${pack.approxSizeKb} KB) for offline Home Screen use${synced > 0 ? ` • synced ${synced} attempts` : ''}.`
-                    );
-                  } catch {
-                    setPackMessage('Could not cache the study pack. Please check storage and try again.');
-                  } finally {
-                    setSyncingPack(false);
-                  }
+                  await runHomeScreenFileSync(true);
                 }}
                 className="w-full min-h-[44px] rounded-xl bg-[#00B8A9] hover:bg-[#009c8f] px-4 py-2 font-bold text-white disabled:opacity-60 cursor-pointer"
               >
-                {syncingPack ? 'Caching study pack...' : 'Cache & Sync Offline Study Pack'}
+                {syncingPack ? 'Storing files & Home Screen pack...' : 'Cache & Sync Offline Study Pack'}
               </button>
               {packMessage && <p role="status" className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{packMessage}</p>}
               <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">Saved practice may need a connection and an active session to sync.</p>

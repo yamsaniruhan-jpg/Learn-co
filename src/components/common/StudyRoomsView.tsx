@@ -453,20 +453,22 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [activeRoomState?.messages?.length]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = inputMsg.trim();
-    if (!trimmed) return;
+    if (!trimmed || !activeRoomId) return;
     const msgId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const vis: RoomVisibility = activeRoom?.visibility === 'private' ? 'private' : 'public';
+
     const sent = sendWsEvent({
       type: 'chat:send',
       roomId: activeRoomId,
       id: msgId,
       text: trimmed,
     });
+
     if (sent) {
       setInputMsg('');
-      const vis: RoomVisibility = activeRoom?.visibility === 'private' ? 'private' : 'public';
       void postFirestoreRoomMessage({
         roomId: activeRoomId,
         messageId: msgId,
@@ -474,16 +476,76 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
         text: trimmed,
         visibility: vis,
       });
+      return;
+    }
+
+    // HTTP fallback when WebSocket is reconnecting or proxied without WS upgrade
+    try {
+      const ticket = accessTickets[activeRoomId];
+      const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/messages`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+        body: JSON.stringify({
+          id: msgId,
+          peerId: peerIdRef.current,
+          displayName,
+          text: trimmed,
+          ticket,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.message) {
+        setInputMsg('');
+        setActiveRoomState((prev) => {
+          if (!prev || prev.id !== activeRoomId) return prev;
+          if (prev.messages.some((m) => m.id === data.message.id)) return prev;
+          return { ...prev, messages: [...prev.messages, data.message].slice(-100) };
+        });
+        void postFirestoreRoomMessage({
+          roomId: activeRoomId,
+          messageId: msgId,
+          user: displayName,
+          text: trimmed,
+          visibility: vis,
+        });
+      }
+    } catch {
+      // Preserve draft text so user can retry
     }
   };
 
-  const handleTimerControl = (action: 'start' | 'pause' | 'reset' | 'set_mode', mode?: PomodoroMode) => {
-    sendWsEvent({
+  const handleTimerControl = async (action: 'start' | 'pause' | 'reset' | 'set_mode', mode?: PomodoroMode) => {
+    if (!activeRoomId) return;
+    const sent = sendWsEvent({
       type: 'timer:control',
       roomId: activeRoomId,
       action,
       mode,
     });
+    if (sent) return;
+
+    try {
+      const ticket = accessTickets[activeRoomId];
+      const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/timer`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+        body: JSON.stringify({
+          peerId: peerIdRef.current,
+          displayName,
+          action,
+          mode,
+          ticket,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.timer) {
+        setActiveRoomState((prev) => (prev && prev.id === activeRoomId ? { ...prev, timer: data.timer } : prev));
+      }
+    } catch {
+      // Ignore transient HTTP fallback error
+    }
   };
 
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -681,33 +743,86 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
     }
   };
 
-  const handleCreatePoll = (e: React.FormEvent) => {
+  const handleCreatePoll = async (e: React.FormEvent) => {
     e.preventDefault();
     const options = pollOptionsText
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)
       .slice(0, 4);
-    if (!pollQuestion.trim() || options.length < 2) return;
-    sendWsEvent({
+    if (!pollQuestion.trim() || options.length < 2 || !activeRoomId) return;
+    const pollId = `poll-${Date.now()}`;
+    const question = pollQuestion.trim();
+    const sent = sendWsEvent({
       type: 'poll:create',
       roomId: activeRoomId,
-      id: `poll-${Date.now()}`,
-      question: pollQuestion.trim(),
+      id: pollId,
+      question,
       options,
     });
+    if (!sent) {
+      try {
+        const ticket = accessTickets[activeRoomId];
+        const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/polls`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+          body: JSON.stringify({
+            id: pollId,
+            peerId: peerIdRef.current,
+            displayName,
+            question,
+            options,
+            ticket,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.activePoll) {
+          setActiveRoomState((prev) =>
+            prev && prev.id === activeRoomId ? { ...prev, activePoll: data.activePoll } : prev
+          );
+        }
+      } catch {
+        // Ignore transient fallback error
+      }
+    }
     setPollQuestion('');
     setIsPollModalOpen(false);
   };
 
-  const handleVotePoll = (optionIndex: number) => {
-    if (!activeRoomState?.activePoll) return;
-    sendWsEvent({
+  const handleVotePoll = async (optionIndex: number) => {
+    if (!activeRoomState?.activePoll || !activeRoomId) return;
+    const pollId = activeRoomState.activePoll.id;
+    const sent = sendWsEvent({
       type: 'poll:vote',
       roomId: activeRoomId,
-      pollId: activeRoomState.activePoll.id,
+      pollId,
       optionIndex,
     });
+    if (sent) return;
+
+    try {
+      const ticket = accessTickets[activeRoomId];
+      const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/polls/vote`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+        body: JSON.stringify({
+          peerId: peerIdRef.current,
+          pollId,
+          optionIndex,
+          ticket,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.activePoll) {
+        setActiveRoomState((prev) =>
+          prev && prev.id === activeRoomId ? { ...prev, activePoll: data.activePoll } : prev
+        );
+      }
+    } catch {
+      // Ignore transient fallback error
+    }
   };
 
   const filteredRooms = rooms.filter((r) => {
@@ -1099,17 +1214,17 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
             <form onSubmit={handleSend} className="p-4 border-t border-[#E3DFF5] dark:border-[#3D3861] flex gap-2">
               <input
                 type="text"
-                placeholder={`Chat live in ${activeRoom?.title || 'Study Room'}...`}
+                placeholder={`Chat in ${activeRoom?.title || 'Study Room'}...`}
                 value={inputMsg}
                 onChange={(e) => setInputMsg(e.target.value)}
-                disabled={connectionState !== 'connected'}
+                disabled={Boolean(activeRoom?.isLocked)}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#FAF9FF] dark:bg-[#1E1B33] text-xs text-[#2D2A4A] dark:text-[#F1EFFF] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] disabled:opacity-60"
               />
               <Button
                 type="submit"
                 variant="primary"
                 size="sm"
-                disabled={connectionState !== 'connected' || !inputMsg.trim()}
+                disabled={Boolean(activeRoom?.isLocked) || !inputMsg.trim()}
                 leftIcon={<Send className="w-3.5 h-3.5" />}
                 className="min-h-[44px] bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white"
               >

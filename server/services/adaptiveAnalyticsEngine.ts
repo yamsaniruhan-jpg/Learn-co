@@ -65,7 +65,14 @@ export function invalidateUserAnalyticsCache(userId: string) {
 function getGeminiClient(): GoogleGenAI | null {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  return new GoogleGenAI({ apiKey: key });
+  return new GoogleGenAI({
+    apiKey: key,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
 }
 
 export class AdaptiveAnalyticsEngine {

@@ -136,4 +136,117 @@ router.delete('/:roomId', async (req: Request, res: Response) => {
   res.json({ success: true, deletedRoomId: roomId });
 });
 
+function extractRoomAuth(req: Request) {
+  const peerId =
+    (typeof req.query.peerId === 'string' ? req.query.peerId : null) ||
+    (typeof req.body?.peerId === 'string' ? req.body.peerId : null) ||
+    (typeof req.headers['x-peer-id'] === 'string' ? req.headers['x-peer-id'] : null);
+  const ticket =
+    (typeof req.query.ticket === 'string' ? req.query.ticket : null) ||
+    (typeof req.body?.ticket === 'string' ? req.body.ticket : null) ||
+    (typeof req.headers['x-room-ticket'] === 'string' ? req.headers['x-room-ticket'] : null);
+  return { peerId, ticket };
+}
+
+function verifyRoomWriteAccess(req: Request, res: Response): { roomId: string; peerId: string } | null {
+  const { roomId } = req.params;
+  const { peerId, ticket } = extractRoomAuth(req);
+  if (!studyRoomHub.canAccessRoom(roomId, peerId, ticket)) {
+    const exists = studyRoomHub.getRoom(roomId);
+    if (!exists) {
+      res.status(404).json({ success: false, error: 'Study room not found.' });
+      return null;
+    }
+    res.status(403).json({
+      success: false,
+      code: 'PRIVATE_ROOM_LOCKED',
+      error: 'Room code and password are required to interact with this private study room.',
+    });
+    return null;
+  }
+  return { roomId, peerId: peerId || `rest-${Date.now()}` };
+}
+
+// POST /api/study-rooms/:roomId/messages - HTTP fallback when WebSocket is unavailable
+router.post('/:roomId/messages', (req: Request, res: Response) => {
+  const access = verifyRoomWriteAccess(req, res);
+  if (!access) return;
+
+  const { id, displayName, text } = req.body || {};
+  const msg = studyRoomHub.addMessage(
+    access.roomId,
+    typeof id === 'string' ? id : '',
+    access.peerId,
+    typeof displayName === 'string' ? displayName : 'Scholar',
+    typeof text === 'string' ? text : ''
+  );
+  if (!msg) {
+    res.status(400).json({ success: false, error: 'Message text is required.' });
+    return;
+  }
+  res.status(201).json({ success: true, message: msg });
+});
+
+// POST /api/study-rooms/:roomId/timer - HTTP fallback for synced timer control
+router.post('/:roomId/timer', (req: Request, res: Response) => {
+  const access = verifyRoomWriteAccess(req, res);
+  if (!access) return;
+
+  const { action, mode, displayName } = req.body || {};
+  if (!['start', 'pause', 'reset', 'set_mode'].includes(action)) {
+    res.status(400).json({ success: false, error: 'Invalid timer action.' });
+    return;
+  }
+  const timer = studyRoomHub.controlTimer(
+    access.roomId,
+    action,
+    typeof displayName === 'string' ? displayName : 'Scholar',
+    mode
+  );
+  if (!timer) {
+    res.status(404).json({ success: false, error: 'Study room not found.' });
+    return;
+  }
+  res.json({ success: true, timer });
+});
+
+// POST /api/study-rooms/:roomId/polls - HTTP fallback for creating a live poll
+router.post('/:roomId/polls', (req: Request, res: Response) => {
+  const access = verifyRoomWriteAccess(req, res);
+  if (!access) return;
+
+  const { id, question, options, displayName } = req.body || {};
+  const poll = studyRoomHub.createPoll(
+    access.roomId,
+    typeof id === 'string' ? id : '',
+    typeof question === 'string' ? question : '',
+    Array.isArray(options) ? options : [],
+    typeof displayName === 'string' ? displayName : 'Scholar'
+  );
+  if (!poll) {
+    res.status(400).json({ success: false, error: 'Poll question and at least 2 options are required.' });
+    return;
+  }
+  res.status(201).json({ success: true, activePoll: poll });
+});
+
+// POST /api/study-rooms/:roomId/polls/vote - HTTP fallback for voting in a live poll
+router.post('/:roomId/polls/vote', (req: Request, res: Response) => {
+  const access = verifyRoomWriteAccess(req, res);
+  if (!access) return;
+
+  const { pollId, optionIndex } = req.body || {};
+  const poll = studyRoomHub.votePoll(
+    access.roomId,
+    String(pollId || ''),
+    Number(optionIndex),
+    access.peerId
+  );
+  if (!poll) {
+    res.status(400).json({ success: false, error: 'Unable to record vote on active poll.' });
+    return;
+  }
+  res.json({ success: true, activePoll: poll });
+});
+
 export default router;

@@ -50,7 +50,18 @@ export function mountProductionStatic(app: express.Express, distPath: string) {
 
   app.get(['/', '/index.html'], (req, res) => sendNoncedHtml(req, res, indexHtmlPath, 200));
   app.get('/404.html', (req, res) => sendNoncedHtml(req, res, notFoundHtmlPath, 404));
-  app.use(express.static(distPath, { index: false }));
+  app.use(express.static(distPath, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      const base = path.basename(filePath);
+      if (base === 'sw.js' || base === 'manifest.json') {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      }
+      if (base === 'sw.js') {
+        res.setHeader('Service-Worker-Allowed', '/');
+      }
+    },
+  }));
   app.use((req, res) => {
     if ((req.method === 'GET' || req.method === 'HEAD') && req.accepts('html')) {
       return sendNoncedHtml(req, res, notFoundHtmlPath, 404);
@@ -73,8 +84,22 @@ export async function createApp() {
 
   // Same-origin requests need no CORS permission. Cross-origin browser clients
   // must be listed explicitly; do not trust entire shared hosting domains.
+  const runtimeOrigins: string[] = [];
+  for (const rawUrl of [process.env.APP_URL, process.env.APP_ORIGIN]) {
+    if (rawUrl) {
+      try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          runtimeOrigins.push(parsed.origin);
+        }
+      } catch {
+        // Ignore invalid APP_URL/APP_ORIGIN placeholder
+      }
+    }
+  }
   const allowedOrigins = new Set([
     "https://learn-co.ai.studio",
+    ...runtimeOrigins,
     ...(process.env.CORS_ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean),
     ...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000", "http://127.0.0.1:3000"] : []),
   ]);
@@ -93,9 +118,17 @@ export async function createApp() {
   // Stripe verifies the signature against the original bytes, before JSON parsing.
   app.use("/api/subscription/webhook", express.raw({ type: "application/json", limit: "1mb" }));
 
-  // Body parsers with payload limits
-  app.use(express.json({ limit: "10mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+  // Creator document uploads accept base64 PDF payloads up to 10mb; all other routes are capped at 100kb.
+  const creatorUploadJsonParser = express.json({ limit: "10mb" });
+  const defaultJsonParser = express.json({ limit: "100kb" });
+  app.post("/api/creator/sources", creatorUploadJsonParser);
+  app.use((req, res, next) => {
+    if (req.method === "POST" && req.path === "/api/creator/sources") {
+      return next();
+    }
+    return defaultJsonParser(req, res, next);
+  });
+  app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 
   // Cookie parser & CSRF protection for state-changing API requests
   app.use(cookieParser());

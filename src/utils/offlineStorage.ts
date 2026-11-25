@@ -35,10 +35,18 @@ export interface OfflineOlympiadPack {
   trackCounts: OlympiadPackTrackCounts;
 }
 
+export interface MobileHomeScreenPackageStatus {
+  preparedAt: string;
+  filesCachedCount: number;
+  questionsCount: number;
+  approxSizeKb: number;
+}
+
 const STORAGE_KEY_PENDING_ATTEMPTS = 'learnco_offline_pending_attempts';
 const STORAGE_KEY_OLYMPIAD_PACK = 'learnco_offline_olympiad_pack_v1';
 const STORAGE_KEY_OLYMPIAD_LAUNCH = 'learnco_offline_pack_launch_v1';
 const STORAGE_KEY_LAST_SYNCED_AT = 'learnco_last_synced_at_v1';
+const STORAGE_KEY_HOME_SCREEN_PACKAGE = 'learnco_home_screen_package_v1';
 
 function computeOlympiadTrackCounts(questions: QuestionBankItem[]): OlympiadPackTrackCounts {
   const counts: OlympiadPackTrackCounts = { IPhO: 0, IChO: 0, IBHO: 0, IJSO: 0, ICT: 0 };
@@ -66,6 +74,7 @@ export class OfflineStorageManager {
    * Save an attempt made while offline
    */
   private static syncing: Promise<number> | null = null;
+  private static preparingHomeScreenPackage: Promise<MobileHomeScreenPackageStatus> | null = null;
 
   static saveOfflineAttempt(attempt: Omit<PendingOfflineAttempt, 'timestamp'>): void {
     const list = this.getPendingAttempts();
@@ -149,6 +158,149 @@ export class OfflineStorageManager {
       window.dispatchEvent(new CustomEvent('learnco_olympiad_pack_updated', { detail: pack }));
     }
     return pack;
+  }
+
+  /**
+   * Cache core app shell files, Home Screen icons, active JS/CSS chunks, and
+   * offline study questions into persistent CacheStorage + localStorage when
+   * the user adds LearnCo to their mobile Home Screen.
+   */
+  static prepareMobileHomeScreenPackage(): Promise<MobileHomeScreenPackageStatus> {
+    if (this.preparingHomeScreenPackage) return this.preparingHomeScreenPackage;
+    const task = this.runPrepareMobileHomeScreenPackage();
+    this.preparingHomeScreenPackage = task;
+    task
+      .finally(() => {
+        if (this.preparingHomeScreenPackage === task) {
+          this.preparingHomeScreenPackage = null;
+        }
+      })
+      .catch(() => {});
+    return task;
+  }
+
+  private static async runPrepareMobileHomeScreenPackage(): Promise<MobileHomeScreenPackageStatus> {
+    const urls = new Set<string>([
+      '/',
+      '/index.html',
+      '/manifest.json',
+      '/apple-touch-icon.png',
+      '/icons/icon-192.png',
+      '/icons/icon-512.png',
+      '/icons/icon-maskable-512.png',
+      '/logo-mark.png',
+      '/favicon.ico',
+    ]);
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const origin = window.location.origin;
+      const collectUrl = (rawUrl: string | null | undefined) => {
+        if (!rawUrl) return;
+        try {
+          const parsed = new URL(rawUrl, origin);
+          if (parsed.origin !== origin) return;
+          if (parsed.pathname.startsWith('/api/')) return;
+          urls.add(parsed.pathname + parsed.search);
+        } catch {
+          // ignore malformed asset URLs
+        }
+      };
+
+      document
+        .querySelectorAll(
+          'script[src], link[rel="stylesheet"][href], link[rel="icon"][href], link[rel="apple-touch-icon"][href]'
+        )
+        .forEach((el) => {
+          collectUrl(el.getAttribute('src') || el.getAttribute('href'));
+        });
+
+      if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
+        for (const entry of performance.getEntriesByType('resource')) {
+          const name = (entry as PerformanceResourceTiming)?.name;
+          if (
+            name &&
+            (/\/assets\//.test(name) ||
+              /\/icons\//.test(name) ||
+              /apple-touch-icon\.png$/.test(name))
+          ) {
+            collectUrl(name);
+          }
+        }
+      }
+    }
+
+    const urlList = Array.from(urls);
+    let filesCachedCount = 0;
+
+    if (typeof caches !== 'undefined') {
+      try {
+        const cache = await caches.open('learnco-offline-app-v1');
+        const results = await Promise.allSettled(
+          urlList.map(async (url) => {
+            if (typeof fetch !== 'function') {
+              await cache.add(url);
+              return true;
+            }
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (res && res.ok) {
+              await cache.put(url, res.clone());
+              return true;
+            }
+            return false;
+          })
+        );
+        filesCachedCount = results.filter(
+          (r) => r.status === 'fulfilled' && r.value === true
+        ).length;
+      } catch {
+        // Ignore CacheStorage unavailability in restricted contexts
+      }
+    }
+
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      try {
+        navigator.serviceWorker.controller?.postMessage({
+          type: 'CACHE_OFFLINE_PACKAGE',
+          urls: urlList,
+        });
+      } catch {
+        // ignore postMessage errors
+      }
+    }
+
+    const pack = await this.downloadOlympiadPack();
+    const status: MobileHomeScreenPackageStatus = {
+      preparedAt: new Date().toISOString(),
+      filesCachedCount,
+      questionsCount: pack.questions.length,
+      approxSizeKb: pack.approxSizeKb,
+    };
+
+    try {
+      localStorage.setItem(STORAGE_KEY_HOME_SCREEN_PACKAGE, JSON.stringify(status));
+    } catch {
+      // ignore storage quota limits
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('learnco_home_screen_package_ready', { detail: status })
+      );
+    }
+
+    return status;
+  }
+
+  static getMobileHomeScreenPackageStatus(): MobileHomeScreenPackageStatus | null {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_HOME_SCREEN_PACKAGE);
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as MobileHomeScreenPackageStatus;
+      if (!parsed || typeof parsed.preparedAt !== 'string') return null;
+      return parsed;
+    } catch {
+      return null;
+    }
   }
 
   static getOlympiadPack(): OfflineOlympiadPack | null {

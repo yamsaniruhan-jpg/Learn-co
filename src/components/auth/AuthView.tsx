@@ -150,7 +150,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
     setIsGoogleSubmitting(true);
     try {
       const result = await signInWithGoogle(undefined, undefined, undefined, 'auto');
-      if (result === 'signed-in') handleGoogleSuccess();
+      if (result === 'signed-in') {
+        handleGoogleSuccess();
+      } else if (result === 'redirecting') {
+        setSuccessMessage('Redirecting to Google Sign-In...');
+      }
     } catch (err: any) {
       if (err?.isRedirecting) {
         setSuccessMessage('Redirecting to Google Sign-In...');

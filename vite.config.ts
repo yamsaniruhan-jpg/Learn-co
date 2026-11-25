@@ -75,6 +75,7 @@ export default defineConfig(() => {
         includeAssets: [
           'favicon.ico',
           'favicon.jpg',
+          'apple-touch-icon.png',
           'logo-mark.png',
           'logo.jpg',
           'icons/icon-192.png',
@@ -85,10 +86,11 @@ export default defineConfig(() => {
           id: '/',
           name: 'Learn.co - AI Learning Companion',
           short_name: 'LearnCo',
-          description: 'An AI-powered learning companion built to support the way we learn.',
+          description: '10,000+ practice questions, 132 concept lessons, adaptive AI mentors and simulations for deep STEM study.',
           theme_color: '#6C5CE7',
           background_color: '#F7F5FF',
           display: 'standalone',
+          orientation: 'portrait-primary',
           start_url: '/',
           scope: '/',
           icons: [
@@ -118,6 +120,7 @@ export default defineConfig(() => {
           globPatterns: [
             'index.html',
             'manifest.json',
+            'apple-touch-icon.png',
             'icons/icon-*.png',
             'logo-mark.png',
             'assets/index-*.{js,css}',
@@ -143,6 +146,20 @@ export default defineConfig(() => {
           navigateFallback: '/index.html',
           navigateFallbackAllowlist: [/^\/(?:\?.*)?$/],
           runtimeCaching: [
+            {
+              urlPattern: /\/(?:apple-touch-icon\.png|favicon\.ico|logo-mark\.png|icons\/.*\.png)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'home-screen-icons-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: /\/assets\/.*\.(?:js|css)$/i,
               handler: 'StaleWhileRevalidate',
@@ -172,7 +189,7 @@ export default defineConfig(() => {
               },
             },
             {
-              urlPattern: /\/api\/learning\/(?:curriculum|tracks)/i,
+              urlPattern: /\/api\/learning\/(?:curriculum|tracks|questions)/i,
               handler: 'StaleWhileRevalidate',
               options: {
                 cacheName: 'curriculum-subject-api-cache',

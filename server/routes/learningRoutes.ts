@@ -26,7 +26,14 @@ const userImportedQuestions = new Map<string, QuestionBankItem[]>();
 function getGeminiClient(): GoogleGenAI | null {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  return new GoogleGenAI({ apiKey: key });
+  return new GoogleGenAI({
+    apiKey: key,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
 }
 
 // GET /api/learning/curriculum

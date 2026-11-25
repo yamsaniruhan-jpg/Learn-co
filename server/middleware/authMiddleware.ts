@@ -86,8 +86,12 @@ async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<Auth
       const uid = decodedToken.uid;
       const verifiedTokenEmail =
         decodedToken.email && decodedToken.email_verified ? decodedToken.email : undefined;
+      const linkedUser = Object.values(Database.getDb().users || {}).find(
+        (candidate) => candidate.firebaseUid === uid
+      );
       const resolvedUser =
         Database.findUserById(uid) ||
+        linkedUser ||
         (verifiedTokenEmail ? Database.findUserByEmail(verifiedTokenEmail) : null) || {
           id: uid,
           uid,

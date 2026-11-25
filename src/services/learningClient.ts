@@ -134,13 +134,24 @@ export class LearningClient {
   }
 
   private static seenQuestionIds = new Set<string>();
+  private static syncedServerIds = new Set<string>();
+  private static readonly MAX_CLIENT_EXCLUDE_IDS = 1200;
 
   static clearSeenQuestions() {
     this.seenQuestionIds.clear();
+    this.syncedServerIds.clear();
   }
 
   static getCachedSeenQuestionIds(): string[] {
-    return Array.from(this.seenQuestionIds);
+    return Array.from(new Set([...this.syncedServerIds, ...this.seenQuestionIds]));
+  }
+
+  private static compactExcludeIds(explicitIds?: string[]): string[] {
+    // Server already excludes persisted Database/SQL solved IDs; only transmit unsynced
+    // session-local IDs (and explicit overrides) capped to stay safely under 100kb JSON.
+    const unsynced = Array.from(this.seenQuestionIds).filter((id) => !this.syncedServerIds.has(id));
+    const merged = Array.from(new Set([...(explicitIds ?? []), ...unsynced]));
+    return merged.slice(-this.MAX_CLIENT_EXCLUDE_IDS);
   }
 
   /**
@@ -158,14 +169,17 @@ export class LearningClient {
       const data = await res.json();
       if (Array.isArray(data?.solvedIds)) {
         data.solvedIds.forEach((id: string) => {
-          if (typeof id === 'string' && id) this.seenQuestionIds.add(id);
+          if (typeof id === 'string' && id) {
+            this.syncedServerIds.add(id);
+            this.seenQuestionIds.add(id);
+          }
         });
         return data.solvedIds;
       }
     } catch {
       // Offline / unreachable: preserve already-collected local IDs
     }
-    return Array.from(this.seenQuestionIds);
+    return this.getCachedSeenQuestionIds();
   }
 
   /**
@@ -174,7 +188,7 @@ export class LearningClient {
   static async startPracticeSession(config: PracticeSessionConfig): Promise<StartSessionResponse> {
     const shouldDeduplicate = config.mode !== 'mistake_remediation';
     const mergedExclude = shouldDeduplicate
-      ? Array.from(new Set([...this.seenQuestionIds, ...(config.excludeQuestionIds ?? [])]))
+      ? this.compactExcludeIds(config.excludeQuestionIds)
       : config.excludeQuestionIds;
 
     const payloadConfig: PracticeSessionConfig = shouldDeduplicate
@@ -213,9 +227,7 @@ export class LearningClient {
     durationSeconds: number;
     questions: Array<Omit<QuestionBankItem, 'correctAnswer' | 'explanation' | 'stepByStepSolution'>>;
   }> {
-    const mergedExclude = Array.from(
-      new Set([...this.seenQuestionIds, ...(params.excludeQuestionIds ?? [])])
-    );
+    const mergedExclude = this.compactExcludeIds(params.excludeQuestionIds);
     const res = await fetch('/api/learning/contest/start', {
       method: 'POST',
       credentials: 'include',

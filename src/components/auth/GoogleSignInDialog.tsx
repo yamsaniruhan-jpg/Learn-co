@@ -47,10 +47,14 @@ export const GoogleSignInDialog: React.FC<GoogleSignInDialogProps> = ({
       setAccountNotFound(false);
       setStep('prompt');
       setIntent(initialIntent);
-      setOptionalEmailHint(savedGoogleEmail);
+      try {
+        setOptionalEmailHint(localStorage.getItem('learnco_last_google_email') || '');
+      } catch {
+        setOptionalEmailHint('');
+      }
       setRequireExactEmail(false);
     }
-  }, [isOpen, initialIntent, savedGoogleEmail]);
+  }, [isOpen, initialIntent]);
 
   if (!isOpen) return null;
 

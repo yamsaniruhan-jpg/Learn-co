@@ -23,11 +23,20 @@ export async function verifyFirebaseIdTokenSafely(
   } catch (err: any) {
     const code = err?.code || '';
     const msg = err?.message || String(err || '');
+    const isExplicitTokenRejection =
+      code === 'auth/id-token-revoked' ||
+      code === 'auth/id-token-expired' ||
+      code === 'auth/argument-error' ||
+      code === 'auth/invalid-id-token' ||
+      code === 'auth/user-disabled' ||
+      code === 'auth/user-not-found';
     const isUpstreamIdentityToolkitUnavailable =
       checkRevoked &&
+      !isExplicitTokenRejection &&
       !process.env.VITEST &&
       (code === 'auth/internal-error' ||
-        /identitytoolkit\.googleapis\.com|SERVICE_DISABLED|PERMISSION_DENIED|has not been used in project/i.test(msg));
+        code === 'app/invalid-credential' ||
+        /identitytoolkit\.googleapis\.com|SERVICE_DISABLED|PERMISSION_DENIED|has not been used in project|default credentials|insufficient permission|metadata|ENOTFOUND|EAI_AGAIN/i.test(msg));
 
     if (isUpstreamIdentityToolkitUnavailable) {
       if (!warnedRevocationFallback) {
@@ -42,3 +51,4 @@ export async function verifyFirebaseIdTokenSafely(
     throw err;
   }
 }
+
