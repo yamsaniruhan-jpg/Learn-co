@@ -206,7 +206,8 @@ export class CopilotGateway {
       effectivePrompt,
       mode,
       ragContextFormatted.length,
-      selectedModel
+      selectedModel,
+      Boolean(validImage)
     );
 
     const systemInstruction = ModelRouter.buildSystemPrompt(

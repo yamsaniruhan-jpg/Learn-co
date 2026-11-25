@@ -3,8 +3,8 @@ import type { CopilotImageAttachment } from '../types/copilot';
 const SUPPORTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const MAX_DIMENSION = 1024;
 const MAX_BYTES = 4 * 1024 * 1024;
-// Keep base64 payload comfortably inside the server's 100 KB global JSON limit alongside prompt & history.
-export const MAX_SAFE_IMAGE_BASE64_CHARS = 64_000;
+// Large upload parser on /api/copilot/chat and /api/copilot/stream handles up to 10 MB.
+export const MAX_SAFE_IMAGE_BASE64_CHARS = 4_000_000;
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,25 +18,26 @@ function readFileAsDataUrl(file: File): Promise<string> {
 export async function prepareQuestionImage(
   file: File
 ): Promise<{ attachment: CopilotImageAttachment; previewUrl: string }> {
-  const mimeType = file.type as CopilotImageAttachment['mimeType'];
-  if (!SUPPORTED_IMAGE_TYPES.has(mimeType)) {
-    throw new Error('Please choose a PNG, JPEG, or WebP screenshot/photo.');
+  const mimeType = (file.type || 'image/jpeg') as CopilotImageAttachment['mimeType'];
+  const isSupported = SUPPORTED_IMAGE_TYPES.has(mimeType) || file.type.startsWith('image/');
+  if (!isSupported) {
+    throw new Error('Please choose an image or photo of your question.');
   }
 
-  if (file.size > MAX_BYTES * 2) {
-    throw new Error('Image is too large. Please upload a file under 8 MB.');
+  if (file.size > 20 * 1024 * 1024) {
+    throw new Error('Image is too large. Please upload a file under 20 MB.');
   }
 
   const rawDataUrl = await readFileAsDataUrl(file);
   const rawBase64 = rawDataUrl.split(',')[1] || '';
-  if (rawBase64 && rawBase64.length <= MAX_SAFE_IMAGE_BASE64_CHARS) {
+  if (SUPPORTED_IMAGE_TYPES.has(mimeType) && rawBase64 && rawBase64.length <= 1_200_000) {
     return {
       attachment: { mimeType, data: rawBase64, name: file.name },
       previewUrl: rawDataUrl,
     };
   }
 
-  // Downscale & compress in browser canvas so JSON payload stays within the 100 KB API limit.
+  // Downscale & compress in browser canvas so high-resolution camera photos remain crisp for OCR.
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
@@ -47,11 +48,14 @@ export async function prepareQuestionImage(
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    throw new Error('Image exceeds the 100 KB upload budget and cannot be compressed in this browser.');
+    return {
+      attachment: { mimeType: 'image/jpeg', data: rawBase64, name: file.name },
+      previewUrl: rawDataUrl,
+    };
   }
 
-  const dimensionSteps = [MAX_DIMENSION, 768, 560, 400];
-  const qualitySteps = [0.8, 0.65, 0.5, 0.35];
+  const dimensionSteps = [1600, 1280, 1024, 768];
+  const qualitySteps = [0.85, 0.75, 0.65];
 
   let bestUrl = '';
   let bestBase64 = '';
@@ -78,12 +82,8 @@ export async function prepareQuestionImage(
     }
   }
 
-  if (!bestBase64 || bestBase64.length > MAX_SAFE_IMAGE_BASE64_CHARS) {
-    throw new Error('Could not compress image small enough for upload. Please crop tightly around the question.');
-  }
-
   return {
-    attachment: { mimeType: 'image/jpeg', data: bestBase64, name: file.name },
-    previewUrl: bestUrl,
+    attachment: { mimeType: 'image/jpeg', data: bestBase64 || rawBase64, name: file.name },
+    previewUrl: bestUrl || rawDataUrl,
   };
 }

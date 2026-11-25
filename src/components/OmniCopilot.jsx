@@ -357,7 +357,7 @@ export default function OmniCopilot() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/*"
             className="hidden"
             onChange={(e) => {
               handleImagePick(e.target.files?.[0]);

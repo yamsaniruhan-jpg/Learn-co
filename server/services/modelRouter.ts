@@ -30,7 +30,8 @@ export class ModelRouter {
     prompt: string,
     mode: CopilotMode = 'socratic_hint',
     contextLength: number = 0,
-    requestedModel?: string
+    requestedModel?: string,
+    hasImage: boolean = false
   ): ModelRouteDecision {
     if (requestedModel && requestedModel.trim() && !requestedModel.startsWith('auto')) {
       const model = requestedModel.trim();
@@ -39,6 +40,16 @@ export class ModelRouter {
         reason: 'User explicitly selected model',
         temperature: 0.3,
         maxOutputTokens: 1200,
+        isEcoSaver: false,
+      };
+    }
+
+    if (hasImage) {
+      return {
+        modelName: this.DEFAULT_MODEL,
+        reason: 'High-speed multimodal vision question analysis',
+        temperature: 0.2,
+        maxOutputTokens: 1400,
         isEcoSaver: false,
       };
     }

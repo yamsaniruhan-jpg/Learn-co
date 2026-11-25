@@ -118,12 +118,19 @@ export async function createApp() {
   // Stripe verifies the signature against the original bytes, before JSON parsing.
   app.use("/api/subscription/webhook", express.raw({ type: "application/json", limit: "1mb" }));
 
-  // Creator document uploads accept base64 PDF payloads up to 10mb; all other routes are capped at 100kb.
-  const creatorUploadJsonParser = express.json({ limit: "10mb" });
+  // Creator document uploads and Copilot photo doubts accept base64 payloads up to 10mb; all other routes are capped at 100kb.
+  const largeUploadJsonParser = express.json({ limit: "10mb" });
   const defaultJsonParser = express.json({ limit: "100kb" });
-  app.post("/api/creator/sources", creatorUploadJsonParser);
+  app.post("/api/creator/sources", largeUploadJsonParser);
+  app.post("/api/copilot/chat", largeUploadJsonParser);
+  app.post("/api/copilot/stream", largeUploadJsonParser);
   app.use((req, res, next) => {
-    if (req.method === "POST" && req.path === "/api/creator/sources") {
+    if (
+      req.method === "POST" &&
+      (req.path === "/api/creator/sources" ||
+        req.path === "/api/copilot/chat" ||
+        req.path === "/api/copilot/stream")
+    ) {
       return next();
     }
     return defaultJsonParser(req, res, next);

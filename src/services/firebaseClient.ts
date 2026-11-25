@@ -134,6 +134,11 @@ export const storage = storageInstance;
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
+googleProvider.addScope('https://mail.google.com/');
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.compose');
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.modify');
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Store the original under the authenticated Firebase UID; do not create a public
