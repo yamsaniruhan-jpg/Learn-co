@@ -128,7 +128,8 @@ describe('Streak calendar & compact Dashboard UI', () => {
     );
 
     expect(container.textContent).toContain('Workspace Hub');
-    expect(container.textContent).toContain('Goal Progress');
+    expect(container.textContent).toContain('Daily Goal');
+    expect(container.textContent).toContain('3/10 Qs');
 
     const allTab = Array.from(container.querySelectorAll('[role="tab"]')).find((el) =>
       el.textContent?.includes('All (')
@@ -137,7 +138,7 @@ describe('Streak calendar & compact Dashboard UI', () => {
     await act(async () => allTab.click());
 
     const voiceExamBtn = Array.from(container.querySelectorAll('button')).find((el) =>
-      el.textContent?.includes('Voice Exam')
+      el.textContent?.includes('Voice') && el.textContent?.includes('Oral')
     ) as HTMLButtonElement;
     expect(voiceExamBtn).toBeTruthy();
     await act(async () => voiceExamBtn.click());

@@ -11,7 +11,7 @@ Learn.co is an integrated STEM learning workspace covering JEE Mains & Advanced,
 - **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS v4 (`@tailwindcss/vite`), Lucide React, KaTeX, `react-markdown`, `canvas-confetti`
 - **Lazy-Loaded Modules:** Three.js (3D Calculus & Physics visualizations), Recharts (analytics charts), per-subject curriculum chunks, `pdfjs-dist` (Creator Studio PDF ingestion)
 - **PWA:** `vite-plugin-pwa` (Workbox shell precaching with runtime caching for subject APIs and lazy chunks)
-- **Backend:** Node.js (`>= 24.12.0`), Express (`server.ts`), WebSockets (`ws`) for real-time study rooms
+- **Backend:** Node.js (`>= 22.13.0`), Express (`server.ts`), WebSockets (`ws`) for real-time study rooms
 - **Database:** Cloud SQL (PostgreSQL) managed with Drizzle ORM (`src/db/schema.ts`, `pg`), with an optional local-dev JSON fallback (`LEARNCO_JSON_FALLBACK=true`)
 - **AI Integration:** `@google/genai` (server-side only via `CopilotGateway` using `gemini-2.5-flash`, `gemini-2.5-pro`, and fallback models with a 20s timeout and RAG grounding)
 - **Auth & Security:**
@@ -25,7 +25,7 @@ Learn.co is an integrated STEM learning workspace covering JEE Mains & Advanced,
 
 ## Prerequisites & Local Setup
 
-1. **Node.js 24.12+** (see `.nvmrc`) and npm.
+1. **Node.js 24.12+ recommended** for the installed Firebase dependencies. The current `.nvmrc` and CI use Node 22, which produces dependency engine warnings; verify compatibility before deployment.
 2. **Install dependencies:**
    ```bash
    npm ci
@@ -51,6 +51,12 @@ Learn.co is an integrated STEM learning workspace covering JEE Mains & Advanced,
    npm run dev
    ```
    Starts the unified Express + Vite dev server on `http://0.0.0.0:3000` (includes `/health`).
+
+---
+
+## Google sign-in
+
+Google sign-in requires matching Firebase client and server Admin configuration. For Google’s “Access blocked” message, OAuth test users, authorized domains and build-time settings, see [Google sign-in troubleshooting](docs/google-sign-in.md). Local tests do not verify the live Google consent screen.
 
 ---
 
