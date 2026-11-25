@@ -7,12 +7,14 @@ import {
   CopilotPromptOptions,
   CopilotCitation,
   CopilotArtifact,
+  CopilotFallbackQuestion,
+  CopilotUnavailableReason,
 } from '../types/copilot';
 import { SubjectId } from '../types/curriculum';
+import { buildApiHeaders } from '../utils/csrf';
 
-function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem('learnco_auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+function getAuthHeader(includeContentType = true): Record<string, string> {
+  return buildApiHeaders(undefined, includeContentType);
 }
 
 export class CopilotClient {
@@ -23,6 +25,7 @@ export class CopilotClient {
     try {
       const query = search ? `?search=${encodeURIComponent(search)}` : '';
       const response = await fetch(`/api/copilot/conversations${query}`, {
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeader(),
@@ -49,6 +52,7 @@ export class CopilotClient {
   ): Promise<{ conversation: CopilotConversation; messages: CopilotMessage[] } | null> {
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}`, {
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeader(),
@@ -81,6 +85,7 @@ export class CopilotClient {
   }): Promise<CopilotConversation> {
     const response = await fetch('/api/copilot/conversations', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeader(),
@@ -106,6 +111,7 @@ export class CopilotClient {
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeader(),
@@ -129,8 +135,9 @@ export class CopilotClient {
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: {
-          ...getAuthHeader(),
+          ...getAuthHeader(false),
         },
       });
       return response.ok;
@@ -147,8 +154,9 @@ export class CopilotClient {
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}/clear`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          ...getAuthHeader(),
+          ...getAuthHeader(false),
         },
       });
       return response.ok;
@@ -165,8 +173,9 @@ export class CopilotClient {
     try {
       const response = await fetch('/api/copilot/conversations', {
         method: 'DELETE',
+        credentials: 'include',
         headers: {
-          ...getAuthHeader(),
+          ...getAuthHeader(false),
         },
       });
       return response.ok;
@@ -182,8 +191,9 @@ export class CopilotClient {
   static async exportHistory(): Promise<any> {
     try {
       const response = await fetch('/api/copilot/history/export', {
+        credentials: 'include',
         headers: {
-          ...getAuthHeader(),
+          ...getAuthHeader(false),
         },
       });
       if (!response.ok) return null;
@@ -204,9 +214,13 @@ export class CopilotClient {
     citations?: CopilotCitation[];
     artifact?: CopilotArtifact;
     modelUsed?: string;
+    hintOnly?: boolean;
+    unavailableReason?: CopilotUnavailableReason;
+    fallbackPracticeQuestions?: CopilotFallbackQuestion[];
   }> {
     const response = await fetch('/api/copilot/chat', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeader(),
@@ -222,7 +236,7 @@ export class CopilotClient {
   }
 
   /**
-   * Stream message response using Server-Sent Events (SSE)
+   * Stream message response using Server-Sent Events (SSE) with optional disconnect recovery.
    */
   static async streamMessage(
     options: CopilotPromptOptions,
@@ -230,14 +244,29 @@ export class CopilotClient {
       onToken?: (token: string) => void;
       onCitation?: (citation: CopilotCitation) => void;
       onArtifact?: (artifact: CopilotArtifact) => void;
-      onDone?: (data: { conversationId: string; messageId: string; modelUsed: string }) => void;
+      onReconnecting?: (attempt: number) => void;
+      onDone?: (data: {
+        conversationId: string;
+        messageId: string;
+        modelUsed: string;
+        hintOnly?: boolean;
+        unavailableReason?: CopilotUnavailableReason;
+        fallbackPracticeQuestions?: CopilotFallbackQuestion[];
+      }) => void;
       onError?: (err: string) => void;
     },
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    streamConfig?: { recoverOnDisconnect?: boolean }
   ): Promise<void> {
+    const recoverOnDisconnect = streamConfig?.recoverOnDisconnect ?? false;
+    let accumulated = '';
+    let seenConvId = options.conversationId;
+    let explicitServerError: string | undefined;
+
     try {
       const response = await fetch('/api/copilot/stream', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeader(),
@@ -258,7 +287,6 @@ export class CopilotClient {
       const decoder = new TextDecoder();
       let buffer = '';
       let completed = false;
-      let streamError: string | undefined;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -277,8 +305,12 @@ export class CopilotClient {
 
           try {
             const data = JSON.parse(jsonStr);
-            if (data.type === 'token' && callbacks.onToken && data.content) {
-              callbacks.onToken(data.content);
+            if (data.conversationId && !seenConvId) {
+              seenConvId = data.conversationId;
+            }
+            if (data.type === 'token' && data.content) {
+              accumulated += data.content;
+              callbacks.onToken?.(data.content);
             } else if (data.type === 'citation' && callbacks.onCitation && data.citation) {
               callbacks.onCitation(data.citation);
             } else if (data.type === 'artifact' && callbacks.onArtifact && data.artifact) {
@@ -288,20 +320,78 @@ export class CopilotClient {
               callbacks.onDone?.(data);
             } else if (data.type === 'error') {
               completed = true;
-              streamError = data.error || 'Unknown streaming error';
+              explicitServerError = data.error || 'Unknown streaming error';
             }
           } catch (parseErr) {
             console.warn('Failed to parse SSE chunk:', parseErr);
           }
         }
       }
-      if (streamError) throw new Error(streamError);
+      if (explicitServerError) throw new Error(explicitServerError);
       if (!completed) throw new Error('Stream ended before completion.');
     } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || signal?.aborted) {
         console.log('Stream generation was aborted by user.');
         return;
       }
+
+      // Recover from unexpected network or mid-stream disconnect when enabled
+      if (recoverOnDisconnect && !explicitServerError) {
+        try {
+          callbacks.onReconnecting?.(1);
+          await new Promise((r) => setTimeout(r, 250));
+
+          if (seenConvId && accumulated.length > 0) {
+            const existing = await CopilotClient.getConversation(seenConvId);
+            const lastAssistant = existing?.messages
+              ?.slice()
+              .reverse()
+              .find((m) => m.role === 'assistant');
+
+            if (lastAssistant && lastAssistant.content.startsWith(accumulated.slice(0, 24))) {
+              const tail = lastAssistant.content.slice(accumulated.length);
+              if (tail) callbacks.onToken?.(tail);
+              lastAssistant.citations?.forEach((c) => callbacks.onCitation?.(c));
+              callbacks.onDone?.({
+                conversationId: seenConvId,
+                messageId: lastAssistant.id,
+                modelUsed: lastAssistant.modelUsed || 'gemini-2.5-flash',
+                hintOnly: lastAssistant.hintOnly,
+                unavailableReason: lastAssistant.unavailableReason,
+                fallbackPracticeQuestions: lastAssistant.fallbackPracticeQuestions,
+              });
+              return;
+            }
+          }
+
+          // Fallback to non-streaming /chat endpoint to complete cleanly
+          const fallbackRes = await CopilotClient.sendMessage({
+            ...options,
+            conversationId: seenConvId || options.conversationId,
+          });
+          const fullText = fallbackRes.message?.content || '';
+          const delta = accumulated && fullText.startsWith(accumulated)
+            ? fullText.slice(accumulated.length)
+            : accumulated
+            ? `\n\n${fullText}`
+            : fullText;
+          if (delta) callbacks.onToken?.(delta);
+          fallbackRes.citations?.forEach((c) => callbacks.onCitation?.(c));
+          if (fallbackRes.artifact) callbacks.onArtifact?.(fallbackRes.artifact);
+          callbacks.onDone?.({
+            conversationId: fallbackRes.conversationId,
+            messageId: fallbackRes.message.id,
+            modelUsed: fallbackRes.modelUsed || fallbackRes.message.modelUsed || 'gemini-2.5-flash',
+            hintOnly: fallbackRes.hintOnly,
+            unavailableReason: fallbackRes.unavailableReason,
+            fallbackPracticeQuestions: fallbackRes.fallbackPracticeQuestions,
+          });
+          return;
+        } catch {
+          // Fall through to callbacks.onError below if recovery fails
+        }
+      }
+
       if (callbacks.onError) {
         callbacks.onError(err.message || 'Stream connection failed.');
       } else {
@@ -323,6 +413,7 @@ export class CopilotClient {
   }): Promise<{ isCorrect: boolean; xpEarned: number; message: string; gamification: any }> {
     const response = await fetch('/api/copilot/practice/submit', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeader(),
@@ -343,6 +434,7 @@ export class CopilotClient {
   static async executeTool(toolName: string, toolInput: any): Promise<any> {
     const response = await fetch('/api/copilot/tools/execute', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeader(),

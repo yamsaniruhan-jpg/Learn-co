@@ -45,26 +45,26 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
   ] as const;
 
   return (
-    <div className="bg-slate-900 border-b border-slate-800 shrink-0">
+    <div className="bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] shrink-0">
       {/* Top Banner Row */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <span className="px-2 py-0.5 text-xs font-semibold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              Study Planner
+            <span className="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-[#6C5CE7]/10 dark:bg-[#8577ED]/20 text-[#6C5CE7] dark:text-[#A99DF5]">
+              Study Plan
             </span>
             <XPIndicator xp={currentXp} size="sm" />
             {plan && (
-              <span className="flex items-center gap-1 text-xs text-slate-400 font-mono">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="flex items-center gap-1 text-xs text-[#6B6890] dark:text-[#B4B0D5] font-mono">
+                <span className="w-2 h-2 rounded-full bg-[#4CAF8E]" />
                 Active (v{plan.version})
               </span>
             )}
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#2D2A4A] dark:text-[#F1EFFF] tracking-tight">
             {plan?.title || 'Personalized Study Planner'}
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">
             {plan?.description ||
               'Adaptive scheduling engine integrating concept mastery, practice drills, mistake remediation, and spaced retention.'}
           </p>
@@ -76,10 +76,10 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
             <button
               id="btn-version-history"
               onClick={onOpenVersionHistory}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white border border-slate-700 transition-all shadow-sm"
+              className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EDE9FE] dark:hover:bg-[#353059] border border-[#E3DFF5] dark:border-[#3D3861] transition-all cursor-pointer"
               title="Plan Version History & Rollback"
             >
-              <History className="w-3.5 h-3.5 text-slate-400" />
+              <History className="w-3.5 h-3.5 text-[#6B6890] dark:text-[#B4B0D5]" />
               <span>History</span>
             </button>
           )}
@@ -87,16 +87,16 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
           <button
             id="btn-start-focus-session-header"
             onClick={onOpenFocusSession}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-200 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/40 shadow-sm transition-all"
+            className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#8A5A00] dark:text-[#FFD68A] bg-[#FFB84D]/15 hover:bg-[#FFB84D]/25 border border-[#FFB84D]/40 transition-all cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5 text-amber-400 fill-current" />
+            <Zap className="w-3.5 h-3.5 text-[#D98200] dark:text-[#FFB84D] fill-current" />
             <span>Focus Mode</span>
           </button>
 
           <button
             id="btn-new-task-header"
             onClick={onOpenNewTask}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all shadow-sm"
+            className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EDE9FE] dark:hover:bg-[#353059] border border-[#E3DFF5] dark:border-[#3D3861] transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Task</span>
@@ -105,9 +105,9 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
           <button
             id="btn-open-ai-planner-wizard"
             onClick={onOpenAiWizard}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-900/30 transition-all"
+            className="min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white shadow-sm transition-all cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-indigo-200" />
+            <Sparkles className="w-4 h-4" />
             <span>AI Plan Generator</span>
           </button>
         </div>
@@ -122,10 +122,10 @@ export const PlannerHeader: React.FC<PlannerHeaderProps> = ({
               key={tab.id}
               id={`tab-planner-${tab.id}`}
               onClick={() => onTabChange(tab.id as any)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-all ${
+              className={`min-h-[44px] flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
                 isActive
-                  ? 'border-indigo-500 text-indigo-400 font-semibold bg-indigo-500/10'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  ? 'border-[#6C5CE7] text-[#6C5CE7] dark:text-[#A99DF5] bg-[#6C5CE7]/8 dark:bg-[#8577ED]/12'
+                  : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
               }`}
             >
               <span>{tab.icon}</span>

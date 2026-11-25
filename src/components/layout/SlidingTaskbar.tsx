@@ -75,15 +75,15 @@ export const SlidingTaskbar: React.FC<SlidingTaskbarProps> = ({ activeTab, setAc
   return (
     <nav
       aria-label="Quick tab switcher"
-      className="w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] py-2 px-3 sm:px-6 sticky top-16 z-20 shadow-xs"
+      className="w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] py-1 px-2.5 sm:px-6 sticky top-14 sm:top-16 z-20"
     >
-      <div className="max-w-[1600px] mx-auto flex items-center gap-2">
+      <div className="max-w-[1600px] mx-auto flex items-center gap-1.5">
         {/* Left Scroll Button */}
         <button
           type="button"
-          onClick={() => scrollBy(-280)}
+          onClick={() => scrollBy(-260)}
           disabled={!canScrollLeft}
-          className="hidden sm:flex p-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-35 disabled:cursor-default transition-colors shrink-0 shadow-xs cursor-pointer"
+          className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] disabled:opacity-35 disabled:cursor-default transition-colors shrink-0 cursor-pointer"
           aria-label="Scroll tabs left"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -94,13 +94,13 @@ export const SlidingTaskbar: React.FC<SlidingTaskbarProps> = ({ activeTab, setAc
           {canScrollLeft && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 w-7 bg-gradient-to-r from-[#FFFFFF] dark:from-[#2A2647] to-transparent z-10"
+              className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-[#FFFFFF] dark:from-[#2A2647] to-transparent z-10"
             />
           )}
           {canScrollRight && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 w-7 bg-gradient-to-l from-[#FFFFFF] dark:from-[#2A2647] to-transparent z-10"
+              className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-[#FFFFFF] dark:from-[#2A2647] to-transparent z-10"
             />
           )}
 
@@ -110,7 +110,7 @@ export const SlidingTaskbar: React.FC<SlidingTaskbarProps> = ({ activeTab, setAc
             onScroll={updateScrollEdges}
             role="tablist"
             aria-label="Application sections"
-            className="w-full overflow-x-auto flex items-center gap-2 py-1 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="w-full overflow-x-auto flex items-center gap-1 py-0.5 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
             {visibleFeatures.map((feat, idx) => {
               const Icon = feat.icon;
@@ -129,17 +129,14 @@ export const SlidingTaskbar: React.FC<SlidingTaskbarProps> = ({ activeTab, setAc
                   aria-current={isActive ? 'page' : undefined}
                   onKeyDown={(e) => handleTabKeyDown(e, idx)}
                   onClick={() => setActiveTab(feat.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6C5CE7] ${
                     isActive
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25 scale-[1.02]'
-                      : 'bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
+                      ? 'bg-[#6C5CE7] text-white font-bold shadow-xs'
+                      : 'bg-transparent hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-indigo-500 dark:text-indigo-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-[#6C5CE7] dark:text-[#8577ED]'}`} />
                   <span className="whitespace-nowrap">{feat.shortLabel || feat.label}</span>
-                  {feat.highlight && !isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                  )}
                 </button>
               );
             })}
@@ -149,9 +146,9 @@ export const SlidingTaskbar: React.FC<SlidingTaskbarProps> = ({ activeTab, setAc
         {/* Right Scroll Button */}
         <button
           type="button"
-          onClick={() => scrollBy(280)}
+          onClick={() => scrollBy(260)}
           disabled={!canScrollRight}
-          className="hidden sm:flex p-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-35 disabled:cursor-default transition-colors shrink-0 shadow-xs cursor-pointer"
+          className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] disabled:opacity-35 disabled:cursor-default transition-colors shrink-0 cursor-pointer"
           aria-label="Scroll tabs right"
         >
           <ChevronRight className="w-4 h-4" />

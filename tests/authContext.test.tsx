@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getToken: vi.fn(), getMe: vi.fn(), removeToken: vi.fn(), signIn: vi.fn(), setCurrentUser: vi.fn(),
+  getSessionId: vi.fn(), getMe: vi.fn(), clearSession: vi.fn(), signIn: vi.fn(), setCurrentUser: vi.fn(),
   updateProfile: vi.fn(), updateSettings: vi.fn(), uploadAvatar: vi.fn(), saveOnboarding: vi.fn(), signOut: vi.fn(async () => {}),
   auth: { app: {}, currentUser: null as null | { email: string } },
   firebaseSignIn: vi.fn(), firebaseSignOut: vi.fn(async () => {}),
@@ -33,7 +33,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
   sessionStorage.clear();
-  mocks.getToken.mockReset(); mocks.getMe.mockReset(); mocks.removeToken.mockReset(); mocks.signIn.mockReset();
+  mocks.getSessionId.mockReset(); mocks.getMe.mockReset(); mocks.clearSession.mockReset(); mocks.signIn.mockReset();
   mocks.google.mockReset();
   mocks.setCurrentUser.mockReset();
   mocks.onAuthStateChanged.mockReset();
@@ -48,7 +48,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 describe('Google redirect and signup', () => {
   it('reports redirect initiation rather than signed-in success', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.popup.mockRejectedValue({ code: 'auth/popup-blocked' });
     mocks.redirect.mockResolvedValue(undefined);
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
@@ -58,7 +58,7 @@ describe('Google redirect and signup', () => {
   });
 
   it('explains a Google access denial without granting a session', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.popup.mockRejectedValue({ code: 'auth/access-denied' });
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
     await act(async () => {
@@ -69,14 +69,14 @@ describe('Google redirect and signup', () => {
   });
 
   it('surfaces redirect errors', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.redirectResult.mockRejectedValue(new Error('Redirect failed'));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
     expect(snapshot.authError).toBe('Redirect failed');
   });
 
   it('uses the redirected account when reconciling local XP', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     localStorage.setItem('learnco_xp_v2:account:alice:activity', '40');
     mocks.redirectResult.mockResolvedValue({ user: { email: 'alice@example.test', providerData: [], getIdToken: async () => 'google-token' } });
     mocks.google.mockResolvedValue({ user: { id: 'alice', email: 'alice@example.test' }, profile: null, gamification: { userId: 'alice', xp: 20, level: 1 }, settings: null });
@@ -85,7 +85,7 @@ describe('Google redirect and signup', () => {
   });
 
   it('rejects local signup before attempting Firebase provisioning', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.signUp.mockRejectedValue(new Error('Already exists'));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
     await act(async () => { await expect(snapshot.signUpWithEmail('a@example.test', 'Password1')).rejects.toThrow('Already exists'); });
@@ -96,10 +96,10 @@ describe('Google redirect and signup', () => {
 
 describe('sign-in cancellation', () => {
   it('does not restore a signed-out account after slow Firebase sign-in', async () => {
-    let token: string | null = null;
-    mocks.getToken.mockImplementation(() => token);
-    mocks.signOut.mockImplementation(async () => { token = null; });
-    mocks.signIn.mockImplementation(async () => { token = 'token-a'; return { user: { id: 'a', email: 'alice@example.test' }, profile: null, settings: null, gamification: null }; });
+    let sessionId: string | null = null;
+    mocks.getSessionId.mockImplementation(() => sessionId);
+    mocks.signOut.mockImplementation(async () => { sessionId = null; });
+    mocks.signIn.mockImplementation(async () => { sessionId = '1:a'; return { user: { id: 'a', email: 'alice@example.test' }, profile: null, settings: null, gamification: null }; });
     let finish!: (value: any) => void;
     mocks.firebaseSignIn.mockReturnValue(new Promise(resolve => { finish = resolve; }));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
@@ -112,15 +112,15 @@ describe('sign-in cancellation', () => {
     });
     expect(snapshot.isAuthenticated).toBe(false);
     expect(snapshot.user).toBeNull();
-    expect(token).toBeNull();
+    expect(sessionId).toBeNull();
   });
 });
 
 describe('in-flight account updates', () => {
   it.each(['updateProfile', 'updateSettings', 'uploadAvatar', 'saveOnboarding'] as const)(
     'does not apply a stale %s response to another session', async (method) => {
-      let token: string | null = 'token-a';
-      mocks.getToken.mockImplementation(() => token);
+      let sessionId: string | null = '1:a';
+      mocks.getSessionId.mockImplementation(() => sessionId);
       mocks.getMe.mockResolvedValue({ user: { id: 'a' }, profile: { displayName: 'Alice' }, settings: null, gamification: { userId: 'a', xp: 0 } });
       let finish!: (value: any) => void;
       mocks[method].mockReturnValue(new Promise(resolve => { finish = resolve; }));
@@ -131,7 +131,7 @@ describe('in-flight account updates', () => {
           : method === 'saveOnboarding' ? snapshot.saveOnboarding({})
           : method === 'updateSettings' ? snapshot.updateSettings({}) : snapshot.updateProfile({});
       });
-      token = 'token-b';
+      sessionId = '2:b';
       await act(async () => {
         finish({ profile: { displayName: 'Stale Alice' }, settings: { theme: 'dark' }, avatarUrl: '/old' });
         await expect(pending).rejects.toThrow(/session changed/i);
@@ -143,11 +143,10 @@ describe('in-flight account updates', () => {
 
 describe('session refresh failures', () => {
   it('retains the verified account’s device activity when refreshing server XP', async () => {
-    localStorage.setItem('learnco_auth_token', 'stored-session');
     localStorage.setItem('learnco_user', JSON.stringify({id: 'old-account'}));
     localStorage.setItem('learnco_xp_v2:account:alice:activity', '40');
     localStorage.setItem('learnco_xp_v2:account:old-account:activity', '900');
-    mocks.getToken.mockReturnValue('stored-session');
+    mocks.getSessionId.mockReturnValue('1:old-account');
     mocks.getMe.mockResolvedValue({ user: {id: 'alice'}, profile: null, settings: null, gamification: {userId: 'alice', xp: 20, level: 1} });
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
     expect(mocks.setCurrentUser).toHaveBeenCalledWith({id: 'alice'});
@@ -156,25 +155,25 @@ describe('session refresh failures', () => {
     expect(localStorage.getItem('learnco_xp_v2:account:old-account:server')).toBeNull();
   });
 
-  it('preserves a stored token during a temporary server failure', async () => {
-    mocks.getToken.mockReturnValue('stored-session');
+  it('preserves a stored session during a temporary server failure', async () => {
+    mocks.getSessionId.mockReturnValue('1:alice');
     mocks.getMe.mockRejectedValue(Object.assign(new Error('service unavailable'), { status: 503 }));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
-    expect(mocks.removeToken).not.toHaveBeenCalled();
+    expect(mocks.clearSession).not.toHaveBeenCalled();
     expect(snapshot.isAuthenticated).toBe(false);
     expect(snapshot.authError).toMatch(/could not verify/i);
   });
 
   it('clears an explicitly rejected session', async () => {
-    mocks.getToken.mockReturnValue('expired-session');
+    mocks.getSessionId.mockReturnValue('1:alice');
     mocks.getMe.mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
-    expect(mocks.removeToken).toHaveBeenCalledOnce();
+    expect(mocks.clearSession).toHaveBeenCalledOnce();
     expect(snapshot.isAuthenticated).toBe(false);
   });
 
   it('does not contact Firebase when backend password verification fails', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.firebaseSignIn.mockResolvedValue({ user: { getIdToken: async () => 'firebase-token' } });
     mocks.signIn.mockRejectedValue(new Error('Invalid credentials'));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
@@ -187,7 +186,7 @@ describe('session refresh failures', () => {
   });
 
   it('signs out a mismatched Firebase identity after backend sign-in', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.firebaseSignIn.mockRejectedValue(new Error('Firebase unavailable'));
     mocks.auth.currentUser = { email: 'other@example.test' };
     mocks.signIn.mockResolvedValue({ user: { id: 'local-a', email: 'alice@example.test' }, profile: null, gamification: null, settings: null });
@@ -197,19 +196,19 @@ describe('session refresh failures', () => {
     expect(snapshot.isAuthenticated).toBe(true);
   });
 
-  it('does not clear a newer token when an old refresh finishes late', async () => {
-    let token = 'old-session';
-    mocks.getToken.mockImplementation(() => token);
+  it('does not clear a newer session when an old refresh finishes late', async () => {
+    let sessionId = '1:old-user';
+    mocks.getSessionId.mockImplementation(() => sessionId);
     let reject!: (error: Error) => void;
     mocks.getMe.mockReturnValue(new Promise((_resolve, r) => { reject = r; }));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
-    token = 'new-session';
+    sessionId = '2:new-user';
     await act(async () => { reject(Object.assign(new Error('unauthorized'), { status: 401 })); });
-    expect(mocks.removeToken).not.toHaveBeenCalled();
+    expect(mocks.clearSession).not.toHaveBeenCalled();
   });
 
   it('does not exchange a persisted Firebase identity when a pending redirect has no result', async () => {
-    mocks.getToken.mockReturnValue(null);
+    mocks.getSessionId.mockReturnValue(null);
     mocks.auth.currentUser = { email: 'alice@example.test' };
     sessionStorage.setItem('learnco_google_redirect_pending', JSON.stringify({ intent: 'signin' }));
     await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });

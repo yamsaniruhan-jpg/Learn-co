@@ -10,7 +10,13 @@ import {
   ExamTrackId,
 } from '../types/curriculum';
 import { AuthClient } from './authClient';
-import { CURRICULUM_DATA, EXAM_TRACKS } from '../data/curriculumData';
+import { buildApiHeaders } from '../utils/csrf';
+import { EXAM_TRACKS } from '../data/curriculumMeta';
+import {
+  findConceptOfflineFallback,
+  loadCurriculumOfflineFallback,
+  loadSubjectCurriculum,
+} from '../data/curriculumLoader';
 
 export interface CurriculumResponse {
   success: boolean;
@@ -41,20 +47,30 @@ export interface StartSessionResponse {
 
 export class LearningClient {
   private static getHeaders(): HeadersInit {
-    const token = AuthClient.getToken();
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+    return buildApiHeaders();
+  }
+
+  /**
+   * Fetch single subject curriculum on demand with local cache and offline fallback.
+   */
+  static async getSubjectCurriculum(
+    subjectId: SubjectId,
+    trackId: ExamTrackId = 'all'
+  ): Promise<SubjectCurriculum | null> {
+    return loadSubjectCurriculum(subjectId, trackId);
   }
 
   /**
    * Fetch data-driven curriculum hierarchy with optional track / subject filter
    */
   static async getCurriculum(trackId?: ExamTrackId, subjectId?: SubjectId): Promise<SubjectCurriculum[]> {
+    if (subjectId && (subjectId as string) !== 'all') {
+      const single = await loadSubjectCurriculum(subjectId, trackId || 'all');
+      return single ? [single] : [];
+    }
+
     try {
       const params = new URLSearchParams();
-      if (subjectId && subjectId !== ('all' as any)) params.append('subjectId', subjectId);
       if (trackId && trackId !== 'all') params.append('trackId', trackId);
 
       const res = await fetch(`/api/learning/curriculum?${params.toString()}`);
@@ -71,20 +87,7 @@ export class LearningClient {
       console.warn('Network error loading curriculum from API, falling back to local dataset:', err);
     }
 
-    // Local fallback
-    let fallback = [...CURRICULUM_DATA];
-    if (subjectId && (subjectId as string) !== 'all') {
-      fallback = fallback.filter((s) => s.id === subjectId);
-    }
-    if (trackId && trackId !== 'all') {
-      fallback = fallback.map((subject) => ({
-        ...subject,
-        chapters: subject.chapters.filter(
-          (ch) => ch.examTracks.includes(trackId as any) || ch.examTracks.includes('all')
-        ),
-      }));
-    }
-    return fallback;
+    return loadCurriculumOfflineFallback(trackId, subjectId);
   }
 
   /**
@@ -127,28 +130,28 @@ export class LearningClient {
       console.warn('Network error loading concept from API, resolving locally:', err);
     }
 
-    // Local fallback
-    for (const subject of CURRICULUM_DATA) {
-      for (const chapter of subject.chapters) {
-        for (const topic of chapter.topics) {
-          for (const subtopic of topic.subtopics) {
-            const concept = subtopic.concepts.find((c) => c.id === conceptId);
-            if (concept) return concept;
-          }
-        }
-      }
-    }
-    return null;
+    return findConceptOfflineFallback(conceptId);
   }
 
   private static seenQuestionIds = new Set<string>();
+  private static syncedServerIds = new Set<string>();
+  private static readonly MAX_CLIENT_EXCLUDE_IDS = 1200;
 
   static clearSeenQuestions() {
     this.seenQuestionIds.clear();
+    this.syncedServerIds.clear();
   }
 
   static getCachedSeenQuestionIds(): string[] {
-    return Array.from(this.seenQuestionIds);
+    return Array.from(new Set([...this.syncedServerIds, ...this.seenQuestionIds]));
+  }
+
+  private static compactExcludeIds(explicitIds?: string[]): string[] {
+    // Server already excludes persisted Database/SQL solved IDs; only transmit unsynced
+    // session-local IDs (and explicit overrides) capped to stay safely under 100kb JSON.
+    const unsynced = Array.from(this.seenQuestionIds).filter((id) => !this.syncedServerIds.has(id));
+    const merged = Array.from(new Set([...(explicitIds ?? []), ...unsynced]));
+    return merged.slice(-this.MAX_CLIENT_EXCLUDE_IDS);
   }
 
   /**
@@ -157,23 +160,26 @@ export class LearningClient {
    */
   static async syncSolvedQuestionIds(): Promise<string[]> {
     try {
-      const token = AuthClient.getToken();
-      if (!token) return [];
+      if (!AuthClient.hasSession()) return [];
       const res = await fetch('/api/practice/solved-ids', {
+        credentials: 'include',
         headers: this.getHeaders(),
       });
       if (!res.ok) return [];
       const data = await res.json();
       if (Array.isArray(data?.solvedIds)) {
         data.solvedIds.forEach((id: string) => {
-          if (typeof id === 'string' && id) this.seenQuestionIds.add(id);
+          if (typeof id === 'string' && id) {
+            this.syncedServerIds.add(id);
+            this.seenQuestionIds.add(id);
+          }
         });
         return data.solvedIds;
       }
     } catch {
       // Offline / unreachable: preserve already-collected local IDs
     }
-    return Array.from(this.seenQuestionIds);
+    return this.getCachedSeenQuestionIds();
   }
 
   /**
@@ -182,7 +188,7 @@ export class LearningClient {
   static async startPracticeSession(config: PracticeSessionConfig): Promise<StartSessionResponse> {
     const shouldDeduplicate = config.mode !== 'mistake_remediation';
     const mergedExclude = shouldDeduplicate
-      ? Array.from(new Set([...this.seenQuestionIds, ...(config.excludeQuestionIds ?? [])]))
+      ? this.compactExcludeIds(config.excludeQuestionIds)
       : config.excludeQuestionIds;
 
     const payloadConfig: PracticeSessionConfig = shouldDeduplicate
@@ -191,6 +197,7 @@ export class LearningClient {
 
     const res = await fetch('/api/learning/session/start', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify({ config: payloadConfig }),
     });
@@ -220,11 +227,10 @@ export class LearningClient {
     durationSeconds: number;
     questions: Array<Omit<QuestionBankItem, 'correctAnswer' | 'explanation' | 'stepByStepSolution'>>;
   }> {
-    const mergedExclude = Array.from(
-      new Set([...this.seenQuestionIds, ...(params.excludeQuestionIds ?? [])])
-    );
+    const mergedExclude = this.compactExcludeIds(params.excludeQuestionIds);
     const res = await fetch('/api/learning/contest/start', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify({ ...params, excludeQuestionIds: mergedExclude }),
     });
@@ -262,6 +268,7 @@ export class LearningClient {
   }> {
     const res = await fetch('/api/learning/contest/submit', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify(params),
     });
@@ -335,6 +342,7 @@ export class LearningClient {
    */
   static async getWeakTopics(): Promise<WeakTopicSignal[]> {
     const res = await fetch('/api/learning/weak-topics', {
+      credentials: 'include',
       headers: this.getHeaders(),
     });
     if (!res.ok) return [];
@@ -347,6 +355,7 @@ export class LearningClient {
    */
   static async getRecommendations(): Promise<PracticeRecommendation[]> {
     const res = await fetch('/api/learning/recommendations', {
+      credentials: 'include',
       headers: this.getHeaders(),
     });
     if (!res.ok) return [];
@@ -360,6 +369,7 @@ export class LearningClient {
   static async importCreatorQuiz(resourceId: string): Promise<{ success: boolean; importedCount: number; message: string }> {
     const res = await fetch('/api/learning/import-creator-quiz', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify({ resourceId }),
     });
@@ -377,6 +387,7 @@ export class LearningClient {
     try {
       const res = await fetch('/api/learning/socratic-hint', {
         method: 'POST',
+        credentials: 'include',
         headers: this.getHeaders(),
         body: JSON.stringify({ questionText, topic, currentHintCount }),
       });

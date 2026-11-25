@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { StudyGoal } from '../../types/planner';
 import { SubjectId } from '../../types/curriculum';
+import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/Button';
 
 interface PlannerGoalsViewProps {
   goals: StudyGoal[];
@@ -103,13 +105,13 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Target className="w-5 h-5 text-indigo-400" />
-            <h3 className="font-bold text-white text-base">Milestone Goals & Exam Targets</h3>
+            <Target className="w-5 h-5 text-[#6C5CE7] dark:text-[#A99DF5]" />
+            <h3 className="font-bold text-[#2D2A4A] dark:text-[#F1EFFF] text-base">Milestone Goals &amp; Exam Targets</h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
             Define high-impact milestones. Your study plan automatically tracks completion
             percentages from scheduled tasks.
           </p>
@@ -118,99 +120,115 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
         <button
           id="btn-create-goal"
           onClick={openCreateModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-900/30 transition-all shrink-0"
+          className="min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-semibold shadow-sm transition-all shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Create Goal
         </button>
       </div>
 
       {/* Goals Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {goals.map((g) => {
-          const daysLeft = Math.ceil(
-            (new Date(g.deadline).getTime() - new Date().getTime()) / 86400000
-          );
+      {goals.length === 0 ? (
+        <EmptyState
+          icon={<Target className="w-6 h-6" />}
+          title="No milestone goals yet"
+          description="Set an exam or mastery milestone to track long-term progress alongside daily tasks."
+          action={
+            <Button variant="primary" size="md" onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
+              Create Goal
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {goals.map((g) => {
+            const daysLeft = Math.ceil(
+              (new Date(g.deadline).getTime() - new Date().getTime()) / 86400000
+            );
 
-          return (
-            <div
-              key={g.id}
-              className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all shadow-md flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                      {g.targetExam || 'STEM Mastery'}
-                    </span>
-                    <h4 className="text-base font-bold text-white mt-1.5">{g.title}</h4>
+            return (
+              <div
+                key={g.id}
+                className="p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7]/40 transition-all shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#6C5CE7]/12 text-[#6C5CE7] dark:text-[#A99DF5]">
+                        {g.targetExam || 'STEM Mastery'}
+                      </span>
+                      <h4 className="text-base font-bold text-[#2D2A4A] dark:text-[#F1EFFF] mt-1.5">{g.title}</h4>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditModal(g)}
+                        aria-label="Edit goal"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] rounded-xl cursor-pointer"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteGoal(g.id)}
+                        aria-label="Delete goal"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#6B6890] dark:text-[#B4B0D5] hover:text-rose-600 rounded-xl cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditModal(g)}
-                      className="p-1.5 text-slate-400 hover:text-white rounded-lg"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteGoal(g.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                  {g.description && (
+                    <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-2 line-clamp-2">{g.description}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {g.subjects.map((sub) => (
+                      <span
+                        key={sub}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861] uppercase"
+                      >
+                        {sub}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
-                {g.description && (
-                  <p className="text-xs text-slate-400 mt-2 line-clamp-2">{g.description}</p>
-                )}
+                <div className="mt-5 pt-4 border-t border-[#E3DFF5] dark:border-[#3D3861]">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="text-[#6B6890] dark:text-[#B4B0D5]">Target Progress</span>
+                    <span className="font-bold text-[#6C5CE7] dark:text-[#A99DF5]">{g.progressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-[#E3DFF5] dark:bg-[#3D3861] h-2 rounded-full overflow-hidden mb-3">
+                    <div
+                      className="bg-[#6C5CE7] h-full rounded-full transition-all duration-500"
+                      style={{ width: `${g.progressPercent}%` }}
+                    />
+                  </div>
 
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {g.subjects.map((sub) => (
-                    <span
-                      key={sub}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-300 uppercase"
-                    >
-                      {sub}
+                  <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+                    <span>Deadline: {g.deadline}</span>
+                    <span className={daysLeft < 7 ? 'text-[#D98200] dark:text-[#FFB84D] font-semibold' : ''}>
+                      {daysLeft > 0 ? `${daysLeft} days remaining` : 'Target reached'}
                     </span>
-                  ))}
+                  </div>
                 </div>
               </div>
-
-              <div className="mt-5 pt-4 border-t border-slate-800/80">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-slate-400">Target Progress</span>
-                  <span className="font-bold text-indigo-400">{g.progressPercent}%</span>
-                </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
-                  <div
-                    className="bg-indigo-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${g.progressPercent}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>📅 Deadline: {g.deadline}</span>
-                  <span className={daysLeft < 7 ? 'text-amber-400 font-semibold' : ''}>
-                    {daysLeft > 0 ? `${daysLeft} days remaining` : 'Target reached'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Goal Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90">
           <div className="relative w-full max-w-md bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-3xl shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] p-6 text-[#2D2A4A] dark:text-[#F1EFFF]">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-semibold text-white text-base">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E3DFF5] dark:border-[#3D3861]">
+              <h3 className="font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] text-base">
                 {editingGoal ? 'Edit Milestone Goal' : 'Create Milestone Goal'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-white"
+                aria-label="Close goal modal"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -218,7 +236,7 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
 
             <form onSubmit={handleSubmit} className="space-y-4 py-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] mb-1.5">
                   Goal Title *
                 </label>
                 <input
@@ -227,13 +245,13 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Master Multivariable Calculus & Linear Algebra"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] mb-1.5">
                     Target Exam / Focus
                   </label>
                   <input
@@ -241,11 +259,11 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
                     value={targetExam}
                     onChange={(e) => setTargetExam(e.target.value)}
                     placeholder="e.g. JEE Advanced"
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    className="w-full min-h-[44px] px-3 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] mb-1.5">
                     Target Score / Grade
                   </label>
                   <input
@@ -253,13 +271,13 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
                     value={targetScore}
                     onChange={(e) => setTargetScore(e.target.value)}
                     placeholder="e.g. 95% / 5.0"
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    className="w-full min-h-[44px] px-3 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] mb-1.5">
                   Target Deadline
                 </label>
                 <input
@@ -267,12 +285,12 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
                   required
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] mb-1.5">
                   Associated Subjects
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -283,10 +301,10 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
                         key={sub.id}
                         type="button"
                         onClick={() => toggleSubject(sub.id)}
-                        className={`px-3 py-1 rounded-lg border text-xs font-medium transition-all ${
+                        className={`min-h-[44px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-500'
-                            : 'bg-slate-800 border-slate-700 text-slate-400'
+                            ? 'bg-[#6C5CE7] text-white border-[#6C5CE7]'
+                            : 'bg-[#F7F5FF] dark:bg-[#1E1B33] border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5]'
                         }`}
                       >
                         {sub.name}
@@ -297,7 +315,7 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] mb-1.5">
                   Description
                 </label>
                 <textarea
@@ -305,22 +323,22 @@ export const PlannerGoalsView: React.FC<PlannerGoalsViewProps> = ({
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Key milestones, textbook chapters, or target mastery areas..."
                   rows={2}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#E3DFF5] dark:border-[#3D3861]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                  className="min-h-[44px] px-4 py-2 text-xs font-semibold text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg transition-all"
+                  className="min-h-[44px] px-5 py-2 text-xs font-semibold bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white rounded-xl shadow-sm transition-all cursor-pointer"
                 >
                   {editingGoal ? 'Save Changes' : 'Create Goal'}
                 </button>

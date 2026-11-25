@@ -1,4 +1,4 @@
-import { AuthClient } from './authClient';
+import { buildApiHeaders } from '../utils/csrf';
 import {
   StudyPlan,
   StudyTask,
@@ -13,11 +13,7 @@ import {
 } from '../types/planner';
 
 function getHeaders(): HeadersInit {
-  const token = AuthClient.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  return buildApiHeaders();
 }
 
 export class PlannerClient {
@@ -33,7 +29,7 @@ export class PlannerClient {
     conflicts: ScheduleConflict[];
     recommendations: PlannerAdaptationRecommendation[];
   }> {
-    const res = await fetch('/api/planner/overview', { headers: getHeaders() });
+    const res = await fetch('/api/planner/overview', { credentials: 'include', headers: getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch planner overview.');
     return res.json();
   }
@@ -210,6 +206,24 @@ export class PlannerClient {
   }
 
   /**
+   * Ask AI to identify top topics and subtopics for chosen subjects
+   */
+  static async identifyTopTopics(input: {
+    subjects: import('../types/curriculum').SubjectId[];
+    targetExamTrack?: string;
+    customFocus?: string;
+  }): Promise<{ topics: import('../types/planner').TopicSubtopicGroup[]; source: 'ai' | 'curated' }> {
+    const res = await fetch('/api/planner/identify-topics', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(input),
+    });
+
+    if (!res.ok) throw new Error('Failed to identify top topics and subtopics.');
+    return res.json();
+  }
+
+  /**
    * Generate AI study plan preview
    */
   static async generateAiPlan(input: PlanGenerationInput): Promise<PlanGenerationResult> {
@@ -226,9 +240,10 @@ export class PlannerClient {
   /**
    * Apply previewed AI plan to user profile
    */
-  static async applyGeneratedPlan(result: PlanGenerationResult): Promise<{ plan: StudyPlan; tasksCount: number }> {
+  static async applyGeneratedPlan(result: PlanGenerationResult): Promise<{ plan: StudyPlan; tasks: StudyTask[]; tasksCount?: number }> {
     const res = await fetch('/api/planner/apply-generated', {
       method: 'POST',
+      credentials: 'include',
       headers: getHeaders(),
       body: JSON.stringify({ generatedPlan: result }),
     });
@@ -241,7 +256,7 @@ export class PlannerClient {
    * Get plan version history
    */
   static async getVersions(planId: string): Promise<StudyPlanVersion[]> {
-    const res = await fetch(`/api/planner/versions/${planId}`, { headers: getHeaders() });
+    const res = await fetch(`/api/planner/versions/${planId}`, { credentials: 'include', headers: getHeaders() });
     if (!res.ok) return [];
     const d = await res.json();
     return d.versions || [];
@@ -253,6 +268,7 @@ export class PlannerClient {
   static async rollbackPlan(planId: string, versionId: string): Promise<{ plan: StudyPlan; tasks: StudyTask[] }> {
     const res = await fetch(`/api/planner/versions/${planId}/rollback/${versionId}`, {
       method: 'POST',
+      credentials: 'include',
       headers: getHeaders(),
     });
 
@@ -261,13 +277,20 @@ export class PlannerClient {
   }
 
   /**
-   * Start focus session on task
+   * Start focus session on task or standalone focus sprint
    */
-  static async startFocusSession(taskId: string): Promise<{ sessionId: string; task: StudyTask }> {
+  static async startFocusSession(
+    taskOrInput?: string | { taskId?: string; title?: string; subjectId?: string; topicTitle?: string }
+  ): Promise<{ sessionId: string; session: any; task: StudyTask | null }> {
+    const payload =
+      typeof taskOrInput === 'string'
+        ? { taskId: taskOrInput }
+        : taskOrInput || {};
     const res = await fetch('/api/planner/sessions/start', {
       method: 'POST',
+      credentials: 'include',
       headers: getHeaders(),
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) throw new Error('Failed to start focus session.');
@@ -279,13 +302,21 @@ export class PlannerClient {
    */
   static async stopFocusSession(
     sessionId: string,
-    minutesSpent: number,
+    durationSeconds: number,
+    completed = true,
     notes?: string
-  ): Promise<{ task: StudyTask }> {
+  ): Promise<{ session: any; task: StudyTask | null }> {
     const res = await fetch('/api/planner/sessions/stop', {
       method: 'POST',
+      credentials: 'include',
       headers: getHeaders(),
-      body: JSON.stringify({ sessionId, minutesSpent, notes }),
+      body: JSON.stringify({
+        sessionId,
+        durationSeconds,
+        minutesSpent: Math.round(durationSeconds / 60),
+        completed,
+        notes,
+      }),
     });
 
     if (!res.ok) throw new Error('Failed to stop focus session.');

@@ -183,6 +183,7 @@ export interface PracticeSessionConfig {
   examTrack?: ExamTrackId;
   chapterId?: string;
   topicId?: string;
+  subtopicId?: string;
   conceptId?: string;
   difficultyMode?: 'calibrated_ladder' | 'easy' | 'medium' | 'hard' | 'adaptive';
   questionCount: number; // default 5

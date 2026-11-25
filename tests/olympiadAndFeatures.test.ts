@@ -56,18 +56,20 @@ describe('Olympiad & Platform Upgrades', () => {
   });
 
   it('supplements exhausted static bank selections with fresh parameterized questions and resists forged keys', async () => {
-    const allStaticPhysicsIds = MASTER_QUESTION_BANK.filter((q) => q.subjectId === 'physics').map(
-      (q) => q.id
-    );
+    const topicId = 'phys-topic-work-energy';
+    const allStaticTopicIds = MASTER_QUESTION_BANK.filter(
+      (q) => q.subjectId === 'physics' && q.topicId === topicId
+    ).map((q) => q.id);
     const sessionRes = await request(app)
       .post('/api/learning/session/start')
       .set(auth())
       .send({
         config: {
           subjectId: 'physics',
+          topicId,
           questionCount: 5,
           timed: false,
-          excludeQuestionIds: allStaticPhysicsIds,
+          excludeQuestionIds: allStaticTopicIds,
         },
       });
 
@@ -77,7 +79,7 @@ describe('Olympiad & Platform Upgrades', () => {
       String(q.id).startsWith('q-param-')
     );
     expect(paramQuestion).toBeDefined();
-    expect(allStaticPhysicsIds.includes(paramQuestion.id)).toBe(false);
+    expect(allStaticTopicIds.includes(paramQuestion.id)).toBe(false);
 
     // Attempt to forge answer key on the parameterized question
     const forgedAnswer =

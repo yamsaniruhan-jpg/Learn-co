@@ -23,19 +23,13 @@ export const AIUsageIndicator: React.FC<AIUsageIndicatorProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    let token: string | null = null;
-    try {
-      token = localStorage.getItem('learnco_auth_token');
-    } catch {
-      token = null;
-    }
-    if (!token) {
+    if (!user?.id) {
       setIsLoading(false);
       return;
     }
 
     fetch('/api/ai/usage', {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => {

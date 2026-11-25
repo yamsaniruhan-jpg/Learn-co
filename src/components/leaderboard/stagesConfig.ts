@@ -793,3 +793,15 @@ export function getWeeklyResetCountdown(): { days: number; hours: number; minute
 
   return { days, hours, minutes };
 }
+
+/**
+ * Returns the next substage for weekly promotion
+ */
+export function getNextSubstage(currentSubstageId: string): LeaderboardSubstage | undefined {
+  const currentIndex = ALL_SUBSTAGES.findIndex((s) => s.id === currentSubstageId);
+  if (currentIndex !== -1 && currentIndex < ALL_SUBSTAGES.length - 1) {
+    return ALL_SUBSTAGES[currentIndex + 1];
+  }
+  return undefined;
+}
+

@@ -1,6 +1,7 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { Database, hashPassword, verifyPassword } from '../db';
-import { requireAuth, getEffectiveRole, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, getEffectiveRole, AuthenticatedRequest, extractAuthToken } from '../middleware/authMiddleware';
+import { ensureCsrfCookie, setAuthSessionCookies, clearAuthSessionCookies } from '../middleware/csrf';
 import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
@@ -11,6 +12,12 @@ import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
 import { findAccountByEmailFromSql, persistAccountToSql } from '../../src/db/persistence';
 
 const router = Router();
+
+// GET /api/auth/csrf - ensure double-submit CSRF cookie is present for SPA forms/requests
+router.get('/csrf', (req: Request, res: Response) => {
+  const csrfToken = ensureCsrfCookie(req, res);
+  res.json({ success: true, csrfToken });
+});
 
 // Limit password guessing per client IP. Multi-instance deployments should use
 // a shared rate-limit store; test mode skips this to keep independent suites isolated.
@@ -59,6 +66,8 @@ router.post('/signup', (req, res: Response) => {
       role: profile?.role,
       authProvider: user.authProvider,
     }).catch((error) => console.warn('[CloudSQL] User sync on signup failed:', error));
+
+    setAuthSessionCookies(req, res, token);
 
     res.status(201).json({
       token,
@@ -143,6 +152,8 @@ router.post('/signin', signinLimiter, async (req, res: Response) => {
       authProvider: user.authProvider,
     }).catch((error) => console.warn('[CloudSQL] User sync on signin failed:', error));
 
+    setAuthSessionCookies(req, res, token);
+
     res.json({
       token,
       firebaseToken: idToken || null,
@@ -181,6 +192,8 @@ router.post('/google', async (req, res: Response) => {
     }
     let verifiedEmail: string;
     let decodedUid: string | undefined;
+    let decodedName: string | undefined;
+    let decodedPicture: string | undefined;
     try {
       const decoded = await verifyFirebaseIdTokenSafely(adminAuth, idToken, true);
       if (
@@ -194,6 +207,8 @@ router.post('/google', async (req, res: Response) => {
       }
       verifiedEmail = decoded.email.trim().toLowerCase();
       decodedUid = decoded.uid;
+      decodedName = typeof decoded.name === 'string' ? decoded.name.trim() : undefined;
+      decodedPicture = typeof decoded.picture === 'string' ? decoded.picture.trim() : undefined;
     } catch (err: any) {
       console.warn('[auth/google] Google ID token verification failure:', err?.code || err?.message || err);
       res.status(401).json({ error: 'Invalid or expired Google ID token.' });
@@ -223,19 +238,43 @@ router.post('/google', async (req, res: Response) => {
 
       const created = Database.createUser({
         email: verifiedEmail,
-        fullName: name || verifiedEmail.split('@')[0],
+        fullName: decodedName || name || verifiedEmail.split('@')[0],
         authProvider: 'google',
-        avatarUrl: avatarUrl || '/logo-mark.png',
+        avatarUrl: decodedPicture || avatarUrl || '/logo-mark.png',
         timezone: timezone || 'UTC',
       });
       user = created.user;
+      if (decodedUid) {
+        user.firebaseUid = decodedUid;
+      }
       token = created.token;
       profile = created.profile;
+      Database.saveToDisk();
     } else {
+      if (decodedUid && !user.firebaseUid) {
+        user.firebaseUid = decodedUid;
+      }
       user.lastLoginAt = new Date().toISOString();
       user.updatedAt = new Date().toISOString();
       token = Database.createSession(user.id);
       profile = Database.getProfile(user.id);
+      const preferredAvatar = decodedPicture || avatarUrl;
+      const preferredName = decodedName || name;
+      if (profile) {
+        const profileUpdates: Record<string, any> = {};
+        if (preferredAvatar && (!profile.avatarUrl || profile.avatarUrl === '/logo-mark.png')) {
+          profileUpdates.avatarUrl = preferredAvatar;
+        }
+        if (preferredName && (!profile.displayName || profile.displayName === verifiedEmail.split('@')[0])) {
+          profileUpdates.displayName = preferredName;
+          if (!profile.fullName || profile.fullName === verifiedEmail.split('@')[0]) {
+            profileUpdates.fullName = preferredName;
+          }
+        }
+        if (Object.keys(profileUpdates).length > 0) {
+          profile = Database.updateProfile(user.id, profileUpdates);
+        }
+      }
       Database.saveToDisk();
       void persistAccountToSql(user);
     }
@@ -261,6 +300,8 @@ router.post('/google', async (req, res: Response) => {
       role: profile?.role,
       authProvider: user.authProvider,
     }).catch((error) => console.warn('[CloudSQL] User sync on google auth failed:', error));
+
+    setAuthSessionCookies(req, res, token);
 
     res.json({
       token,
@@ -297,6 +338,8 @@ router.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     const effectiveRole = getEffectiveRole(req);
     const effectiveProfile = { ...profile, role: effectiveRole };
 
+    ensureCsrfCookie(req, res);
+
     res.json({
       user: {
         id: user.id,
@@ -315,11 +358,11 @@ router.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
 
 // POST /api/auth/signout
 router.post('/signout', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
+  const token = extractAuthToken(req);
+  if (token) {
     Database.revokeSession(token);
   }
+  clearAuthSessionCookies(req, res);
   res.json({ success: true, message: 'Signed out successfully.' });
 });
 
@@ -370,24 +413,28 @@ router.post('/onboarding', requireAuth, (req: AuthenticatedRequest, res: Respons
 // PASSWORD RESET
 // ==========================================================
 
-// Password reset sends email, so it needs throttling — but a limit keyed only by
-// IP would let one attacker lock every user out by exhausting the shared bucket
-// (and would also catch several people on the same campus NAT). Throttle per
-// address instead, so abuse is contained to the account being targeted.
-// Skipped in tests so the suite is not throttled by its own assertions.
-const resetLimiter = rateLimit({
+// Throttle password reset requests by both client IP (blocks rotation attacks
+// across many emails) and target email (max 5/hr/email to block distributed spam).
+// Skipped in tests so the reset flow test suite is not throttled by its own assertions.
+const resetIpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 10,
+  limit: 15,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skip: () => process.env.NODE_ENV === 'test',
+  keyGenerator: (req: any) => `reset:ip:${ipKeyGenerator(req.ip)}`,
+  message: { error: 'Too many reset requests from this network. Please try again later.' },
+});
+
+const resetEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: (req: any) => process.env.NODE_ENV === 'test' || !String(req.body?.email || '').trim(),
   keyGenerator: (req: any) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
-    if (email) return `reset:email:${email}`;
-    // Fall back to IP when no address was supplied. `ipKeyGenerator` is required:
-    // a bare `req.ip` lets anyone rotate through their own IPv6 /64 and bypass the
-    // limit (ERR_ERL_KEY_GEN_IPV6).
-    return `reset:ip:${ipKeyGenerator(req.ip)}`;
+    return `reset:email:${email}`;
   },
   message: { error: 'Too many reset requests for this address. Please try again later.' },
 });
@@ -410,7 +457,7 @@ router.get('/mail-status', (_req, res: Response) => {
  * Answers identically for known and unknown addresses. If email is unavailable
  * for the whole deployment, return a generic 503 before issuing any token.
  */
-router.post('/forgot-password', resetLimiter, async (req, res: Response) => {
+router.post('/forgot-password', resetIpLimiter, resetEmailLimiter, async (req, res: Response) => {
   const respond = () => res.json({
     success: true,
     message: 'If an account exists for that address, a reset link will be sent if delivery is available.',
@@ -489,7 +536,7 @@ router.get('/reset-password/:token', (req, res: Response) => {
  * POST /api/auth/reset-password
  * Body: { token, password }
  */
-router.post('/reset-password', resetLimiter, (req, res: Response) => {
+router.post('/reset-password', resetIpLimiter, (req, res: Response) => {
   try {
     const token = String(req.body?.token || '').trim();
     const password = String(req.body?.password || '');
@@ -518,6 +565,7 @@ router.post('/reset-password', resetLimiter, (req, res: Response) => {
     // so the user lands signed in rather than being bounced to the login screen.
     const session = Database.createSession(result.userId);
     const user = Database.findUserById(result.userId);
+    setAuthSessionCookies(req, res, session);
     res.json({
       success: true,
       message: 'Your password has been updated.',

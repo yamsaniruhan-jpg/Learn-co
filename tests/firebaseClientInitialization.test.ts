@@ -4,11 +4,12 @@ const mocks = vi.hoisted(() => ({
   initializeApp: vi.fn((config: any) => ({ name: 'test', options: config })),
   getAuth: vi.fn((app: any) => { if (!app.name) throw new Error('No app'); return { app }; }),
   getFirestore: vi.fn(() => ({})),
+  addScope: vi.fn(),
 }));
 vi.mock('firebase/app', () => ({ initializeApp: mocks.initializeApp, getApps: () => [], getApp: vi.fn() }));
 vi.mock('firebase/auth', () => ({
   getAuth: mocks.getAuth,
-  GoogleAuthProvider: class { addScope() {} setCustomParameters() {} },
+  GoogleAuthProvider: class { addScope(scope: string) { mocks.addScope(scope); } setCustomParameters() {} },
   signInWithPopup: vi.fn(), signInWithRedirect: vi.fn(), getRedirectResult: vi.fn(),
   signInWithEmailAndPassword: vi.fn(), createUserWithEmailAndPassword: vi.fn(),
   updateProfile: vi.fn(), signOut: vi.fn(), onAuthStateChanged: vi.fn(),
@@ -36,6 +37,7 @@ describe('Firebase client initialization', () => {
     }));
     expect(mocks.getFirestore).toHaveBeenCalledWith(expect.anything(), 'override-db');
     expect(client.isFirebaseConfigured()).toBe(true);
+    expect(mocks.addScope.mock.calls.map(([scope]) => scope)).toEqual(['email', 'profile']);
   });
 
   it('does not initialize a mixed-project SDK when a core override is incomplete', async () => {

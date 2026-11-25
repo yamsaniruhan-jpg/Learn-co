@@ -17,7 +17,7 @@ afterEach(async () => {await act(async()=>root.unmount());el.remove();});
 describe('Copilot message evidence and recovery', () => {
   it('labels retrieved context as unverified and exposes expanded state', async () => {
     await act(async()=>root.render(<CopilotMessageItem message={message} userFullName="Alice" />));
-    expect(el.textContent).toContain('not verified citations');
+    expect(el.textContent).toContain('Retrieved reference material');
     const toggle=button('Retrieved reference material'); expect(toggle.getAttribute('aria-expanded')).toBe('true');
     await act(async()=>toggle.click()); expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(el.textContent).toContain('generated questions earn no server XP');

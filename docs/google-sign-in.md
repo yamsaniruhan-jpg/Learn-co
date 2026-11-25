@@ -2,6 +2,8 @@
 
 Google's **403 `access_denied` / “Access blocked”** screen is returned by Google before the application can exchange a Firebase ID token. The message alone does not prove which setting is wrong. Check the exact error details and the OAuth client ID on that screen; do not share authorization codes, tokens, passwords, or client secrets.
 
+The newer main-branch sign-in requested broad Gmail mailbox scopes in addition to identity. This branch removes those unnecessary Gmail scopes from ordinary sign-in: they can add verification requirements and request access unrelated to login, though we cannot verify they caused the reported 403. The client-side Gmail helper is not wired into the sign-in flow; Gmail access would require a separate, explicit opt-in authorization flow and appropriate Google review. Server-configured mail delivery is separate.
+
 ## For the project owner
 
 1. In Firebase Console, select the project used by the deployed web app. The committed default in `firebase-applet-config.json` names project `robust-virtue-62t1j` and auth domain `robust-virtue-62t1j.firebaseapp.com`; a deployment may use a build-time override. Enable **Authentication → Sign-in method → Google** and configure its support email. Google sign-in must be enabled in the same Firebase project the client uses.

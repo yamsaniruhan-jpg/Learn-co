@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'primary' | 'success' | 'warning' | 'error' | 'outline' | 'xp' | 'streak' | 'math' | 'cs' | 'physics' | 'chemistry' | 'biology' | 'english' | 'data_science';
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'error' | 'outline' | 'xp' | 'streak' | 'math' | 'cs' | 'physics' | 'chemistry' | 'biology' | 'english' | 'data_science' | 'secondary';
   size?: 'sm' | 'md' | 'lg';
   dot?: boolean;
 }
@@ -37,6 +37,7 @@ export const Badge: React.FC<BadgeProps> = ({
     biology: 'bg-[#E056FD] text-white border border-[#b83acc]',
     english: 'bg-[#8854D0] text-white border border-[#6f3fb0]',
     data_science: 'bg-[#00D2D3] text-[#2D2A4A] border border-[#00abab]',
+    secondary: 'bg-[#F7F5FF] dark:bg-[#2A2647] text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861]',
   };
 
   return (

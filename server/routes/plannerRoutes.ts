@@ -96,6 +96,18 @@ router.post('/plan', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/planner/identify-topics (Identify top topics & subtopics per subject)
+router.post('/identify-topics', async (req: Request, res: Response) => {
+  try {
+    resolveUserId(req);
+    const { subjects, targetExamTrack, customFocus } = req.body || {};
+    const result = await PlannerEngine.identifyTopTopics(subjects, targetExamTrack, customFocus);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to identify topics.' });
+  }
+});
+
 // POST /api/planner/generate-ai (Preview AI-assisted plan)
 router.post('/generate-ai', async (req: Request, res: Response) => {
   try {
@@ -468,18 +480,24 @@ router.get('/recommendations', (req: Request, res: Response) => {
 router.post('/sessions/start', async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
-    const { taskId, title, subjectId, topicTitle } = req.body;
+    const { taskId, title, subjectId, topicTitle } = req.body || {};
 
-    const session = await withUserLock(userId, async () => {
-      return Database.startActiveStudySession(userId, {
+    const result = await withUserLock(userId, async () => {
+      const session = Database.startActiveStudySession(userId, {
         taskId,
         title: title || 'Focused Study Session',
         subjectId: subjectId || 'math',
         topicTitle,
       });
+      const task = taskId ? Database.listTasks(userId).find((t) => t.id === taskId) || null : null;
+      return { session, task };
     });
 
-    res.status(201).json({ session });
+    res.status(201).json({
+      session: result.session,
+      sessionId: result.session.id,
+      task: result.task,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to start study session.' });
   }
@@ -489,29 +507,42 @@ router.post('/sessions/start', async (req: Request, res: Response) => {
 router.post('/sessions/stop', async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
-    const { sessionId, durationSeconds, completed, notes } = req.body;
+    const { sessionId, durationSeconds, minutesSpent, completed, notes } = req.body || {};
 
     if (!sessionId) {
       res.status(400).json({ error: 'sessionId is required.' });
       return;
     }
 
-    const session = await withUserLock(userId, async () => {
-      return Database.stopActiveStudySession(
+    const resolvedSeconds =
+      typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)
+        ? Math.max(0, Math.round(durationSeconds))
+        : typeof minutesSpent === 'number' && Number.isFinite(minutesSpent)
+        ? Math.max(0, Math.round(minutesSpent * 60))
+        : 0;
+    const isCompleted = typeof completed === 'boolean' ? completed : resolvedSeconds > 0;
+
+    const result = await withUserLock(userId, async () => {
+      const session = Database.stopActiveStudySession(
         userId,
         sessionId,
-        durationSeconds || 0,
-        !!completed,
+        resolvedSeconds,
+        isCompleted,
         notes
       );
+      if (!session) return null;
+      const task = session.taskId
+        ? Database.listTasks(userId).find((t) => t.id === session.taskId) || null
+        : null;
+      return { session, task };
     });
 
-    if (!session) {
+    if (!result) {
       res.status(404).json({ error: 'Session not found.' });
       return;
     }
 
-    res.json({ session });
+    res.json({ session: result.session, task: result.task });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to stop study session.' });
   }

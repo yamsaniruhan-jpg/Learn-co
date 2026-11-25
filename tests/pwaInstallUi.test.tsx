@@ -34,4 +34,21 @@ describe('mobile install guidance', () => {
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
+  it('promotes direct Home Screen installation on desktop without desktop file downloads', async () => {
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    device.isIOS = false;
+    device.isMobile = false;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<PWAInstallButton />));
+    const button = container.querySelector('button')!;
+    await act(async () => button.click());
+    expect(container.textContent).toContain('Add LearnCo to Home Screen');
+    expect(container.textContent).not.toContain('Desktop File (.html)');
+    expect(container.textContent).not.toContain('Save Clickable App File');
+    expect(container.textContent).toContain('Install LearnCo');
+    const iconImg = container.querySelector('img[alt="LearnCo Home Screen Icon"]') as HTMLImageElement | null;
+    expect(iconImg?.getAttribute('src')).toBe('/icons/icon-192.png');
+  });
 });

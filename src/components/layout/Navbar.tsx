@@ -68,43 +68,44 @@ export const Navbar: React.FC<NavbarProps> = ({
   const allowanceRemaining = Math.max(0, DAILY_PRACTICE_LIMIT - solvedToday);
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] transition-colors shadow-[0_1px_3px_rgba(45,42,74,0.05)]">
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-x-2 sm:gap-x-3 gap-y-1">
+    <header className="sticky top-0 z-30 w-full bg-[#FFFFFF] dark:bg-[#2A2647] border-b border-[#E3DFF5] dark:border-[#3D3861] transition-colors shadow-[0_1px_2px_rgba(45,42,74,0.04)]">
+      <div className="max-w-[1600px] mx-auto px-2.5 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
         {/* Left: Brand Logo */}
-        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-5 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('dashboard')}
             aria-label="Go to dashboard"
             className="cursor-pointer hover:opacity-90 transition-opacity rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6C5CE7]"
           >
-            <BrandLogo size="md" />
+            <BrandLogo size="sm" className="sm:hidden" />
+            <BrandLogo size="md" className="hidden sm:flex" />
           </button>
 
           {/* Quick Command Palette Button on Desktop */}
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-56 lg:w-72 justify-between cursor-pointer min-h-[40px]"
+            className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-52 lg:w-64 justify-between cursor-pointer min-h-[44px]"
           >
-            <span className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-[#6B6890]" />
-              <span>Search STEM modules & tools...</span>
+            <span className="flex items-center gap-2 truncate">
+              <Search className="w-4 h-4 text-[#6B6890] shrink-0" />
+              <span className="truncate">Search modules...</span>
             </span>
-            <kbd className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#FFFFFF] dark:bg-[#2A2647] rounded-full border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]">
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#FFFFFF] dark:bg-[#2A2647] rounded border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]">
               ⌘K
             </kbd>
           </button>
         </div>
 
-        {/* Right: Gamification Status, Quota, Notifications, Theme, and Profile */}
-        <div className="flex min-w-0 flex-wrap 2xl:flex-nowrap items-center justify-end gap-1 sm:gap-2.5">
+        {/* Right: Single-row compact mobile controls */}
+        <div className="flex min-w-0 flex-nowrap items-center justify-end gap-1 sm:gap-2">
           {/* Mobile Search Icon Trigger */}
           <button
             onClick={onOpenSearch}
-            className="md:hidden p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]"
+            className="md:hidden h-11 w-11 flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] shrink-0 cursor-pointer"
             aria-label="Open Search"
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-4.5 h-4.5" />
           </button>
 
           {/* Offline Mode Indicator if disconnected */}
@@ -162,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onToggleZenMode && (
             <button
               onClick={onToggleZenMode}
-              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+              className="hidden sm:flex p-2 min-h-[40px] min-w-[40px] items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] dark:hover:text-[#8577ED] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
               title={isZenMode ? "Exit Zen Mode" : "Enter Distraction-Free Zen Study Canvas (Esc to exit)"}
               aria-label="Toggle Zen Focus Mode"
             >
@@ -171,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Daily Allowance Quota Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold border border-[#E3DFF5] dark:border-[#3D3861] min-h-[40px] tabular-nums">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-bold border border-[#E3DFF5] dark:border-[#3D3861] min-h-[38px] tabular-nums">
             <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] font-semibold">Quota:</span>
             <span className="text-[#6C5CE7] dark:text-[#8577ED] font-black">
               {allowanceRemaining}/{DAILY_PRACTICE_LIMIT}
@@ -183,39 +184,49 @@ export const Navbar: React.FC<NavbarProps> = ({
             <AIUsageIndicator userTier={user?.subscription} />
           </div>
 
-          {/* Streak Flame */}
+          {/* Streak Flame (tappable on both mobile & desktop to open Streak Modal) */}
+          <div className="sm:hidden shrink-0">
+            <StreakIndicator streak={gamification?.currentStreak ?? 0} size="sm" className="!px-2 !py-1 !text-[11px]" />
+          </div>
           <div className="hidden sm:block">
             <StreakIndicator streak={gamification?.currentStreak ?? 0} size="sm" />
           </div>
 
           {/* XP Pill */}
-          <XPIndicator xp={gamification?.xp ?? 0} size="sm" />
+          <div className="hidden sm:block">
+            <XPIndicator xp={gamification?.xp ?? 0} size="sm" />
+          </div>
 
-          {/* In-App PWA Install Action */}
-          <PWAInstallButton />
+          {/* Direct Home Screen App Install Action */}
+          <div className="sm:hidden shrink-0">
+            <PWAInstallButton compact compactLabel="App" />
+          </div>
+          <div className="hidden sm:block shrink-0">
+            <PWAInstallButton />
+          </div>
 
           {/* Notification Bell */}
           <button
             onClick={onOpenNotifications}
-            className="relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+            className="relative h-11 w-11 flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer shrink-0"
             aria-label="Notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
             {unreadNotificationsCount > 0 && (
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#6C5CE7] ring-2 ring-[#FFFFFF] dark:ring-[#2A2647]" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#6C5CE7] ring-2 ring-[#FFFFFF] dark:ring-[#2A2647]" />
             )}
           </button>
 
           {/* Theme Toggle (Dark/Light) */}
           <button
             onClick={onToggleTheme}
-            className="flex p-2.5 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer shrink-0"
             aria-label="Toggle theme"
           >
             {isDarkMode ? (
-              <Sun className="w-5 h-5 text-[#FFB84D]" />
+              <Sun className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-[#FFB84D]" />
             ) : (
-              <Moon className="w-5 h-5 text-[#6B6890]" />
+              <Moon className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-[#6B6890]" />
             )}
           </button>
 

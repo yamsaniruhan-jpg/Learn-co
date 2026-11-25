@@ -10,7 +10,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { awardXp } from './utils/xpManager';
 import { useLocalPractice } from './utils/localPractice';
 import { useLocalNotifications } from './utils/localNotifications';
-import { lazyNamed } from './utils/lazyNamed';
+import { lazyNamed, lazyWithRetry } from './utils/lazyNamed';
 import {
   Sparkles,
   ShieldCheck,
@@ -42,16 +42,13 @@ const OnboardingWizard = lazy(() =>
 const MobileAllTabsNav = lazy(() =>
   import('./components/layout/MobileAllTabsNav').then((m) => ({ default: m.MobileAllTabsNav }))
 );
-const SlidingTaskbar = lazy(() =>
-  import('./components/layout/SlidingTaskbar').then((m) => ({ default: m.SlidingTaskbar }))
-);
 const ZenFocusCanvas = lazy(() =>
   import('./components/common/ZenFocusCanvas').then((m) => ({ default: m.ZenFocusCanvas }))
 );
 const FloatingGuideButton = lazy(() =>
   import('./components/common/FloatingGuideButton').then((m) => ({ default: m.FloatingGuideButton }))
 );
-const OmniCopilot = lazy(() => import('./components/OmniCopilot'));
+const OmniCopilot = lazyWithRetry(() => import('./components/OmniCopilot'));
 const IOSInstallBanner = lazy(() =>
   import('./components/pwa/IOSInstallBanner').then((m) => ({ default: m.IOSInstallBanner }))
 );
@@ -152,6 +149,10 @@ const OfflineSyncView = lazyNamed(
   () => import('./components/common/OfflineSyncView'),
   'OfflineSyncView'
 );
+const SavedView = lazyNamed(
+  () => import('./components/common/SavedView'),
+  'SavedView'
+);
 const FormulaInspectorModal = lazyNamed(
   () => import('./components/common/FormulaInspectorModal'),
   'FormulaInspectorModal'
@@ -168,7 +169,7 @@ const NotificationCenter = lazyNamed(
   () => import('./components/layout/NotificationCenter'),
   'NotificationCenter'
 );
-const Marketplace = lazy(() => import('./components/Marketplace'));
+const Marketplace = lazyWithRetry(() => import('./components/Marketplace'));
 
 export default function App() {
   const { user, profile, gamification, settings, isLoading, isAuthenticated } = useAuth();
@@ -498,9 +499,9 @@ export default function App() {
                   <div className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
                     Android, iOS &amp; Desktop PWA
                   </div>
-                  <div className="text-sm font-black mt-1">Add to Home Screen &amp; Offline Sync</div>
+                  <div className="text-sm font-black mt-1">Direct Home Screen App &amp; Offline Sync</div>
                   <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
-                    Install straight to your phone home screen or download a desktop launcher with automatic offline attempt queueing.
+                    Add straight to your phone Home Screen or Desktop Apps with automatic offline practice queueing and cloud sync.
                   </p>
                 </div>
 
@@ -518,10 +519,10 @@ export default function App() {
               <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
-                    Install Learn.co on Mobile or Desktop
+                    Add Learn.co to Your Home Screen
                   </div>
                   <div className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">
-                    Auto-detects Android/iOS Home Screen installation or desktop `.url` / `.html` / `.webloc` / `.desktop` shortcuts.
+                    Installs directly on Android, iPhone, iPad, or Desktop browsers — zero file download needed.
                   </div>
                 </div>
                 <div className="shrink-0">
@@ -592,15 +593,8 @@ export default function App() {
         />
       </Suspense>
 
-      {/* Horizontal Sliding Taskbar for All Tabs */}
-      {!isZenMode && (
-        <Suspense fallback={null}>
-          <SlidingTaskbar activeTab={activeTab} setActiveTab={setActiveTab} />
-        </Suspense>
-      )}
-
       {/* Main Body Workspace */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-w-0 w-full overflow-x-clip">
         {/* Desktop Left Nav Sidebar */}
         <Suspense fallback={null}>
           <Sidebar
@@ -616,7 +610,7 @@ export default function App() {
         {/* Dynamic Center Stage Canvas with Zen Focus Canvas */}
         <Suspense fallback={<div className="flex-1" />}>
           <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
+          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-3 py-4 sm:p-6 lg:p-8 pb-24 md:pb-8 bg-[#F7F5FF] dark:bg-[#1E1B33] transition-colors">
             <ErrorBoundary
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
@@ -809,6 +803,7 @@ export default function App() {
               {activeTab === 'voice-exam' && <VoiceExamView onNavigateToTab={(tab) => setActiveTab(tab)} />}
               {activeTab === 'forecaster' && <ExamForecasterView onNavigateToTab={(tab) => setActiveTab(tab)} />}
               {activeTab === 'offline-sync' && <OfflineSyncView onNavigateToTab={(tab) => setActiveTab(tab)} />}
+              {activeTab === 'saved' && <SavedView onNavigate={(tab) => setActiveTab(tab)} />}
 
               {(activeTab === 'user-guide' || activeTab === 'guide') && (
                 <UserGuideView onNavigateToTab={handleNavigateWithContext} />
@@ -978,25 +973,33 @@ export default function App() {
 
       {/* Floating Guide Icon beside Floating Omni Copilot Widget */}
       {!isZenMode && (
-        <Suspense fallback={null}>
-          <FloatingGuideButton
-            activeTab={activeTab}
-            onNavigate={handleNavigateWithContext}
-            copilotVisible={activeTab !== 'copilot'}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <FloatingGuideButton
+              activeTab={activeTab}
+              onNavigate={handleNavigateWithContext}
+              copilotVisible={activeTab !== 'copilot'}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {activeTab !== 'copilot' && !isZenMode && (
-        <Suspense fallback={null}>
-          <OmniCopilot />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <OmniCopilot />
+          </Suspense>
+        </ErrorBoundary>
       )}
-      <Suspense fallback={null}>
-        <IOSInstallBanner />
-      </Suspense>
-      <Suspense fallback={null}>
-        <OfflineIndicator onOpenOfflineSync={() => setActiveTab('offline-sync')} />
-      </Suspense>
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <IOSInstallBanner />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <OfflineIndicator onOpenOfflineSync={() => setActiveTab('offline-sync')} />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

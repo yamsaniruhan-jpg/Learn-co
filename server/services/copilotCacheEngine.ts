@@ -48,6 +48,9 @@ export class CopilotCacheEngine {
     learnerLevel: string;
     modelPreference?: string;
     citations: unknown[];
+    hintFirst?: boolean;
+    revealFullSolution?: boolean;
+    imageDigest?: string;
   }): string {
     return `v2:${createHash('sha256').update(JSON.stringify(input)).digest('hex')}`;
   }

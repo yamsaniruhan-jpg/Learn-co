@@ -16,11 +16,14 @@ import {
   KeyRound,
   Copy,
   Check,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
+import { buildApiHeaders } from '../../utils/csrf';
 import {
   createFirestoreStudyRoom,
+  deleteFirestoreStudyRoom,
   fetchFirestoreStudyRooms,
   generateRoomCode,
   joinFirestorePrivateRoom,
@@ -78,6 +81,7 @@ interface Room {
   visibility?: RoomVisibility;
   roomCode?: string | null;
   hostName?: string;
+  isHost?: boolean;
   isLocked?: boolean;
   peers: RoomPeer[];
   peerCount: number;
@@ -146,6 +150,11 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joiningPrivate, setJoiningPrivate] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Delete room modal state
+  const [deleteConfirmRoom, setDeleteConfirmRoom] = useState<Room | null>(null);
+  const [deletingRoom, setDeletingRoom] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [inputMsg, setInputMsg] = useState('');
   const [pollQuestion, setPollQuestion] = useState('');
@@ -356,6 +365,21 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
             }
             break;
           }
+          case 'room:deleted': {
+            const deletedId = msg.roomId;
+            if (typeof deletedId === 'string') {
+              setRooms((prev) => {
+                const next = prev.filter((r) => r.id !== deletedId);
+                if (activeRoomIdRef.current === deletedId) {
+                  const fallback = next.find((r) => !r.isLocked) || next[0] || null;
+                  setActiveRoomId(fallback ? fallback.id : '');
+                  setActiveRoomState(fallback);
+                }
+                return next;
+              });
+            }
+            break;
+          }
         }
       };
 
@@ -429,20 +453,22 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [activeRoomState?.messages?.length]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = inputMsg.trim();
-    if (!trimmed) return;
+    if (!trimmed || !activeRoomId) return;
     const msgId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const vis: RoomVisibility = activeRoom?.visibility === 'private' ? 'private' : 'public';
+
     const sent = sendWsEvent({
       type: 'chat:send',
       roomId: activeRoomId,
       id: msgId,
       text: trimmed,
     });
+
     if (sent) {
       setInputMsg('');
-      const vis: RoomVisibility = activeRoom?.visibility === 'private' ? 'private' : 'public';
       void postFirestoreRoomMessage({
         roomId: activeRoomId,
         messageId: msgId,
@@ -450,16 +476,76 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
         text: trimmed,
         visibility: vis,
       });
+      return;
+    }
+
+    // HTTP fallback when WebSocket is reconnecting or proxied without WS upgrade
+    try {
+      const ticket = accessTickets[activeRoomId];
+      const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/messages`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+        body: JSON.stringify({
+          id: msgId,
+          peerId: peerIdRef.current,
+          displayName,
+          text: trimmed,
+          ticket,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.message) {
+        setInputMsg('');
+        setActiveRoomState((prev) => {
+          if (!prev || prev.id !== activeRoomId) return prev;
+          if (prev.messages.some((m) => m.id === data.message.id)) return prev;
+          return { ...prev, messages: [...prev.messages, data.message].slice(-100) };
+        });
+        void postFirestoreRoomMessage({
+          roomId: activeRoomId,
+          messageId: msgId,
+          user: displayName,
+          text: trimmed,
+          visibility: vis,
+        });
+      }
+    } catch {
+      // Preserve draft text so user can retry
     }
   };
 
-  const handleTimerControl = (action: 'start' | 'pause' | 'reset' | 'set_mode', mode?: PomodoroMode) => {
-    sendWsEvent({
+  const handleTimerControl = async (action: 'start' | 'pause' | 'reset' | 'set_mode', mode?: PomodoroMode) => {
+    if (!activeRoomId) return;
+    const sent = sendWsEvent({
       type: 'timer:control',
       roomId: activeRoomId,
       action,
       mode,
     });
+    if (sent) return;
+
+    try {
+      const ticket = accessTickets[activeRoomId];
+      const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/timer`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+        body: JSON.stringify({
+          peerId: peerIdRef.current,
+          displayName,
+          action,
+          mode,
+          ticket,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.timer) {
+        setActiveRoomState((prev) => (prev && prev.id === activeRoomId ? { ...prev, timer: data.timer } : prev));
+      }
+    } catch {
+      // Ignore transient HTTP fallback error
+    }
   };
 
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -476,7 +562,8 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
     try {
       const res = await fetch('/api/study-rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: buildApiHeaders(),
         body: JSON.stringify({
           title: newTitle.trim(),
           topic: newTopic.trim(),
@@ -510,15 +597,71 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
         hostName: displayName,
       });
 
-      setRooms((prev) => [data.room, ...prev.filter((r) => r.id !== data.room.id)]);
+      const createdRoom: Room = { ...data.room, isHost: data.room.isHost ?? true };
+      setRooms((prev) => [createdRoom, ...prev.filter((r) => r.id !== createdRoom.id)]);
       setNewTitle('');
       setNewTopic('');
       setNewPassword('');
       setNewRoomCode(generateRoomCode());
       setIsCreateModalOpen(false);
-      handleSelectRoom(data.room.id, data.accessTicket || undefined);
+      handleSelectRoom(createdRoom.id, data.accessTicket || undefined);
     } catch {
       setCreateError('Network error while creating study room.');
+    }
+  };
+
+  const handleConfirmDeleteRoom = async () => {
+    if (!deleteConfirmRoom) return;
+    const target = deleteConfirmRoom;
+    setDeletingRoom(true);
+    setDeleteError(null);
+    try {
+      const ticket = accessTickets[target.id];
+      const res = await fetch(
+        `/api/study-rooms/${encodeURIComponent(target.id)}?peerId=${encodeURIComponent(peerIdRef.current)}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined, false),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(data?.error || 'Could not delete study room.');
+        setDeletingRoom(false);
+        return;
+      }
+
+      void deleteFirestoreStudyRoom(target.id);
+
+      setRooms((prev) => {
+        const next = prev.filter((r) => r.id !== target.id);
+        if (activeRoomIdRef.current === target.id) {
+          const fallback = next.find((r) => !r.isLocked) || next[0] || null;
+          setActiveRoomId(fallback ? fallback.id : '');
+          setActiveRoomState(fallback);
+          if (fallback) {
+            sendWsEvent({
+              type: 'room:join',
+              roomId: fallback.id,
+              displayName,
+              accessTicket: accessTicketsRef.current[fallback.id],
+            });
+          }
+        }
+        return next;
+      });
+
+      setAccessTickets((prev) => {
+        const copy = { ...prev };
+        delete copy[target.id];
+        return copy;
+      });
+      setDeleteConfirmRoom(null);
+    } catch {
+      setDeleteError('Network error while deleting study room.');
+    } finally {
+      setDeletingRoom(false);
     }
   };
 
@@ -536,7 +679,8 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
     try {
       const res = await fetch('/api/study-rooms/join-private', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: buildApiHeaders(),
         body: JSON.stringify({
           roomCode: cleanCode,
           password: cleanPassword,
@@ -599,33 +743,86 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
     }
   };
 
-  const handleCreatePoll = (e: React.FormEvent) => {
+  const handleCreatePoll = async (e: React.FormEvent) => {
     e.preventDefault();
     const options = pollOptionsText
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)
       .slice(0, 4);
-    if (!pollQuestion.trim() || options.length < 2) return;
-    sendWsEvent({
+    if (!pollQuestion.trim() || options.length < 2 || !activeRoomId) return;
+    const pollId = `poll-${Date.now()}`;
+    const question = pollQuestion.trim();
+    const sent = sendWsEvent({
       type: 'poll:create',
       roomId: activeRoomId,
-      id: `poll-${Date.now()}`,
-      question: pollQuestion.trim(),
+      id: pollId,
+      question,
       options,
     });
+    if (!sent) {
+      try {
+        const ticket = accessTickets[activeRoomId];
+        const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/polls`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+          body: JSON.stringify({
+            id: pollId,
+            peerId: peerIdRef.current,
+            displayName,
+            question,
+            options,
+            ticket,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.activePoll) {
+          setActiveRoomState((prev) =>
+            prev && prev.id === activeRoomId ? { ...prev, activePoll: data.activePoll } : prev
+          );
+        }
+      } catch {
+        // Ignore transient fallback error
+      }
+    }
     setPollQuestion('');
     setIsPollModalOpen(false);
   };
 
-  const handleVotePoll = (optionIndex: number) => {
-    if (!activeRoomState?.activePoll) return;
-    sendWsEvent({
+  const handleVotePoll = async (optionIndex: number) => {
+    if (!activeRoomState?.activePoll || !activeRoomId) return;
+    const pollId = activeRoomState.activePoll.id;
+    const sent = sendWsEvent({
       type: 'poll:vote',
       roomId: activeRoomId,
-      pollId: activeRoomState.activePoll.id,
+      pollId,
       optionIndex,
     });
+    if (sent) return;
+
+    try {
+      const ticket = accessTickets[activeRoomId];
+      const res = await fetch(`/api/study-rooms/${encodeURIComponent(activeRoomId)}/polls/vote`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: buildApiHeaders(ticket ? { 'x-room-ticket': ticket } : undefined),
+        body: JSON.stringify({
+          peerId: peerIdRef.current,
+          pollId,
+          optionIndex,
+          ticket,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.activePoll) {
+        setActiveRoomState((prev) =>
+          prev && prev.id === activeRoomId ? { ...prev, activePoll: data.activePoll } : prev
+        );
+      }
+    } catch {
+      // Ignore transient fallback error
+    }
   };
 
   const filteredRooms = rooms.filter((r) => {
@@ -743,40 +940,63 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
             {filteredRooms.map((room) => {
               const isPrivate = room.visibility === 'private';
               const isLocked = Boolean(isPrivate && room.isLocked && !accessTickets[room.id]);
+              const isActive = activeRoomId === room.id;
               return (
-                <button
-                  type="button"
+                <div
                   key={room.id}
-                  onClick={() => handleSelectRoom(room.id)}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                    activeRoomId === room.id
+                  className={`w-full rounded-2xl border transition-all flex items-stretch gap-1 ${
+                    isActive
                       ? 'bg-[#6C5CE7] text-white border-[#6C5CE7] shadow-md'
                       : 'bg-white dark:bg-[#2A2647] border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:border-[#6C5CE7]'
                   }`}
                 >
-                  <div className="space-y-1 min-w-0 pr-2">
-                    <div className="flex items-center gap-2">
-                      {isPrivate ? (
-                        <Lock className={`w-3.5 h-3.5 shrink-0 ${activeRoomId === room.id ? 'text-amber-200' : 'text-amber-500'}`} />
-                      ) : (
-                        <Globe className={`w-3.5 h-3.5 shrink-0 ${activeRoomId === room.id ? 'text-emerald-200' : 'text-emerald-500'}`} />
-                      )}
-                      <h4 className="font-bold text-sm truncate">{room.title}</h4>
-                    </div>
-                    <p className={`text-[11px] truncate ${activeRoomId === room.id ? 'text-white/80' : 'text-[#6B6890] dark:text-[#B4B0D5]'}`}>
-                      Topic: {room.topic}
-                    </p>
-                  </div>
-                  <div
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold shrink-0 tabular-nums ${
-                      activeRoomId === room.id
-                        ? 'bg-white/20 text-white'
-                        : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5]'
-                    }`}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectRoom(room.id)}
+                    className="flex-1 min-w-0 text-left p-4 cursor-pointer flex items-center justify-between"
                   >
-                    {isLocked ? 'Locked' : `${room.peerCount} Online`}
-                  </div>
-                </button>
+                    <div className="space-y-1 min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        {isPrivate ? (
+                          <Lock className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-200' : 'text-amber-500'}`} />
+                        ) : (
+                          <Globe className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-200' : 'text-emerald-500'}`} />
+                        )}
+                        <h4 className="font-bold text-sm truncate">{room.title}</h4>
+                      </div>
+                      <p className={`text-[11px] truncate ${isActive ? 'text-white/80' : 'text-[#6B6890] dark:text-[#B4B0D5]'}`}>
+                        Topic: {room.topic}
+                      </p>
+                    </div>
+                    <div
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold shrink-0 tabular-nums ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5]'
+                      }`}
+                    >
+                      {isLocked ? 'Locked' : `${room.peerCount} Online`}
+                    </div>
+                  </button>
+                  {room.isHost && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteConfirmRoom(room);
+                      }}
+                      aria-label={`Delete ${room.title}`}
+                      title="Delete your study room"
+                      className={`px-3 flex items-center justify-center rounded-r-2xl transition cursor-pointer shrink-0 ${
+                        isActive
+                          ? 'text-white/85 hover:text-white hover:bg-rose-500/40'
+                          : 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                      }`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -939,14 +1159,29 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsPollModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#8577ED] text-xs font-bold flex items-center gap-1.5 border border-[#E3DFF5] dark:border-[#3D3861] cursor-pointer shrink-0"
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Launch Poll</span>
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsPollModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#8577ED] text-xs font-bold flex items-center gap-1.5 border border-[#E3DFF5] dark:border-[#3D3861] cursor-pointer shrink-0"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Launch Poll</span>
+                </button>
+                {activeRoom?.isHost && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteConfirmRoom(activeRoom);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 text-xs font-bold flex items-center gap-1.5 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Room</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex-1 p-4 overflow-y-auto space-y-3">
@@ -979,17 +1214,17 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
             <form onSubmit={handleSend} className="p-4 border-t border-[#E3DFF5] dark:border-[#3D3861] flex gap-2">
               <input
                 type="text"
-                placeholder={`Chat live in ${activeRoom?.title || 'Study Room'}...`}
+                placeholder={`Chat in ${activeRoom?.title || 'Study Room'}...`}
                 value={inputMsg}
                 onChange={(e) => setInputMsg(e.target.value)}
-                disabled={connectionState !== 'connected'}
+                disabled={Boolean(activeRoom?.isLocked)}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#FAF9FF] dark:bg-[#1E1B33] text-xs text-[#2D2A4A] dark:text-[#F1EFFF] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] disabled:opacity-60"
               />
               <Button
                 type="submit"
                 variant="primary"
                 size="sm"
-                disabled={connectionState !== 'connected' || !inputMsg.trim()}
+                disabled={Boolean(activeRoom?.isLocked) || !inputMsg.trim()}
                 leftIcon={<Send className="w-3.5 h-3.5" />}
                 className="min-h-[44px] bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white"
               >
@@ -1244,6 +1479,61 @@ export const StudyRoomsView: React.FC<StudyRoomsViewProps> = ({ onNavigateToTab 
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Delete Room Confirmation Modal */}
+      {deleteConfirmRoom && (
+        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-[#E3DFF5] dark:border-[#3D3861] pb-3">
+              <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+                <span>Delete Study Room?</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmRoom(null)}
+                disabled={deletingRoom}
+                className="p-1.5 rounded-xl text-[#6B6890] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] cursor-pointer"
+                aria-label="Close delete room confirmation"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {deleteError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-600 dark:text-rose-300 font-semibold">
+                  {deleteError}
+                </div>
+              )}
+              <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
+                This will permanently close{' '}
+                <strong className="text-[#2D2A4A] dark:text-[#F1EFFF]">{deleteConfirmRoom.title}</strong>, disconnect active participants, and remove it from the study room catalog.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={deletingRoom}
+                onClick={() => setDeleteConfirmRoom(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={deletingRoom}
+                onClick={handleConfirmDeleteRoom}
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                className="min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              >
+                {deletingRoom ? 'Deleting...' : 'Delete Room'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -97,9 +97,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Initialize session on mount
   const refreshUserData = useCallback(async () => {
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     try {
-      if (!token) {
+      if (!sessionId) {
         // No active session: Start in clean guest / unauthenticated state with local gamification
         setUser(null);
         setProfile(null);
@@ -132,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const res = await AuthClient.getMe();
       // An in-flight refresh must not overwrite a newer sign-in/sign-out.
-      if (AuthClient.getToken() !== token) return;
+      if (AuthClient.getSessionId() !== sessionId) return;
       setAuthError(null);
       setUser(res.user);
       setProfile(res.profile);
@@ -149,16 +149,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSettings(res.settings);
       syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
-      if (AuthClient.getToken() !== token) return;
+      if (AuthClient.getSessionId() !== sessionId) return;
       // A temporary network/server failure is not proof that the session is
-      // invalid. Keep the token so the user can retry when service returns.
+      // invalid. Keep the session marker so the user can retry when service returns.
       if (err?.status !== 401 && err?.status !== 403) {
         console.warn('Session verification temporarily unavailable:', err?.message || err);
         setAuthError('Could not verify your session. Please check your connection and try again.');
         return;
       }
       console.warn('Session expired or rejected.');
-      AuthClient.removeToken();
+      AuthClient.clearSession();
       const guestXp = getCurrentXp(0, null);
       setUser(null);
       setProfile(null);
@@ -194,8 +194,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const operation = authOperation.current;
     (async () => {
       try {
+        let hasPendingRedirect = false;
+        try {
+          hasPendingRedirect = Boolean(sessionStorage.getItem('learnco_google_redirect_pending'));
+        } catch {}
         if (auth?.app && typeof getRedirectResult === 'function') {
-          const redirectResult = await getRedirectResult(auth);
+          const redirectTimeoutMs = hasPendingRedirect ? 8000 : 1200;
+          const redirectResult = await Promise.race([
+            getRedirectResult(auth),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), redirectTimeoutMs)),
+          ]);
           if (active && operation === authOperation.current && redirectResult?.user) {
             let pendingIntent: 'signin' | 'signup' | 'auto' = 'auto';
             let expectedEmail: string | undefined;
@@ -352,7 +360,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSettings(res.settings);
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
-      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getToken())) {
+      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getSessionId())) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-in error */ }
       }
       if (operation === authOperation.current) setAuthError(err.message || 'Sign in failed.');
@@ -395,7 +403,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSettings(res.settings);
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
     } catch (err: any) {
-      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getToken())) {
+      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getSessionId())) {
         try { await fbSignOut(auth); } catch { /* retain the original sign-up error */ }
       }
       if (operation === authOperation.current) setAuthError(err.message || 'Sign up failed.');
@@ -431,6 +439,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           if (code === 'auth/access-denied') {
             throw new Error('Google denied access. If the app is in testing, an administrator may need to add your account as a test user. Check Google’s error details.');
+          }
+          if (code === 'auth/account-exists-with-different-credential' || code === 'auth/credential-already-in-use') {
+            throw new Error(
+              'An account with this email already uses Email & Password sign-in. Sign in with your email and password below, or link Google from Firebase Console.'
+            );
           }
           if (code === 'auth/unauthorized-domain') {
             throw new Error('This domain is not authorized for Google Sign-In in Firebase Console. Open the live app URL or sign in with Email & Password.');
@@ -515,7 +528,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await syncClientToFirestore(res.user, res.profile, res.gamification).catch(() => {});
       return 'signed-in' as const;
     } catch (err: any) {
-      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getToken())) {
+      if (firebaseSignedIn && (operation === authOperation.current || !AuthClient.getSessionId())) {
         try { await fbSignOut(auth); } catch { /* retain the original Google sign-in error */ }
       }
       if (operation === authOperation.current) setAuthError(err.message || 'Google sign in failed.');
@@ -561,16 +574,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await Promise.allSettled([localRevocation, firebaseRevocation]);
   };
 
-  const assertSessionUnchanged = (token: string | null) => {
-    if (!token || AuthClient.getToken() !== token) {
+  const assertSessionUnchanged = (sessionId: string | null) => {
+    if (!sessionId || AuthClient.getSessionId() !== sessionId) {
       throw new Error('Your session changed while this request was in progress. Please try again.');
     }
   };
 
   const updateProfile = async (updates: Partial<UserProfile>): Promise<UserProfile> => {
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     const res = await AuthClient.updateProfile(updates);
-    assertSessionUnchanged(token);
+    assertSessionUnchanged(sessionId);
     setProfile(res.profile);
     if (
       auth?.currentUser &&
@@ -589,17 +602,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateSettings = async (updates: Partial<UserSettings>): Promise<UserSettings> => {
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     const res = await AuthClient.updateSettings(updates);
-    assertSessionUnchanged(token);
+    assertSessionUnchanged(sessionId);
     setSettings(res.settings);
     return res.settings;
   };
 
   const uploadAvatar = async (imageData: string): Promise<string> => {
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     const res = await AuthClient.uploadAvatar(imageData);
-    assertSessionUnchanged(token);
+    assertSessionUnchanged(sessionId);
     setProfile(res.profile);
     if (user) {
       await syncClientToFirestore(user, res.profile, gamification).catch(() => {});
@@ -608,9 +621,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const saveOnboarding = async (data: any) => {
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     const res = await AuthClient.saveOnboarding(data);
-    assertSessionUnchanged(token);
+    assertSessionUnchanged(sessionId);
     setProfile(res.profile);
     if (res.settings) setSettings(res.settings);
     if (user) {

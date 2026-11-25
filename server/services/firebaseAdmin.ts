@@ -47,22 +47,31 @@ export function hasGoogleCredentials(): boolean {
 }
 
 export const isFirebaseAdminConfigured = hasGoogleCredentials();
+const explicitServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
+const isAdminDisabled = process.env.FIREBASE_ADMIN_DISABLED === 'true';
 
 let app: App | null = null;
+let authOnlyApp: App | null = null;
 
 if (isFirebaseAdminConfigured) {
   try {
     if (getApps().length === 0) {
       // Invalid explicit credentials must not silently fall back to another account.
-      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
-      const credential = serviceAccount ? cert(JSON.parse(serviceAccount)) : applicationDefault();
+      const credential = explicitServiceAccount ? cert(JSON.parse(explicitServiceAccount)) : applicationDefault();
       app = initializeApp({ credential, projectId });
     } else {
       app = getApp();
     }
-  } catch (err: any) {
+  } catch {
     console.warn('[FirebaseAdmin] Initialisation skipped. Check Firebase Admin credential configuration.');
     app = null;
+  }
+} else if (!isAdminDisabled && !explicitServiceAccount) {
+  // Public Google SecureToken JWKS verification only requires projectId (no service account/IAM).
+  try {
+    authOnlyApp = getApps().length === 0 ? initializeApp({ projectId }) : getApp();
+  } catch {
+    authOnlyApp = null;
   }
 }
 
@@ -76,6 +85,8 @@ function createFirestore(): Firestore | null {
   }
 }
 
-export const adminAuth: Auth | null = app ? getAuth(app) : null;
+const resolvedAuthApp = app || authOnlyApp;
+export const adminAuth: Auth | null = resolvedAuthApp ? getAuth(resolvedAuthApp) : null;
 export const adminDb: Firestore | null = createFirestore();
 export { app as firebaseAdminApp };
+

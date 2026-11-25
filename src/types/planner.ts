@@ -192,6 +192,13 @@ export interface PlanGenerationResult {
   summaryText?: string;
 }
 
+export interface TopicSubtopicGroup {
+  subjectId: SubjectId;
+  topic: string;
+  weight?: 'HIGH' | 'CORE' | 'FOUNDATIONAL';
+  subtopics: string[];
+}
+
 export interface PlanGenerationInput {
   goalTitle: string;
   targetExamTrack: string;
@@ -202,6 +209,7 @@ export interface PlanGenerationInput {
   availableDays: DayOfWeek[];
   preferredSessionLength: number;
   priorityTopics?: string[];
+  identifiedTopicGroups?: TopicSubtopicGroup[];
   includeWeakMistakeRemediation?: boolean;
   includeSpacedRevision?: boolean;
   customPrompt?: string;

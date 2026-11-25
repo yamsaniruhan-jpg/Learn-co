@@ -9,6 +9,7 @@ import { CURRICULUM_EXPANSION_4 } from './curricula/curriculumExpansion4';
 import { CURRICULUM_EXPANSION_5 } from './curricula/curriculumExpansion5';
 import { CURRICULUM_EXPANSION_6 } from './curricula/curriculumExpansion6';
 import { OLYMPIAD_EXPANSION_7 } from './curricula/olympiadExpansion7';
+import { COMPREHENSIVE_EXAM_EXPANSION_8 } from './curricula/comprehensiveExamExpansion8';
 import {
   CONCEPT_ENRICHMENT,
   CONCEPT_ENRICHMENT_2,
@@ -16,80 +17,8 @@ import {
   CONCEPT_ENRICHMENT_4,
 } from './curricula/conceptEnrichment';
 
-export const EXAM_TRACKS: ExamTrack[] = [
-  {
-    id: 'all',
-    name: 'All Curricula & Tracks',
-    shortName: 'All Tracks',
-    description: 'Comprehensive universal STEM curriculum covering all concepts and levels.',
-    badgeColor: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200',
-    subjects: ['math', 'cs', 'physics', 'chemistry', 'biology', 'english', 'data_science'],
-  },
-  {
-    id: 'jee_advanced',
-    name: 'JEE Advanced & Top-Tier Engineering',
-    shortName: 'JEE Advanced',
-    description: 'Extreme analytical rigor, multi-concept problems, calculus derivations, and deep physics invariants.',
-    badgeColor: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300',
-    subjects: ['math', 'physics', 'chemistry'],
-  },
-  {
-    id: 'jee_main',
-    name: 'JEE Main & National Engineering Entrance',
-    shortName: 'JEE Main',
-    description: 'High-speed conceptual mastery, standard problem archetypes, and formula accuracy.',
-    badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-    subjects: ['math', 'physics', 'chemistry'],
-  },
-  {
-    id: 'nsejs',
-    name: 'IJSO & NSEJS Junior Science Olympiad',
-    shortName: 'IJSO / NSEJS',
-    description: 'International Junior Science Olympiad (IJSO) & NSEJS integrated physics, chemistry, biology, and math foundations.',
-    badgeColor: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
-    subjects: ['physics', 'chemistry', 'biology', 'math'],
-  },
-  {
-    id: 'iapt_exams',
-    name: 'IPhO / IChO / IBHO & IAPT National Qualifiers',
-    shortName: 'IPhO · IChO · IBHO',
-    description: 'International Physics (IPhO), Chemistry (IChO), and Biology (IBHO/IBO) Olympiad preparation alongside NSEP, NSEC, and NSEB stages.',
-    badgeColor: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
-    subjects: ['physics', 'chemistry', 'biology', 'math'],
-  },
-  {
-    id: 'ict_hackathon',
-    name: 'ICT International Coding Test & Competitive Systems',
-    shortName: 'ICT Coding Test',
-    description: 'ICT International Coding Test algorithms, segment trees, graph shortest paths, dynamic programming, and production systems.',
-    badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-    subjects: ['cs', 'math', 'data_science'],
-  },
-  {
-    id: 'ai_ml_foundations',
-    name: 'AI, Data Science Olympiad & Computational STEM',
-    shortName: 'AI & Data Science',
-    description: 'Matrix calculus, Bayesian inference, KL divergence, gradient boosting, neural architectures, and algorithmic complexity.',
-    badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300',
-    subjects: ['cs', 'math', 'data_science'],
-  },
-  {
-    id: 'stem_olympiad',
-    name: 'International & National Olympiad (IPhO, IChO, IBHO, IJSO, INMO)',
-    shortName: 'Olympiad Zone',
-    description: 'Proof-based INMO mathematics, IPhO optics/Lagrangian mechanics, IChO equilibria, and IBHO/IJSO molecular genetics.',
-    badgeColor: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
-    subjects: ['math', 'physics', 'chemistry', 'biology'],
-  },
-  {
-    id: 'ap_stem',
-    name: 'Advanced Placement (AP Calculus / Physics / Chem / CS)',
-    shortName: 'AP STEM',
-    description: 'College-level foundational calculus, mechanics, organic reactions, algorithms, and cellular biology.',
-    badgeColor: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300',
-    subjects: ['math', 'physics', 'chemistry', 'biology', 'cs'],
-  },
-];
+import { EXAM_TRACKS } from './curriculumMeta';
+export { EXAM_TRACKS };
 
 const BASE_CURRICULUM_DATA: SubjectCurriculum[] = [
   // ==========================================
@@ -2306,7 +2235,7 @@ export const CURRICULUM_DATA: SubjectCurriculum[] = [
 // studyable end to end. Additive only — no shipped chapter, topic or concept
 // is removed or reordered. Must run after the amplified-concept merge above so
 // newly added topics also receive their amplified concepts.
-applyCurriculumExpansion(CURRICULUM_DATA, [...CURRICULUM_EXPANSION, ...CURRICULUM_EXPANSION_2, ...CURRICULUM_EXPANSION_3, ...CURRICULUM_EXPANSION_4, ...CURRICULUM_EXPANSION_5, ...CURRICULUM_EXPANSION_6, ...OLYMPIAD_EXPANSION_7]);
+applyCurriculumExpansion(CURRICULUM_DATA, [...CURRICULUM_EXPANSION, ...CURRICULUM_EXPANSION_2, ...CURRICULUM_EXPANSION_3, ...CURRICULUM_EXPANSION_4, ...CURRICULUM_EXPANSION_5, ...CURRICULUM_EXPANSION_6, ...OLYMPIAD_EXPANSION_7, ...COMPREHENSIVE_EXAM_EXPANSION_8]);
 
 // Content-completeness pass: fill the worked-example / pitfall / mini-check
 // gaps on concepts that shipped summary-only. Only empty sections are filled;

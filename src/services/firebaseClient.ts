@@ -107,18 +107,20 @@ export function handleFirestoreError(
 export async function testConnection(): Promise<boolean> {
   if (!isFirebaseConfigured() || !dbInstance) return false;
   try {
-    await getDocFromServer(doc(dbInstance, 'test', 'connection'));
+    await getDocFromServer(doc(dbInstance, 'gamification', 'xpRules'));
     return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
+  } catch (error: any) {
+    const code = error?.code || '';
+    const msg = error instanceof Error ? error.message : String(error || '');
+    if (code === 'permission-denied' || /permission[- ]denied/i.test(msg)) {
+      // Server responded, so Firestore network connectivity is available.
+      return true;
+    }
+    if (msg.includes('the client is offline') || code === 'unavailable') {
       console.warn('Firestore connection check: client is offline.');
     }
     return false;
   }
-}
-
-if (typeof window !== 'undefined' && isFirebaseConfigured()) {
-  void testConnection();
 }
 
 export const app = appInstance;

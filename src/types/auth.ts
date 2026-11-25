@@ -36,6 +36,7 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 export interface UserAccount {
   id: string;
   uid?: string;
+  firebaseUid?: string;
   email: string;
   passwordHash?: string;
   authProvider: 'email' | 'google';
@@ -67,6 +68,10 @@ export interface UserProfile {
   joinedDate: string;
   bio?: string;
   institution?: string;
+  xp?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  dailyQuestionsSolvedToday?: number;
 }
 
 export interface UserGamification {

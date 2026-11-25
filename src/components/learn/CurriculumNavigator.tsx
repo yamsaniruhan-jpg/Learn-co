@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { SubjectCurriculum, ExamTrack, ExamTrackId, SubjectId } from '../../types/curriculum';
+import { SUBJECT_SUMMARIES, SubjectSummary } from '../../data/curriculumMeta';
+import { SubjectCurriculumSkeleton } from '../ui/Skeleton';
 import { FormattedMathText } from '../common/FormattedMathText';
 import {
   Calculator,
@@ -21,6 +23,8 @@ import {
 
 interface CurriculumNavigatorProps {
   curriculum: SubjectCurriculum[];
+  subjectSummaries?: SubjectSummary[];
+  isLoadingSubject?: boolean;
   tracks: ExamTrack[];
   selectedSubject: SubjectId;
   selectedTrack: ExamTrackId;
@@ -28,10 +32,13 @@ interface CurriculumNavigatorProps {
   onSelectTrack: (trackId: ExamTrackId) => void;
   onSelectConcept: (conceptId: string) => void;
   onStartTopicPractice: (subjectId: SubjectId, topicId: string, topicTitle: string) => void;
+  onStartSubtopicPractice?: (subjectId: SubjectId, topicId: string, subtopicId: string, subtopicTitle: string) => void;
 }
 
 export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
   curriculum,
+  subjectSummaries = SUBJECT_SUMMARIES,
+  isLoadingSubject = false,
   tracks,
   selectedSubject,
   selectedTrack,
@@ -39,6 +46,7 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
   onSelectTrack,
   onSelectConcept,
   onStartTopicPractice,
+  onStartSubtopicPractice,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({
@@ -100,13 +108,15 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
     <div className="space-y-6">
       {/* Subject Selector Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-        {curriculum.map((subject) => {
+        {subjectSummaries.map((subject) => {
           const isSelected = subject.id === selectedSubject;
+          const loadedSubject = curriculum.find((s) => s.id === subject.id);
+          const chapterCount = loadedSubject ? loadedSubject.chapters.length : subject.chapterCount;
           return (
             <button
               key={subject.id}
               onClick={() => onSelectSubject(subject.id)}
-              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[44px] ${
                 isSelected
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/10'
                   : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700'
@@ -123,7 +133,7 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
                 <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
                   isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                 }`}>
-                  {subject.chapters.length} Ch
+                  {chapterCount} Ch
                 </span>
               </div>
               <div>
@@ -171,6 +181,9 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
       </div>
 
       {/* Chapter & Topics Hierarchy */}
+      {isLoadingSubject && !activeSubjectData && (
+        <SubjectCurriculumSkeleton label="Loading subject chapters and concepts..." />
+      )}
       <div className="space-y-4">
         {filteredChapters && filteredChapters.length > 0 ? (
           filteredChapters.map((chapter, cIdx) => {
@@ -243,9 +256,28 @@ export const CurriculumNavigator: React.FC<CurriculumNavigatorProps> = ({
                         <div className="space-y-3 pt-1">
                           {topic.subtopics.map((subtopic) => (
                             <div key={subtopic.id} className="space-y-2">
-                              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                <Layers className="w-3 h-3" />
-                                <FormattedMathText text={subtopic.title} inline />
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <Layers className="w-3 h-3" />
+                                  <FormattedMathText text={subtopic.title} inline />
+                                </div>
+                                {onStartSubtopicPractice && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      onStartSubtopicPractice(
+                                        activeSubjectData.id,
+                                        topic.id,
+                                        subtopic.id,
+                                        subtopic.title
+                                      )
+                                    }
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>Create Sub-Questions</span>
+                                  </button>
+                                )}
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">

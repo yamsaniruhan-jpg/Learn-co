@@ -27,12 +27,14 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
 import { LeaderboardEntry, TimeframeFilter } from '../../types/auth';
+import { awardXp } from '../../utils/xpManager';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import { Progress } from '../ui/Progress';
 import { EmptyState } from '../ui/EmptyState';
+import { ScreenSkeleton } from '../ui/Skeleton';
 import {
   LEADERBOARD_STAGES,
   LeaderboardStage,
@@ -40,6 +42,7 @@ import {
   calculateStageFromXp,
   getPromotionZoneInfo,
   getWeeklyResetCountdown,
+  getNextSubstage,
 } from './stagesConfig';
 import { StagesLadderModal } from './StagesLadderModal';
 
@@ -113,6 +116,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   // Selected Stage Filter ('all' or 'bronze', 'silver', etc.)
   const [selectedStageFilter, setSelectedStageFilter] = useState<string>('all');
   const [isStagesModalOpen, setIsStagesModalOpen] = useState<boolean>(false);
+  const [promotionClaimed, setPromotionClaimed] = useState<boolean>(false);
 
   const [serverEntries, setServerEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(!propEntries);
@@ -138,7 +142,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     if (onSubjectChange) onSubjectChange(sub);
   };
 
-  const loadFromCacheOrFallback = () => {
+  const loadFromCacheOrFallback = (): boolean => {
     setIsOffline(true);
     try {
       const cached = localStorage.getItem(`learnco_leaderboard_server_v2_${activeTimeframe}_${activeSubject}`);
@@ -146,11 +150,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setServerEntries(parsed);
-          return;
+          return true;
         }
       }
     } catch (_) {}
     setServerEntries([]);
+    return false;
   };
 
   const fetchLeaderboard = async (isManualRefresh = false) => {
@@ -173,7 +178,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     } catch (err: any) {
       if (requestId !== leaderboardRequest.current) return;
       console.warn('Leaderboard offline mode activated:', err?.message);
-      loadFromCacheOrFallback();
+      const hadCached = loadFromCacheOrFallback();
+      if (!hadCached) {
+        setError(err?.message || 'Unable to load cohort rankings. Please check your connection and try again.');
+      }
     } finally {
       if (requestId === leaderboardRequest.current) {
         setIsLoading(false);
@@ -242,6 +250,17 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     const xp = currentUserEntry?.xp ?? 0;
     return calculateStageFromXp(xp);
   }, [currentUserEntry?.xp]);
+
+  const nextSubstageInfo = useMemo(() => {
+    return getNextSubstage(userStageDetails.substage.id);
+  }, [userStageDetails.substage.id]);
+
+  const handleClaimWeeklyPromotion = () => {
+    if (!nextSubstageInfo) return;
+    const xpNeeded = nextSubstageInfo.minXp - (currentUserEntry?.xp ?? 0);
+    awardXp(Math.max(50, xpNeeded + 10), `Weekly League Promotion to ${nextSubstageInfo.substageName}`);
+    setPromotionClaimed(true);
+  };
 
   // Filter entries by Search and Stage Filter
   const filteredEntries = useMemo(() => {
@@ -334,20 +353,20 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             <button
               onClick={() => setIsStagesModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
             >
-              <Layers className="w-3.5 h-3.5 text-amber-300" />
-              <span>View 10 Stages & Rules</span>
+              <Layers className="w-3.5 h-3.5 text-[#FFB84D]" />
+              <span>View 10 Stages &amp; Rules</span>
             </button>
 
             <button
               onClick={() => fetchLeaderboard(true)}
               disabled={isRefreshing || isLoading}
-              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all cursor-pointer disabled:opacity-50"
+              className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] hover:bg-[#F7F5FF] dark:hover:bg-[#353059] text-[#2D2A4A] dark:text-[#F1EFFF] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center"
               title="Refresh Leaderboard"
               aria-label="Refresh Leaderboard"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#6C5CE7]' : ''}`} />
             </button>
           </div>
         </div>
@@ -376,9 +395,23 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                   {currentUserEntry.rank <= userStageDetails.stage.promotionTopCount ? 'Promotion Zone 🚀' : 'Safe Zone 🛡️'}
                 </span>
               </h3>
-              <p className="text-xs text-[#E3DFF5] font-medium">
-                Illustrative cutoff: top {userStageDetails.stage.promotionTopCount}. Automatic weekly promotions are not implemented.
+              <p className="text-xs text-[#E3DFF5] font-medium mb-1.5">
+                {currentUserEntry.rank <= userStageDetails.stage.promotionTopCount
+                  ? `Top ${userStageDetails.stage.promotionTopCount} finish! Weekly promotion to ${nextSubstageInfo?.substageName || 'next level'} is ready.`
+                  : `Finish in top ${userStageDetails.stage.promotionTopCount} by weekly reset to earn promotion.`}
               </p>
+              {currentUserEntry.rank <= userStageDetails.stage.promotionTopCount && nextSubstageInfo && (
+                <div>
+                  <button
+                    onClick={handleClaimWeeklyPromotion}
+                    disabled={promotionClaimed}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-black transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{promotionClaimed ? 'Promoted Successfully! 🎉' : `Claim Promotion ➔ ${nextSubstageInfo.substageName}`}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -407,9 +440,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       )}
 
       {/* 3. Control Bar: Timeframe Switcher + Subject Filter + Search */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-800/40 p-2 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#FFFFFF] dark:bg-[#2A2647] p-2.5 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861]">
         {/* Timeframe Tabs */}
-        <div className="flex bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto no-scrollbar">
+        <div className="flex bg-[#F7F5FF] dark:bg-[#1E1B33] p-1 rounded-xl overflow-x-auto no-scrollbar gap-1">
           {TIMEFRAME_OPTIONS.map((tf) => {
             const isActive = activeTimeframe === tf.id;
             return (
@@ -417,10 +450,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 key={tf.id}
                 onClick={() => handleTimeframeChange(tf.id)}
                 title={tf.description}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                className={`min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-[#6C5CE7] text-white shadow-xs'
+                    : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
                 }`}
               >
                 {tf.icon}
@@ -437,7 +470,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <select
               value={activeSubject}
               onChange={(e) => handleSubjectChange(e.target.value)}
-              className="text-xs font-semibold py-1.5 pl-3 pr-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 cursor-pointer appearance-none"
+              aria-label="Filter rankings by subject"
+              className="min-h-[44px] text-xs font-semibold py-2 pl-3.5 pr-8 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] cursor-pointer appearance-none"
             >
               {SUBJECT_OPTIONS.map((sub) => (
                 <option key={sub.id} value={sub.id}>
@@ -445,19 +479,20 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 </option>
               ))}
             </select>
-            <Filter className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Filter className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B6890] pointer-events-none" />
           </div>
 
           {/* Search Scholar Input */}
           {showSearch && (
-            <div className="relative flex-1 sm:w-48">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="relative flex-1 sm:w-52">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890]" />
               <input
                 type="text"
                 placeholder="Search scholars..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                aria-label="Search scholars"
+                className="w-full min-h-[44px] pl-8.5 pr-3 py-2 text-xs rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] placeholder-[#6B6890]"
               />
             </div>
           )}
@@ -468,10 +503,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
         <button
           onClick={() => setSelectedStageFilter('all')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+          className={`min-h-[44px] px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
             selectedStageFilter === 'all'
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-xs'
-              : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+              ? 'bg-[#2D2A4A] dark:bg-[#F1EFFF] text-white dark:text-[#1E1B33] shadow-xs'
+              : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7]/40'
           }`}
         >
           All Stages (30 Divisions)
@@ -483,10 +518,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <button
               key={st.id}
               onClick={() => setSelectedStageFilter(st.id)}
-              className={`px-2.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`min-h-[44px] px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 isSelected
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                  ? 'bg-[#6C5CE7] text-white shadow-xs'
+                  : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7]/40'
               }`}
             >
               <span>{st.badgeEmoji}</span>
@@ -609,37 +644,55 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       {/* 6. Main Leaderboard List Card */}
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* List Table Header */}
-        <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
+        <div className="grid grid-cols-12 gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
           <div className="col-span-2 sm:col-span-1 text-center">Rank</div>
           <div className="col-span-6 sm:col-span-4 md:col-span-5">Scholar</div>
-          <div className="hidden sm:block sm:col-span-3 md:col-span-3 text-left">Division & Zone</div>
+          <div className="hidden sm:block sm:col-span-3 md:col-span-3 text-left">Division &amp; Zone</div>
           <div className="hidden md:block md:col-span-1 text-center">Streak</div>
-          <div className="col-span-4 sm:col-span-4 md:col-span-2 text-right">XP Earned</div>
+          <div className="col-span-4 sm:col-span-4 md:col-span-2 text-right">XP</div>
         </div>
 
-        {/* Loading Spinner */}
+        {/* Loading State */}
         {isLoading && (
-          <div className="p-12 flex flex-col items-center justify-center text-center space-y-3">
-            <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Synchronizing verified cohort records...
-            </p>
+          <div className="p-4 sm:p-6">
+            <ScreenSkeleton rows={compact ? 2 : 4} />
+          </div>
+        )}
+
+        {/* Error State */}
+        {!isLoading && error && (
+          <div className="p-4 sm:p-6">
+            <EmptyState
+              variant="error"
+              title="Could not load rankings"
+              description={error}
+              action={
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => fetchLeaderboard(true)}
+                  leftIcon={<RefreshCw className="w-4 h-4" />}
+                >
+                  Retry
+                </Button>
+              }
+            />
           </div>
         )}
 
         {/* Empty State */}
-        {!isLoading && filteredEntries.length === 0 && (
+        {!isLoading && !error && filteredEntries.length === 0 && (
           <EmptyState
             icon={<Trophy className="w-6 h-6" />}
             title="No scholars found"
             description={searchQuery ? `No scholars matching "${searchQuery}".` : 'No scholars found in this division.'}
-            actionLabel={searchQuery ? "Clear search" : undefined}
+            actionLabel={searchQuery ? 'Clear search' : undefined}
             onAction={searchQuery ? () => setSearchQuery('') : undefined}
           />
         )}
 
         {/* Leaderboard Rows */}
-        {!isLoading && filteredEntries.length > 0 && (
+        {!isLoading && !error && filteredEntries.length > 0 && (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {filteredEntries.map((scholar: any) => {
               const isUser = scholar.isCurrentUser;
@@ -652,9 +705,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 <div
                   key={scholar.userId}
                   onClick={() => onSelectScholar && onSelectScholar(scholar)}
-                  className={`grid grid-cols-12 gap-2 items-center px-4 py-3.5 transition-colors ${
+                  className={`grid grid-cols-12 gap-1.5 sm:gap-2 items-center px-3 sm:px-4 py-2.5 sm:py-3 transition-colors ${
                     isUser
-                      ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-l-4 border-l-indigo-600 font-medium'
+                      ? 'bg-[#F0EDFA] dark:bg-[#1E1B33] font-medium'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   } ${onSelectScholar ? 'cursor-pointer' : ''}`}
                 >

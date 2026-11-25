@@ -7,45 +7,53 @@ import {
   XPTransaction,
   LeaderboardEntry,
   DailyPracticeQuota,
-  OnboardingStatus,
   SubmitAttemptRequest,
   SubmitAttemptResult,
 } from '../types/auth';
+import { buildApiHeaders, ensureCsrfToken } from '../utils/csrf';
 
-const TOKEN_STORAGE_KEY = 'learnco_auth_token';
+const LEGACY_TOKEN_STORAGE_KEY = 'learnco_auth_token';
+const USER_STORAGE_KEY = 'learnco_user';
+
+function purgeLegacyTokenStorage(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // ignore storage access issues
+  }
+}
 
 export class AuthClient {
   // Prevent a slow sign-in/reset response from replacing a newer session.
   private static authAttempt = 0;
 
-  static getToken(): string | null {
-    try {
-      return localStorage.getItem(TOKEN_STORAGE_KEY);
-    } catch {
+  static getSessionId(): string | null {
+    const user = this.getCurrentUser();
+    if (!user || typeof user.id !== 'string' || !user.id) {
       return null;
     }
+    return `${this.authAttempt}:${user.id}`;
   }
 
-  static setToken(token: string): void {
-    try {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } catch {
-      throw new Error('Your browser could not save the session. Enable browser storage and try again.');
-    }
+  static hasSession(): boolean {
+    return this.getSessionId() !== null;
   }
 
-  static removeToken(): void {
+  static clearSession(): void {
+    purgeLegacyTokenStorage();
     try {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      localStorage.removeItem('learnco_user');
+      localStorage.removeItem(USER_STORAGE_KEY);
     } catch (e) {
-      console.error('Failed to remove auth token', e);
+      console.error('Failed to clear session metadata', e);
     }
   }
 
   static getCurrentUser(): any | null {
+    purgeLegacyTokenStorage();
     try {
-      const userStr = localStorage.getItem('learnco_user');
+      const userStr = localStorage.getItem(USER_STORAGE_KEY);
       if (userStr) {
         return JSON.parse(userStr);
       }
@@ -54,8 +62,9 @@ export class AuthClient {
   }
 
   static setCurrentUser(user: any): void {
+    purgeLegacyTokenStorage();
     try {
-      localStorage.setItem('learnco_user', JSON.stringify(user));
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
     } catch (_) {}
   }
 
@@ -63,22 +72,15 @@ export class AuthClient {
     if (attempt !== this.authAttempt) {
       throw new Error('Your session changed while this request was in progress. Please try again.');
     }
-    if (typeof data?.token !== 'string' || !data.token || typeof data?.user?.id !== 'string' || !data.user.id) {
+    if (typeof data?.user?.id !== 'string' || !data.user.id) {
       throw new Error('The server returned an invalid sign-in response. Please try again.');
     }
-    this.setToken(data.token);
+    // Auth token is managed strictly via HttpOnly cookie by the backend.
     this.setCurrentUser(data.user);
   }
 
-  private static getHeaders(): HeadersInit {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    const token = this.getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    return headers;
+  private static getHeaders(includeContentType = true): HeadersInit {
+    return buildApiHeaders(undefined, includeContentType);
   }
 
   static async signUp(params: {
@@ -88,16 +90,17 @@ export class AuthClient {
     timezone?: string;
     idToken?: string;
   }): Promise<{
-    token: string;
     user: any;
     profile: UserProfile;
     gamification: UserGamification;
     settings: UserSettings;
   }> {
     const attempt = ++this.authAttempt;
+    await ensureCsrfToken();
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: this.getHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -107,21 +110,21 @@ export class AuthClient {
     }
 
     this.saveAuthResponse(data, attempt);
-
     return data;
   }
 
   static async signIn(email: string, password?: string, idToken?: string): Promise<{
-    token: string;
     user: any;
     profile: UserProfile;
     gamification: UserGamification;
     settings: UserSettings;
   }> {
     const attempt = ++this.authAttempt;
+    await ensureCsrfToken();
     const res = await fetch('/api/auth/signin', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: this.getHeaders(),
       body: JSON.stringify({ email, password, idToken }),
     });
 
@@ -135,7 +138,6 @@ export class AuthClient {
     }
 
     this.saveAuthResponse(data, attempt);
-
     return data;
   }
 
@@ -147,7 +149,6 @@ export class AuthClient {
     intent?: 'signin' | 'signup' | 'auto';
     idToken?: string;
   }): Promise<{
-    token: string;
     googleToken?: string;
     user: any;
     profile: UserProfile;
@@ -155,9 +156,11 @@ export class AuthClient {
     settings: UserSettings;
   }> {
     const attempt = ++this.authAttempt;
+    await ensureCsrfToken();
     const res = await fetch('/api/auth/google', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: this.getHeaders(),
       body: JSON.stringify(payload),
     });
 
@@ -171,7 +174,6 @@ export class AuthClient {
     }
 
     this.saveAuthResponse(data, attempt);
-
     return data;
   }
 
@@ -181,54 +183,59 @@ export class AuthClient {
     gamification: UserGamification;
     settings: UserSettings;
   }> {
-    const res = await fetch('/api/auth/me', {
-      method: 'GET',
-      headers: this.getHeaders(),
-    });
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include',
+        headers: this.getHeaders(),
+        ...(controller ? { signal: controller.signal } : {}),
+      });
 
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      const error = new Error(data?.error || 'Session verification failed.') as Error & { status?: number };
-      error.status = res.status;
-      throw error;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const error = new Error(data?.error || 'Session verification failed.') as Error & { status?: number };
+        error.status = res.status;
+        throw error;
+      }
+      if (!data?.user?.id) throw new Error('Invalid session response.');
+      this.setCurrentUser(data.user);
+      return data;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-    if (!data?.user?.id) throw new Error('Invalid session response.');
-    return data;
   }
 
   static async signOut(): Promise<void> {
     ++this.authAttempt;
-    // Remove the current browser session immediately. A late network response
-    // must never remove a newer session created while revocation is in flight.
-    const token = this.getToken();
-    this.removeToken();
-    if (!token) return;
+    const hadUser = Boolean(this.getCurrentUser());
+    this.clearSession();
     try {
+      await ensureCsrfToken();
       await fetch('/api/auth/signout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        headers: this.getHeaders(),
       });
     } catch {
-      // Local sign-out still succeeds; server-side revocation is unconfirmed.
+      if (hadUser) {
+        // Local session cleared; server-side cookie revocation will expire or clear next online request.
+      }
     }
   }
 
-  /**
-   * Request a password-reset link.
-   *
-   * The API responds identically whether or not the address is registered, so the
-   * UI must not imply that a real account was found. An unconfigured mail
-   * provider returns a deployment-wide error without issuing a reset link.
-   */
   static async requestPasswordReset(email: string): Promise<{
     success: boolean;
     message: string;
     transport: 'email';
     expiresInMinutes: number;
   }> {
+    await ensureCsrfToken();
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: this.getHeaders(),
       body: JSON.stringify({ email }),
     });
     const data = await res.json().catch(() => ({}));
@@ -245,7 +252,7 @@ export class AuthClient {
     missingEnvVars: string[];
   }> {
     try {
-      const res = await fetch('/api/auth/mail-status');
+      const res = await fetch('/api/auth/mail-status', { credentials: 'include' });
       const data = await res.json().catch(() => ({}));
       if (res.ok && typeof data.configured === 'boolean') {
         return {
@@ -261,10 +268,11 @@ export class AuthClient {
     return { configured: false, provider: 'none', mailFrom: '', missingEnvVars: ['RESEND_API_KEY or SMTP_URL'] };
   }
 
-  /** Check a reset link before showing the "choose a new password" form. */
   static async validateResetToken(token: string): Promise<boolean> {
     try {
-      const res = await fetch(`/api/auth/reset-password/${encodeURIComponent(token)}`);
+      const res = await fetch(`/api/auth/reset-password/${encodeURIComponent(token)}`, {
+        credentials: 'include',
+      });
       const data = await res.json().catch(() => ({}));
       return res.ok && data?.valid === true;
     } catch {
@@ -272,12 +280,13 @@ export class AuthClient {
     }
   }
 
-  /** Complete the reset. On success the user is signed in with a fresh session. */
   static async resetPassword(token: string, password: string): Promise<void> {
     const attempt = ++this.authAttempt;
+    await ensureCsrfToken();
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: this.getHeaders(),
       body: JSON.stringify({ token, password }),
     });
     const data = await res.json().catch(() => ({}));
@@ -300,6 +309,7 @@ export class AuthClient {
   }): Promise<{ profile: UserProfile; settings: UserSettings }> {
     const res = await fetch('/api/auth/onboarding', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -312,11 +322,10 @@ export class AuthClient {
     return result;
   }
 
-  static async updateProfile(
-    updates: Partial<UserProfile>
-  ): Promise<{ profile: UserProfile }> {
+  static async updateProfile(updates: Partial<UserProfile>): Promise<{ profile: UserProfile }> {
     const res = await fetch('/api/user/profile', {
       method: 'PUT',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify(updates),
     });
@@ -329,11 +338,10 @@ export class AuthClient {
     return data;
   }
 
-  static async updateSettings(
-    updates: Partial<UserSettings>
-  ): Promise<{ settings: UserSettings }> {
+  static async updateSettings(updates: Partial<UserSettings>): Promise<{ settings: UserSettings }> {
     const res = await fetch('/api/user/settings', {
       method: 'PUT',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify(updates),
     });
@@ -346,11 +354,10 @@ export class AuthClient {
     return data;
   }
 
-  static async uploadAvatar(
-    imageData: string
-  ): Promise<{ avatarUrl: string; profile: UserProfile }> {
+  static async uploadAvatar(imageData: string): Promise<{ avatarUrl: string; profile: UserProfile }> {
     const res = await fetch('/api/user/avatar', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify({ imageData }),
     });
@@ -366,6 +373,7 @@ export class AuthClient {
   static async getUserStatistics(): Promise<UserStatistics> {
     const res = await fetch('/api/user/stats', {
       method: 'GET',
+      credentials: 'include',
       headers: this.getHeaders(),
     });
 
@@ -381,6 +389,7 @@ export class AuthClient {
     const url = subject && subject !== 'all' ? `/api/user/mistakes?subject=${subject}` : '/api/user/mistakes';
     const res = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: this.getHeaders(),
     });
 
@@ -395,6 +404,7 @@ export class AuthClient {
   static async getXpHistory(): Promise<XPTransaction[]> {
     const res = await fetch('/api/user/xp-history', {
       method: 'GET',
+      credentials: 'include',
       headers: this.getHeaders(),
     });
 
@@ -409,6 +419,7 @@ export class AuthClient {
   static async getDailyQuota(): Promise<DailyPracticeQuota> {
     const res = await fetch('/api/practice/quota', {
       method: 'GET',
+      credentials: 'include',
       headers: this.getHeaders(),
     });
 
@@ -420,11 +431,10 @@ export class AuthClient {
     return data.quota;
   }
 
-  static async submitPracticeAttempt(
-    attempt: SubmitAttemptRequest
-  ): Promise<SubmitAttemptResult> {
+  static async submitPracticeAttempt(attempt: SubmitAttemptRequest): Promise<SubmitAttemptResult> {
     const res = await fetch('/api/practice/submit-attempt', {
       method: 'POST',
+      credentials: 'include',
       headers: this.getHeaders(),
       body: JSON.stringify(attempt),
     });
@@ -449,6 +459,7 @@ export class AuthClient {
       : `/api/leaderboard?timeframe=${timeframe}`;
     const res = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: this.getHeaders(),
     });
 

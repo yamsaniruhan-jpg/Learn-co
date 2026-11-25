@@ -8,6 +8,7 @@ vi.mock('../server/services/firebaseAdmin', () => ({
   adminDb: null,
 }));
 import authRoutes from '../server/routes/authRoutes';
+import { Database } from '../server/db';
 
 const app = express();
 app.use(express.json());
@@ -71,5 +72,35 @@ describe('Google identity verification', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('links firebaseUid cleanly when an existing email account signs in with Google', async () => {
+    const email = `link-uid-${Date.now()}@example.org`;
+    const signup = await request(app).post('/api/auth/signup').send({
+      email,
+      password: 'StrongPassword123!',
+      fullName: 'Existing Student',
+    });
+    expect(signup.status).toBe(201);
+
+    verifyIdToken.mockResolvedValueOnce({
+      uid: 'google-uid-12345',
+      email,
+      email_verified: true,
+      name: 'Google Student',
+      picture: 'https://example.org/avatar.png',
+      firebase: { sign_in_provider: 'google.com' },
+    });
+
+    const googleRes = await request(app).post('/api/auth/google').send({
+      email,
+      idToken: 'verified-google-token',
+      intent: 'signin',
+    });
+    expect(googleRes.status).toBe(200);
+    expect(googleRes.body.token).toBeTruthy();
+    expect(googleRes.body.user.email).toBe(email);
+    expect(googleRes.body.profile?.avatarUrl).toBe('https://example.org/avatar.png');
+    expect(Database.findUserByEmail(email)?.firebaseUid).toBe('google-uid-12345');
   });
 });

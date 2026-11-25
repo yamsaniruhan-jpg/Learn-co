@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   StudyPlan,
   StudyTask,
@@ -14,15 +14,23 @@ import { TodayTasksView } from './TodayTasksView';
 import { MyPlanView } from './MyPlanView';
 import { PlannerCalendarView } from './PlannerCalendarView';
 import { PlannerGoalsView } from './PlannerGoalsView';
-import { PlannerProgressView } from './PlannerProgressView';
+import { ChartSkeleton, ScreenSkeleton } from '../ui/Skeleton';
+import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/Button';
+import { RefreshCw } from 'lucide-react';
+const PlannerProgressView = lazy(() =>
+  import('./PlannerProgressView').then((m) => ({ default: m.PlannerProgressView }))
+);
 import { PlannerSettingsView } from './PlannerSettingsView';
 import { AiPlanWizardModal } from './AiPlanWizardModal';
 import { TaskModal } from './TaskModal';
 import { VersionHistoryModal } from './VersionHistoryModal';
 import { FocusSessionModal } from './FocusSessionModal';
 import { awardXp } from '../../utils/xpManager';
+import { useAuth } from '../../context/AuthContext';
 
 export const PlannerView: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
     'today' | 'my-plan' | 'calendar' | 'goals' | 'progress' | 'settings'
   >('today');
@@ -32,7 +40,7 @@ export const PlannerView: React.FC = () => {
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [goals, setGoals] = useState<StudyGoal[]>([]);
   const [settings, setSettings] = useState<StudyScheduleSettings>({
-    userId: 'user-1',
+    userId: user?.id || '',
     availableDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
     dailyAvailableMinutes: 120,
     preferredStartTime: '17:30',
@@ -69,6 +77,7 @@ export const PlannerView: React.FC = () => {
   const [conflicts, setConflicts] = useState<ScheduleConflict[]>([]);
   const [recommendations, setRecommendations] = useState<PlannerAdaptationRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modals state
   const [isAiWizardOpen, setIsAiWizardOpen] = useState(false);
@@ -77,10 +86,12 @@ export const PlannerView: React.FC = () => {
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
   const [isFocusModalOpen, setIsFocusModalOpen] = useState(false);
   const [focusTask, setFocusTask] = useState<StudyTask | null>(null);
+  const [activeFocusSessionId, setActiveFocusSessionId] = useState<string | null>(null);
 
   // Fetch all planner data from API via PlannerClient
   const fetchPlannerData = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const overview = await PlannerClient.getOverview();
       if (overview.plan) setActivePlan(overview.plan);
@@ -90,8 +101,9 @@ export const PlannerView: React.FC = () => {
       if (overview.analytics) setAnalytics(overview.analytics);
       if (overview.conflicts) setConflicts(overview.conflicts);
       if (overview.recommendations) setRecommendations(overview.recommendations);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading study planner data:', err);
+      setLoadError(err?.message || 'Could not load your study schedule. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -232,9 +244,19 @@ export const PlannerView: React.FC = () => {
   };
 
   // Start Focus Session
-  const handleStartFocusSession = (task: StudyTask) => {
+  const handleStartFocusSession = (task: StudyTask | null) => {
     setFocusTask(task);
+    setActiveFocusSessionId(null);
     setIsFocusModalOpen(true);
+    void PlannerClient.startFocusSession(
+      task
+        ? { taskId: task.id, title: task.title, subjectId: task.subjectId }
+        : { title: 'Focused Study Sprint', subjectId: 'math' }
+    )
+      .then((res) => {
+        if (res?.sessionId) setActiveFocusSessionId(res.sessionId);
+      })
+      .catch(() => {});
   };
 
   // Edit Task helper
@@ -251,7 +273,7 @@ export const PlannerView: React.FC = () => {
   const handleOpenNewTaskForDate = (dateStr: string) => {
     setEditingTask({
       id: '',
-      userId: 'user-1',
+      userId: user?.id || '',
       title: '',
       taskType: 'LEARN_CONCEPT',
       subjectId: 'math',
@@ -276,7 +298,7 @@ export const PlannerView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-slate-950 text-slate-100">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] rounded-3xl overflow-hidden border border-[#E3DFF5] dark:border-[#3D3861]">
       {/* Planner Header & Navigation Sub-tabs */}
       <PlannerHeader
         plan={activePlan}
@@ -285,8 +307,8 @@ export const PlannerView: React.FC = () => {
         onOpenAiWizard={() => setIsAiWizardOpen(true)}
         onOpenNewTask={handleOpenNewTask}
         onOpenFocusSession={() => {
-          setFocusTask(tasks.find((t) => t.status !== 'COMPLETED') || tasks[0] || null);
-          setIsFocusModalOpen(true);
+          const nextTask = tasks.find((t) => t.status !== 'COMPLETED') || tasks[0] || null;
+          handleStartFocusSession(nextTask);
         }}
         onOpenVersionHistory={() => setIsVersionModalOpen(true)}
       />
@@ -294,10 +316,23 @@ export const PlannerView: React.FC = () => {
       {/* Main Tab Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-10 h-10 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin mb-3" />
-            <p className="text-xs text-slate-400">Loading personalized timetable & metrics...</p>
-          </div>
+          <ScreenSkeleton rows={4} />
+        ) : loadError ? (
+          <EmptyState
+            variant="error"
+            title="Could not load study planner"
+            description={loadError}
+            action={
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => fetchPlannerData()}
+                leftIcon={<RefreshCw className="w-4 h-4" />}
+              >
+                Retry
+              </Button>
+            }
+          />
         ) : (
           <>
             {activeTab === 'today' && (
@@ -352,14 +387,16 @@ export const PlannerView: React.FC = () => {
             )}
 
             {activeTab === 'progress' && (
-              <PlannerProgressView
-                analytics={analytics}
-                settings={settings}
-                recommendations={recommendations}
-                onApplyRecommendation={() => {
-                  fetchPlannerData();
-                }}
-              />
+              <Suspense fallback={<ChartSkeleton label="Loading progress & analytics charts..." />}>
+                <PlannerProgressView
+                  analytics={analytics}
+                  settings={settings}
+                  recommendations={recommendations}
+                  onApplyRecommendation={() => {
+                    fetchPlannerData();
+                  }}
+                />
+              </Suspense>
             )}
 
             {activeTab === 'settings' && (
@@ -402,9 +439,23 @@ export const PlannerView: React.FC = () => {
         onClose={() => {
           setIsFocusModalOpen(false);
           setFocusTask(null);
+          setActiveFocusSessionId(null);
         }}
-        onComplete={async (durationSeconds, notes) => {
-          fetchPlannerData();
+        onComplete={async (durationSeconds, notes, completed) => {
+          if (activeFocusSessionId) {
+            try {
+              await PlannerClient.stopFocusSession(activeFocusSessionId, durationSeconds, Boolean(completed), notes);
+            } catch (err) {
+              console.error('Failed to persist focus session:', err);
+            }
+          }
+          if (completed && durationSeconds >= 60) {
+            const earned = Math.min(50, Math.floor((durationSeconds / 60) * 1.5));
+            if (earned > 0) {
+              awardXp(earned, `Focus study session: ${focusTask?.title || 'Deep Work'}`);
+            }
+          }
+          await fetchPlannerData();
         }}
       />
     </div>

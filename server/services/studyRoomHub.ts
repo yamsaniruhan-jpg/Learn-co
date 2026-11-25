@@ -67,6 +67,7 @@ export interface StudyRoomPublicState {
   visibility: RoomVisibility;
   roomCode: string | null;
   hostName: string;
+  isHost?: boolean;
   isLocked: boolean;
   createdAt: string;
   peers: StudyRoomPeer[];
@@ -425,6 +426,7 @@ class StudyRoomHubService {
         : room.timer;
     room.timer = timerSnapshot;
 
+    const isHost = Boolean(viewerPeerId && room.hostPeerId !== 'system' && room.hostPeerId === viewerPeerId);
     const authorized =
       room.visibility === 'public' ||
       (Boolean(viewerPeerId) && verifyAccessTicket(room.id, viewerPeerId!, ticket));
@@ -438,6 +440,7 @@ class StudyRoomHubService {
         visibility: room.visibility,
         roomCode: null,
         hostName: room.hostName,
+        isHost,
         isLocked: true,
         createdAt: room.createdAt,
         peers: [],
@@ -456,6 +459,7 @@ class StudyRoomHubService {
       visibility: room.visibility,
       roomCode: room.roomCode,
       hostName: room.hostName,
+      isHost,
       isLocked: false,
       createdAt: room.createdAt,
       peers,
@@ -464,6 +468,44 @@ class StudyRoomHubService {
       timer: timerSnapshot,
       activePoll: room.activePoll,
     };
+  }
+
+  deleteRoom(
+    roomId: string,
+    requesterPeerId?: string | null,
+    accessTicket?: string | null
+  ): { deleted: boolean; reason?: 'not_found' | 'protected' | 'forbidden' } {
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      return { deleted: false, reason: 'not_found' };
+    }
+    if (room.hostPeerId === 'system') {
+      return { deleted: false, reason: 'protected' };
+    }
+    const cleanRequester = sanitizeText(requesterPeerId, 64);
+    const isHostMatch = Boolean(cleanRequester && room.hostPeerId === cleanRequester);
+    const hasHostTicket =
+      room.visibility === 'private' &&
+      isHostMatch &&
+      verifyAccessTicket(roomId, cleanRequester, accessTicket);
+    if (!isHostMatch && !hasHostTicket) {
+      return { deleted: false, reason: 'forbidden' };
+    }
+
+    this.broadcastToRoom(roomId, {
+      type: 'room:deleted',
+      roomId,
+    });
+    for (const client of this.clients) {
+      if (client.roomId === roomId) {
+        client.roomId = null;
+        client.accessTicket = null;
+      }
+    }
+    this.rooms.delete(roomId);
+    this.roomPeers.delete(roomId);
+    this.broadcastRoomsCatalog();
+    return { deleted: true };
   }
 
   private broadcastRoomsCatalog() {

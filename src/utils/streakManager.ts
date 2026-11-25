@@ -536,3 +536,114 @@ export function mergeStreakData(
     streakStatus: currentStreak > 1 ? 'EXTENDED' : 'ACTIVE_TODAY',
   };
 }
+
+export interface StreakCalendarCell {
+  dateKey: string;
+  dayNumber: number;
+  dayLabel: string;
+  isActive: boolean;
+  isToday: boolean;
+  isFuture: boolean;
+  intensity: 0 | 1 | 2 | 3 | 4;
+  questionsSolved: number;
+  xpEarned: number;
+  minutesStudied: number;
+  sessionsCompleted: number;
+}
+
+export interface StreakCalendarMonth {
+  year: number;
+  monthIndex: number;
+  monthLabel: string;
+  leadingEmptySlots: number;
+  days: StreakCalendarCell[];
+  activeDaysCount: number;
+}
+
+/**
+ * Build a calendar-month grid (Sunday-start, 7 columns) with per-day telemetry.
+ */
+export function getStreakCalendarMonth(
+  streakData: StreakData,
+  year: number,
+  monthIndex: number,
+  now: Date = new Date()
+): StreakCalendarMonth {
+  const firstDay = new Date(year, monthIndex, 1);
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const leadingEmptySlots = firstDay.getDay();
+  const todayKey = formatDateToDateKey(now);
+  const historySet = new Set(streakData.streakHistory || []);
+  const activities = streakData.dailyActivities || {};
+  const monthsFull = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const daysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const days: StreakCalendarCell[] = [];
+  let activeDaysCount = 0;
+
+  for (let dayNum = 1; dayNum <= daysInMonth; dayNum += 1) {
+    const d = new Date(year, monthIndex, dayNum);
+    const dateKey = formatDateToDateKey(d);
+    const dayAct = activities[dateKey] || {
+      questionsSolved: 0,
+      xpEarned: 0,
+      minutesStudied: 0,
+      sessionsCompleted: 0,
+    };
+
+    const questionsSolved = Math.max(0, Number(dayAct.questionsSolved || 0));
+    const xpEarned = Math.max(0, Number(dayAct.xpEarned || 0));
+    const minutesStudied = Math.max(0, Number(dayAct.minutesStudied || 0));
+    const sessionsCompleted = Math.max(0, Number(dayAct.sessionsCompleted || 0));
+
+    const activityScore =
+      questionsSolved * 3 +
+      Math.round(xpEarned / 5) +
+      Math.round(minutesStudied / 4) +
+      sessionsCompleted * 4;
+
+    const isActive =
+      historySet.has(dateKey) ||
+      questionsSolved > 0 ||
+      xpEarned > 0 ||
+      minutesStudied > 0 ||
+      sessionsCompleted > 0;
+
+    if (isActive) activeDaysCount += 1;
+
+    let intensity: 0 | 1 | 2 | 3 | 4 = 0;
+    if (isActive) {
+      if (activityScore >= 40) intensity = 4;
+      else if (activityScore >= 20) intensity = 3;
+      else if (activityScore >= 6) intensity = 2;
+      else intensity = 1;
+    }
+
+    days.push({
+      dateKey,
+      dayNumber: dayNum,
+      dayLabel: `${daysShort[d.getDay()]}, ${monthsShort[monthIndex]} ${dayNum}`,
+      isActive,
+      isToday: dateKey === todayKey,
+      isFuture: dateKey > todayKey,
+      intensity,
+      questionsSolved,
+      xpEarned,
+      minutesStudied,
+      sessionsCompleted,
+    });
+  }
+
+  return {
+    year: firstDay.getFullYear(),
+    monthIndex: firstDay.getMonth(),
+    monthLabel: `${monthsFull[firstDay.getMonth()]} ${firstDay.getFullYear()}`,
+    leadingEmptySlots,
+    days,
+    activeDaysCount,
+  };
+}

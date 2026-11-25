@@ -11,10 +11,8 @@ function accountScope(accountId?: AccountId): string {
   if (accountId === null) return 'guest';
   if (typeof accountId === 'string' && accountId) return `account:${encodeURIComponent(accountId)}`;
   try {
-    if (localStorage.getItem('learnco_auth_token')) {
-      const user = JSON.parse(localStorage.getItem('learnco_user') || 'null');
-      if (typeof user?.id === 'string' && user.id) return `account:${encodeURIComponent(user.id)}`;
-    }
+    const user = JSON.parse(localStorage.getItem('learnco_user') || 'null');
+    if (typeof user?.id === 'string' && user.id) return `account:${encodeURIComponent(user.id)}`;
   } catch { /* Use a separate guest scope if storage is unavailable. */ }
   return 'guest';
 }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { AuthClient } from '../../services/authClient';
 import {
   History,
   CheckCircle2,
@@ -44,9 +43,7 @@ export const PracticeHistoryView: React.FC = () => {
     setIsLoading(true);
     try {
       const res = await fetch('/api/practice/history', {
-        headers: {
-          Authorization: `Bearer ${AuthClient.getToken()}`,
-        },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.attempts) {

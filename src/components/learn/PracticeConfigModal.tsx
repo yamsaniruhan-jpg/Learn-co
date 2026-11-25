@@ -8,6 +8,7 @@ interface PracticeConfigModalProps {
   onStart: (config: PracticeSessionConfig) => void;
   initialSubjectId?: SubjectId;
   initialTopicId?: string;
+  initialSubtopicId?: string;
   initialConceptId?: string;
   initialTitle?: string;
   dailyQuotaRemaining: number;
@@ -15,11 +16,13 @@ interface PracticeConfigModalProps {
 
 const MODAL_EXAM_TRACK_OPTIONS: Array<{ id: ExamTrackId; label: string }> = [
   { id: 'all', label: 'All Tracks' },
-  { id: 'stem_olympiad', label: 'STEM Olympiad (IPhO/IChO/IBHO)' },
-  { id: 'iapt_exams', label: 'IAPT Olympiads (NSEP/NSEC/NSEB)' },
-  { id: 'nsejs', label: 'IJSO / NSEJS Junior Olympiad' },
-  { id: 'ict_hackathon', label: 'ICT Coding & Algorithms' },
   { id: 'jee_advanced', label: 'JEE Advanced' },
+  { id: 'jee_main', label: 'JEE Main' },
+  { id: 'ap_stem', label: 'AP Calculus & AP STEM' },
+  { id: 'ict_hackathon', label: 'ICT Coding & Algorithms' },
+  { id: 'iapt_exams', label: 'IPhO / IChO / IBO & IAPT' },
+  { id: 'nsejs', label: 'IJSO / NSEJS Junior Olympiad' },
+  { id: 'stem_olympiad', label: 'STEM Olympiad Zone' },
 ];
 
 export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
@@ -28,6 +31,7 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
   onStart,
   initialSubjectId = 'math',
   initialTopicId,
+  initialSubtopicId,
   initialConceptId,
   initialTitle,
   dailyQuotaRemaining,
@@ -70,6 +74,7 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
       subjectId: initialSubjectId,
       examTrack: examTrack !== 'all' ? examTrack : undefined,
       topicId: initialTopicId,
+      subtopicId: initialSubtopicId,
       conceptId: initialConceptId,
       difficultyMode,
       questionCount,
@@ -171,12 +176,12 @@ export const PracticeConfigModal: React.FC<PracticeConfigModalProps> = ({
         {/* Question Count Selection */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Session Length</label>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[5, 10, 15, 20].map((cnt) => (
               <button
                 key={cnt}
                 onClick={() => setQuestionCount(cnt)}
-                className={`py-2 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   questionCount === cnt
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                     : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'

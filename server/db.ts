@@ -37,6 +37,8 @@ import {
   CopilotCitation,
   CopilotToolCall,
   CopilotArtifact,
+  CopilotUnavailableReason,
+  CopilotFallbackQuestion,
 } from '../src/types/copilot';
 import {
   MentorProfile,
@@ -90,8 +92,17 @@ import {
   persistSessionToSql,
   revokeSessionInSql,
   revokeUserSessionsInSql,
-  persistSolvedQuestionToSql,
+  commitPasswordResetToSql,
+  persistPracticeAttemptAtomicToSql,
+  persistXpUpdateAtomicToSql,
+  persistMentorProfileToSql,
+  persistMentorshipRequestToSql,
+  persistMentorshipRelationshipToSql,
+  persistMentorshipItemToSql,
+  persistMentorshipDecisionAtomicToSql,
+  hashSessionToken,
 } from '../src/db/persistence';
+export { hashSessionToken };
 
 export interface AuditLogEntry {
   id: string;
@@ -114,7 +125,7 @@ export interface DatabaseState {
   questionAttempts: QuestionAttemptRecord[];
   attemptsById: Record<string, QuestionAttemptRecord>;
   mistakes: MistakeRecord[];
-  sessions: Record<string, { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean }>;
+  sessions: Record<string, { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean; tokenHashVersion?: number }>;
   passwordResets: Record<string, { userId: string; expiresAt: string; usedAt?: string; createdAt: string }>;
   creatorSources: Record<string, CreatorSource>;
   creatorResources: Record<string, CreatorResource>;
@@ -143,6 +154,17 @@ export interface DatabaseState {
 }
 
 const DB_FILE_PATH = process.env.LEARNCO_DB_FILE ? path.resolve(process.env.LEARNCO_DB_FILE) : path.join(process.cwd(), '.learnco_db.json');
+
+/**
+ * Cloud SQL PostgreSQL is the primary source of truth.
+ * The local JSON store only operates in test isolation or when explicitly enabled via LEARNCO_JSON_FALLBACK=true.
+ */
+export function isJsonFallbackEnabled(): boolean {
+  if (process.env.LEARNCO_JSON_FALLBACK === 'true') return true;
+  if (process.env.LEARNCO_JSON_FALLBACK === 'false') return false;
+  if (process.env.NODE_ENV === 'test' || Boolean(process.env.LEARNCO_DB_FILE)) return true;
+  return false;
+}
 
 // Memory store initialized with defaults
 let memoryDb: DatabaseState = {
@@ -339,6 +361,9 @@ function seedDatabase() {
 }
 
 export function loadDbFromDisk() {
+  if (!isJsonFallbackEnabled()) {
+    return;
+  }
   try {
     if (fs.existsSync(DB_FILE_PATH)) {
       const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
@@ -349,7 +374,21 @@ export function loadDbFromDisk() {
         if (parsed.profiles) memoryDb.profiles = { ...memoryDb.profiles, ...parsed.profiles };
         if (parsed.gamification) memoryDb.gamification = { ...memoryDb.gamification, ...parsed.gamification };
         if (parsed.settings) memoryDb.settings = { ...memoryDb.settings, ...parsed.settings };
-        if (parsed.sessions) memoryDb.sessions = { ...memoryDb.sessions, ...parsed.sessions };
+
+        // Security upgrade: delete all pre-upgrade unhashed sessions on startup (logs legacy raw tokens out once).
+        // Only retain sessions explicitly tagged with tokenHashVersion === 2 (SHA-256 keyed).
+        let purgedLegacySessions = false;
+        if (parsed.sessions && typeof parsed.sessions === 'object') {
+          const entries = Object.entries(parsed.sessions as Record<string, any>);
+          const hasLegacy = entries.some(([, rec]) => !rec || rec.tokenHashVersion !== 2);
+          if (hasLegacy) {
+            memoryDb.sessions = {};
+            purgedLegacySessions = entries.length > 0;
+          } else {
+            memoryDb.sessions = { ...memoryDb.sessions, ...parsed.sessions };
+          }
+        }
+
         if (parsed.passwordResets) memoryDb.passwordResets = { ...memoryDb.passwordResets, ...parsed.passwordResets };
         // Restore all persisted state, not just profiles and a subset of resources.
         for (const key of ['attemptsById', 'creatorResourceVersions', 'creatorJobs',
@@ -379,6 +418,11 @@ export function loadDbFromDisk() {
         }
         if (parsed.creatorResources) memoryDb.creatorResources = { ...memoryDb.creatorResources, ...parsed.creatorResources };
         if (parsed.creatorSources) memoryDb.creatorSources = { ...memoryDb.creatorSources, ...parsed.creatorSources };
+
+        if (purgedLegacySessions) {
+          isDirty = true;
+          flushDbSync();
+        }
       }
     }
   } catch (err) {
@@ -391,6 +435,10 @@ let writeQueue: Promise<void> = Promise.resolve();
 let isDirty = false;
 
 async function writeDbSnapshotAsync(): Promise<void> {
+  if (!isJsonFallbackEnabled()) {
+    isDirty = false;
+    return;
+  }
   isDirty = false;
   const dir = path.dirname(DB_FILE_PATH);
   await fs.promises.mkdir(dir, { recursive: true });
@@ -406,6 +454,10 @@ async function writeDbSnapshotAsync(): Promise<void> {
 }
 
 export function flushDbSync(): void {
+  if (!isJsonFallbackEnabled()) {
+    isDirty = false;
+    return;
+  }
   if (!isDirty && !saveTimer) return;
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -426,6 +478,9 @@ export function flushDbSync(): void {
 }
 
 export function saveDbToDisk() {
+  if (!isJsonFallbackEnabled()) {
+    return;
+  }
   isDirty = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -439,6 +494,10 @@ export function saveDbToDisk() {
 }
 
 export async function flushDb(): Promise<void> {
+  if (!isJsonFallbackEnabled()) {
+    isDirty = false;
+    return;
+  }
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   await writeQueue;
   if (isDirty) await writeDbSnapshotAsync();
@@ -475,11 +534,13 @@ export class Database {
     await hydrateDatabaseFromSql(memoryDb);
   }
 
-  static persistAttemptToSql(attempt: QuestionAttemptRecord, gamification?: UserGamification | null): void {
-    void persistSolvedQuestionToSql(attempt);
-    if (gamification) {
-      void persistGamificationToSql(gamification);
-    }
+  static persistAttemptToSql(
+    attempt: QuestionAttemptRecord,
+    gamification?: UserGamification | null,
+    xpTx?: XPTransaction | null,
+    mistake?: MistakeRecord | null
+  ): void {
+    void persistPracticeAttemptAtomicToSql(attempt, gamification, xpTx, mistake);
   }
 
   static cacheResolvedSqlIdentity(resolved: {
@@ -487,7 +548,7 @@ export class Database {
     profile?: UserProfile;
     gamification?: UserGamification;
     settings?: UserSettings;
-    session?: { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean };
+    session?: { userId: string; createdAt: string; expiresAt: string; verifiedOwner?: boolean; tokenHashVersion?: number };
     token?: string;
   }): void {
     const { user, profile, gamification, settings, session, token } = resolved;
@@ -496,7 +557,10 @@ export class Database {
     if (profile) memoryDb.profiles[user.id] = profile;
     if (gamification) memoryDb.gamification[user.id] = gamification;
     if (settings) memoryDb.settings[user.id] = settings;
-    if (token && session) memoryDb.sessions[token.trim()] = session;
+    if (token && session) {
+      const tokenHash = hashSessionToken(token);
+      memoryDb.sessions[tokenHash] = { ...session, tokenHashVersion: 2 };
+    }
   }
 
   static findUserByEmail(email: string): UserAccount | null {
@@ -819,23 +883,29 @@ export class Database {
     record.usedAt = new Date().toISOString();
     delete memoryDb.passwordResets[digest];
 
-    // Revoke all live sessions for this account.
-    for (const [sessionToken, session] of Object.entries(memoryDb.sessions)) {
-      if (session.userId === user.id) delete memoryDb.sessions[sessionToken];
+    // Revoke all live sessions for this account (hashed keys).
+    for (const [sessionKey, session] of Object.entries(memoryDb.sessions)) {
+      if (session.userId === user.id) delete memoryDb.sessions[sessionKey];
     }
 
     saveDbToDisk();
-    void persistAccountToSql(user);
-    void revokeUserSessionsInSql(user.id);
+    void commitPasswordResetToSql(user);
     return { userId: user.id };
   }
 
   static createSession(userId: string, verifiedOwner = false): string {
     const token = generateToken();
+    const tokenHash = hashSessionToken(token);
     const createdAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-    const session = { userId, createdAt, expiresAt, ...(verifiedOwner ? { verifiedOwner: true } : {}) };
-    memoryDb.sessions[token] = session;
+    const session = {
+      userId,
+      createdAt,
+      expiresAt,
+      tokenHashVersion: 2,
+      ...(verifiedOwner ? { verifiedOwner: true } : {}),
+    };
+    memoryDb.sessions[tokenHash] = session;
     saveDbToDisk();
     void persistSessionToSql(token, session);
     return token;
@@ -847,13 +917,14 @@ export class Database {
     if (!cleanToken || cleanToken === 'null' || cleanToken === 'undefined') {
       return null;
     }
-    const session = memoryDb.sessions[cleanToken];
+    const tokenHash = hashSessionToken(cleanToken);
+    const session = memoryDb.sessions[tokenHash];
     if (!session) {
       return null;
     }
 
     if (new Date(session.expiresAt) < new Date()) {
-      delete memoryDb.sessions[cleanToken];
+      delete memoryDb.sessions[tokenHash];
       saveDbToDisk();
       void revokeSessionInSql(cleanToken);
       return null;
@@ -863,14 +934,22 @@ export class Database {
   }
 
   static isVerifiedOwnerSession(token: string): boolean {
-    return Boolean(this.getSessionUser(token) && memoryDb.sessions[token.trim()]?.verifiedOwner);
+    if (!token) return false;
+    const cleanToken = token.trim();
+    if (!cleanToken) return false;
+    const tokenHash = hashSessionToken(cleanToken);
+    return Boolean(this.getSessionUser(cleanToken) && memoryDb.sessions[tokenHash]?.verifiedOwner);
   }
 
   static revokeSession(token: string): boolean {
-    if (memoryDb.sessions[token]) {
-      delete memoryDb.sessions[token];
+    if (!token) return false;
+    const cleanToken = token.trim();
+    if (!cleanToken) return false;
+    const tokenHash = hashSessionToken(cleanToken);
+    if (memoryDb.sessions[tokenHash]) {
+      delete memoryDb.sessions[tokenHash];
       saveDbToDisk();
-      void revokeSessionInSql(token);
+      void revokeSessionInSql(cleanToken);
       return true;
     }
     return false;
@@ -1318,17 +1397,20 @@ export class Database {
     gam.lastActiveDate = new Date().toISOString().split('T')[0];
 
     const delta = Math.max(0, gam.xp - previousXp);
+    let xpTx: XPTransaction | undefined;
     if (delta > 0) {
-      memoryDb.xpTransactions.unshift({
+      xpTx = {
         id: `xp-tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         userId,
         amount: delta,
         reason: (reason as any) || 'QUESTION_CORRECT',
         timestamp: new Date().toISOString(),
-      });
+      };
+      memoryDb.xpTransactions.unshift(xpTx);
     }
 
     saveDbToDisk();
+    void persistXpUpdateAtomicToSql(gam, xpTx || null);
     return { xp: gam.xp, level: gam.level };
   }
 
@@ -1741,6 +1823,9 @@ export class Database {
       content: string;
       mode?: CopilotMode;
       modelUsed?: string;
+      hintOnly?: boolean;
+      unavailableReason?: CopilotUnavailableReason;
+      fallbackPracticeQuestions?: CopilotFallbackQuestion[];
       citations?: CopilotCitation[];
       toolCalls?: CopilotToolCall[];
       artifact?: CopilotArtifact;
@@ -1766,6 +1851,9 @@ export class Database {
       content: messageData.content,
       mode: messageData.mode || conv.mode,
       modelUsed: messageData.modelUsed,
+      hintOnly: messageData.hintOnly,
+      unavailableReason: messageData.unavailableReason,
+      fallbackPracticeQuestions: messageData.fallbackPracticeQuestions,
       citations: messageData.citations,
       toolCalls: messageData.toolCalls,
       artifact: messageData.artifact,
@@ -1987,9 +2075,11 @@ export class Database {
     // Upgrade role in userProfile if not already educator or admin
     if (userProfile && userProfile.role === 'student') {
       userProfile.role = 'educator';
+      void persistProfileToSql(userProfile);
     }
 
     saveDbToDisk();
+    void persistMentorProfileToSql(existing);
     return existing;
   }
 
@@ -2097,6 +2187,7 @@ export class Database {
 
     memoryDb.mentorshipRequests[reqId] = newRequest;
     saveDbToDisk();
+    void persistMentorshipRequestToSql(newRequest);
     return { request: newRequest };
   }
 
@@ -2148,6 +2239,7 @@ export class Database {
     if (action === 'DECLINE') {
       request.status = 'DECLINED';
       saveDbToDisk();
+      void persistMentorshipDecisionAtomicToSql({ request });
       return { request, relationship: null };
     }
 
@@ -2231,6 +2323,13 @@ export class Database {
     memoryDb.mentorshipMessages[relId] = [welcomeMsg];
 
     saveDbToDisk();
+    void persistMentorshipDecisionAtomicToSql({
+      request,
+      relationship: newRel,
+      mentor: mentor || null,
+      initialGoal,
+      welcomeMessage: welcomeMsg,
+    });
     return { request, relationship: newRel };
   }
 
@@ -2306,6 +2405,7 @@ export class Database {
     request.status = 'CANCELLED';
     request.updatedAt = new Date().toISOString();
     saveDbToDisk();
+    void persistMentorshipRequestToSql(request);
     return true;
   }
 
@@ -2349,6 +2449,7 @@ export class Database {
     rel.status = status;
     rel.updatedAt = new Date().toISOString();
     saveDbToDisk();
+    void persistMentorshipRelationshipToSql(rel);
     return rel;
   }
 
@@ -2368,6 +2469,7 @@ export class Database {
     };
     rel.updatedAt = new Date().toISOString();
     saveDbToDisk();
+    void persistMentorshipRelationshipToSql(rel);
     return rel.privacySettings;
   }
 
@@ -2504,6 +2606,8 @@ export class Database {
     rel.notesCount += 1;
     rel.updatedAt = now;
     saveDbToDisk();
+    void persistMentorshipItemToSql('message', newMsg.id, relationshipId, newMsg);
+    void persistMentorshipRelationshipToSql(rel);
 
     return newMsg;
   }
@@ -2577,6 +2681,8 @@ export class Database {
     rel.goalsCount += 1;
     rel.updatedAt = now;
     saveDbToDisk();
+    void persistMentorshipItemToSql('goal', goal.id, goal.mentorshipId, goal);
+    void persistMentorshipRelationshipToSql(rel);
     return goal;
   }
 
@@ -2603,6 +2709,7 @@ export class Database {
     }
     goal.updatedAt = new Date().toISOString();
     saveDbToDisk();
+    void persistMentorshipItemToSql('goal', goal.id, goal.mentorshipId, goal);
     return goal;
   }
 
@@ -2650,6 +2757,7 @@ export class Database {
 
     memoryDb.mentorshipTasks[id] = task;
     saveDbToDisk();
+    void persistMentorshipItemToSql('task', task.id, task.mentorshipId, task);
     return task;
   }
 
@@ -2675,6 +2783,7 @@ export class Database {
     if (updates.dueDate) task.dueDate = updates.dueDate;
 
     saveDbToDisk();
+    void persistMentorshipItemToSql('task', task.id, task.mentorshipId, task);
     return task;
   }
 
@@ -2740,6 +2849,8 @@ export class Database {
     rel.sessionsCount += 1;
     rel.updatedAt = now;
     saveDbToDisk();
+    void persistMentorshipItemToSql('session', session.id, session.mentorshipId, session);
+    void persistMentorshipRelationshipToSql(rel);
     return session;
   }
 
@@ -2770,6 +2881,7 @@ export class Database {
 
     session.updatedAt = new Date().toISOString();
     saveDbToDisk();
+    void persistMentorshipItemToSql('session', session.id, session.mentorshipId, session);
     return session;
   }
 
@@ -2824,9 +2936,11 @@ export class Database {
       const avg = allRatings.reduce((sum, f) => sum + f.overallRating, 0) / Math.max(1, allRatings.length);
       mentor.rating = Math.round(avg * 100) / 100;
       mentor.reviewCount = allRatings.length;
+      void persistMentorProfileToSql(mentor);
     }
 
     saveDbToDisk();
+    void persistMentorshipItemToSql('feedback', fb.id, fb.mentorshipId, fb);
     return fb;
   }
 
@@ -2852,6 +2966,7 @@ export class Database {
 
     memoryDb.mentorshipReports.push(report);
     saveDbToDisk();
+    void persistMentorshipItemToSql('report', report.id, report.mentorshipId, report);
     return report;
   }
 

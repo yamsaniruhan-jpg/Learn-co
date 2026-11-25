@@ -14,7 +14,7 @@ export interface MarketplaceCourseProgress {
 function getAuthenticatedUid(): string | null {
   const local = AuthClient.getCurrentUser();
   const firebaseUser = auth?.currentUser;
-  if (!AuthClient.getToken() || !local?.id || !firebaseUser?.emailVerified ||
+  if (!AuthClient.getSessionId() || !local?.id || !firebaseUser?.emailVerified ||
       !hasMatchingFirebaseIdentity(firebaseUser.email, local.email)) return null;
   return firebaseUser.uid;
 }
@@ -81,10 +81,10 @@ export async function fetchCourseProgressFromFirestore(): Promise<Record<string,
   }
 }
 
-export async function syncPublishedCourseToFirestore(course: Record<string, any>): Promise<void> {
-  if (!isFirebaseConfigured() || !db) return;
+export async function syncPublishedCourseToFirestore(course: Record<string, any>): Promise<boolean> {
+  if (!isFirebaseConfigured() || !db) return false;
   const uid = getAuthenticatedUid();
-  if (!uid || !course?.id || !/^[A-Za-z0-9_-]{1,128}$/.test(course.id)) return;
+  if (!uid || !course?.id || !/^[A-Za-z0-9_-]{1,128}$/.test(course.id)) return false;
 
   const path = `marketplace/${course.id}`;
   try {
@@ -98,12 +98,34 @@ export async function syncPublishedCourseToFirestore(course: Record<string, any>
       },
       { merge: true }
     );
+    return true;
   } catch (error) {
     try {
       handleFirestoreError(error, OperationType.WRITE, path);
     } catch {
-      // Non-fatal fallback
+      return false;
     }
+    return false;
+  }
+}
+
+export async function fetchPublishedCoursesFromFirestore(): Promise<Record<string, any>[]> {
+  if (!isFirebaseConfigured() || !db) return [];
+  const path = 'marketplace';
+  try {
+    const snap = await getDocs(collection(db, 'marketplace'));
+    const rows: Record<string, any>[] = snap.docs.map((d) => ({
+      ...(d.data() as Record<string, any>),
+      id: d.id,
+    }));
+    return rows.filter((c) => c.status === 'published');
+  } catch (error) {
+    try {
+      handleFirestoreError(error, OperationType.LIST, path);
+    } catch {
+      return [];
+    }
+    return [];
   }
 }
 

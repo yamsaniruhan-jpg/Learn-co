@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
+import { ScreenSkeleton } from '../ui/Skeleton';
 
 import { useAuth } from '../../context/AuthContext';
 
@@ -246,10 +248,10 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const handleAddToPractice = async (res: CreatorResource) => {
     try {
       const accountId = AuthClient.getCurrentUser()?.id;
-      const token = AuthClient.getToken();
-      if (!accountId || !token) throw new Error('Sign in to transfer this resource to practice.');
+      const sessionId = AuthClient.getSessionId();
+      if (!accountId || !sessionId) throw new Error('Sign in to transfer this resource to practice.');
       const result = await CreatorClient.addToPractice(res.id);
-      if (AuthClient.getCurrentUser()?.id !== accountId || AuthClient.getToken() !== token) {
+      if (AuthClient.getCurrentUser()?.id !== accountId || AuthClient.getSessionId() !== sessionId) {
         throw new Error('Your session changed before the transfer completed. Please try again.');
       }
       if (result.questions && result.questions.length > 0) {
@@ -267,7 +269,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       showToast(result.message || 'Transferred to Practice Arena! Redirecting...');
       if (onNavigateToPractice) {
         setTimeout(() => {
-          if (AuthClient.getCurrentUser()?.id === accountId && AuthClient.getToken() === token) onNavigateToPractice();
+          if (AuthClient.getCurrentUser()?.id === accountId && AuthClient.getSessionId() === sessionId) onNavigateToPractice();
         }, 500);
       }
     } catch (err: any) {
@@ -276,28 +278,20 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
-      {loadError && (
-        <div role="alert" className="p-4 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-700 dark:text-rose-300 flex items-center justify-between gap-3">
-          <span>{loadError}</span>
-          <Button type="button" variant="outline" size="sm" onClick={loadData}>
-            Retry
-          </Button>
-        </div>
-      )}
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-200">
       {storageStatus && (
-        <div role="status" className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
-          {storageStatus} Firebase copies are retained separately when a local source is deleted.
-          <button type="button" onClick={() => setStorageStatus('')} className="ml-3 underline">Dismiss</button>
+        <div role="status" className="p-4 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] text-xs text-[#2D2A4A] dark:text-[#F1EFFF] flex items-center justify-between gap-2">
+          <span>{storageStatus} Firebase copies are retained separately when a local source is deleted.</span>
+          <button type="button" onClick={() => setStorageStatus('')} className="min-h-[44px] px-3 underline cursor-pointer">Dismiss</button>
         </div>
       )}
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div
-          className={`p-4 rounded-xl border flex items-center justify-between shadow-lg text-xs font-semibold animate-in slide-in-from-top duration-200 ${
+          className={`p-4 rounded-2xl border flex items-center justify-between shadow-sm text-xs font-semibold animate-in slide-in-from-top duration-200 ${
             toastMessage.type === 'success'
-              ? 'bg-emerald-600 text-white border-emerald-500'
-              : 'bg-rose-600 text-white border-rose-500'
+              ? 'bg-[#4CAF8E] text-white border-[#4CAF8E]'
+              : 'bg-[#F25F5C] text-white border-[#F25F5C]'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -308,7 +302,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             )}
             <span>{toastMessage.text}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-white/80 hover:text-white">
+          <button onClick={() => setToastMessage(null)} className="min-h-[44px] px-2 text-white/90 hover:text-white cursor-pointer">
             Dismiss
           </button>
         </div>
@@ -318,58 +312,59 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Volume 4 • AI Pedagogical Synthesis</span>
-            </span>
+            <Badge variant="primary" size="sm">
+              <Sparkles className="w-3 h-3 mr-1" />
+              Create
+            </Badge>
             {quota && (
               <Badge variant="outline" size="sm">
-                Daily Uploads: {quota.sources.used}/{quota.sources.limit} • Artifacts: {quota.artifacts.used}/{quota.artifacts.limit}
+                Uploads: {quota.sources.used}/{quota.sources.limit} · Artifacts: {quota.artifacts.used}/{quota.artifacts.limit}
               </Badge>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
-            Creator Studio
+          <h1 className="text-2xl sm:text-3xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
+            Create
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Ingest syllabus PDFs, lecture notes, or research papers and synthesize structured interactive artifacts.
+          <p className="text-xs sm:text-sm text-[#6B6890] dark:text-[#B4B0D5]">
+            Turn syllabus PDFs, links, or study notes into flashcards, summaries, and practice quizzes.
           </p>
         </div>
 
         {/* Studio Sub-Navigation Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto shrink-0">
+        <div className="flex bg-[#FFFFFF] dark:bg-[#2A2647] p-1 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto shrink-0">
           <button
-            onClick={() => {
-              setActiveTab('synthesizer');
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            type="button"
+            onClick={() => setActiveTab('synthesizer')}
+            className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'synthesizer'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white shadow-xs'
+                : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Studio Lab</span>
+            <span>Studio</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('library')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'library'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white shadow-xs'
+                : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>My Library ({resources.length})</span>
+            <span>Library ({resources.length})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('sources')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'sources'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white shadow-xs'
+                : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
             }`}
           >
             <FolderTree className="w-3.5 h-3.5" />
@@ -378,93 +373,106 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         </div>
       </div>
 
-      {/* TAB CONTENT: STUDIO SYNTHESIZER */}
-      {activeTab === 'synthesizer' && (
-        <div className="space-y-8">
-          {activeResource ? (
-            <div className="space-y-6">
-              {/* Back to Intake Button */}
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setActiveResource(null)}
-                  leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
-                  className="text-xs"
-                >
-                  Synthesize Another Resource
-                </Button>
+      {isLoadingResources ? (
+        <ScreenSkeleton label="Loading Creator Studio artifacts and sources..." />
+      ) : loadError ? (
+        <EmptyState
+          variant="error"
+          icon={<AlertCircle className="w-6 h-6" />}
+          title="Could not load Create studio"
+          description={loadError}
+          action={
+            <Button type="button" variant="primary" size="md" onClick={loadData} leftIcon={<RefreshCw className="w-4 h-4" />}>
+              Retry
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          {/* TAB CONTENT: STUDIO SYNTHESIZER */}
+          {activeTab === 'synthesizer' && (
+            <div className="space-y-8">
+              {activeResource ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={() => setActiveResource(null)}
+                      leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+                    >
+                      New Synthesis
+                    </Button>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">
-                    Viewing Active Synthesized Artifact
-                  </span>
+                    <span className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
+                      Viewing Active Synthesized Artifact
+                    </span>
+                  </div>
+
+                  <ResourceViewer
+                    resource={activeResource}
+                    versions={activeVersions}
+                    onEdit={(res) => setEditingResource(res)}
+                    onDelete={handleDeleteResource}
+                    onExport={(res) => setExportingResource(res)}
+                    onAddToPractice={handleAddToPractice}
+                    onSelectVersion={(ver) => {
+                      setActiveResource((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              version: ver.versionNumber,
+                              content: ver.content,
+                            }
+                          : null
+                      );
+                    }}
+                  />
                 </div>
-              </div>
-
-              {/* Master Resource Viewer */}
-              <ResourceViewer
-                resource={activeResource}
-                versions={activeVersions}
-                onEdit={(res) => setEditingResource(res)}
-                onDelete={handleDeleteResource}
-                onExport={(res) => setExportingResource(res)}
-                onAddToPractice={handleAddToPractice}
-                onSelectVersion={(ver) => {
-                  setActiveResource((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          version: ver.versionNumber,
-                          content: ver.content,
-                        }
-                      : null
-                  );
-                }}
-              />
+              ) : (
+                <SourceIntakePanel
+                  onGenerate={handleGenerate}
+                  onStorageStatus={setStorageStatus}
+                  onSourceSaved={refreshSourcesAndQuota}
+                  isGenerating={isGenerating}
+                  isGenerationLimitReached={isGenerationLimitReached}
+                  prefillSource={prefillSource}
+                />
+              )}
             </div>
-          ) : (
-            <SourceIntakePanel
-              onGenerate={handleGenerate}
-              onStorageStatus={setStorageStatus}
-              onSourceSaved={refreshSourcesAndQuota}
-              isGenerating={isGenerating}
-              isGenerationLimitReached={isGenerationLimitReached}
-              prefillSource={prefillSource}
+          )}
+
+          {/* TAB CONTENT: RESOURCE LIBRARY */}
+          {activeTab === 'library' && (
+            <ResourceLibrary
+              resources={resources}
+              onSelectResource={handleSelectResource}
+              onEditResource={(res) => setEditingResource(res)}
+              onDeleteResource={handleDeleteResource}
+              onExportResource={(res) => setExportingResource(res)}
+              onAddToPractice={handleAddToPractice}
+              onCreateNew={() => {
+                setActiveResource(null);
+                setPrefillSource(undefined);
+                setActiveTab('synthesizer');
+              }}
             />
           )}
-        </div>
-      )}
 
-      {/* TAB CONTENT: RESOURCE LIBRARY */}
-      {activeTab === 'library' && (
-        <ResourceLibrary
-          resources={resources}
-          onSelectResource={handleSelectResource}
-          onEditResource={(res) => setEditingResource(res)}
-          onDeleteResource={handleDeleteResource}
-          onExportResource={(res) => setExportingResource(res)}
-          onAddToPractice={handleAddToPractice}
-          onCreateNew={() => {
-            setActiveResource(null);
-            setPrefillSource(undefined);
-            setActiveTab('synthesizer');
-          }}
-        />
-      )}
-
-      {/* TAB CONTENT: SOURCES HUB */}
-      {activeTab === 'sources' && (
-        <SourcesHub
-          sources={sources}
-          onSynthesizeFromSource={handleSynthesizeFromSource}
-          onDeleteSource={handleDeleteSource}
-          onCreateNewSource={() => {
-            setActiveResource(null);
-            setPrefillSource(undefined);
-            setActiveTab('synthesizer');
-          }}
-        />
+          {/* TAB CONTENT: SOURCES HUB */}
+          {activeTab === 'sources' && (
+            <SourcesHub
+              sources={sources}
+              onSynthesizeFromSource={handleSynthesizeFromSource}
+              onDeleteSource={handleDeleteSource}
+              onCreateNewSource={() => {
+                setActiveResource(null);
+                setPrefillSource(undefined);
+                setActiveTab('synthesizer');
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* Modals */}

@@ -258,6 +258,7 @@ export class XpEngine {
 
       // 7. Mistake Tracking (If incorrect answer)
       let mistakeRecorded = false;
+      let mistakeRecord: MistakeRecord | null = null;
       if (!isCorrect) {
         const mistake: MistakeRecord = {
           id: `mistake-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -277,6 +278,7 @@ export class XpEngine {
           createdAt: now,
         };
         db.mistakes.unshift(mistake);
+        mistakeRecord = mistake;
         mistakeRecorded = true;
       }
 
@@ -284,7 +286,7 @@ export class XpEngine {
       // The engine mutates the in-memory store directly; mark it dirty and
       // flush before telling an offline queue that its attempt was accepted.
       await flushCurrentState();
-      Database.persistAttemptToSql(attemptRecord, gam);
+      Database.persistAttemptToSql(attemptRecord, gam, xpTx || null, mistakeRecord);
 
       return {
         attempt: attemptRecord,

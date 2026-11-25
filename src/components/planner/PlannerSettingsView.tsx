@@ -99,14 +99,14 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Top Card */}
-      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center justify-between">
+      <div className="p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+          <div className="p-2 rounded-xl bg-[#6C5CE7]/12 text-[#6C5CE7] dark:text-[#A99DF5]">
             <Settings className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-white text-base">Planner & Capacity Settings</h3>
-            <p className="text-xs text-slate-400">
+            <h3 className="font-bold text-[#2D2A4A] dark:text-[#F1EFFF] text-base">Planner &amp; Capacity Settings</h3>
+            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
               Configure your daily workload limits, available days, and scheduling heuristics
             </p>
           </div>
@@ -115,8 +115,8 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
 
       <form onSubmit={handleSave} className="space-y-5">
         {/* Available Study Days */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-3">
-          <label className="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
+        <div className="p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-3">
+          <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] uppercase tracking-wider">
             Available Study Days
           </label>
           <div className="grid grid-cols-7 gap-2">
@@ -127,10 +127,10 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
                   key={d.id}
                   type="button"
                   onClick={() => toggleDay(d.id)}
-                  className={`py-2 rounded-xl border text-xs font-semibold transition-all ${
+                  className={`min-h-[44px] py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     active
-                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
-                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                      ? 'bg-[#6C5CE7] border-[#6C5CE7] text-white shadow-sm'
+                      : 'bg-[#F7F5FF] dark:bg-[#1E1B33] border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
                   }`}
                 >
                   {d.label}
@@ -141,17 +141,17 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
         </div>
 
         {/* Daily Capacity Slider */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
+        <div className="p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <label className="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] uppercase tracking-wider">
                 Daily Available Study Time
               </label>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">
                 The planner flags overload conflicts whenever scheduled tasks exceed this limit
               </p>
             </div>
-            <span className="text-sm font-mono font-bold text-indigo-400">
+            <span className="text-sm font-mono font-bold text-[#6C5CE7] dark:text-[#A99DF5]">
               {dailyMinutes} mins ({Math.floor(dailyMinutes / 60)}h {dailyMinutes % 60}m)
             </span>
           </div>
@@ -163,43 +163,44 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
             step="15"
             value={dailyMinutes}
             onChange={(e) => setDailyMinutes(Number(e.target.value))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            aria-label="Daily available study time in minutes"
+            className="w-full h-2 bg-[#E3DFF5] dark:bg-[#3D3861] rounded-lg appearance-none cursor-pointer accent-[#6C5CE7]"
           />
         </div>
 
         {/* Time Windows & Session Durations */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
-          <label className="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
-            Study Windows & Durations
+        <div className="p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-4">
+          <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] uppercase tracking-wider">
+            Study Windows &amp; Durations
           </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-slate-300 mb-1.5">Preferred Start Time</label>
+              <label className="block text-xs text-[#6B6890] dark:text-[#B4B0D5] mb-1.5">Preferred Start Time</label>
               <input
                 type="time"
                 value={preferredStartTime}
                 onChange={(e) => setPreferredStartTime(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className="w-full min-h-[44px] px-3.5 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-300 mb-1.5">Preferred End Time</label>
+              <label className="block text-xs text-[#6B6890] dark:text-[#B4B0D5] mb-1.5">Preferred End Time</label>
               <input
                 type="time"
                 value={preferredEndTime}
                 onChange={(e) => setPreferredEndTime(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className="w-full min-h-[44px] px-3.5 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-300 mb-1.5">
+              <label className="block text-xs text-[#6B6890] dark:text-[#B4B0D5] mb-1.5">
                 Default Session Duration
               </label>
               <select
                 value={preferredSessionLength}
                 onChange={(e) => setPreferredSessionLength(Number(e.target.value))}
-                className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className="w-full min-h-[44px] px-3.5 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
               >
                 <option value={30}>30 mins</option>
                 <option value={45}>45 mins</option>
@@ -208,11 +209,11 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs text-slate-300 mb-1.5">Break Buffer (mins)</label>
+              <label className="block text-xs text-[#6B6890] dark:text-[#B4B0D5] mb-1.5">Break Buffer (mins)</label>
               <select
                 value={breakDurationMinutes}
                 onChange={(e) => setBreakDurationMinutes(Number(e.target.value))}
-                className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className="w-full min-h-[44px] px-3.5 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs"
               >
                 <option value={5}>5 mins</option>
                 <option value={10}>10 mins</option>
@@ -223,17 +224,17 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
         </div>
 
         {/* Toggles & Preferences */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-3">
-          <label className="block text-xs font-semibold text-slate-200 uppercase tracking-wider mb-2">
-            Automation & Adaptive Settings
+        <div className="p-5 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm space-y-3">
+          <label className="block text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] uppercase tracking-wider mb-2">
+            Automation &amp; Adaptive Settings
           </label>
 
-          <label className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer">
+          <label className="min-h-[44px] flex items-center justify-between p-3.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] cursor-pointer">
             <div>
-              <span className="text-xs font-semibold text-slate-200 block">
+              <span className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] block">
                 Auto-Reschedule Missed Tasks
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
                 Automatically suggest moving past uncompleted sessions forward
               </span>
             </div>
@@ -241,16 +242,16 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
               type="checkbox"
               checked={autoRescheduleMissed}
               onChange={(e) => setAutoRescheduleMissed(e.target.checked)}
-              className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+              className="rounded border-[#E3DFF5] dark:border-[#3D3861] accent-[#6C5CE7] w-5 h-5"
             />
           </label>
 
-          <label className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer">
+          <label className="min-h-[44px] flex items-center justify-between p-3.5 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] cursor-pointer">
             <div>
-              <span className="text-xs font-semibold text-slate-200 block">
+              <span className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] block">
                 Study Session Reminders
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
                 Notify before scheduled study blocks start
               </span>
             </div>
@@ -258,7 +259,7 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
               type="checkbox"
               checked={reminderNotifications}
               onChange={(e) => setReminderNotifications(e.target.checked)}
-              className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+              className="rounded border-[#E3DFF5] dark:border-[#3D3861] accent-[#6C5CE7] w-5 h-5"
             />
           </label>
         </div>
@@ -266,7 +267,7 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
         {/* Save Button */}
         <div className="flex items-center justify-end gap-3 pt-2">
           {savedSuccess && (
-            <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+            <span className="text-xs font-semibold text-[#247A5E] dark:text-[#7ADEC0] flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4" /> Settings Saved!
             </span>
           )}
@@ -274,7 +275,7 @@ export const PlannerSettingsView: React.FC<PlannerSettingsViewProps> = ({
             id="btn-save-planner-settings"
             type="submit"
             disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-900/30 transition-all disabled:opacity-50"
+            className="min-h-[44px] flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
           >
             <Save className="w-4 h-4" /> Save Schedule Preferences
           </button>

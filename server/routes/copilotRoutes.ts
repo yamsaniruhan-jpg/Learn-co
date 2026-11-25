@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { Database } from '../db';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/authMiddleware';
-import { CopilotGateway } from '../services/copilotGateway';
+import { CopilotGateway, sanitizeImageAttachment } from '../services/copilotGateway';
 import { CopilotToolRegistry } from '../services/copilotTools';
 import { CopilotCacheEngine } from '../services/copilotCacheEngine';
 import { XpEngine } from '../xpEngine';
@@ -210,23 +210,31 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
       learnerLevel = 'intermediate',
       context,
       selectedModel,
+      hintFirst = false,
+      revealFullSolution = false,
+      imageAttachment,
     } = body;
     const rawPrompt = typeof body.prompt === 'string' ? body.prompt : typeof body.message === 'string' ? body.message : '';
 
-    if (!rawPrompt.trim()) {
-      res.status(400).json({ error: 'Prompt is required.' });
+    let validImage;
+    try {
+      validImage = sanitizeImageAttachment(imageAttachment);
+    } catch (imgErr: any) {
+      res.status(400).json({ error: imgErr.message || 'Invalid image attachment.' });
       return;
     }
 
-    const prompt = rawPrompt.trim();
-    // The legacy database append method does not enforce ownership itself.
-    // Validate before reservation and before appending to a supplied conversation.
+    if (!rawPrompt.trim() && !validImage) {
+      res.status(400).json({ error: 'Prompt or question image is required.' });
+      return;
+    }
+
+    const prompt = rawPrompt.trim() || 'Solve and explain the question shown in this image.';
     if (conversationId && (typeof conversationId !== 'string' || !Database.getCopilotConversation(userId, conversationId))) {
       res.status(404).json({ error: 'Conversation not found or access denied.' });
       return;
     }
 
-    // Enforce daily doubts quota (DAILY_DOUBTS_LIMIT per day, refreshes at midnight)
     let quotaInfo;
     try {
       quotaInfo = Database.checkAndIncrementDoubtQuota(userId);
@@ -242,7 +250,6 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
 
     const reservationDate = (Database.getGamification(userId) as any)?.lastQuotaResetDate as string | undefined;
 
-    // Ensure conversation exists or create one
     let targetConvId = conversationId;
     if (!targetConvId) {
       const newConv = Database.createCopilotConversation(userId, {
@@ -254,38 +261,39 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
       targetConvId = newConv.id;
     }
 
-    // Save user message to database
     const userMsg = Database.addCopilotMessage(userId, targetConvId, {
       role: 'user',
-      content: prompt.trim(),
+      content: validImage && !rawPrompt.trim() ? '[Attached question photo]' : prompt,
       mode,
     });
 
-    // Generate AI/Pedagogical response with RAG and tools
     const genResult = await CopilotGateway.generate({
       userId,
       conversationId: targetConvId,
-      prompt: prompt.trim(),
+      prompt,
       mode,
       learnerLevel,
       context,
       selectedModel,
+      hintFirst: Boolean(hintFirst),
+      revealFullSolution: Boolean(revealFullSolution),
+      imageAttachment: validImage,
     });
 
     if (genResult.modelUsed === 'unavailable') quotaInfo = refundUnavailableDoubt(userId, reservationDate);
-    // A conversation can be deleted while generation is in flight. Never
-    // recreate it implicitly or append after ownership no longer holds.
     if (!Database.getCopilotConversation(userId, targetConvId)) {
       res.status(409).json({ error: 'Conversation is no longer available.' });
       return;
     }
 
-    // Save assistant message to database
     const assistantMsg = Database.addCopilotMessage(userId, targetConvId, {
       role: 'assistant',
       content: genResult.reply,
       mode,
       modelUsed: genResult.modelUsed,
+      hintOnly: genResult.hintOnly,
+      unavailableReason: genResult.unavailableReason,
+      fallbackPracticeQuestions: genResult.fallbackPracticeQuestions,
       citations: genResult.citations,
       toolCalls: genResult.toolCalls,
       artifact: genResult.artifact,
@@ -299,6 +307,9 @@ router.post('/chat', requireAuth, async (req: AuthenticatedRequest, res: Respons
       toolCalls: genResult.toolCalls,
       artifact: genResult.artifact,
       modelUsed: genResult.modelUsed,
+      hintOnly: genResult.hintOnly,
+      unavailableReason: genResult.unavailableReason,
+      fallbackPracticeQuestions: genResult.fallbackPracticeQuestions,
       doubtQuota: quotaInfo,
     });
   } catch (err: any) {
@@ -313,23 +324,36 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
     const userId = req.userId!;
     const {
       conversationId,
-      prompt,
+      prompt: rawPrompt,
       mode = 'socratic_hint',
       learnerLevel = 'intermediate',
       context,
       selectedModel,
+      hintFirst = false,
+      revealFullSolution = false,
+      imageAttachment,
     } = req.body as CopilotPromptOptions;
 
-    if (typeof prompt !== 'string' || !prompt.trim()) {
-      res.status(400).json({ error: 'Prompt is required.' });
+    let validImage;
+    try {
+      validImage = sanitizeImageAttachment(imageAttachment);
+    } catch (imgErr: any) {
+      res.status(400).json({ error: imgErr.message || 'Invalid image attachment.' });
       return;
     }
+
+    const cleanPrompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : '';
+    if (!cleanPrompt && !validImage) {
+      res.status(400).json({ error: 'Prompt or question image is required.' });
+      return;
+    }
+    const prompt = cleanPrompt || 'Solve and explain the question shown in this image.';
+
     if (conversationId && (typeof conversationId !== 'string' || !Database.getCopilotConversation(userId, conversationId))) {
       res.status(404).json({ error: 'Conversation not found or access denied.' });
       return;
     }
 
-    // Enforce daily doubts quota (DAILY_DOUBTS_LIMIT per day, refreshes at midnight)
     try {
       Database.checkAndIncrementDoubtQuota(userId);
     } catch (quotaErr: any) {
@@ -344,7 +368,6 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
 
     const reservationDate = (Database.getGamification(userId) as any)?.lastQuotaResetDate as string | undefined;
 
-    // Prepare SSE response headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -361,22 +384,23 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
       targetConvId = newConv.id;
     }
 
-    // Save user message
     Database.addCopilotMessage(userId, targetConvId, {
       role: 'user',
-      content: prompt.trim(),
+      content: validImage && !cleanPrompt ? '[Attached question photo]' : prompt,
       mode,
     });
 
-    // Generate response
     const genResult = await CopilotGateway.generate({
       userId,
       conversationId: targetConvId,
-      prompt: prompt.trim(),
+      prompt,
       mode,
       learnerLevel,
       context,
       selectedModel,
+      hintFirst: Boolean(hintFirst),
+      revealFullSolution: Boolean(revealFullSolution),
+      imageAttachment: validImage,
     });
     if (genResult.modelUsed === 'unavailable') refundUnavailableDoubt(userId, reservationDate);
     if (!Database.getCopilotConversation(userId, targetConvId)) {
@@ -385,51 +409,52 @@ router.post('/stream', requireAuth, async (req: AuthenticatedRequest, res: Respo
       return;
     }
 
-    // Stream tokens in chunked simulation if full string returned
     const text = genResult.reply;
     const chunkSize = 20;
     for (let i = 0; i < text.length; i += chunkSize) {
       const chunk = text.slice(i, i + chunkSize);
-      res.write(`data: ${JSON.stringify({ type: 'token', content: chunk })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'token', content: chunk, index: i, conversationId: targetConvId })}\n\n`);
       await new Promise((r) => setTimeout(r, 15));
     }
 
-    // Stream citations if present
     if (genResult.citations && genResult.citations.length > 0) {
       for (const cit of genResult.citations) {
         res.write(`data: ${JSON.stringify({ type: 'citation', citation: cit })}\n\n`);
       }
     }
 
-    // Stream artifact if present
     if (genResult.artifact) {
       res.write(`data: ${JSON.stringify({ type: 'artifact', artifact: genResult.artifact })}\n\n`);
     }
 
-    // The client may delete the conversation during streaming too.
     if (!Database.getCopilotConversation(userId, targetConvId)) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Conversation is no longer available.' })}\n\n`);
       res.end();
       return;
     }
-    // Save assistant message to database
+
     const assistantMsg = Database.addCopilotMessage(userId, targetConvId, {
       role: 'assistant',
       content: genResult.reply,
       mode,
       modelUsed: genResult.modelUsed,
+      hintOnly: genResult.hintOnly,
+      unavailableReason: genResult.unavailableReason,
+      fallbackPracticeQuestions: genResult.fallbackPracticeQuestions,
       citations: genResult.citations,
       toolCalls: genResult.toolCalls,
       artifact: genResult.artifact,
     });
 
-    // Send completion event
     res.write(
       `data: ${JSON.stringify({
         type: 'done',
         conversationId: targetConvId,
         messageId: assistantMsg.id,
         modelUsed: genResult.modelUsed,
+        hintOnly: genResult.hintOnly,
+        unavailableReason: genResult.unavailableReason,
+        fallbackPracticeQuestions: genResult.fallbackPracticeQuestions,
       })}\n\n`
     );
     res.end();

@@ -1,3 +1,5 @@
+import { compileSafeSolveFunction } from '../utils/safeJsRunner';
+
 export interface ICTTestCase {
   id: string;
   label: string;
@@ -368,18 +370,15 @@ export async function runICTCodeInSandbox(
   cases: ICTTestCase[],
   timeoutMs = 2000
 ): Promise<ICTRunResult> {
-  // Pure fallback for non-browser test runners where Worker is unavailable
-  if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL.createObjectURL !== 'function') {
+  // Synchronous fallback for Node/Vitest or environments without Worker
+  if (typeof Worker === 'undefined') {
     const logs: string[] = [];
     const caseResults: ICTCaseResult[] = [];
     const started = performance.now();
     try {
-      const factory = new Function(
-        'console',
-        `"use strict";\n${userCode}\nif (typeof solve !== 'function') { throw new Error('Define function solve(input)'); }\nreturn solve;`
-      );
-      const solveFn = factory({
-        log: (...args: any[]) => logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')),
+      const solveFn = compileSafeSolveFunction(userCode, {
+        log: (...args: any[]) =>
+          logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')),
       });
       for (const tc of cases) {
         const t0 = performance.now();
@@ -432,104 +431,15 @@ export async function runICTCodeInSandbox(
     }
   }
 
-  // Isolated Web Worker sandbox for browsers (zero access to window/DOM/localStorage + hard timeout)
+  // Isolated 'self' Web Worker sandbox (no eval / no new Function / hard timeout)
   return new Promise<ICTRunResult>((resolve) => {
-    const workerSource = `
-      const deepEqual = (a, b) => {
-        if (Object.is(a, b)) return true;
-        if (typeof a !== typeof b || a === null || b === null) return false;
-        if (Array.isArray(a) !== Array.isArray(b)) return false;
-        if (Array.isArray(a)) {
-          if (a.length !== b.length) return false;
-          return a.every((v, idx) => deepEqual(v, b[idx]));
-        }
-        if (typeof a === 'object') {
-          const keysA = Object.keys(a), keysB = Object.keys(b);
-          if (keysA.length !== keysB.length) return false;
-          return keysA.every((k) => deepEqual(a[k], b[k]));
-        }
-        return false;
-      };
-      const formatVal = (v) => {
-        if (v === undefined) return 'undefined';
-        try { return JSON.stringify(v); } catch { return String(v); }
-      };
-      self.onmessage = (ev) => {
-        const { code, testCases } = ev.data;
-        const logs = [];
-        const started = performance.now();
-        const sandboxConsole = {
-          log: (...args) => {
-            if (logs.length < 50) logs.push(args.map((a) => typeof a === 'object' ? formatVal(a) : String(a)).join(' '));
-          }
-        };
-        let solveFn;
-        try {
-          const build = new Function('console', '"use strict";\\n' + code + '\\nif (typeof solve !== "function") { throw new Error("Please define function solve(input) { ... }"); }\\nreturn solve;');
-          solveFn = build(sandboxConsole);
-        } catch (err) {
-          self.postMessage({
-            success: false,
-            passedCount: 0,
-            totalCount: testCases.length,
-            timedOut: false,
-            compileError: err && err.message ? err.message : String(err),
-            logs,
-            totalDurationMs: 0,
-            caseResults: [],
-          });
-          return;
-        }
-        const caseResults = [];
-        for (const tc of testCases) {
-          const t0 = performance.now();
-          try {
-            const inputCopy = JSON.parse(JSON.stringify(tc.input));
-            const actual = solveFn(inputCopy);
-            const dt = Math.max(0.1, Number((performance.now() - t0).toFixed(2)));
-            caseResults.push({
-              id: tc.id,
-              label: tc.label,
-              passed: deepEqual(actual, tc.expected),
-              isHidden: Boolean(tc.isHidden),
-              expected: formatVal(tc.expected),
-              actual: formatVal(actual),
-              durationMs: dt,
-            });
-          } catch (err) {
-            caseResults.push({
-              id: tc.id,
-              label: tc.label,
-              passed: false,
-              isHidden: Boolean(tc.isHidden),
-              expected: formatVal(tc.expected),
-              actual: 'Runtime Error',
-              durationMs: 0,
-              error: err && err.message ? err.message : String(err),
-            });
-          }
-        }
-        const passedCount = caseResults.filter((r) => r.passed).length;
-        self.postMessage({
-          success: passedCount === caseResults.length && caseResults.length > 0,
-          passedCount,
-          totalCount: caseResults.length,
-          timedOut: false,
-          logs,
-          totalDurationMs: Number((performance.now() - started).toFixed(2)),
-          caseResults,
-        });
-      };
-    `;
-
-    const blob = new Blob([workerSource], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    const worker = new Worker(url);
+    const worker = new Worker(new URL('../utils/ictSandboxWorker.ts', import.meta.url), {
+      type: 'module',
+    });
     let settled = false;
 
     const cleanup = () => {
       worker.terminate();
-      URL.revokeObjectURL(url);
     };
 
     const timer = setTimeout(() => {

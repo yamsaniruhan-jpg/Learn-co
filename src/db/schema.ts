@@ -46,10 +46,104 @@ export const authAccounts = pgTable('auth_accounts', {
 export const authSessions = pgTable('auth_sessions', {
   id: serial('id').primaryKey(),
   token: text('token').notNull().unique(),
+  tokenVersion: integer('token_version').default(2),
   userId: text('user_id').notNull(),
   verifiedOwner: boolean('verified_owner').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   expiresAt: timestamp('expires_at').notNull(),
+});
+
+export const practiceAttempts = pgTable('practice_attempts', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  attemptId: text('attempt_id'),
+  questionId: text('question_id'),
+  subjectId: text('subject_id'),
+  topicId: text('topic_id'),
+  isCorrect: boolean('is_correct').default(false),
+  xpAwarded: integer('xp_awarded').default(0),
+  attemptJson: jsonb('attempt_json').$type<Record<string, any>>().notNull(),
+  submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const xpLedger = pgTable('xp_ledger', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  txId: text('tx_id'),
+  amount: integer('amount').default(0),
+  reason: text('reason'),
+  transactionJson: jsonb('transaction_json').$type<Record<string, any>>(),
+  txJson: jsonb('tx_json').$type<Record<string, any>>(),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const userMistakes = pgTable('user_mistakes', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  mistakeId: text('mistake_id'),
+  subjectId: text('subject_id'),
+  topicId: text('topic_id'),
+  isCorrect: boolean('is_correct').default(false),
+  resolved: boolean('resolved').default(false),
+  mistakeJson: jsonb('mistake_json').$type<Record<string, any>>().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const mentorshipProfiles = pgTable('mentorship_profiles', {
+  id: serial('id').primaryKey(),
+  mentorId: text('mentor_id').unique(),
+  userId: text('user_id').notNull().unique(),
+  email: text('email'),
+  isVerified: boolean('is_verified').default(true),
+  profileJson: jsonb('profile_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const mentorshipRequests = pgTable('mentorship_requests', {
+  id: serial('id').primaryKey(),
+  requestId: text('request_id').notNull().unique(),
+  learnerId: text('learner_id'),
+  mentorId: text('mentor_id'),
+  status: text('status'),
+  requestJson: jsonb('request_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const mentorshipRelationships = pgTable('mentorship_relationships', {
+  id: serial('id').primaryKey(),
+  relationshipId: text('relationship_id').notNull().unique(),
+  learnerId: text('learner_id'),
+  mentorId: text('mentor_id'),
+  status: text('status'),
+  relationshipJson: jsonb('relationship_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const mentorshipItems = pgTable('mentorship_items', {
+  id: serial('id').primaryKey(),
+  itemId: text('item_id').unique(),
+  itemKey: text('item_key').unique(),
+  kind: text('kind'),
+  mentorshipId: text('mentorship_id'),
+  itemJson: jsonb('item_json').$type<Record<string, any>>().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const appDomainRecords = pgTable('app_domain_records', {
+  id: serial('id').primaryKey(),
+  recordKey: text('record_key').notNull().unique(),
+  domain: text('domain'),
+  ownerId: text('owner_id'),
+  recordJson: jsonb('record_json').$type<Record<string, any>>(),
+  payloadJson: jsonb('payload_json').$type<Record<string, any>>(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 /**

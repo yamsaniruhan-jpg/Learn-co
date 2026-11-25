@@ -9,15 +9,11 @@ import {
 } from '../types/analytics';
 import { SubjectId, ExamTrackId } from '../types/curriculum';
 import { MistakeRecord } from '../types/auth';
-import { AuthClient } from './authClient';
+import { buildApiHeaders } from '../utils/csrf';
 
 export class AnalyticsClient {
   private static getHeaders(): HeadersInit {
-    const token = AuthClient.getToken();
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+    return buildApiHeaders();
   }
 
   /**
@@ -25,7 +21,7 @@ export class AnalyticsClient {
    */
   static async getDashboard(): Promise<LearnerAnalyticsDashboardData> {
     const res = await fetch('/api/analytics/dashboard', {
-      headers: this.getHeaders(),
+      credentials: 'include', headers: this.getHeaders(),
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to fetch analytics dashboard');

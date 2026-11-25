@@ -75,6 +75,7 @@ export default defineConfig(() => {
         includeAssets: [
           'favicon.ico',
           'favicon.jpg',
+          'apple-touch-icon.png',
           'logo-mark.png',
           'logo.jpg',
           'icons/icon-192.png',
@@ -85,10 +86,11 @@ export default defineConfig(() => {
           id: '/',
           name: 'Learn.co - AI Learning Companion',
           short_name: 'LearnCo',
-          description: 'An AI-powered learning companion built to support the way we learn.',
+          description: '10,000+ practice questions, 132 concept lessons, adaptive AI mentors and simulations for deep STEM study.',
           theme_color: '#6C5CE7',
           background_color: '#F7F5FF',
           display: 'standalone',
+          orientation: 'portrait-primary',
           start_url: '/',
           scope: '/',
           icons: [
@@ -113,19 +115,93 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
-          // A precached /404.html would be served with 200 by Workbox.
-          globIgnores: ['**/404.html'],
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          // Precache only the core app shell and PWA icons so mobile users don't
+          // download 7+ MB of heavy 3D/chart/curriculum chunks on first visit.
+          globPatterns: [
+            'index.html',
+            'manifest.json',
+            'apple-touch-icon.png',
+            'icons/icon-*.png',
+            'logo-mark.png',
+            'assets/index-*.{js,css}',
+            'assets/vendor-icons-*.js',
+          ],
+          // Exclude heavy lazy chunks, alternate image/font assets, and 404.html from upfront precache.
+          globIgnores: [
+            '**/404.html',
+            '**/vendor-three*',
+            '**/vendor-recharts*',
+            '**/vendor-katex*',
+            '**/vendor-firebase*',
+            '**/curriculumData*',
+            '**/Calculus3DLab*',
+            '**/PlannerProgressView*',
+            '**/*.{woff,woff2,ttf}',
+          ],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           // Claim the first open page and serve only the app shell for offline
-          // navigations. API responses remain network-only and are never cached.
+          // navigations. Authenticated API responses stay network-only except public curriculum metadata.
           clientsClaim: true,
           skipWaiting: true,
           navigateFallback: '/index.html',
-          // The SPA uses only the root path (including reset query strings).
-          // Do not mask server 404s for arbitrary URLs with the offline shell.
           navigateFallbackAllowlist: [/^\/(?:\?.*)?$/],
           runtimeCaching: [
+            {
+              urlPattern: /\/(?:apple-touch-icon\.png|favicon\.ico|logo-mark\.png|icons\/.*\.png)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'home-screen-icons-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /\/assets\/.*\.(?:js|css)$/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'lazy-app-chunks-cache',
+                expiration: {
+                  maxEntries: 60,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /\/assets\/.*\.(?:woff|woff2|ttf)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'katex-local-fonts-cache',
+                expiration: {
+                  maxEntries: 40,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /\/api\/learning\/(?:curriculum|tracks|questions)/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'curriculum-subject-api-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+                cacheableResponse: {
+                  statuses: [200],
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',

@@ -67,13 +67,16 @@
   html {
     scroll-behavior: smooth;
     font-family: 'Nunito', 'Poppins', system-ui, -apple-system, sans-serif;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
     background-color: var(--color-bg-canvas);
     color: var(--color-text-primary);
     min-height: 100vh;
-    overflow-x: hidden;
+    max-width: 100%;
+    overflow-x: clip;
     font-family: 'Nunito', 'Poppins', system-ui, -apple-system, sans-serif;
   }
 
@@ -93,8 +96,8 @@
     outline-offset: 2px;
   }
 
-  /* Large Touch Target Defaults */
-  button, a, input, select, textarea, [role="button"] {
+  /* Touch-friendly form field defaults without stretching compact cells or inline links */
+  :where(input:not([type="checkbox"]):not([type="radio"]), select) {
     min-height: 40px;
   }
 

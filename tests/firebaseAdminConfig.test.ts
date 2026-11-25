@@ -31,4 +31,28 @@ describe('Firebase Admin credential selection', () => {
     expect(m.initialize).not.toHaveBeenCalled();
     expect(JSON.stringify(warn.mock.calls)).not.toContain('malformed-private-data');
   });
+
+  it('initializes auth-only verifier using projectId when GCP credentials are absent', async () => {
+    vi.stubEnv('K_SERVICE', '');
+    vi.stubEnv('K_REVISION', '');
+    vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', '');
+    vi.stubEnv('FIREBASE_SERVICE_ACCOUNT_JSON', '');
+    vi.stubEnv('FIREBASE_SERVICE_ACCOUNT', '');
+    vi.stubEnv('FIREBASE_CONFIG', '');
+    vi.stubEnv('GCLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    const result = await import('../server/services/firebaseAdmin');
+    expect(m.adc).not.toHaveBeenCalled();
+    expect(m.initialize).toHaveBeenCalledWith(expect.objectContaining({ projectId: expect.any(String) }));
+    expect(result.adminAuth).not.toBeNull();
+    expect(result.adminDb).toBeNull();
+  });
+
+  it('keeps both adminAuth and adminDb null when FIREBASE_ADMIN_DISABLED=true', async () => {
+    vi.stubEnv('FIREBASE_ADMIN_DISABLED', 'true');
+    const result = await import('../server/services/firebaseAdmin');
+    expect(result.adminAuth).toBeNull();
+    expect(result.adminDb).toBeNull();
+    expect(m.initialize).not.toHaveBeenCalled();
+  });
 });

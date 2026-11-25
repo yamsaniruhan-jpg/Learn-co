@@ -13,18 +13,11 @@ import {
   MentorApplicationRecord,
 } from '../types/mentorship';
 import { SubjectId } from '../types';
-import { AuthClient } from './authClient';
+import { buildApiHeaders } from '../utils/csrf';
 
 export class MentorshipClient {
   private static getHeaders(): HeadersInit {
-    const token = AuthClient.getToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    return headers;
+    return buildApiHeaders();
   }
 
   static async getMentors(params?: {
@@ -46,6 +39,7 @@ export class MentorshipClient {
     if (params?.limit) query.set('limit', params.limit.toString());
 
     const res = await fetch(`/api/mentorship/mentors?${query.toString()}`, {
+      credentials: 'include',
       headers: this.getHeaders(),
     });
     const data = await res.json();

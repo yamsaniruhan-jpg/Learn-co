@@ -128,7 +128,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
             {onCloseMobile && (
               <button
                 onClick={onCloseMobile}
-                className="md:hidden p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] cursor-pointer"
                 aria-label="Close drawer"
               >
                 <X className="w-4 h-4" />
@@ -142,7 +142,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
             onNewConversation();
             if (onCloseMobile) onCloseMobile();
           }}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+          className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] active:scale-[0.99] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Tutoring Session</span>
@@ -315,15 +315,15 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
               <span>Learner Rigor Level</span>
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1.5">
             {levels.map((lvl) => (
               <button
                 key={lvl.id}
                 onClick={() => onChangeLearnerLevel(lvl.id)}
-                className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold text-left transition-all ${
+                className={`min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-semibold text-left transition-all cursor-pointer ${
                   learnerLevel === lvl.id
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                    ? 'bg-[#6C5CE7] text-white shadow-2xs'
+                    : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7]/40'
                 }`}
               >
                 {lvl.label}
@@ -334,18 +334,18 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
 
         {/* Quick Mode Switches */}
         <div>
-          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
+          <span className="text-[10px] font-bold text-[#6B6890] dark:text-[#B4B0D5] uppercase tracking-wider block mb-1.5">
             Active Pedagogical Mode
           </span>
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1.5">
             {modes.map((m) => (
               <button
                 key={m.id}
                 onClick={() => onChangeMode(m.id)}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+                className={`min-h-[44px] flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold transition-all cursor-pointer ${
                   activeMode === m.id
-                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-400 dark:border-indigo-500 shadow-2xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                    ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A99DF5] border border-[#6C5CE7] shadow-2xs'
+                    : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861]'
                 }`}
               >
                 {m.icon}
@@ -356,10 +356,10 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
         </div>
 
         {/* Save & Delete All History Actions */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E3DFF5] dark:border-[#3D3861]">
           <button
             onClick={onExportHistory}
-            className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+            className="min-h-[44px] flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-[#4CAF8E]/12 hover:bg-[#4CAF8E]/20 text-[#247A5E] dark:text-[#7ADEC0] text-[11px] font-bold border border-[#4CAF8E]/30 transition-colors cursor-pointer"
             title="Save & Export All History"
           >
             <FileText className="w-3.5 h-3.5" />
@@ -367,7 +367,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
           </button>
           <button
             onClick={onDeleteAllHistory}
-            className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-700 dark:text-rose-300 text-[10px] font-bold border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+            className="min-h-[44px] flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-bold border border-rose-500/25 transition-colors cursor-pointer"
             title="Delete All History"
           >
             <Trash2 className="w-3.5 h-3.5" />
