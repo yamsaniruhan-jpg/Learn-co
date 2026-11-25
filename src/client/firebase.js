@@ -1,20 +1,18 @@
 // src/client/firebase.js
+import { buildApiHeaders } from '../utils/csrf';
 
 export async function apiCall(endpoint, options = {}) {
-  const token =
-    typeof window !== 'undefined' ? localStorage.getItem('learnco_auth_token') : null;
-
   const normalizedEndpoint = endpoint.startsWith('/api')
     ? endpoint
     : `/api${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
   const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...buildApiHeaders(),
     ...(options.headers || {}),
   };
 
   return fetch(normalizedEndpoint, {
+    credentials: 'include',
     ...options,
     headers,
   });

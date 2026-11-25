@@ -86,4 +86,69 @@ describe('database persistence across process restarts', () => {
       console.log(JSON.stringify({name: Database.getProfile(user.id).displayName, theme: Database.getSettings(user.id).theme}));`)))
       .toEqual({ name: 'After', theme: 'dark' });
   });
+
+  it('persists practice attempts and mentorship state across restarts', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'learnco-persist-mentorship-')), 'db.json');
+    const env = { ...process.env, NODE_ENV: 'test', LEARNCO_DB_FILE: file, LEARNCO_JSON_FALLBACK: 'true', FIREBASE_ADMIN_DISABLED: 'true' };
+    const run = (script: string) => {
+      const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
+        cwd: process.cwd(), env, encoding: 'utf8', timeout: 30_000,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+
+    const ids = JSON.parse(run(`
+      import { Database, flushDb } from './server/db.ts';
+      import { XpEngine } from './server/xpEngine.ts';
+      const { user: student } = Database.createUser({ email: 'student-persist@example.org', password: 'ValidPass123', fullName: 'Student One', authProvider: 'email' });
+      const { user: mentorUser } = Database.createUser({ email: 'mentor-persist@example.org', password: 'ValidPass123', fullName: 'Mentor One', authProvider: 'email' });
+      const mentor = Database.createOrUpdateMentorProfile(mentorUser.id, { headline: 'Physics Olympiad Coach', subjects: ['physics'] });
+      const reqRes = Database.createMentorshipRequest(student.id, {
+        mentorId: mentor.id,
+        subjectId: 'physics',
+        goalDescription: 'Master Lagrangian Mechanics',
+        initialMessage: 'Looking forward to weekly sessions',
+      });
+      const dec = Database.respondMentorshipRequest(mentorUser.id, reqRes.request.id, 'ACCEPT', 'Welcome!');
+      const attempt = await XpEngine.submitAttempt(student.id, {
+        attemptId: 'att-persist-1',
+        questionId: 'q-custom-persist',
+        subjectId: 'physics',
+        topicId: 'Mechanics',
+        difficulty: 'medium',
+        questionText: 'Work done by conservative force in closed loop?',
+        selectedAnswer: '0',
+        correctAnswer: '0',
+        explanation: 'Closed path integral of conservative force is zero.',
+        solvingTimeSeconds: 20,
+        hintsRevealedCount: 0,
+      });
+      await flushDb();
+      console.log(JSON.stringify({ studentId: student.id, mentorUserId: mentorUser.id, relId: dec.relationship?.id, attemptOk: attempt.isCorrect }));
+    `));
+
+    expect(ids.attemptOk).toBe(true);
+    expect(ids.relId).toBeTruthy();
+
+    const restored = JSON.parse(run(`
+      import { Database } from './server/db.ts';
+      const attempts = Database.getUserAttempts(${JSON.stringify(ids.studentId)});
+      const rels = Database.listMentorshipRelationships(${JSON.stringify(ids.studentId)});
+      const msgs = Database.listMentorshipMessages(${JSON.stringify(ids.studentId)}, ${JSON.stringify(ids.relId)});
+      console.log(JSON.stringify({
+        attemptCount: attempts.length,
+        relCount: rels.length,
+        relStatus: rels[0]?.status,
+        msgCount: msgs.length,
+      }));
+    `));
+
+    expect(restored).toEqual({
+      attemptCount: 1,
+      relCount: 1,
+      relStatus: 'ACTIVE',
+      msgCount: 1,
+    });
+  });
 });

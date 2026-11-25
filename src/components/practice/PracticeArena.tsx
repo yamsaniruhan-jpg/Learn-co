@@ -11,6 +11,7 @@ import { syncLocalXpOnly } from '../../utils/xpManager';
 import { gradeQuestionAnswer } from '../../utils/gradeAnswer';
 import { practiceStorageKey } from '../../utils/localPractice';
 import { readStoredArray } from '../../utils/storageSafety';
+import { buildApiHeaders } from '../../utils/csrf';
 import confetti from 'canvas-confetti';
 import { FormattedMathText } from '../common/FormattedMathText';
 import {
@@ -261,12 +262,12 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
       const isCorrect = gradeQuestionAnswer(currentQuestion, rawAnswer);
 
       const effectiveUserId = AuthClient.getCurrentUser()?.id || 'guest';
-      const token = AuthClient.getToken();
+      const sessionId = AuthClient.getSessionId();
       const attemptId = `att-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
       const timeSpent = timeSpentPerQuestion[questionId] || 15;
       const hintsCount = hintsRevealed[questionId] || 0;
 
-      if (!token) {
+      if (!sessionId) {
         setSubmitError('Please sign in to submit answers and earn verified XP.');
         return;
       }
@@ -274,10 +275,8 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
       try {
         const submitRes = await fetch('/api/practice/submit-attempt', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: 'include',
+          headers: buildApiHeaders(),
           body: JSON.stringify({
             attemptId,
             questionId: currentQuestion.id,
@@ -293,7 +292,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
 
         const data = await submitRes.json().catch(() => ({}));
         // Do not apply a delayed result to a newly signed-in account.
-        if (AuthClient.getToken() !== token || AuthClient.getCurrentUser()?.id !== effectiveUserId) {
+        if (AuthClient.getSessionId() !== sessionId || AuthClient.getCurrentUser()?.id !== effectiveUserId) {
           setSubmitError('Your session changed while this attempt was being submitted. Check your practice history.');
           return;
         }
@@ -367,7 +366,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         }
       } catch (_networkErr) {
         // Offline / unreachable server fallback: queue attempt for later sync
-        if (effectiveUserId === 'guest' || AuthClient.getToken() !== token || AuthClient.getCurrentUser()?.id !== effectiveUserId) {
+        if (effectiveUserId === 'guest' || AuthClient.getSessionId() !== sessionId || AuthClient.getCurrentUser()?.id !== effectiveUserId) {
           setSubmitError('Your session changed before this attempt could be saved. Please sign in and try again.');
           return;
         }

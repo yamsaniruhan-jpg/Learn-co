@@ -3,11 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { awardXp, getCurrentXp, setGlobalXp, syncLocalXpOnly } from '../src/utils/xpManager';
 
 function signIn(id: string) {
-  localStorage.setItem('learnco_auth_token', `token-${id}`);
   localStorage.setItem('learnco_user', JSON.stringify({ id }));
 }
 function signOut() {
-  localStorage.removeItem('learnco_auth_token');
   localStorage.removeItem('learnco_user');
 }
 beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });

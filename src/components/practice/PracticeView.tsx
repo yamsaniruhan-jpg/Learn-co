@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   SubjectId,
+  ExamTrackId,
+  SubjectCurriculum,
   PracticeSessionConfig,
   QuestionBankItem,
   PracticeRecommendation,
@@ -37,11 +39,19 @@ import {
   Award,
   Trophy,
   Code2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
+import { ScreenSkeleton } from '../ui/Skeleton';
 
 export interface PracticeNavigationContext {
   subjectId?: SubjectId;
   topicId?: string;
+  subtopicId?: string;
   conceptId?: string;
   title?: string;
 }
@@ -73,6 +83,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [modalSubject, setModalSubject] = useState<SubjectId>('math');
   const [modalTopic, setModalTopic] = useState<string | undefined>(undefined);
+  const [modalSubtopic, setModalSubtopic] = useState<string | undefined>(undefined);
   const [modalConcept, setModalConcept] = useState<string | undefined>(undefined);
   const [modalTitle, setModalTitle] = useState<string>('Calibrated 5-Question Ladder');
 
@@ -82,6 +93,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
       const subj = initialPracticeContext.subjectId || 'math';
       setModalSubject(subj);
       setModalTopic(initialPracticeContext.topicId);
+      setModalSubtopic(initialPracticeContext.subtopicId);
       setModalConcept(initialPracticeContext.conceptId);
       setModalTitle(
         initialPracticeContext.title ||
@@ -124,39 +136,62 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
   // Async data
   const [recommendations, setRecommendations] = useState<PracticeRecommendation[]>([]);
   const [weakTopics, setWeakTopics] = useState<WeakTopicSignal[]>([]);
+  const [curriculumSubjects, setCurriculumSubjects] = useState<SubjectCurriculum[]>([]);
+  const [drillSubjectId, setDrillSubjectId] = useState<SubjectId>('math');
+  const [drillExamTrack, setDrillExamTrack] = useState<ExamTrackId>('all');
+  const [drillTopicId, setDrillTopicId] = useState<string>('');
+  const [drillSubtopicId, setDrillSubtopicId] = useState<string>('');
+  const [drillCount, setDrillCount] = useState<number>(10);
+  const [drillDifficulty, setDrillDifficulty] = useState<'calibrated_ladder' | 'easy' | 'medium' | 'hard'>('calibrated_ladder');
+  const [drillError, setDrillError] = useState<string | null>(null);
+  const [launchingDrill, setLaunchingDrill] = useState<boolean>(false);
   const [bankQuestions, setBankQuestions] = useState<QuestionBankItem[]>([]);
   const [bankSubjectFilter, setBankSubjectFilter] = useState<string>('all');
   const [bankSearchQuery, setBankSearchQuery] = useState<string>('');
   const [isLoadingBank, setIsLoadingBank] = useState<boolean>(false);
+  const [bankError, setBankError] = useState<string | null>(null);
+  const [isLoadingHub, setIsLoadingHub] = useState<boolean>(true);
+  const [hubError, setHubError] = useState<string | null>(null);
 
   const dailyQuotaRemaining = Math.max(0, 25 - (gamification?.dailyQuestionsSolvedToday || 0));
 
-  // Load recommendations and weak topics on mount
-  useEffect(() => {
-    async function loadHubData() {
-      try {
-        const [recs, weak] = await Promise.all([
-          LearningClient.getRecommendations(),
-          LearningClient.getWeakTopics(),
-        ]);
-        setRecommendations(recs);
-        setWeakTopics(weak);
-      } catch (err) {
-        console.error('Failed to load practice hub data:', err);
+  const loadHubData = async () => {
+    setIsLoadingHub(true);
+    setHubError(null);
+    try {
+      const [recs, weak, subjects] = await Promise.all([
+        LearningClient.getRecommendations(),
+        LearningClient.getWeakTopics(),
+        LearningClient.getCurriculum('all'),
+      ]);
+      setRecommendations(recs);
+      setWeakTopics(weak);
+      if (Array.isArray(subjects) && subjects.length > 0) {
+        setCurriculumSubjects(subjects);
       }
+    } catch (err: any) {
+      console.error('Failed to load practice hub data:', err);
+      setHubError(err?.message || 'Could not load practice modules right now.');
+    } finally {
+      setIsLoadingHub(false);
     }
-    loadHubData();
+  };
+
+  // Load recommendations, weak topics, and curriculum hierarchy for Guided Drill Builder
+  useEffect(() => {
+    void loadHubData();
   }, []);
 
   // Load Question Bank when Bank tab selected
   useEffect(() => {
     if (activeTab === 'bank') {
-      loadBank();
+      void loadBank();
     }
   }, [activeTab, bankSubjectFilter, bankSearchQuery]);
 
   const loadBank = async () => {
     setIsLoadingBank(true);
+    setBankError(null);
     try {
       const data = await LearningClient.getQuestionBank({
         subjectId: bankSubjectFilter !== 'all' ? (bankSubjectFilter as SubjectId) : undefined,
@@ -164,8 +199,9 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
         limit: 30,
       });
       setBankQuestions(data.questions);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load bank:', err);
+      setBankError(err?.message || 'Failed to load question bank.');
     } finally {
       setIsLoadingBank(false);
     }
@@ -231,6 +267,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
 
   const handleLaunchSession = async (config: PracticeSessionConfig) => {
     setIsConfigModalOpen(false);
+    setDrillError(null);
+    setLaunchingDrill(true);
     try {
       const mergedExcluded = Array.from(
         new Set([
@@ -250,15 +288,55 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           questions: session.questions,
         });
         setSessionResults(null);
+      } else {
+        setDrillError('No questions matched that selection. Try resetting filters.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to start session:', err);
+      setDrillError(err?.message || 'Unable to generate sub-questions right now.');
+    } finally {
+      setLaunchingDrill(false);
     }
   };
+
+  // Derived Guided Drill Builder selections: Subject -> Topic -> Subtopic -> Create Sub-Questions
+  const activeDrillSubject =
+    curriculumSubjects.find((s) => s.id === drillSubjectId) || curriculumSubjects[0];
+  const trackMatchingChapters = activeDrillSubject
+    ? activeDrillSubject.chapters.filter(
+        (ch) =>
+          drillExamTrack === 'all' ||
+          ch.examTracks.includes(drillExamTrack) ||
+          ch.examTracks.includes('all')
+      )
+    : [];
+  const effectiveDrillChapters =
+    trackMatchingChapters.length > 0 ? trackMatchingChapters : activeDrillSubject?.chapters || [];
+  const availableDrillTopics = effectiveDrillChapters.flatMap((ch) =>
+    ch.topics.map((t) => ({ ...t, chapterTitle: ch.title }))
+  );
+  const activeDrillTopic =
+    availableDrillTopics.find((t) => t.id === drillTopicId) || availableDrillTopics[0];
+  const availableDrillSubtopics = activeDrillTopic?.subtopics || [];
+  const activeDrillSubtopic =
+    availableDrillSubtopics.find((st) => st.id === drillSubtopicId) || availableDrillSubtopics[0];
+
+  useEffect(() => {
+    if (availableDrillTopics.length > 0 && !availableDrillTopics.some((t) => t.id === drillTopicId)) {
+      setDrillTopicId(availableDrillTopics[0].id);
+    }
+  }, [drillSubjectId, drillExamTrack, curriculumSubjects]);
+
+  useEffect(() => {
+    if (availableDrillSubtopics.length > 0 && !availableDrillSubtopics.some((st) => st.id === drillSubtopicId)) {
+      setDrillSubtopicId(availableDrillSubtopics[0].id);
+    }
+  }, [activeDrillTopic?.id]);
 
   const handleStartQuickSubject = (subjectId: SubjectId) => {
     setModalSubject(subjectId);
     setModalTopic(undefined);
+    setModalSubtopic(undefined);
     setModalConcept(undefined);
     setModalTitle(`${subjectId.toUpperCase()} Calibrated 5-Question Ladder`);
     setIsConfigModalOpen(true);
@@ -320,55 +398,57 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
       {!activePracticeSession && !sessionResults && (
         <div className="space-y-6">
           {/* Header Banner */}
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-800 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <Card variant="elevated" padding="lg" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  Calibrated Problem Ladders
-                </span>
-                <div className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                <Badge variant="primary" size="sm">
+                  Practice
+                </Badge>
+                <span className="flex items-center gap-1 text-xs text-[#4CAF8E] font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Server-checked bank &amp; non-repeating Olympiad sets</span>
-                </div>
+                  <span>Non-repeating calibrated sets</span>
+                </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Practice &amp; Diagnostic Engine
+              <h1 className="text-2xl sm:text-3xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display tracking-tight">
+                Practice
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Practice across Mathematics, CS &amp; AI, Physics, Chemistry, Biology, IPhO/IChO/IBHO/IJSO, and ICT Coding. Solved items sync across devices so problem ladders never repeat.
+              <p className="text-xs sm:text-sm text-[#6B6890] dark:text-[#B4B0D5] max-w-2xl leading-relaxed">
+                Pick a subject, topic, and subtopic for adaptive drills, timed Olympiad contests, or coding labs.
               </p>
 
               {/* Quick Actions */}
-              <div className="pt-2 flex flex-wrap items-center gap-2">
-                <button
+              <div className="pt-1 flex flex-wrap items-center gap-2">
+                <Button
                   type="button"
+                  variant="xp"
+                  size="md"
                   onClick={() => window.dispatchEvent(new CustomEvent('learnco-open-flash-check'))}
-                  className="min-h-[44px] px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
+                  leftIcon={<Zap className="w-4 h-4 fill-current" />}
                 >
-                  <Zap className="w-3.5 h-3.5 fill-current text-slate-950" />
-                  <span>60s Flash Check (+15 XP)</span>
-                </button>
-                <button
+                  60s Flash Check (+15 XP)
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="md"
                   onClick={() => window.dispatchEvent(new CustomEvent('learnco-toggle-zen-mode'))}
-                  className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <span>Zen Study Mode</span>
-                </button>
+                  Zen Study Mode
+                </Button>
               </div>
             </div>
 
             {/* Daily Practice Limit Live Quota */}
-            <div className="p-4 rounded-2xl bg-white/10 border border-white/10 shrink-0 text-center min-w-[180px]">
-              <div className="text-[11px] uppercase tracking-wider text-slate-300 font-semibold mb-1">
-                Daily Limit Quota
+            <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] shrink-0 text-center min-w-[168px]">
+              <div className="text-[11px] uppercase tracking-wider text-[#6B6890] dark:text-[#B4B0D5] font-bold mb-1">
+                Daily Quota
               </div>
-              <div className="text-2xl font-mono font-bold text-white tabular-nums">
-                <span className="text-amber-400">{dailyQuotaRemaining}</span> / 25
+              <div className="text-2xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] tabular-nums">
+                <span className="text-[#6C5CE7] dark:text-[#A594FF]">{dailyQuotaRemaining}</span> / 25
               </div>
-              <div className="text-[10px] text-slate-400 mt-1">Questions remaining today</div>
+              <div className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">Questions left today</div>
             </div>
-          </div>
+          </Card>
 
           {/* Creator Studio Imported Resource Banner */}
           {creatorImportSession && creatorImportSession.accountId === user?.id && (
@@ -460,7 +540,193 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           {/* TAB 1: PRACTICE HUB & QUICK LADDERS */}
           {activeTab === 'hub' && (
             <div className="space-y-6">
+              {isLoadingHub ? (
+                <ScreenSkeleton label="Loading practice modules and recommendations..." />
+              ) : hubError ? (
+                <EmptyState
+                  variant="error"
+                  icon={<AlertCircle className="w-6 h-6" />}
+                  title="Practice hub unavailable"
+                  description={hubError}
+                  action={
+                    <Button type="button" variant="primary" size="md" onClick={loadHubData} leftIcon={<RefreshCw className="w-4 h-4" />}>
+                      Retry
+                    </Button>
+                  }
+                />
+              ) : (
+                <>
               <ConfidenceSummary attempts={localAttempts} />
+
+              {/* Guided 4-Step Subtopic Drill Workflow: Subject -> Topic -> Subtopic -> Create Sub-Questions */}
+              {curriculumSubjects.length > 0 && (
+                <div className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-5 sm:p-6 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Guided Subtopic Generator · 100+ Multi-Model Problems per Topic</span>
+                      </div>
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                        Select Subject → Topic → Subtopic → Create Sub-Questions
+                      </h2>
+                    </div>
+                    <select
+                      aria-label="Exam track filter"
+                      value={drillExamTrack}
+                      onChange={(e) => setDrillExamTrack(e.target.value as ExamTrackId)}
+                      className="min-h-[40px] px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer"
+                    >
+                      <option value="all">All Exams (Universal)</option>
+                      <option value="jee_advanced">JEE Advanced</option>
+                      <option value="jee_main">JEE Main</option>
+                      <option value="ap_stem">AP Calculus &amp; AP STEM</option>
+                      <option value="ict_hackathon">ICT Coding Test</option>
+                      <option value="iapt_exams">IPhO · IChO · IBO</option>
+                      <option value="nsejs">NSEJS · IJSO</option>
+                    </select>
+                  </div>
+
+                  {drillError && (
+                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-600 dark:text-rose-300 font-semibold">
+                      {drillError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Step 1: Subject */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        1. Subject
+                      </label>
+                      <select
+                        aria-label="Select Subject"
+                        value={activeDrillSubject?.id || drillSubjectId}
+                        onChange={(e) => setDrillSubjectId(e.target.value as SubjectId)}
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+                      >
+                        {curriculumSubjects.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.chapters.reduce((acc, c) => acc + c.topics.length, 0)} Topics)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Step 2: Topic */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        2. Topic
+                      </label>
+                      <select
+                        aria-label="Select Topic"
+                        value={activeDrillTopic?.id || ''}
+                        onChange={(e) => setDrillTopicId(e.target.value)}
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+                      >
+                        {availableDrillTopics.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.title} (100+ problems)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Step 3: Subtopic */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        3. Subtopic
+                      </label>
+                      <select
+                        aria-label="Select Subtopic"
+                        value={activeDrillSubtopic?.id || ''}
+                        onChange={(e) => setDrillSubtopicId(e.target.value)}
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+                      >
+                        {availableDrillSubtopics.map((st) => (
+                          <option key={st.id} value={st.id}>
+                            {st.title} ({st.concepts.length} concept{st.concepts.length === 1 ? '' : 's'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Step 4: Concepts preview + Count + Difficulty + Create Sub-Questions CTA */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
+                    <div className="space-y-1.5 min-w-0">
+                      {activeDrillSubtopic && activeDrillSubtopic.concepts.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            Concepts covered:
+                          </span>
+                          {activeDrillSubtopic.concepts.map((c) => (
+                            <span
+                              key={c.id}
+                              className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold border border-indigo-200/70 dark:border-indigo-800/50"
+                            >
+                              {c.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <select
+                        aria-label="Question count"
+                        value={drillCount}
+                        onChange={(e) => setDrillCount(Number(e.target.value))}
+                        className="min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                      >
+                        {[5, 10, 15, 20].map((cnt) => (
+                          <option key={cnt} value={cnt}>
+                            {cnt} Sub-Questions
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        aria-label="Difficulty mode"
+                        value={drillDifficulty}
+                        onChange={(e) => setDrillDifficulty(e.target.value as any)}
+                        className="min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                      >
+                        <option value="calibrated_ladder">Multi-Model Ladder</option>
+                        <option value="easy">Easy Foundation</option>
+                        <option value="medium">Standard Exam</option>
+                        <option value="hard">Advanced Olympiad</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        disabled={launchingDrill || !activeDrillTopic}
+                        onClick={() => {
+                          if (!activeDrillSubject || !activeDrillTopic) return;
+                          handleLaunchSession({
+                            sessionTitle: activeDrillSubtopic
+                              ? `${activeDrillTopic.title} · ${activeDrillSubtopic.title}`
+                              : activeDrillTopic.title,
+                            subjectId: activeDrillSubject.id,
+                            examTrack: drillExamTrack !== 'all' ? drillExamTrack : undefined,
+                            chapterId: activeDrillTopic.chapterId,
+                            topicId: activeDrillTopic.id,
+                            subtopicId: activeDrillSubtopic?.id,
+                            difficultyMode: drillDifficulty,
+                            questionCount: drillCount,
+                            timed: false,
+                            mode: 'standard',
+                          });
+                        }}
+                        className="min-h-[44px] px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-extrabold shadow-md flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <Zap className="w-4 h-4 fill-current text-amber-300" />
+                        <span>{launchingDrill ? 'Creating...' : '4. Create Sub-Questions'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Olympiad & ICT Dedicated Launch Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -584,7 +850,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                         </div>
                         <button
                           onClick={() => handleStartWeakTopicDrill(w.topicId, w.subjectId, w.topicTitle)}
-                          className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                          className="min-h-[44px] px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
                         >
                           Remediate
                         </button>
@@ -592,6 +858,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                     ))}
                   </div>
                 </div>
+              )}
+                </>
               )}
             </div>
           )}
@@ -657,29 +925,42 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
 
               <div className="space-y-3">
                 {isLoadingBank ? (
-                  <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                    Loading questions...
-                  </div>
+                  <ScreenSkeleton label="Loading question bank..." />
+                ) : bankError ? (
+                  <EmptyState
+                    variant="error"
+                    icon={<AlertCircle className="w-6 h-6" />}
+                    title="Could not load question bank"
+                    description={bankError}
+                    action={
+                      <Button type="button" variant="primary" size="md" onClick={loadBank} leftIcon={<RefreshCw className="w-4 h-4" />}>
+                        Retry
+                      </Button>
+                    }
+                  />
                 ) : bankQuestions.length > 0 ? (
-                  bankQuestions.map((q, idx) => (
+                  bankQuestions.map((q) => (
                     <div
                       key={q.id}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3"
+                      className="bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl p-5 shadow-xs space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 uppercase">
-                            {q.subjectId}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          <Badge variant="primary" size="sm">
+                            {q.subjectId.toUpperCase()}
+                          </Badge>
+                          <span className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]">
                             {q.topicId}
                           </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 capitalize text-slate-500">
+                          <Badge variant="outline" size="sm">
                             {q.difficulty.replace('_', ' ')}
-                          </span>
+                          </Badge>
                         </div>
 
-                        <button
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
                           onClick={() => {
                             setActivePracticeSession({
                               config: {
@@ -691,22 +972,29 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                               questions: [q],
                             });
                           }}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                          leftIcon={<Zap className="w-3.5 h-3.5 fill-current text-[#FFB84D]" />}
+                          className="min-h-[44px]"
                         >
-                          <Zap className="w-3 h-3 fill-current text-amber-300" />
-                          <span>Solve Problem</span>
-                        </button>
+                          Solve Problem
+                        </Button>
                       </div>
 
-                      <div className="text-sm text-slate-800 dark:text-slate-200 font-serif leading-relaxed">
+                      <div className="text-sm text-[#2D2A4A] dark:text-[#F1EFFF] leading-relaxed">
                         <FormattedMathText text={q.questionText} />
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                    No questions found matching your filter criteria.
-                  </div>
+                  <EmptyState
+                    icon={<Search className="w-6 h-6" />}
+                    title="No matching questions"
+                    description="Try clearing the search query or switching to All Subjects."
+                    actionLabel="Reset filters"
+                    onAction={() => {
+                      setBankSubjectFilter('all');
+                      setBankSearchQuery('');
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -721,6 +1009,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
         onStart={handleLaunchSession}
         initialSubjectId={modalSubject}
         initialTopicId={modalTopic}
+        initialSubtopicId={modalSubtopic}
         initialConceptId={modalConcept}
         initialTitle={modalTitle}
         dailyQuotaRemaining={dailyQuotaRemaining}

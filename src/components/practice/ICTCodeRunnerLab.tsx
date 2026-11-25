@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AuthClient } from '../../services/authClient';
 import { OfflineStorageManager } from '../../utils/offlineStorage';
+import { buildApiHeaders } from '../../utils/csrf';
 
 function solvedStorageKey(userId: string | null | undefined): string {
   return `learnco_ict_code_solved_v1:${userId || 'guest'}`;
@@ -85,11 +86,11 @@ export const ICTCodeRunnerLab: React.FC = () => {
       // ignore storage errors
     }
 
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     const attemptId = `ict-code-${prob.id}-${Date.now()}`;
     const seconds = Math.max(1, Math.round(durationMs / 1000) || 10);
 
-    if (!token || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+    if (!sessionId || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       if (user?.id) {
         OfflineStorageManager.saveOfflineAttempt({
           id: attemptId,
@@ -109,10 +110,8 @@ export const ICTCodeRunnerLab: React.FC = () => {
     try {
       const res = await fetch('/api/practice/submit-attempt', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
+        headers: buildApiHeaders(),
         body: JSON.stringify({
           attemptId,
           questionId: prob.id,

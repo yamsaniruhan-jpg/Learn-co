@@ -5,18 +5,11 @@ import {
   GenerateResourceRequest,
   CreatorResourceType,
 } from '../types/creator';
-import { AuthClient } from './authClient';
+import { buildApiHeaders } from '../utils/csrf';
 
 export class CreatorClient {
   private static getHeaders(): HeadersInit {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    const token = AuthClient.getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    return headers;
+    return buildApiHeaders();
   }
 
   // --- Sources ---
@@ -25,6 +18,7 @@ export class CreatorClient {
     const query = search ? `?search=${encodeURIComponent(search)}` : '';
     const res = await fetch(`/api/creator/sources${query}`, {
       method: 'GET',
+      credentials: 'include',
       headers: this.getHeaders(),
     });
 

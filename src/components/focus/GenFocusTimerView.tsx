@@ -23,12 +23,17 @@ import {
   Radio,
   Layers,
   Zap,
+  RefreshCw,
 } from 'lucide-react';
 import { SubjectId } from '../../types';
-import { CURRICULUM_DATA } from '../../data/curriculumData';
+import { TopicItem } from '../../types/curriculum';
+import { SUBJECT_SUMMARIES } from '../../data/curriculumMeta';
+import { LearningClient } from '../../services/learningClient';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { Skeleton } from '../ui/Skeleton';
+import { EmptyState } from '../ui/EmptyState';
 import { awardXp } from '../../utils/xpManager';
 
 export interface GenFocusTimerViewProps {
@@ -94,15 +99,54 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const soundNodesRef = useRef<{ source?: any; gain?: GainNode; filter?: BiquadFilterNode; osc1?: OscillatorNode; osc2?: OscillatorNode }>({});
 
-  // Get current subject curriculum
-  const currentSubject = CURRICULUM_DATA.find((s) => s.id === selectedSubjectId) || CURRICULUM_DATA[0];
-  const allTopics = currentSubject.chapters.flatMap((c) => c.topics);
+  const [allTopics, setAllTopics] = useState<TopicItem[]>([]);
+  const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(true);
+  const [topicError, setTopicError] = useState<string | null>(null);
+  const currentSubject = SUBJECT_SUMMARIES.find((s) => s.id === selectedSubjectId) || SUBJECT_SUMMARIES[0];
 
-  // Set default topic on subject change
+  // Load topics for only the selected subject on demand
+  const loadTopics = React.useCallback((subjectId: SubjectId) => {
+    setIsLoadingTopics(true);
+    setTopicError(null);
+    return LearningClient.getSubjectCurriculum(subjectId)
+      .then((subjectData) => {
+        const topics = subjectData ? subjectData.chapters.flatMap((c) => c.topics) : [];
+        setAllTopics(topics);
+        setSelectedTopicId((prev) =>
+          topics.length > 0 && (!prev || !topics.some((t) => t.id === prev)) ? topics[0].id : prev
+        );
+      })
+      .catch((err: any) => {
+        setTopicError(err?.message || 'Unable to load subject topics right now.');
+      })
+      .finally(() => {
+        setIsLoadingTopics(false);
+      });
+  }, []);
+
   useEffect(() => {
-    if (allTopics.length > 0 && (!selectedTopicId || !allTopics.some((t) => t.id === selectedTopicId))) {
-      setSelectedTopicId(allTopics[0].id);
-    }
+    let cancelled = false;
+    setIsLoadingTopics(true);
+    setTopicError(null);
+    LearningClient.getSubjectCurriculum(selectedSubjectId)
+      .then((subjectData) => {
+        if (cancelled) return;
+        const topics = subjectData ? subjectData.chapters.flatMap((c) => c.topics) : [];
+        setAllTopics(topics);
+        if (topics.length > 0 && (!selectedTopicId || !topics.some((t) => t.id === selectedTopicId))) {
+          setSelectedTopicId(topics[0].id);
+        }
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        setTopicError(err?.message || 'Unable to load subject topics right now.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingTopics(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSubjectId]);
 
   // Update timer when mode or session type changes
@@ -388,21 +432,21 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
   return (
     <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Top Header & Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E3DFF5] dark:border-[#3D3861] pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-[#6C5CE7]/12 text-[#6C5CE7] dark:text-[#A99DF5]">
               <Clock className="w-5 h-5" />
             </span>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white font-display tracking-tight">
-              Zen Focus Timer
+            <h1 className="text-2xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display tracking-tight">
+              Focus Timer
             </h1>
             <Badge variant="primary" size="sm">
-              Deep Work Engine
+              Deep Work
             </Badge>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Calibrated Pomodoro cycles, binaural soundscapes, distraction-free flow, and focus XP pulses.
+          <p className="text-xs sm:text-sm text-[#6B6890] dark:text-[#B4B0D5] mt-1">
+            Calibrated focus cycles, ambient soundscapes, and instant XP logs.
           </p>
         </div>
 
@@ -411,18 +455,18 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
           {onToggleZenMode && (
             <Button
               variant="outline"
-              size="sm"
-              leftIcon={<Maximize2 className="w-4 h-4 text-indigo-500" />}
+              size="md"
+              leftIcon={<Maximize2 className="w-4 h-4 text-[#6C5CE7] dark:text-[#A99DF5]" />}
               onClick={onToggleZenMode}
               title="Enter distraction-free fullscreen Zen mode (Esc to exit)"
             >
-              Immersive Zen Mode
+              Zen Mode
             </Button>
           )}
 
           <Button
             variant="ghost"
-            size="sm"
+            size="md"
             leftIcon={<RotateCcw className="w-4 h-4" />}
             onClick={handleResetTimer}
           >
@@ -435,28 +479,28 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
         {/* Left 7 Columns: Focus Timer Center Stage */}
         <div className="lg:col-span-7 space-y-6">
-          <Card variant="default" padding="lg" className="relative overflow-hidden shadow-lg border-indigo-500/20">
+          <Card variant="default" padding="lg" className="relative overflow-hidden">
             {/* Session Type Pill (Focus vs. Break) */}
             <div className="flex items-center justify-center gap-2 mb-6">
               <button
                 onClick={() => setSessionType('focus')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   sessionType === 'focus'
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-[#6C5CE7] text-white shadow-sm'
+                    : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861]'
                 }`}
               >
-                🎯 Deep Focus Sprint
+                Deep Focus Sprint
               </button>
               <button
                 onClick={() => setSessionType('short_break')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   sessionType === 'short_break'
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-[#00B8A9] text-white shadow-sm'
+                    : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861]'
                 }`}
               >
-                ☕ Rest & Recovery
+                Rest &amp; Recovery
               </button>
             </div>
 
@@ -518,19 +562,20 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
                 size="md"
                 onClick={handleAddFiveMinutes}
                 title="Add 5 minutes to current timer"
-                className="rounded-full"
+                className="rounded-xl"
               >
                 <Plus className="w-4 h-4 mr-1" /> 5m
               </Button>
 
               <button
                 onClick={() => setIsRunning((prev) => !prev)}
-                className={`p-5 rounded-full text-white shadow-xl transition-all transform hover:scale-105 active:scale-95 cursor-pointer ${
+                className={`min-w-[56px] min-h-[56px] p-5 rounded-full text-white shadow-md transition-all active:scale-95 cursor-pointer ${
                   isRunning
-                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
-                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30'
+                    ? 'bg-[#FFB84D] hover:bg-[#F0A432] text-[#2D2A4A]'
+                    : 'bg-[#6C5CE7] hover:bg-[#5B4BC4]'
                 }`}
                 title={isRunning ? 'Pause Timer' : 'Start Focus Sprint'}
+                aria-label={isRunning ? 'Pause Timer' : 'Start Focus Sprint'}
               >
                 {isRunning ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current ml-0.5" />}
               </button>
@@ -540,7 +585,7 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
                 size="md"
                 onClick={handleSessionCompletion}
                 title="Complete session and advance"
-                className="rounded-full"
+                className="rounded-xl"
               >
                 <SkipForward className="w-4 h-4 mr-1" /> Skip
               </Button>
@@ -548,26 +593,27 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
 
             {/* Focus Pulse Quick Action & XP Feedback */}
             <div className="mt-4 flex flex-col items-center justify-center gap-2">
-              <button
+              <Button
+                variant="xp"
+                size="md"
                 onClick={handleLogFocusPulse}
-                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-bold shadow-lg shadow-amber-500/25 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
+                leftIcon={<Zap className="w-4 h-4 fill-current" />}
                 title="Log a 15-minute quick Focus Pulse (+25 XP)"
               >
-                <Zap className="w-4 h-4 fill-white" />
-                <span>Log Focus Pulse (+25 XP)</span>
-              </button>
+                Log Focus Pulse (+25 XP)
+              </Button>
 
               {pulseToast && (
-                <div className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-in fade-in flex items-center gap-1.5 shadow-xs">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <div className="px-3.5 py-1.5 rounded-xl bg-[#4CAF8E]/15 border border-[#4CAF8E]/35 text-[#247A5E] dark:text-[#7ADEC0] text-xs font-bold animate-in fade-in flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{pulseToast}</span>
                 </div>
               )}
             </div>
 
             {/* Mode Presets Buttons */}
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-              <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5">
+            <div className="mt-6 pt-6 border-t border-[#E3DFF5] dark:border-[#3D3861]">
+              <div className="text-[11px] font-bold text-[#6B6890] dark:text-[#B4B0D5] uppercase tracking-wider mb-2.5">
                 Calibrated Focus Presets
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -578,14 +624,14 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
                       setActiveMode(mode);
                       setSessionType('focus');
                     }}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                    className={`min-h-[44px] p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
                       activeMode === mode
-                        ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                        ? 'bg-[#6C5CE7]/10 dark:bg-[#8577ED]/18 border-[#6C5CE7] text-[#6C5CE7] dark:text-[#A99DF5]'
+                        : 'bg-[#F7F5FF] dark:bg-[#1E1B33] border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:border-[#6C5CE7]/40'
                     }`}
                   >
                     <div className="text-xs font-bold">{MODE_CONFIGS[mode].label.split(' ')[0]}</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    <div className="text-[10px] opacity-80 font-mono mt-0.5">
                       {MODE_CONFIGS[mode].focusMin}m / {MODE_CONFIGS[mode].breakMin}m
                     </div>
                   </button>
@@ -645,18 +691,18 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
 
             {/* Subject Selector Buttons */}
             <div>
-              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1.5">
+              <label className="text-xs font-semibold text-[#6B6890] dark:text-[#B4B0D5] block mb-1.5">
                 Target Subject:
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {CURRICULUM_DATA.map((sub) => (
+                {SUBJECT_SUMMARIES.map((sub) => (
                   <button
                     key={sub.id}
                     onClick={() => setSelectedSubjectId(sub.id as SubjectId)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       selectedSubjectId === sub.id
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        ? 'bg-[#6C5CE7] text-white shadow-xs'
+                        : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861]'
                     }`}
                   >
                     {sub.name}
@@ -667,27 +713,52 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
 
             {/* Topic Dropdown */}
             <div>
-              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1.5">
+              <label className="text-xs font-semibold text-[#6B6890] dark:text-[#B4B0D5] block mb-1.5">
                 Active Topic:
               </label>
-              <select
-                value={selectedTopicId}
-                onChange={(e) => setSelectedTopicId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                {allTopics.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
+              {isLoadingTopics ? (
+                <Skeleton className="h-11 w-full rounded-xl" />
+              ) : topicError ? (
+                <EmptyState
+                  variant="error"
+                  title="Could not load topics"
+                  description={topicError}
+                  action={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                      onClick={() => loadTopics(selectedSubjectId)}
+                    >
+                      Retry
+                    </Button>
+                  }
+                />
+              ) : allTopics.length === 0 ? (
+                <EmptyState
+                  title="No topics available"
+                  description="Pick another subject above to align this focus sprint."
+                />
+              ) : (
+                <select
+                  value={selectedTopicId}
+                  onChange={(e) => setSelectedTopicId(e.target.value)}
+                  className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] text-xs font-medium text-[#2D2A4A] dark:text-[#F1EFFF]"
+                >
+                  {allTopics.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Quick Launch Buttons into Learn or Practice */}
             <div className="pt-2 flex items-center gap-2">
               <Button
                 variant="outline"
-                size="sm"
+                size="md"
                 className="flex-1 text-xs"
                 leftIcon={<BookOpen className="w-3.5 h-3.5" />}
                 onClick={() => onNavigateToTab && onNavigateToTab('learn', { subjectId: selectedSubjectId })}
@@ -696,7 +767,7 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
               </Button>
               <Button
                 variant="primary"
-                size="sm"
+                size="md"
                 className="flex-1 text-xs"
                 leftIcon={<Target className="w-3.5 h-3.5" />}
                 onClick={() => onNavigateToTab && onNavigateToTab('practice')}
@@ -710,12 +781,12 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
           <Card variant="default" padding="md" className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <Radio className="w-4 h-4 text-[#6C5CE7] dark:text-[#A99DF5]" />
+                <h3 className="text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">
                   Ambient Audio Synthesizer
                 </h3>
               </div>
-              <span className="text-[11px] text-slate-400 font-mono">Web Audio API</span>
+              <span className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] font-mono">Web Audio API</span>
             </div>
 
             {/* Sound Selection Grid */}
@@ -730,10 +801,10 @@ export const GenFocusTimerView: React.FC<GenFocusTimerViewProps> = ({
                 <button
                   key={sound.id}
                   onClick={() => handleSelectSound(sound.id as AmbientSound)}
-                  className={`p-2.5 rounded-xl text-left border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                  className={`min-h-[44px] p-2.5 rounded-xl text-left border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
                     ambientSound === sound.id
-                      ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                      ? 'bg-[#6C5CE7]/10 dark:bg-[#8577ED]/18 border-[#6C5CE7] text-[#6C5CE7] dark:text-[#A99DF5]'
+                      : 'bg-[#F7F5FF] dark:bg-[#1E1B33] border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5]'
                   }`}
                 >
                   <sound.icon className="w-3.5 h-3.5 shrink-0" />

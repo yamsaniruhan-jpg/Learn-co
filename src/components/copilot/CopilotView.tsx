@@ -25,6 +25,9 @@ import {
   Cpu,
   AlertTriangle,
   X,
+  ImagePlus,
+  Lightbulb,
+  RefreshCw,
 } from 'lucide-react';
 import {
   CopilotMessage,
@@ -34,16 +37,17 @@ import {
   CopilotContextPayload,
   CopilotCitation,
   CopilotArtifact,
+  CopilotImageAttachment,
 } from '../../types/copilot';
 import { UserProfile } from '../../types';
-import Markdown from 'react-markdown';
-import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
+import { ScreenSkeleton } from '../ui/Skeleton';
+import { EmptyState } from '../ui/EmptyState';
 import { CopilotClient } from '../../services/copilotClient';
 import { CopilotSidebar } from './CopilotSidebar';
 import { CopilotMessageItem } from './CopilotMessageItem';
 import { FormattedMathText } from '../common/FormattedMathText';
+import { prepareQuestionImage } from '../../utils/imageAttachment';
 
 interface CopilotViewProps {
   user: UserProfile;
@@ -72,15 +76,28 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   const [activeMode, setActiveMode] = useState<CopilotMode>('socratic_hint');
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>('intermediate');
   const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [hintFirst, setHintFirst] = useState<boolean>(false);
+
+  // Loading & Error States
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Interactive Context
   const [activeContextNote, setActiveContextNote] = useState<string>(initialContext);
   const [isContextDrawerOpen, setIsContextDrawerOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
+  // Photo / Screenshot Attachment State
+  const [attachedImage, setAttachedImage] = useState<{
+    attachment: CopilotImageAttachment;
+    previewUrl: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Input & Streaming States
   const [inputPrompt, setInputPrompt] = useState<string>(initialPrompt);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [streamingCitations, setStreamingCitations] = useState<CopilotCitation[]>([]);
   const [streamingArtifact, setStreamingArtifact] = useState<CopilotArtifact | undefined>();
@@ -115,17 +132,21 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   }, [messages, streamingContent, isStreaming]);
 
   const loadConversations = async () => {
+    setLoadError(null);
     try {
       const convs = await CopilotClient.listConversations();
       setConversations(convs);
 
       if (convs.length > 0 && !activeConversationId) {
-        selectConversation(convs[0].id);
+        await selectConversation(convs[0].id);
       } else if (convs.length === 0) {
-        handleNewConversation();
+        await handleNewConversation();
       }
     } catch (err) {
       console.error('Failed to load conversations:', err);
+      setLoadError('Could not load your doubt sessions. Please retry.');
+    } finally {
+      setIsLoadingSession(false);
     }
   };
 
@@ -141,6 +162,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       }
     } catch (err) {
       console.error('Failed to select conversation:', err);
+      setLoadError('Failed to open that session.');
     }
   };
 
@@ -163,7 +185,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
           conversationId: newConv.id,
           userId: user.id || 'guest',
           role: 'assistant',
-          content: `Hello **${user.fullName.split(' ')[0]}**! I am your **Omni Socratic AI Copilot**.\n\nI am configured for **${learnerLevel.toUpperCase()}** academic rigor across Mathematics, CS, Physics, Chemistry, and AI.\n\nAsk any question, request a step-by-step mathematical proof, or choose a tutoring mode below to begin.`,
+          content: `Hello **${user.fullName.split(' ')[0]}**! Ask any doubt or upload a photo of a problem.\n\n**Answer:** Every response starts with a 1-line takeaway.\n**Step-by-step:** Then a clean numbered walkthrough tailored to **${learnerLevel.toUpperCase()}** level.\n**Check yourself:** And a quick check question — or turn on **Hint first** above if you want a clue before the full solution.`,
           mode: activeMode,
           timestamp: new Date().toISOString(),
         },
@@ -303,13 +325,34 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
     setStatusNotice({ type: 'info', message: 'Current session messages cleared.' });
   };
 
-  const handleSendMessage = async (customPrompt?: string) => {
-    const textToSend = (customPrompt || inputPrompt).trim();
-    if (!textToSend || isStreaming) return;
+  const handleImageFileSelected = async (file?: File | null) => {
+    if (!file) return;
+    try {
+      const prepared = await prepareQuestionImage(file);
+      setAttachedImage(prepared);
+      setStatusNotice(null);
+    } catch (err: any) {
+      setStatusNotice({ type: 'error', message: err?.message || 'Could not attach that image.' });
+    }
+  };
 
-    setInputPrompt('');
+  const handleSendMessage = async (
+    customPrompt?: string,
+    overrides?: { hintFirst?: boolean; revealFullSolution?: boolean }
+  ) => {
+    const rawText = (customPrompt ?? inputPrompt).trim();
+    const pendingImage = attachedImage;
+    if ((!rawText && !pendingImage) || isStreaming) return;
+
+    const textToSend = rawText || 'Solve and explain the question shown in this photo.';
+    const useHintFirst = overrides?.hintFirst ?? hintFirst;
+    const revealFullSolution = overrides?.revealFullSolution ?? false;
+
+    if (!customPrompt) setInputPrompt('');
+    setAttachedImage(null);
     setStatusNotice(null);
     setIsStreaming(true);
+    setIsReconnecting(false);
 
     // Ensure we have an active conversation
     let currentConvId = activeConversationId;
@@ -325,14 +368,14 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
         setActiveConversation(newConv);
         setConversations((prev) => [newConv, ...prev]);
       } catch {
-        setInputPrompt(textToSend);
+        if (!customPrompt) setInputPrompt(rawText);
+        if (pendingImage) setAttachedImage(pendingImage);
         setIsStreaming(false);
         setStatusNotice({ type: 'error', message: 'Could not start a conversation. Check your connection and try again.' });
         return;
       }
     }
 
-    // Append user message immediately
     const userMsg: CopilotMessage = {
       id: `usr-${Date.now()}`,
       conversationId: currentConvId,
@@ -340,12 +383,12 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       role: 'user',
       content: textToSend,
       mode: activeMode,
+      imageDataUrl: pendingImage?.previewUrl,
       timestamp: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
 
-    // Setup streaming state
     setIsStreaming(true);
     setStreamingContent('');
     setStreamingCitations([]);
@@ -372,9 +415,13 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
           learnerLevel,
           context: contextPayload,
           selectedModel: selectedModel || undefined,
+          hintFirst: useHintFirst,
+          revealFullSolution,
+          imageAttachment: pendingImage?.attachment,
         },
         {
           onToken: (token) => {
+            setIsReconnecting(false);
             accumulatedContent += token;
             setStreamingContent(accumulatedContent);
           },
@@ -386,15 +433,21 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             accumulatedArtifact = art;
             setStreamingArtifact(art);
           },
+          onReconnecting: () => {
+            setIsReconnecting(true);
+          },
           onDone: (doneData) => {
             const assistantMsg: CopilotMessage = {
               id: doneData.messageId || `ai-${Date.now()}`,
-              conversationId: currentConvId!,
+              conversationId: doneData.conversationId || currentConvId!,
               userId: user.id || 'guest',
               role: 'assistant',
               content: accumulatedContent,
               mode: activeMode,
-              modelUsed: doneData.modelUsed || 'gemini-3.5-flash',
+              modelUsed: doneData.modelUsed || selectedModel || 'gemini-2.5-flash',
+              hintOnly: doneData.hintOnly,
+              unavailableReason: doneData.unavailableReason,
+              fallbackPracticeQuestions: doneData.fallbackPracticeQuestions,
               citations: accumulatedCitations,
               artifact: accumulatedArtifact,
               timestamp: new Date().toISOString(),
@@ -402,25 +455,53 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
             setMessages((prev) => [...prev, assistantMsg]);
             setIsStreaming(false);
+            setIsReconnecting(false);
             setStreamingContent('');
             setStreamingCitations([]);
             setStreamingArtifact(undefined);
 
-            // Refresh conversation title & snippet in list
             loadConversations();
           },
-          onError: () => {
-            setStatusNotice({ type: 'error', message: 'The response could not be completed. Check the conversation before retrying.' });
+          onError: (errMsg) => {
+            setIsReconnecting(false);
             setIsStreaming(false);
+            setStatusNotice({
+              type: 'error',
+              message: errMsg || 'The response was interrupted. Tap Retry below or check the conversation.',
+            });
           },
         },
-        controller.signal
+        controller.signal,
+        { recoverOnDisconnect: true }
       );
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        setStatusNotice({ type: 'error', message: 'The response could not be completed. Check the conversation before retrying.' });
+        setStatusNotice({ type: 'error', message: 'The response could not be completed. Retry or check your connection.' });
       }
       setIsStreaming(false);
+      setIsReconnecting(false);
+    }
+  };
+
+  const handleRevealFullSolution = (hintMsg: CopilotMessage) => {
+    const idx = messages.findIndex((m) => m.id === hintMsg.id);
+    const precedingUser = idx > 0
+      ? messages.slice(0, idx).reverse().find((m) => m.role === 'user')
+      : [...messages].reverse().find((m) => m.role === 'user');
+    const questionText = precedingUser?.content || 'the previous question';
+    handleSendMessage(
+      `Provide the full Answer, Step-by-step explanation, and Check yourself for: ${questionText}`,
+      { hintFirst: false, revealFullSolution: true }
+    );
+  };
+
+  const handleRetryFromMessage = (failedMsg: CopilotMessage) => {
+    const idx = messages.findIndex((m) => m.id === failedMsg.id);
+    const precedingUser = idx > 0
+      ? messages.slice(0, idx).reverse().find((m) => m.role === 'user')
+      : [...messages].reverse().find((m) => m.role === 'user');
+    if (precedingUser?.content) {
+      handleSendMessage(precedingUser.content, { hintFirst });
     }
   };
 
@@ -429,6 +510,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       setIsStreaming(false);
+      setIsReconnecting(false);
     }
   };
 
@@ -483,37 +565,40 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       {/* 2. Center Main Chat Canvas */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
         {/* Top Control Header */}
-        <div className="h-14 px-3 sm:px-4 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xs">
+        <div className="min-h-[56px] px-3 sm:px-4 py-1.5 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xs">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Mobile Sessions Toggle Button */}
             <button
+              type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 shrink-0 cursor-pointer"
+              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A594FF] border border-[#E3DFF5] dark:border-[#3D3861] shrink-0 cursor-pointer"
               title="Open Chat Sessions & Modes"
               aria-label="Open sessions"
             >
-              <Layers className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <Layers className="w-4 h-4" />
             </button>
 
             {/* Sub-Tab Switcher: Live Tutoring Chat vs Session History */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center bg-[#F7F5FF] dark:bg-[#1E1B33] p-1 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861]">
               <button
+                type="button"
                 onClick={() => setCopilotViewTab('chat')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   copilotViewTab === 'chat'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                    ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A594FF] shadow-xs'
+                    : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
                 }`}
               >
                 <Bot className="w-3.5 h-3.5" />
-                <span>Chat</span>
+                <span>Doubts</span>
               </button>
               <button
+                type="button"
                 onClick={() => setCopilotViewTab('history')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   copilotViewTab === 'history'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                    ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A594FF] shadow-xs'
+                    : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
@@ -522,44 +607,49 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             </div>
 
             <div className="hidden sm:flex items-center gap-1.5 min-w-0">
-              <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                {activeConversation?.title || 'Omni Socratic AI Copilot'}
+              <h2 className="text-xs sm:text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+                {activeConversation?.title || 'Ask a Doubt'}
               </h2>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Model Selector Dropdown */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <Cpu className="w-3.5 h-3.5 text-slate-400 ml-1" />
+            <div className="flex items-center gap-1 bg-[#F7F5FF] dark:bg-[#1E1B33] px-2 py-1 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] min-h-[44px]">
+              <Cpu className="w-3.5 h-3.5 text-[#6B6890] ml-1 shrink-0" />
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="bg-transparent text-[11px] font-semibold text-slate-700 dark:text-slate-200 outline-hidden pr-2 cursor-pointer"
+                aria-label="Select AI model"
+                className="bg-transparent text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] outline-hidden pr-2 cursor-pointer"
               >
-                <option value="gemini-2.5-flash" className="dark:bg-slate-800">⚡ Gemini 2.5 Flash (Recommended)</option>
-                <option value="gemini-2.5-pro" className="dark:bg-slate-800">🔷 Gemini 2.5 Pro (Deep Reasoning)</option>
-                <option value="gemini-flash-latest" className="dark:bg-slate-800">✨ Gemini Flash Latest</option>
-                <option value="gemini-2.5-flash-lite" className="dark:bg-slate-800">🟢 Gemini 2.5 Flash-Lite</option>
+                <option value="gemini-2.5-flash" className="dark:bg-[#2A2647]">Gemini 2.5 Flash (Recommended)</option>
+                <option value="gemini-2.5-pro" className="dark:bg-[#2A2647]">Gemini 2.5 Pro (Deep Reasoning)</option>
+                <option value="gemini-flash-latest" className="dark:bg-[#2A2647]">Gemini Flash Latest</option>
+                <option value="gemini-2.5-flash-lite" className="dark:bg-[#2A2647]">Gemini 2.5 Flash-Lite</option>
               </select>
             </div>
 
             {/* Clear Messages */}
             <button
+              type="button"
               onClick={handleClearConversation}
               title="Clear message history in active session"
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Clear conversation"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] hover:text-[#F25F5C] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
             </button>
 
             {/* Context Drawer Toggle */}
             <button
+              type="button"
               onClick={() => setIsContextDrawerOpen((prev) => !prev)}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
+              aria-label="Toggle study context"
+              className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all cursor-pointer ${
                 isContextDrawerOpen
-                  ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-600'
-                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A594FF]'
+                  : 'text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]'
               }`}
               title="Toggle Study Context & Knowledge Matrix"
             >
@@ -667,23 +757,16 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
             {/* Conversations Grid List */}
             {conversations.length === 0 ? (
-              <div className="text-center py-16 p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-                <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">No Tutoring Sessions Found</h4>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  Ask Omni Copilot any STEM question to start building your persistent revision archive.
-                </p>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => {
-                    handleNewConversation();
-                    setCopilotViewTab('chat');
-                  }}
-                >
-                  Start New Tutoring Session
-                </Button>
-              </div>
+              <EmptyState
+                icon={<BookOpen className="w-6 h-6" />}
+                title="No tutoring sessions yet"
+                description="Ask your first STEM doubt to build a saved revision log."
+                actionLabel="Start new doubt session"
+                onAction={() => {
+                  handleNewConversation();
+                  setCopilotViewTab('chat');
+                }}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {conversations.map((conv) => (
@@ -754,57 +837,81 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
           <>
             {/* Conversation Message Stream */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-              {messages.map((msg) => (
-                <CopilotMessageItem
-                  key={msg.id}
-                  message={msg}
-                  userFullName={user.fullName}
-                  onQuickAction={handleQuickPrompt}
-                  onRegenerate={() => {
-                    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-                    if (lastUserMsg) {
-                      handleSendMessage(lastUserMsg.content);
-                    }
-                  }}
-                  onNavigateToCreator={(resId) => {
-                    if (onNavigateToTab) {
-                      onNavigateToTab('create');
-                    }
-                  }}
+              {isLoadingSession ? (
+                <ScreenSkeleton rows={4} />
+              ) : loadError ? (
+                <EmptyState
+                  icon={<AlertTriangle className="w-6 h-6" />}
+                  title="Could not load doubts"
+                  description={loadError}
+                  action={
+                    <Button variant="primary" onClick={loadConversations} leftIcon={<RefreshCw className="w-4 h-4" />}>
+                      Retry
+                    </Button>
+                  }
                 />
-              ))}
+              ) : messages.length === 0 ? (
+                <EmptyState
+                  icon={<Bot className="w-6 h-6" />}
+                  title="Ask your first doubt"
+                  description="Type a question or upload a photo of a problem. You'll get a 1-line answer, step-by-step reasoning, and a quick check."
+                />
+              ) : (
+                messages.map((msg) => (
+                  <CopilotMessageItem
+                    key={msg.id}
+                    message={msg}
+                    userFullName={user.fullName}
+                    onQuickAction={handleQuickPrompt}
+                    onRevealFullSolution={handleRevealFullSolution}
+                    onRetryUnavailable={handleRetryFromMessage}
+                    onRegenerate={() => {
+                      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+                      if (lastUserMsg) {
+                        handleSendMessage(lastUserMsg.content);
+                      }
+                    }}
+                    onNavigateToCreator={() => {
+                      if (onNavigateToTab) {
+                        onNavigateToTab('create');
+                      }
+                    }}
+                  />
+                ))
+              )}
 
               {/* Active Live Streaming Item */}
               {isStreaming && (
                 <div className="flex gap-3 max-w-4xl mr-auto animate-in fade-in">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-xl bg-[#6C5CE7] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
                     <Sparkles className="w-4 h-4 animate-spin" />
                   </div>
                   <div className="space-y-2 flex-1 max-w-[92%]">
-                    <div className="flex items-center justify-between text-[11px] text-purple-600 dark:text-purple-400 font-semibold px-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                        <span>Deriving step-by-step Socratic solution...</span>
-                      </div>
+                    <div className="flex items-center justify-between text-[11px] text-[#6C5CE7] dark:text-[#A598FF] font-semibold px-1">
+                      <span>
+                        {isReconnecting
+                          ? 'Connection dropped — recovering response...'
+                          : hintFirst
+                          ? 'Preparing targeted hint...'
+                          : 'Solving step-by-step...'}
+                      </span>
                       <button
+                        type="button"
                         onClick={handleStopStreaming}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950 text-rose-600 text-[10px] font-bold hover:bg-rose-100 cursor-pointer"
+                        className="min-h-[36px] flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-[11px] font-bold hover:bg-rose-100 cursor-pointer"
                       >
-                        <Square className="w-3 h-3 fill-rose-600" />
-                        <span>Stop Generating</span>
+                        <Square className="w-3 h-3 fill-current" />
+                        <span>Stop</span>
                       </button>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-purple-200 dark:border-purple-900 shadow-xs">
+                    <div className="p-4 rounded-2xl bg-white dark:bg-[#2A2647] text-[#2D2A4A] dark:text-[#F1EFFF] rounded-tl-xs border border-[#E3DFF5] dark:border-[#3D3861]">
                       {streamingContent ? (
                         <div className="prose prose-sm dark:prose-invert max-w-none text-xs sm:text-sm space-y-2 whitespace-pre-wrap leading-relaxed">
                           <FormattedMathText text={streamingContent} preferNormalText />
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                          <span className="w-2 h-2 rounded-full bg-purple-600 animate-ping" />
-                          <span>Synthesizing first-principles reasoning...</span>
-                        </div>
+                        <ScreenSkeleton rows={2} />
                       )}
                     </div>
                   </div>
@@ -814,66 +921,127 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Always-Available Quick Prompt Action Chips */}
-            <div className="px-4 pb-1.5 flex gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
+            {/* Study Controls Bar: Hint-first toggle + Quick Prompts */}
+            <div className="px-4 pb-2 flex items-center gap-2 overflow-x-auto shrink-0 scrollbar-none">
               <button
                 type="button"
-                onClick={() => setInputPrompt('Can you provide a Socratic hint without revealing the final answer?')}
-                className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 dark:hover:bg-purple-900 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                aria-pressed={hintFirst}
+                onClick={() => setHintFirst((prev) => !prev)}
+                className={`min-h-[44px] px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7] ${
+                  hintFirst
+                    ? 'bg-amber-100 dark:bg-amber-950/70 border-amber-400 dark:border-amber-600 text-amber-950 dark:text-amber-200'
+                    : 'bg-white dark:bg-[#2A2647] border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:border-[#6C5CE7]'
+                }`}
               >
-                <span>💡 Socratic Hint</span>
+                <Lightbulb className="w-3.5 h-3.5" />
+                <span>Hint first: {hintFirst ? 'ON' : 'OFF'}</span>
               </button>
               <button
                 type="button"
-                onClick={() => setInputPrompt('What is the first-principles intuition and physical/mathematical invariant here?')}
-                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                onClick={() => setInputPrompt('Why does SN2 inversion require backside nucleophilic attack?')}
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] border border-[#E3DFF5] dark:border-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
               >
-                <span>🔍 First Principles</span>
+                SN2 inversion
               </button>
               <button
                 type="button"
-                onClick={() => setInputPrompt('Can you check boundary limits (as x -> 0 or infinity) and symmetry invariants?')}
-                className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                onClick={() => setInputPrompt('Check extrema when f\'(c) = 0 and f\'\'(c) = 0.')}
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] border border-[#E3DFF5] dark:border-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
               >
-                <span>📐 Boundary Check</span>
+                Extrema test
               </button>
               <button
                 type="button"
-                onClick={() => setInputPrompt('Generate 1 challenging diagnostic multiple-choice question on this topic.')}
-                className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                onClick={() => setInputPrompt('Derive the gradient descent step-size limit.')}
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] border border-[#E3DFF5] dark:border-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
               >
-                <span>📝 Practice Problem</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputPrompt('Diagnose the common trap or misconception students fall into for this topic.')}
-                className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
-              >
-                <span>🩺 Diagnose Mistake</span>
+                Gradient descent
               </button>
             </div>
 
             {/* Bottom Input Prompt Bar */}
-            <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800/80 shrink-0 space-y-2">
+            <div className="p-3 sm:p-4 bg-white dark:bg-[#2A2647] border-t border-[#E3DFF5] dark:border-[#3D3861] shrink-0 space-y-2">
+              {attachedImage && (
+                <div className="flex items-center gap-3 p-2 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861]">
+                  <img
+                    src={attachedImage.previewUrl}
+                    alt="Question preview"
+                    className="w-12 h-12 rounded-lg object-cover border border-[#E3DFF5] dark:border-[#3D3861]"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+                      {attachedImage.attachment.name || 'Question photo attached'}
+                    </p>
+                    <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
+                      Ready to analyze with Gemini vision
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedImage(null)}
+                    aria-label="Remove attached photo"
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSendMessage();
                 }}
-                className="relative flex items-center bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all p-1.5 shadow-2xs"
+                className="relative flex items-center gap-1.5 bg-[#F7F5FF] dark:bg-[#1E1B33] rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] focus-within:border-[#6C5CE7] focus-within:ring-2 focus-within:ring-[#6C5CE7]/20 transition-all p-1.5"
               >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    handleImageFileSelected(file);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach photo or screenshot of a question"
+                  aria-label="Upload photo of a question"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] hover:bg-white dark:hover:bg-[#2A2647] transition-colors shrink-0 cursor-pointer"
+                >
+                  <ImagePlus className="w-5 h-5" />
+                </button>
+
                 <textarea
                   rows={1}
                   value={inputPrompt}
                   onChange={(e) => setInputPrompt(e.target.value)}
+                  onPaste={(e) => {
+                    const items = Array.from(e.clipboardData?.items || []);
+                    const imgItem = items.find((item) => item.type.startsWith('image/'));
+                    if (imgItem) {
+                      const file = imgItem.getAsFile();
+                      if (file) {
+                        e.preventDefault();
+                        handleImageFileSelected(file);
+                      }
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
                     }
                   }}
-                  placeholder={`Ask Omni Copilot under ${activeMode.replace('_', ' ')} mode... (Press Enter to send)`}
-                  className="flex-1 bg-transparent px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none resize-none max-h-32"
+                  placeholder={
+                    hintFirst
+                      ? 'Ask a doubt or paste a screenshot (Hint-First ON)...'
+                      : 'Ask a doubt, type an equation, or paste a screenshot...'
+                  }
+                  className="flex-1 bg-transparent px-2 py-2.5 text-xs sm:text-sm text-[#2D2A4A] dark:text-[#F1EFFF] placeholder:text-[#6B6890] focus:outline-none resize-none max-h-32"
                 />
 
                 <div className="flex items-center gap-1.5 pr-1 shrink-0">
@@ -881,7 +1049,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                     <button
                       type="button"
                       onClick={handleStopStreaming}
-                      className="p-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1 shadow-xs cursor-pointer"
+                      className="min-h-[44px] px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <Square className="w-3.5 h-3.5 fill-white" />
                       <span className="hidden sm:inline">Stop</span>
@@ -891,21 +1059,19 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                       type="submit"
                       variant="primary"
                       size="sm"
-                      disabled={!inputPrompt.trim()}
+                      className="min-h-[44px]"
+                      disabled={!inputPrompt.trim() && !attachedImage}
                       leftIcon={<Send className="w-3.5 h-3.5" />}
                     >
-                      Send
+                      Ask
                     </Button>
                   )}
                 </div>
               </form>
 
-              {/* Quick Guidance Footer Note */}
-              <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                <span>
-                  Omni Copilot uses grounded curriculum invariants and verified derivations.
-                </span>
-                <span className="font-mono text-[9px]">Shift+Enter for newline</span>
+              <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5] px-1">
+                <span>Model: {selectedModel} · AI can be wrong — always verify key steps.</span>
+                <span className="hidden sm:inline font-mono text-[10px]">Paste screenshot or Shift+Enter</span>
               </div>
             </div>
           </>

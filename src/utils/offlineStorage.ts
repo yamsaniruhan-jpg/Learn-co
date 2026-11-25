@@ -7,6 +7,8 @@ import {
   OlympiadStudyCheatSheet,
 } from '../data/offlineOlympiadPack';
 import { syncLocalXpOnly } from './xpManager';
+import { AuthClient } from '../services/authClient';
+import { buildApiHeaders } from './csrf';
 
 export interface PendingOfflineAttempt {
   id: string;
@@ -36,6 +38,7 @@ export interface OfflineOlympiadPack {
 const STORAGE_KEY_PENDING_ATTEMPTS = 'learnco_offline_pending_attempts';
 const STORAGE_KEY_OLYMPIAD_PACK = 'learnco_offline_olympiad_pack_v1';
 const STORAGE_KEY_OLYMPIAD_LAUNCH = 'learnco_offline_pack_launch_v1';
+const STORAGE_KEY_LAST_SYNCED_AT = 'learnco_last_synced_at_v1';
 
 function computeOlympiadTrackCounts(questions: QuestionBankItem[]): OlympiadPackTrackCounts {
   const counts: OlympiadPackTrackCounts = { IPhO: 0, IChO: 0, IBHO: 0, IJSO: 0, ICT: 0 };
@@ -213,28 +216,35 @@ export class OfflineStorageManager {
 
   private static async performSync(): Promise<number> {
     const attempts = this.getPendingAttempts();
-    const token = localStorage.getItem('learnco_auth_token');
-    let userId: string | undefined;
-    try { userId = JSON.parse(localStorage.getItem('learnco_user') || 'null')?.id; } catch { /* No trusted account context. */ }
-    if (!token || !userId) return 0;
+    const initialSession = AuthClient.getSessionId();
+    const userId = AuthClient.getCurrentUser()?.id;
+    if (!initialSession || !userId) return 0;
     const hasEligible = attempts.some((item) => item.userId === userId && Boolean(item.id));
     if (!hasEligible) return 0;
     // Bind the local account label to the server session, including during a
     // sign-in transition or when browser storage is stale.
     try {
-      const session = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-      if (!session.ok || (await session.json())?.user?.id !== userId || localStorage.getItem('learnco_auth_token') !== token) return 0;
+      const session = await fetch('/api/auth/me', { credentials: 'include' });
+      if (
+        !session.ok ||
+        (await session.json())?.user?.id !== userId ||
+        AuthClient.getSessionId() !== initialSession ||
+        AuthClient.getCurrentUser()?.id !== userId
+      ) {
+        return 0;
+      }
     } catch { return 0; }
 
     const syncedIds = new Set<string>();
     for (const item of attempts) {
       // Unowned legacy items cannot be safely attributed to an account.
       if (item.userId !== userId || !item.id) continue;
-      if (localStorage.getItem('learnco_auth_token') !== token) break;
+      if (AuthClient.getSessionId() !== initialSession || AuthClient.getCurrentUser()?.id !== userId) break;
       try {
         const res = await fetch('/api/practice/submit-attempt', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          credentials: 'include',
+          headers: buildApiHeaders(),
           body: JSON.stringify({
             attemptId: item.id, questionId: item.questionId, subjectId: item.subjectId,
             topicId: item.topic, conceptId: item.conceptId, selectedAnswer: item.userAnswer,
@@ -253,9 +263,8 @@ export class OfflineStorageManager {
           syncedIds.add(item.id);
           // A successful retry may award server XP. Update the display only if
           // the same account and session are still active after the response.
-          let currentId: string | undefined;
-          try { currentId = JSON.parse(localStorage.getItem('learnco_user') || 'null')?.id; } catch { /* No account context. */ }
-          if (localStorage.getItem('learnco_auth_token') === token && currentId === userId) {
+          const currentId = AuthClient.getCurrentUser()?.id;
+          if (AuthClient.getSessionId() === initialSession && currentId === userId) {
             const totalXp = syncLocalXpOnly(result.newTotalXp, userId);
             window.dispatchEvent(new CustomEvent('learnco_xp_awarded', {
               detail: { amount: 0, reason: 'Offline sync', totalXp, level: calculateLevelFromXp(totalXp).level },
@@ -268,13 +277,41 @@ export class OfflineStorageManager {
     // Re-read to preserve entries queued while the requests were in flight.
     const remaining = this.getPendingAttempts().filter(item => !(item.userId === userId && syncedIds.has(item.id)));
     localStorage.setItem(STORAGE_KEY_PENDING_ATTEMPTS, JSON.stringify(remaining));
+    const syncTimestamp = new Date().toISOString();
+    if (syncedIds.size > 0) {
+      this.markCloudSynced(syncTimestamp);
+    }
     window.dispatchEvent(new CustomEvent('learnco_offline_queue_updated'));
     window.dispatchEvent(
       new CustomEvent('learnco_offline_synced', {
-        detail: { syncedCount: syncedIds.size, timestamp: new Date().toISOString() },
+        detail: { syncedCount: syncedIds.size, timestamp: syncTimestamp },
       })
     );
     return syncedIds.size;
+  }
+
+  static getLastSyncedAt(): string | null {
+    try {
+      return localStorage.getItem(STORAGE_KEY_LAST_SYNCED_AT);
+    } catch {
+      return null;
+    }
+  }
+
+  static markCloudSynced(timestamp: string = new Date().toISOString()): string {
+    try {
+      localStorage.setItem(STORAGE_KEY_LAST_SYNCED_AT, timestamp);
+    } catch {
+      // ignore storage unavailability
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('learnco_offline_synced', {
+          detail: { syncedCount: 0, cloudSynced: true, timestamp },
+        })
+      );
+    }
+    return timestamp;
   }
 
   /**
@@ -301,7 +338,9 @@ export function useNetworkStatus(): {
   const [pendingCount, setPendingCount] = useState<number>(() => {
     return OfflineStorageManager.getPendingAttempts().length;
   });
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() =>
+    OfflineStorageManager.getLastSyncedAt()
+  );
 
   useEffect(() => {
     const refreshCount = () => {
@@ -312,7 +351,7 @@ export function useNetworkStatus(): {
       setIsOnline(true);
       try {
         const count = await OfflineStorageManager.syncPendingAttemptsToServer();
-        if (count > 0) setLastSyncedAt(new Date().toISOString());
+        if (count > 0) setLastSyncedAt(OfflineStorageManager.markCloudSynced());
       } catch { /* Keep pending data for retry. */ }
       refreshCount();
     };
@@ -323,8 +362,8 @@ export function useNetworkStatus(): {
     };
 
     const handleSynced = (e: Event) => {
-      const detail = (e as CustomEvent<{ syncedCount?: number; timestamp?: string }>).detail;
-      if (detail?.syncedCount && detail.syncedCount > 0 && detail.timestamp) {
+      const detail = (e as CustomEvent<{ syncedCount?: number; cloudSynced?: boolean; timestamp?: string }>).detail;
+      if (((detail?.syncedCount && detail.syncedCount > 0) || detail?.cloudSynced) && detail.timestamp) {
         setLastSyncedAt(detail.timestamp);
       }
       refreshCount();

@@ -315,7 +315,7 @@ export default function Marketplace() {
 
   const handleSaveLessonAction = async (lessonId: string, completed = true, quizChoiceIndex: number | null = null) => {
     if (!activePlayerCourse) return;
-    const token = AuthClient.getToken();
+    const sessionId = AuthClient.getSessionId();
     const accountId = user?.id;
     setSavingProgress(true);
     try {
@@ -326,7 +326,7 @@ export default function Marketplace() {
       const data = res.ok ? await res.json() : null;
       if (res.ok && data?.progress) {
         setProgressByCourse((prev) => ({ ...prev, [activePlayerCourse.id]: data.progress }));
-        if (token && token === AuthClient.getToken() && accountId === AuthClient.getCurrentUser()?.id) {
+        if (sessionId && sessionId === AuthClient.getSessionId() && accountId === AuthClient.getCurrentUser()?.id) {
           void syncCourseProgressToFirestore(activePlayerCourse.id, data.progress);
         }
         if (data.quizEvaluation) {

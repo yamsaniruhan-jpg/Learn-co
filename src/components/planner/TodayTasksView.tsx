@@ -23,6 +23,8 @@ import { useAuth } from '../../context/AuthContext';
 import { loadUserStreak } from '../../utils/streakManager';
 import { StreakModal } from '../common/StreakModal';
 import { FormattedMathText } from '../common/FormattedMathText';
+import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/Button';
 
 interface TodayTasksViewProps {
   tasks: StudyTask[];
@@ -38,11 +40,11 @@ interface TodayTasksViewProps {
 }
 
 const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  math: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20' },
-  cs: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-  physics: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
-  chemistry: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  biology: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20' },
+  math: { bg: 'bg-[#6C5CE7]/10', text: 'text-[#6C5CE7] dark:text-[#A99DF5]', border: 'border-[#6C5CE7]/25' },
+  cs: { bg: 'bg-[#00B8A9]/10', text: 'text-[#008C80] dark:text-[#4DE0D3]', border: 'border-[#00B8A9]/25' },
+  physics: { bg: 'bg-[#FFB84D]/15', text: 'text-[#9A6300] dark:text-[#FFD68A]', border: 'border-[#FFB84D]/35' },
+  chemistry: { bg: 'bg-[#4CAF8E]/15', text: 'text-[#247A5E] dark:text-[#7ADEC0]', border: 'border-[#4CAF8E]/35' },
+  biology: { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-300', border: 'border-rose-500/25' },
 };
 
 export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
@@ -104,16 +106,16 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
     <div className="space-y-6">
       {/* Overdue / Missed Tasks Alert Banner */}
       {overdueTasks.length > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20">
+        <div className="p-4 rounded-2xl bg-[#FFF8EB] dark:bg-[#2F281D] border border-[#FFB84D]/45 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3">
-            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+            <div className="p-2 rounded-xl bg-[#FFB84D]/20 text-[#9A6300] dark:text-[#FFD68A] shrink-0">
               <AlertCircle className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-amber-200">
+              <h4 className="text-sm font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]">
                 {overdueTasks.length} Missed Study Task{overdueTasks.length > 1 ? 's' : ''} Detected
               </h4>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">
                 Past uncompleted sessions can be batch-rescheduled forward to keep your target exam
                 pacing intact without streak penalty.
               </p>
@@ -122,7 +124,7 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
           <button
             id="btn-batch-reschedule-overdue"
             onClick={onBatchRescheduleMissed}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-amber-600 hover:bg-amber-500 text-white shadow-md transition-all shrink-0"
+            className="min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-[#FFB84D] hover:bg-[#F0A432] text-[#2D2A4A] shadow-sm transition-all shrink-0 cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reschedule to Tomorrow</span>
@@ -132,21 +134,21 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
 
       {/* Daily Progress & Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span>Today's Task Completion</span>
-            <span className="font-semibold text-slate-200">
+        <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm">
+          <div className="flex items-center justify-between text-xs text-[#6B6890] dark:text-[#B4B0D5] mb-1">
+            <span>Today&apos;s Task Completion</span>
+            <span className="font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]">
               {completedCount}/{todayTasks.length} Done
             </span>
           </div>
-          <div className="text-2xl font-bold text-white mb-2">
+          <div className="text-2xl font-bold text-[#2D2A4A] dark:text-[#F1EFFF] mb-2">
             {todayTasks.length > 0
               ? `${Math.round((completedCount / todayTasks.length) * 100)}%`
               : '0%'}
           </div>
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-[#E3DFF5] dark:bg-[#3D3861] h-2 rounded-full overflow-hidden">
             <div
-              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+              className="bg-[#4CAF8E] h-full rounded-full transition-all duration-500"
               style={{
                 width: `${todayTasks.length > 0 ? (completedCount / todayTasks.length) * 100 : 0}%`,
               }}
@@ -154,20 +156,20 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+        <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm">
+          <div className="flex items-center justify-between text-xs text-[#6B6890] dark:text-[#B4B0D5] mb-1">
             <span>Planned Workload</span>
-            <span className="font-semibold text-slate-200">
+            <span className="font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]">
               {plannedMinutes}m / {settings.dailyAvailableMinutes || 120}m Limit
             </span>
           </div>
-          <div className="text-2xl font-bold text-indigo-400 mb-2">
+          <div className="text-2xl font-bold text-[#6C5CE7] dark:text-[#A99DF5] mb-2">
             {Math.floor(plannedMinutes / 60)}h {plannedMinutes % 60}m
           </div>
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-[#E3DFF5] dark:bg-[#3D3861] h-2 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                capacityPercent > 100 ? 'bg-rose-500' : 'bg-indigo-500'
+                capacityPercent > 100 ? 'bg-rose-500' : 'bg-[#6C5CE7]'
               }`}
               style={{ width: `${Math.min(100, capacityPercent)}%` }}
             />
@@ -176,21 +178,21 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
 
         <div
           onClick={() => setShowStreakModal(true)}
-          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-500/40 transition-colors group"
+          className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-sm flex items-center justify-between cursor-pointer hover:border-[#FFB84D]/60 transition-colors group"
           title="Click to view daily streak breakdown"
         >
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">Current Study Streak</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              <span className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">Current Study Streak</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FFB84D]/15 text-[#9A6300] dark:text-[#FFD68A]">
                 ACTIVE
               </span>
             </div>
-            <div className="text-2xl font-bold text-amber-400 flex items-center gap-1.5 mt-1">
-              <Flame className="w-6 h-6 fill-current animate-pulse group-hover:scale-110 transition-transform" />
+            <div className="text-2xl font-bold text-[#D98200] dark:text-[#FFB84D] flex items-center gap-1.5 mt-1">
+              <Flame className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" />
               <span>{activeStreak} {activeStreak === 1 ? 'Day' : 'Days'}</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] mt-1">
               {activeStreak === 1 ? 'Streak started today! Keep it going.' : 'Consecutive daily momentum'}
             </p>
           </div>
@@ -200,7 +202,7 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
               e.stopPropagation();
               onOpenNewTask();
             }}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-all"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EDE9FE] dark:hover:bg-[#353059] text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861] transition-all cursor-pointer"
           >
             + Add Task
           </button>
@@ -213,16 +215,16 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
 
       {/* Filter and Tab Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+        <div className="flex items-center gap-1.5 p-1 bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl">
           {(['ALL', 'PENDING', 'COMPLETED'] as const).map((filter) => (
             <button
               key={filter}
               id={`filter-today-${filter.toLowerCase()}`}
               onClick={() => setSelectedFilter(filter)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+              className={`min-h-[44px] px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 selectedFilter === filter
-                  ? 'bg-indigo-600 text-white shadow-sm font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#6C5CE7] text-white shadow-sm'
+                  : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
               }`}
             >
               {filter === 'ALL' ? 'All Tasks' : filter === 'PENDING' ? 'Pending' : 'Completed'}
@@ -234,7 +236,8 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
           <select
             value={subjectFilter}
             onChange={(e) => setSubjectFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            aria-label="Filter today's tasks by subject"
+            className="min-h-[44px] px-3.5 py-2 bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl text-[#2D2A4A] dark:text-[#F1EFFF] text-xs font-medium"
           >
             <option value="ALL">All Subjects</option>
             <option value="math">Mathematics</option>
@@ -249,20 +252,16 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
       {/* Task Cards List */}
       <div className="space-y-3">
         {displayedTasks.length === 0 ? (
-          <div className="py-12 text-center rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 p-6">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-60" />
-            <h4 className="text-sm font-semibold text-slate-200">No Tasks Scheduled for Today</h4>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-              You are all caught up! Use the button below to schedule a new study session or use the
-              AI Study Plan generator to pace your curriculum.
-            </p>
-            <button
-              onClick={onOpenNewTask}
-              className="mt-4 px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg transition-all"
-            >
-              + Create Today's Task
-            </button>
-          </div>
+          <EmptyState
+            icon={<CheckCircle2 className="w-6 h-6 text-[#4CAF8E]" />}
+            title="No tasks scheduled for today"
+            description="You are all caught up. Add a study block below or generate a paced curriculum plan."
+            action={
+              <Button variant="primary" size="md" onClick={onOpenNewTask}>
+                + Create Today&apos;s Task
+              </Button>
+            }
+          />
         ) : (
           displayedTasks.map((task) => {
             const isDone = task.status === 'COMPLETED';
@@ -273,8 +272,8 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
                 key={task.id}
                 className={`group p-4 rounded-2xl border transition-all ${
                   isDone
-                    ? 'bg-slate-900/40 border-slate-800/60 opacity-75'
-                    : 'bg-slate-900 border-slate-800 hover:border-slate-700 shadow-md'
+                    ? 'bg-[#FFFFFF]/70 dark:bg-[#2A2647]/60 border-[#E3DFF5]/70 dark:border-[#3D3861]/70 opacity-80'
+                    : 'bg-[#FFFFFF] dark:bg-[#2A2647] border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7]/40 shadow-sm'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -283,12 +282,13 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
                     <button
                       id={`btn-toggle-task-${task.id}`}
                       onClick={() => onToggleTaskStatus(task.id, task.status)}
-                      className="mt-0.5 text-slate-500 hover:text-emerald-400 transition-colors shrink-0"
+                      aria-label={isDone ? 'Mark task incomplete' : 'Mark task complete'}
+                      className="min-w-[44px] min-h-[44px] -ml-2 -mt-2 flex items-center justify-center text-[#6B6890] hover:text-[#4CAF8E] transition-colors shrink-0 cursor-pointer"
                     >
                       {isDone ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-500/20" />
+                        <CheckCircle2 className="w-5 h-5 text-[#4CAF8E] fill-[#4CAF8E]/15" />
                       ) : (
-                        <Circle className="w-5 h-5 hover:stroke-emerald-400" />
+                        <Circle className="w-5 h-5 hover:stroke-[#4CAF8E]" />
                       )}
                     </button>
 
@@ -301,54 +301,54 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
                           {task.subjectId}
                         </span>
 
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861]">
                           {task.taskType.replace(/_/g, ' ')}
                         </span>
 
                         {task.isSpacedRevision && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                            🔄 Spaced Repetition (Cycle {task.revisionCycle || 1})
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#6C5CE7]/10 text-[#6C5CE7] dark:text-[#A99DF5]">
+                            Spaced Repetition (Cycle {task.revisionCycle || 1})
                           </span>
                         )}
 
                         {task.priority === 'CRITICAL' && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300">
                             Critical Priority
                           </span>
                         )}
                         {task.priority === 'HIGH' && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFB84D]/20 text-[#9A6300] dark:text-[#FFD68A]">
                             High Priority
                           </span>
                         )}
                       </div>
 
                       <h3
-                        className={`text-sm font-semibold text-slate-100 line-clamp-1 ${
-                          isDone ? 'line-through text-slate-400' : ''
+                        className={`text-sm font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] line-clamp-1 ${
+                          isDone ? 'line-through opacity-60' : ''
                         }`}
                       >
                         <FormattedMathText text={task.title} inline />
                       </h3>
 
                       {task.description && (
-                        <div className="text-xs text-slate-400 mt-1 line-clamp-2">
+                        <div className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 line-clamp-2">
                           <FormattedMathText text={task.description} />
                         </div>
                       )}
 
                       {/* Time, Practice questions info */}
-                      <div className="flex flex-wrap items-center gap-3 mt-2.5 text-[11px] text-slate-400">
+                      <div className="flex flex-wrap items-center gap-3 mt-2.5 text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          <Clock className="w-3.5 h-3.5" />
                           {task.scheduledStartTime
                             ? `${task.scheduledStartTime} (${task.estimatedDurationMinutes}m)`
                             : `${task.estimatedDurationMinutes}m`}
                         </span>
 
                         {task.practiceQuestionCount && task.practiceQuestionCount > 0 && (
-                          <span className="flex items-center gap-1 text-indigo-300">
-                            <Zap className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="flex items-center gap-1 text-[#6C5CE7] dark:text-[#A99DF5] font-medium">
+                            <Zap className="w-3.5 h-3.5 text-[#D98200] dark:text-[#FFB84D]" />
                             {task.practiceQuestionCount} Practice Questions
                           </span>
                         )}
@@ -362,7 +362,7 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
                       <button
                         id={`btn-start-focus-${task.id}`}
                         onClick={() => onStartFocusSession(task)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-semibold transition-all shadow-sm"
+                        className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#6C5CE7]/10 hover:bg-[#6C5CE7] text-[#6C5CE7] dark:text-[#A99DF5] hover:text-white border border-[#6C5CE7]/25 text-xs font-semibold transition-all cursor-pointer"
                         title="Start Focus Study Mode"
                       >
                         <Play className="w-3.5 h-3.5 fill-current" />
@@ -373,19 +373,21 @@ export const TodayTasksView: React.FC<TodayTasksViewProps> = ({
                     <button
                       id={`btn-edit-task-${task.id}`}
                       onClick={() => onEditTask(task)}
-                      className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] rounded-xl transition-colors cursor-pointer"
                       title="Edit Task"
+                      aria-label="Edit Task"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-4 h-4" />
                     </button>
 
                     <button
                       id={`btn-delete-task-${task.id}`}
                       onClick={() => onDeleteTask(task.id)}
-                      className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#6B6890] dark:text-[#B4B0D5] hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
                       title="Delete Task"
+                      aria-label="Delete Task"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

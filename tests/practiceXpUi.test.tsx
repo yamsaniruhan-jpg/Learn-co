@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ update: vi.fn() }));
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ updateGamificationState: mocks.update }) }));
 vi.mock('../src/services/authClient', () => ({ AuthClient: {
-  getToken: () => localStorage.getItem('learnco_auth_token'),
+  getSessionId: () => {
+    const u = JSON.parse(localStorage.getItem('learnco_user') || 'null');
+    return u?.id ? `1:${u.id}` : null;
+  },
+  hasSession: () => Boolean(JSON.parse(localStorage.getItem('learnco_user') || 'null')?.id),
   getCurrentUser: () => JSON.parse(localStorage.getItem('learnco_user') || 'null'),
 } }));
 vi.mock('../src/utils/sound', () => ({ sounds: { playSuccess: vi.fn(), playFailure: vi.fn() } }));
@@ -16,7 +20,7 @@ import { PracticeArena } from '../src/components/practice/PracticeArena';
 
 const question: any = { id:'test-question', subjectId:'math', topicId:'algebra', difficulty:'easy', questionType:'single_choice', questionText:'Which answer?', options:['Correct choice','Other choice'], correctAnswer:'Correct choice', explanation:'Explanation' };
 let element: HTMLDivElement, root: ReturnType<typeof createRoot>;
-function signIn(id: string) { localStorage.setItem('learnco_auth_token', `token-${id}`); localStorage.setItem('learnco_user', JSON.stringify({id})); }
+function signIn(id: string) { localStorage.setItem('learnco_user', JSON.stringify({id})); }
 function button(text: string) { return [...element.querySelectorAll('button')].find(b => b.textContent?.includes(text))!; }
 beforeEach(async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;

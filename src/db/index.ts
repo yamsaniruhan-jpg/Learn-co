@@ -25,7 +25,7 @@ export const createPool = () => {
       password: process.env.SQL_PASSWORD,
       database: process.env.SQL_DB_NAME,
       max: 10,
-      connectionTimeoutMillis: 15000,
+      connectionTimeoutMillis: 5000,
     });
 
     global._postgresPool.on('error', (err) => {
@@ -38,3 +38,11 @@ export const createPool = () => {
 const pool = createPool();
 
 export const db = drizzle(pool, { schema });
+
+export async function closeSqlPool() {
+  if (global._postgresPool) {
+    await global._postgresPool.end();
+    global._postgresPool = undefined;
+  }
+}
+

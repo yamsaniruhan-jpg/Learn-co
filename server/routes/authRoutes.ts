@@ -1,6 +1,7 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { Database, hashPassword, verifyPassword } from '../db';
-import { requireAuth, getEffectiveRole, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { requireAuth, getEffectiveRole, AuthenticatedRequest, extractAuthToken } from '../middleware/authMiddleware';
+import { ensureCsrfCookie, setAuthSessionCookies, clearAuthSessionCookies } from '../middleware/csrf';
 import { OnboardingStatus } from '../../src/types/auth';
 import { FirestoreSyncService } from '../services/firestoreSync';
 import { adminAuth } from '../services/firebaseAdmin';
@@ -11,6 +12,12 @@ import { getOrCreateSqlUser, isOwnerEmail } from '../../src/db/users.ts';
 import { findAccountByEmailFromSql, persistAccountToSql } from '../../src/db/persistence';
 
 const router = Router();
+
+// GET /api/auth/csrf - ensure double-submit CSRF cookie is present for SPA forms/requests
+router.get('/csrf', (req: Request, res: Response) => {
+  const csrfToken = ensureCsrfCookie(req, res);
+  res.json({ success: true, csrfToken });
+});
 
 // Limit password guessing per client IP. Multi-instance deployments should use
 // a shared rate-limit store; test mode skips this to keep independent suites isolated.
@@ -59,6 +66,8 @@ router.post('/signup', (req, res: Response) => {
       role: profile?.role,
       authProvider: user.authProvider,
     }).catch((error) => console.warn('[CloudSQL] User sync on signup failed:', error));
+
+    setAuthSessionCookies(req, res, token);
 
     res.status(201).json({
       token,
@@ -142,6 +151,8 @@ router.post('/signin', signinLimiter, async (req, res: Response) => {
       role: profile?.role,
       authProvider: user.authProvider,
     }).catch((error) => console.warn('[CloudSQL] User sync on signin failed:', error));
+
+    setAuthSessionCookies(req, res, token);
 
     res.json({
       token,
@@ -262,6 +273,8 @@ router.post('/google', async (req, res: Response) => {
       authProvider: user.authProvider,
     }).catch((error) => console.warn('[CloudSQL] User sync on google auth failed:', error));
 
+    setAuthSessionCookies(req, res, token);
+
     res.json({
       token,
       googleToken: idToken || null,
@@ -297,6 +310,8 @@ router.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     const effectiveRole = getEffectiveRole(req);
     const effectiveProfile = { ...profile, role: effectiveRole };
 
+    ensureCsrfCookie(req, res);
+
     res.json({
       user: {
         id: user.id,
@@ -315,11 +330,11 @@ router.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
 
 // POST /api/auth/signout
 router.post('/signout', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
+  const token = extractAuthToken(req);
+  if (token) {
     Database.revokeSession(token);
   }
+  clearAuthSessionCookies(req, res);
   res.json({ success: true, message: 'Signed out successfully.' });
 });
 
@@ -518,6 +533,7 @@ router.post('/reset-password', resetLimiter, (req, res: Response) => {
     // so the user lands signed in rather than being bounced to the login screen.
     const session = Database.createSession(result.userId);
     const user = Database.findUserById(result.userId);
+    setAuthSessionCookies(req, res, session);
     res.json({
       success: true,
       message: 'Your password has been updated.',

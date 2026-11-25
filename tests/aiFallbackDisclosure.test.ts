@@ -27,7 +27,7 @@ describe('AI fallback disclosure', () => {
     const before = await request(app).get('/api/copilot/quota').set('Authorization', `Bearer ${token}`);
     const response = await request(app).post('/api/copilot/chat').set('Authorization', `Bearer ${token}`).send({prompt:'Write code to solve the heat equation', mode:'code_tutor'});
     expect(response.status).toBe(200);
-    expect(response.body.message.content).toContain('AI is unavailable');
+    expect(response.body.message.content).toContain('AI tutor is currently offline');
     expect(response.body.modelUsed).toBe('unavailable');
     expect(response.body.message.content).not.toContain('production-grade');
     expect(response.body.citations).toEqual([]);

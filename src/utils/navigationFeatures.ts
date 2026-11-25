@@ -47,7 +47,7 @@ export const ALL_APP_FEATURES: NavFeature[] = [
   {
     id: 'focus',
     label: 'Zen Focus Timer',
-    shortLabel: 'Zen Focus',
+    shortLabel: 'Focus',
     category: 'Core',
     icon: Clock,
     description: 'Deep work timer with ambient binaural soundscapes & XP pulses',
@@ -96,7 +96,7 @@ export const ALL_APP_FEATURES: NavFeature[] = [
   {
     id: 'copilot',
     label: 'Omni AI Copilot',
-    shortLabel: 'Copilot',
+    shortLabel: 'Doubts',
     category: 'AI Tools',
     icon: Bot,
     description: 'Socratic first-principles reasoning and step-by-step guidance',

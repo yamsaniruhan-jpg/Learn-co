@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BookOpen,
   Library,
@@ -37,9 +37,11 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { FormattedMathText, cleanLatexToNormalText } from '../common/FormattedMathText';
 import { Badge } from '../ui/Badge';
+import { SubjectCurriculumSkeleton } from '../ui/Skeleton';
 import { useAuth } from '../../context/AuthContext';
-import { CURRICULUM_DATA } from '../../data/curriculumData';
-import { ConceptDetail, SubjectId } from '../../types/curriculum';
+import { SUBJECT_SUMMARIES } from '../../data/curriculumMeta';
+import { LearningClient } from '../../services/learningClient';
+import { ConceptDetail, SubjectCurriculum, SubjectId } from '../../types/curriculum';
 
 export interface ConceptBookChapter {
   id: string;
@@ -706,6 +708,32 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
   const [bookmarkedItems, setBookmarkedItems] = useState<Record<string, boolean>>({});
+  const [loadedSubjects, setLoadedSubjects] = useState<Record<string, SubjectCurriculum>>({});
+  const [isLoadingSyllabus, setIsLoadingSyllabus] = useState<boolean>(false);
+
+  // Lazy-load syllabus curriculum per subject only when browsing the syllabus tab
+  useEffect(() => {
+    if (activeTab !== 'syllabus') return;
+    const targetSubject: SubjectId =
+      selectedSubject === 'all' ? 'math' : (selectedSubject as SubjectId);
+    if (loadedSubjects[targetSubject]) return;
+
+    let cancelled = false;
+    setIsLoadingSyllabus(true);
+    LearningClient.getSubjectCurriculum(targetSubject)
+      .then((subjectData) => {
+        if (!cancelled && subjectData) {
+          setLoadedSubjects((prev) => ({ ...prev, [subjectData.id]: subjectData }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSyllabus(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, selectedSubject, loadedSubjects]);
 
   const toggleBookmark = (id: string) => {
     setBookmarkedItems((prev) => ({
@@ -741,7 +769,13 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
 
   const filteredSyllabusConcepts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return CURRICULUM_DATA.filter((subj) => selectedSubject === 'all' || subj.id === selectedSubject).map((subj) => ({
+    const targetList =
+      selectedSubject === 'all'
+        ? Object.values(loadedSubjects)
+        : loadedSubjects[selectedSubject]
+        ? [loadedSubjects[selectedSubject]]
+        : [];
+    return targetList.map((subj) => ({
       subject: subj,
       chapters: subj.chapters
         .map((chapter) => {
@@ -759,20 +793,10 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
         })
         .filter((entry) => entry.concepts.length > 0),
     })).filter((entry) => entry.chapters.length > 0);
-  }, [selectedSubject, searchQuery]);
+  }, [loadedSubjects, selectedSubject, searchQuery]);
 
   const totalCurriculumConcepts = useMemo(
-    () =>
-      CURRICULUM_DATA.reduce(
-        (acc, subj) =>
-          acc +
-          subj.chapters.reduce(
-            (chAcc, ch) =>
-              chAcc + ch.topics.reduce((tAcc, t) => tAcc + t.conceptCount, 0),
-            0
-          ),
-        0
-      ),
+    () => SUBJECT_SUMMARIES.reduce((acc, subj) => acc + subj.conceptCount, 0),
     []
   );
 
@@ -1608,7 +1632,10 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
         ) : (
           /* ===================== VIEW 3B: LIVE CURRICULUM SYLLABUS BROWSER ===================== */
           <div className="space-y-6">
-            {filteredSyllabusConcepts.map(({ subject, chapters }) => (
+            {isLoadingSyllabus && filteredSyllabusConcepts.length === 0 ? (
+              <SubjectCurriculumSkeleton label="Loading subject syllabus concepts..." />
+            ) : (
+              filteredSyllabusConcepts.map(({ subject, chapters }) => (
               <div key={subject.id} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1662,7 +1689,8 @@ export const ConceptLibraryView: React.FC<ConceptLibraryViewProps> = ({
                   ))}
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         )
       )}

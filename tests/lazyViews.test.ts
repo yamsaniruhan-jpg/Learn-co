@@ -38,6 +38,7 @@ const LAZY_VIEWS: Array<[string, string]> = [
   ['VoiceExamView', 'src/components/common/VoiceExamView'],
   ['ExamForecasterView', 'src/components/common/ExamForecasterView'],
   ['OfflineSyncView', 'src/components/common/OfflineSyncView'],
+  ['SavedView', 'src/components/common/SavedView'],
   ['FormulaInspectorModal', 'src/components/common/FormulaInspectorModal'],
   ['FlashCheckModal', 'src/components/practice/FlashCheckModal'],
   ['WalkthroughModal', 'src/components/common/WalkthroughModal'],

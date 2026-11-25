@@ -100,4 +100,40 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/study-rooms/:roomId - delete a user-created study room (host only)
+router.delete('/:roomId', async (req: Request, res: Response) => {
+  const { roomId } = req.params;
+  const peerId =
+    (typeof req.query.peerId === 'string' ? req.query.peerId : null) ||
+    (typeof req.body?.peerId === 'string' ? req.body.peerId : null) ||
+    (typeof req.headers['x-peer-id'] === 'string' ? req.headers['x-peer-id'] : null);
+  const ticket =
+    (typeof req.query.ticket === 'string' ? req.query.ticket : null) ||
+    (typeof req.headers['x-room-ticket'] === 'string' ? req.headers['x-room-ticket'] : null);
+
+  const outcome = studyRoomHub.deleteRoom(roomId, peerId, ticket);
+  if (!outcome.deleted) {
+    if (outcome.reason === 'not_found') {
+      res.status(404).json({ success: false, error: 'Study room not found.' });
+      return;
+    }
+    if (outcome.reason === 'protected') {
+      res.status(403).json({ success: false, error: 'Default faculty study rooms cannot be deleted.' });
+      return;
+    }
+    res.status(403).json({ success: false, error: 'Only the room host can delete this study room.' });
+    return;
+  }
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('study_rooms').doc(roomId).delete();
+    } catch {
+      // Non-fatal cleanup
+    }
+  }
+
+  res.json({ success: true, deletedRoomId: roomId });
+});
+
 export default router;

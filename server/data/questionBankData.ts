@@ -1051,6 +1051,7 @@ const CORE_QUESTION_BANK: QuestionBankItem[] = [
 
 // Dynamically generate 100 questions per topic for all subjects and chapters
 export const MASTER_QUESTION_BANK: QuestionBankItem[] = [...CORE_QUESTION_BANK];
+const seenBankIds = new Set<string>(MASTER_QUESTION_BANK.map((q) => q.id));
 
 for (const subject of CURRICULUM_DATA) {
   for (const chapter of subject.chapters) {
@@ -1061,6 +1062,7 @@ for (const subject of CURRICULUM_DATA) {
         subtopic.concepts.map((concept) => ({
           id: concept.id,
           subtopicId: subtopic.id,
+          concept,
         }))
       );
 
@@ -1069,13 +1071,7 @@ for (const subject of CURRICULUM_DATA) {
       // handed a monotonicity question. These per-concept items give the
       // concept's own mini-check and worked examples real practice coverage.
       const conceptBank = QuestionGeneratorEngine.generateQuestionsForConcepts(
-        topicConcepts.map((entry) => ({
-          ...entry,
-          // Resolve the full concept, not just its id/subtopic.
-          concept: topic.subtopics
-            .flatMap((subtopic) => subtopic.concepts)
-            .find((candidate) => candidate.id === entry.id)!,
-        })),
+        topicConcepts,
         subject.id as any,
         chapter.id,
         topic.id
@@ -1090,8 +1086,15 @@ for (const subject of CURRICULUM_DATA) {
         topicConcepts
       );
 
-      for (const q of [...conceptBank, ...topicGenerated]) {
-        if (!MASTER_QUESTION_BANK.some((existing) => existing.id === q.id)) {
+      for (const q of conceptBank) {
+        if (!seenBankIds.has(q.id)) {
+          seenBankIds.add(q.id);
+          MASTER_QUESTION_BANK.push(q);
+        }
+      }
+      for (const q of topicGenerated) {
+        if (!seenBankIds.has(q.id)) {
+          seenBankIds.add(q.id);
           MASTER_QUESTION_BANK.push(q);
         }
       }

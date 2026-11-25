@@ -45,6 +45,8 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Progress } from '../ui/Progress';
+import { EmptyState } from '../ui/EmptyState';
+import { ScreenSkeleton } from '../ui/Skeleton';
 import { MasteryIndicator } from '../ui/GamificationIndicators';
 
 interface MentorViewProps {
@@ -104,6 +106,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
   // Filter & Live Sync State
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<SubjectId | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
   const [actionFeedback, setActionFeedback] = useState<{
@@ -142,6 +145,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
       setIsSyncing(true);
     } else {
       setIsLoading(true);
+      setLoadError(null);
     }
     try {
       const [mentorRes, recs, rels, reqs, port] = await Promise.all([
@@ -162,6 +166,7 @@ export const MentorView: React.FC<MentorViewProps> = ({
       setRelationships(rels);
       setRequests(reqs);
       setPortalData(port);
+      setLoadError(null);
       setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
       setSelectedRelationship((prev) => {
@@ -172,8 +177,10 @@ export const MentorView: React.FC<MentorViewProps> = ({
       });
     } catch (err: any) {
       console.error('Failed to load mentorship data:', err);
+      const msg = err?.message || 'Unable to reach live mentorship service.';
       if (!silent) {
-        notifyAction(err?.message || 'Unable to reach live mentorship service.', 'error');
+        setLoadError(msg);
+        notifyAction(msg, 'error');
       }
     } finally {
       setIsLoading(false);
@@ -496,34 +503,34 @@ export const MentorView: React.FC<MentorViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1">
+            <span className="p-1.5 rounded-lg bg-[#00B8A9]/12 text-[#008C80] dark:text-[#4DE0D3] font-bold text-xs flex items-center gap-1">
               <Compass className="w-3.5 h-3.5" />
-              <span>Accredited STEM Mentorship Network</span>
+              <span>STEM Mentorship Network</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="px-2 py-0.5 rounded-md bg-[#4CAF8E]/15 text-[#247A5E] dark:text-[#7ADEC0] text-[11px] font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#4CAF8E]" />
               <span>Live Sync{lastSyncedAt ? ` • ${lastSyncedAt}` : ''}</span>
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
-            Mentorship & Cognitive Diagnostics
+          <h1 className="text-2xl sm:text-3xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] font-display">
+            Mentor &amp; Diagnostics
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Connect with verified STEM mentors, schedule 1-on-1 study rooms, and review cognitive retention forecasts.
+          <p className="text-xs sm:text-sm text-[#6B6890] dark:text-[#B4B0D5]">
+            Connect with verified STEM mentors, schedule 1-on-1 study rooms, and review retention forecasts.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {relationships.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/20">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#00B8A9]/12 text-[#008C80] dark:text-[#4DE0D3] text-xs font-bold border border-[#00B8A9]/25">
+              <ShieldCheck className="w-4 h-4" />
               <span>{relationships.length} Active Mentor(s)</span>
             </div>
           )}
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="md"
             disabled={isSyncing || isLoading}
             onClick={() => {
               syncOverviewData(true);
@@ -531,20 +538,20 @@ export const MentorView: React.FC<MentorViewProps> = ({
             }}
             leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />}
           >
-            Refresh Live
+            Refresh
           </Button>
         </div>
       </div>
 
       {/* Main Tab Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 space-x-2 overflow-x-auto pb-0.5">
+      <div className="flex border-b border-[#E3DFF5] dark:border-[#3D3861] space-x-2 overflow-x-auto pb-0.5">
         <button
           id="main-tab-my-mentorship"
           onClick={() => setActiveMainTab('my_mentorship')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+          className={`min-h-[44px] py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeMainTab === 'my_mentorship'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[#00B8A9] text-[#008C80] dark:text-[#4DE0D3]'
+              : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -554,10 +561,10 @@ export const MentorView: React.FC<MentorViewProps> = ({
         <button
           id="main-tab-discover-mentors"
           onClick={() => setActiveMainTab('discover')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+          className={`min-h-[44px] py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeMainTab === 'discover'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[#00B8A9] text-[#008C80] dark:text-[#4DE0D3]'
+              : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
           <Search className="w-4 h-4" />
@@ -567,29 +574,29 @@ export const MentorView: React.FC<MentorViewProps> = ({
         <button
           id="main-tab-sessions"
           onClick={() => setActiveMainTab('sessions')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+          className={`min-h-[44px] py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeMainTab === 'sessions'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[#00B8A9] text-[#008C80] dark:text-[#4DE0D3]'
+              : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>Sessions & Rooms</span>
+          <span>Sessions &amp; Rooms</span>
         </button>
 
         <button
           id="main-tab-portal"
           onClick={() => setActiveMainTab('portal')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+          className={`min-h-[44px] py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeMainTab === 'portal'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[#00B8A9] text-[#008C80] dark:text-[#4DE0D3]'
+              : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
           <span>Educator Portal</span>
           {portalData.pendingRequests.length > 0 && (
-            <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="w-4 h-4 rounded-full bg-[#FFB84D] text-[#2D2A4A] text-[10px] font-bold flex items-center justify-center">
               {portalData.pendingRequests.length}
             </span>
           )}
@@ -598,10 +605,10 @@ export const MentorView: React.FC<MentorViewProps> = ({
         <button
           id="main-tab-diagnostics"
           onClick={() => setActiveMainTab('diagnostics')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+          className={`min-h-[44px] py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeMainTab === 'diagnostics'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[#00B8A9] text-[#008C80] dark:text-[#4DE0D3]'
+              : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
           <Compass className="w-4 h-4" />
@@ -611,21 +618,21 @@ export const MentorView: React.FC<MentorViewProps> = ({
         <button
           id="main-tab-mentor-access"
           onClick={() => setActiveMainTab('mentor_access')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+          className={`min-h-[44px] py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeMainTab === 'mentor_access'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[#00B8A9] text-[#008C80] dark:text-[#4DE0D3]'
+              : 'border-transparent text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
           <Lock className="w-4 h-4" />
-          <span>Mentor Access & Approvals</span>
+          <span>Mentor Access &amp; Approvals</span>
           {isOwnerOrAdmin ? (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#6C5CE7]/15 text-[#6C5CE7] dark:text-[#A99DF5]">
               Owner Queue
             </span>
           ) : (
             !isMentorRole && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FFB84D]/20 text-[#9A6300] dark:text-[#FFD68A]">
                 Apply
               </span>
             )
@@ -633,14 +640,34 @@ export const MentorView: React.FC<MentorViewProps> = ({
         </button>
       </div>
 
+      {isLoading ? (
+        <ScreenSkeleton rows={4} />
+      ) : loadError ? (
+        <EmptyState
+          variant="error"
+          title="Could not load mentorship hub"
+          description={loadError}
+          action={
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => syncOverviewData(false)}
+              leftIcon={<RefreshCw className="w-4 h-4" />}
+            >
+              Retry
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {/* TAB 1: My Mentorship */}
       {activeMainTab === 'my_mentorship' && (
         <div className="space-y-6">
           {relationships.length === 0 ? (
             <div className="space-y-6">
               {/* Onboarding Empty State */}
-              <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-500/20 text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-md">
+              <div className="p-8 sm:p-12 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-[#00B8A9] text-white flex items-center justify-center mx-auto shadow-sm">
                   <Compass className="w-8 h-8" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 font-display">
@@ -805,8 +832,17 @@ export const MentorView: React.FC<MentorViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sessions.length === 0 ? (
-              <div className="col-span-2 p-12 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/30 rounded-2xl">
-                No sessions scheduled yet. Connect with a mentor to schedule your first 1-on-1 session.
+              <div className="col-span-2">
+                <EmptyState
+                  icon={<Calendar className="w-6 h-6" />}
+                  title="No sessions scheduled yet"
+                  description="Connect with a mentor to book your first 1-on-1 study room and shared agenda."
+                  action={
+                    <Button variant="primary" size="md" onClick={() => setActiveMainTab('discover')}>
+                      Browse Verified Mentors
+                    </Button>
+                  }
+                />
               </div>
             ) : (
               sessions.map((sess) => (
@@ -1017,6 +1053,8 @@ export const MentorView: React.FC<MentorViewProps> = ({
           onApplicationsChanged={loadInitialData}
           onOpenPortal={() => setActiveMainTab('portal')}
         />
+      )}
+        </>
       )}
 
       {/* Modals */}

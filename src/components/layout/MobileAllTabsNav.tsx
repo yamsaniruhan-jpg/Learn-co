@@ -5,6 +5,15 @@ import {
   ChevronRight,
   Download,
   RefreshCw,
+  LayoutDashboard,
+  Sparkles,
+  BookOpen,
+  Target,
+  Bot,
+  Calendar,
+  Clock,
+  Compass,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
@@ -35,12 +44,15 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
   const groupedFeatures = groupNavFeatures(visibleFeatures);
 
   const primaryBottomTabs = [
-    visibleFeatures.find((f) => f.id === 'learn')!,
-    visibleFeatures.find((f) => f.id === 'practice')!,
-    visibleFeatures.find((f) => f.id === 'copilot')!,
-    visibleFeatures.find((f) => f.id === 'create')!,
-    visibleFeatures.find((f) => f.id === 'planner')!,
-    visibleFeatures.find((f) => f.id === 'profile')!,
+    { id: 'dashboard', shortLabel: 'Home', icon: LayoutDashboard },
+    { id: 'learn', shortLabel: 'Learn', icon: BookOpen },
+    { id: 'practice', shortLabel: 'Practice', icon: Target },
+    { id: 'copilot', shortLabel: 'Doubts', icon: Bot },
+    { id: 'create', shortLabel: 'Create', icon: Sparkles },
+    { id: 'planner', shortLabel: 'Plan', icon: Calendar },
+    { id: 'focus', shortLabel: 'Focus', icon: Clock },
+    { id: 'mentor', shortLabel: 'Mentor', icon: Compass },
+    { id: 'leaderboard', shortLabel: 'Ranks', icon: Trophy },
   ];
 
   const handleSelect = (tabId: string) => {
@@ -50,43 +62,47 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
 
   return (
     <>
-      {/* Mobile Bottom Navigation Bar with All-Features Drawer Trigger */}
-      <nav aria-label="Mobile feature navigation" className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]">
+      {/* Mobile Bottom Tab Bar (1-word calm icon labels, 44px+ tap targets) */}
+      <nav
+        aria-label="Mobile feature navigation"
+        className="md:hidden border-t border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-1.5 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] flex items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(45,42,74,0.06)]"
+      >
         {primaryBottomTabs.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => handleSelect(item.id)}
-              className={`relative flex flex-1 min-w-0 flex-col items-center justify-center py-1.5 px-0 rounded-xl text-[10px] font-bold transition-colors min-h-[44px] cursor-pointer ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`relative flex shrink-0 min-w-[58px] min-h-[46px] flex-col items-center justify-center py-1 px-1.5 rounded-xl text-[11px] font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6C5CE7] ${
                 isActive
-                  ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
-                  : 'text-[#6B6890] dark:text-[#B4B0D5]'
+                  ? 'bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A594FF] font-black'
+                  : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
               }`}
             >
-              <Icon className="w-5 h-5 mb-0.5" />
-              <span className="truncate max-w-full px-0.5">{item.shortLabel}</span>
+              <Icon className="w-4.5 h-4.5 mb-0.5" />
+              <span className="truncate max-w-full">{item.shortLabel}</span>
               {item.id === 'practice' && dailyAllowanceRemaining > 0 && (
-                <span className="absolute top-0.5 right-0.5 text-[9px] px-1 rounded-full bg-[#6C5CE7] text-white font-black tabular-nums">
-                  {dailyAllowanceRemaining}
-                </span>
+                <span className="sr-only">{dailyAllowanceRemaining} daily quota remaining</span>
               )}
             </button>
           );
         })}
 
-        {/* The 'All Tabs & Features' Trigger */}
         <button
+          type="button"
           onClick={() => setIsOpenAllDrawer(true)}
-          className={`flex flex-1 min-w-0 flex-col items-center justify-center py-1.5 px-0 rounded-xl text-[10px] font-bold transition-colors min-h-[44px] cursor-pointer ${
+          aria-expanded={isOpenAllDrawer}
+          className={`flex shrink-0 min-w-[58px] min-h-[46px] flex-col items-center justify-center py-1 px-1.5 rounded-xl text-[11px] font-bold transition-colors cursor-pointer ${
             isOpenAllDrawer
-              ? 'text-[#6C5CE7] dark:text-[#8577ED] font-black'
-              : 'text-[#6B6890] dark:text-[#B4B0D5]'
+              ? 'bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A594FF] font-black'
+              : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
           }`}
         >
-          <Menu className="w-5 h-5 mb-0.5" />
-          <span>All Tabs</span>
+          <Menu className="w-4.5 h-4.5 mb-0.5" />
+          <span>More</span>
         </button>
       </nav>
 
@@ -168,17 +184,17 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
                     <button
                       key={`drawer-${feat.id}`}
                       onClick={() => handleSelect(feat.id)}
-                      className={`flex items-start gap-3 p-3 rounded-2xl text-left transition-all cursor-pointer ${
+                      className={`min-h-[44px] flex items-start gap-3 p-3 rounded-2xl text-left transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 shadow-xs'
-                          : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+                          ? 'bg-[#6C5CE7]/10 dark:bg-[#8577ED]/18 border border-[#6C5CE7]/35'
+                          : 'bg-[#F7F5FF] dark:bg-[#1E1B33] hover:bg-[#EDE9FE] dark:hover:bg-[#353059] border border-[#E3DFF5]/60 dark:border-[#3D3861]/60'
                       }`}
                     >
                       <div
                         className={`p-2.5 rounded-xl shrink-0 ${
                           isActive
-                            ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            ? 'bg-[#6C5CE7] text-white'
+                            : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861]'
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -189,17 +205,17 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
                           <span
                             className={`text-sm font-bold truncate ${
                               isActive
-                                ? 'text-indigo-700 dark:text-indigo-300'
-                                : 'text-slate-900 dark:text-white'
+                                ? 'text-[#6C5CE7] dark:text-[#A99DF5]'
+                                : 'text-[#2D2A4A] dark:text-[#F1EFFF]'
                             }`}
                           >
                             {feat.label}
                           </span>
-                          <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                          <span className="text-[10px] font-semibold text-[#6B6890] dark:text-[#B4B0D5] shrink-0">
                             {feat.category}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                        <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] line-clamp-1 mt-0.5">
                           {feat.description}
                         </p>
                       </div>
@@ -207,8 +223,8 @@ export const MobileAllTabsNav: React.FC<MobileAllTabsNavProps> = ({
                       <ChevronRight
                         className={`w-4 h-4 shrink-0 mt-2 ${
                           isActive
-                            ? 'text-indigo-600 dark:text-indigo-400'
-                            : 'text-slate-400 opacity-40'
+                            ? 'text-[#6C5CE7] dark:text-[#A99DF5]'
+                            : 'text-[#6B6890] opacity-50'
                         }`}
                       />
                     </button>

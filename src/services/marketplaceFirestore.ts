@@ -14,7 +14,7 @@ export interface MarketplaceCourseProgress {
 function getAuthenticatedUid(): string | null {
   const local = AuthClient.getCurrentUser();
   const firebaseUser = auth?.currentUser;
-  if (!AuthClient.getToken() || !local?.id || !firebaseUser?.emailVerified ||
+  if (!AuthClient.getSessionId() || !local?.id || !firebaseUser?.emailVerified ||
       !hasMatchingFirebaseIdentity(firebaseUser.email, local.email)) return null;
   return firebaseUser.uid;
 }

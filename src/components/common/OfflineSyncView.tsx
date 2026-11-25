@@ -147,6 +147,9 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
           cloudSynced = false;
         }
       }
+      if (synced > 0 || cloudSynced || (pendingOfflineCount === 0 && backendStatus === 'ONLINE')) {
+        OfflineStorageManager.markCloudSynced();
+      }
       await checkEnvironmentStatus();
 
       if (synced > 0) {
@@ -159,7 +162,9 @@ export const OfflineSyncView: React.FC<OfflineSyncViewProps> = ({ onNavigateToTa
         setSyncNotice(
           cloudSynced
             ? 'All practice attempts and Firestore cloud records are synchronized.'
-            : 'All local practice attempts are synchronized with the server.'
+            : isAuthenticated
+            ? 'All local practice attempts are synchronized with the server.'
+            : 'Offline pack verified locally. Sign in to synchronize XP and progress across devices.'
         );
       } else {
         setSyncNotice(

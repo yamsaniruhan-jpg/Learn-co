@@ -1,5 +1,5 @@
 import { ConceptMastery, QuestionAttempt, SubjectId } from '../types';
-import { CURRICULUM_DATA } from '../data/curriculumData';
+import { STARTER_CONCEPTS } from '../data/curriculumMeta';
 
 export type SM2Quality = 0 | 2 | 4 | 5; // 0: Again, 2: Hard, 4: Good, 5: Easy
 
@@ -63,23 +63,7 @@ export function calculateNextSM2Review(
 }
 
 function getCatalogConcepts(): Array<{ id: string; title: string; subjectId: SubjectId }> {
-  const list: Array<{ id: string; title: string; subjectId: SubjectId }> = [];
-  for (const subject of CURRICULUM_DATA) {
-    for (const chapter of subject.chapters) {
-      for (const topic of chapter.topics) {
-        for (const subtopic of topic.subtopics) {
-          for (const concept of subtopic.concepts) {
-            list.push({
-              id: concept.id,
-              title: concept.title,
-              subjectId: subject.id,
-            });
-          }
-        }
-      }
-    }
-  }
-  return list;
+  return STARTER_CONCEPTS;
 }
 
 export function loadSM2Schedule(userId: string): Record<string, SM2CardState> {

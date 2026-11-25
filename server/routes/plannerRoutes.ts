@@ -96,6 +96,18 @@ router.post('/plan', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/planner/identify-topics (Identify top topics & subtopics per subject)
+router.post('/identify-topics', async (req: Request, res: Response) => {
+  try {
+    resolveUserId(req);
+    const { subjects, targetExamTrack, customFocus } = req.body || {};
+    const result = await PlannerEngine.identifyTopTopics(subjects, targetExamTrack, customFocus);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to identify topics.' });
+  }
+});
+
 // POST /api/planner/generate-ai (Preview AI-assisted plan)
 router.post('/generate-ai', async (req: Request, res: Response) => {
   try {

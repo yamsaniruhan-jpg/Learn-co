@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "fs";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -25,17 +26,34 @@ import { setSessionResolver } from "./middleware/auth";
 import { Database, flushDb } from "./server/db";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import securityHeaders from "./server/middleware/securityHeaders";
+import securityHeaders, { cspNonceMiddleware, injectNonceIntoHtml } from "./server/middleware/securityHeaders";
+import { createCsrfProtection, ensureCsrfCookie } from "./server/middleware/csrf";
 import { requireAuth } from "./server/middleware/authMiddleware";
 import aiRateLimiter from "./server/middleware/aiRateLimit";
 
-/** Serve built public files without turning unknown URLs into soft 404s. */
+/** Serve built public files without turning unknown URLs into soft 404s, injecting per-request CSP nonces into HTML. */
 export function mountProductionStatic(app: express.Express, distPath: string) {
-  app.get('/404.html', (_req, res) => res.status(404).sendFile(path.join(distPath, '404.html')));
-  app.use(express.static(distPath));
+  const indexHtmlPath = path.join(distPath, 'index.html');
+  const notFoundHtmlPath = path.join(distPath, '404.html');
+
+  const sendNoncedHtml = (req: express.Request, res: express.Response, filePath: string, status: number) => {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      ensureCsrfCookie(req, res);
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.status(status).send(injectNonceIntoHtml(raw, String(res.locals.cspNonce || '')));
+    } catch {
+      res.status(status === 200 ? 404 : status).type('text').send('Not found');
+    }
+  };
+
+  app.get(['/', '/index.html'], (req, res) => sendNoncedHtml(req, res, indexHtmlPath, 200));
+  app.get('/404.html', (req, res) => sendNoncedHtml(req, res, notFoundHtmlPath, 404));
+  app.use(express.static(distPath, { index: false }));
   app.use((req, res) => {
     if ((req.method === 'GET' || req.method === 'HEAD') && req.accepts('html')) {
-      return res.status(404).sendFile(path.join(distPath, '404.html'));
+      return sendNoncedHtml(req, res, notFoundHtmlPath, 404);
     }
     res.status(404).type('text').send('Not found');
   });
@@ -49,7 +67,8 @@ export async function createApp() {
   const app = express();
   app.set("trust proxy", 1);
 
-  // ORDER MATTERS — security first
+  // ORDER MATTERS — nonce generation before security headers
+  app.use(cspNonceMiddleware);
   app.use(securityHeaders);
 
   // Same-origin requests need no CORS permission. Cross-origin browser clients
@@ -67,7 +86,7 @@ export async function createApp() {
       },
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
     })
   );
 
@@ -78,8 +97,9 @@ export async function createApp() {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-  // Cookie parser
+  // Cookie parser & CSRF protection for state-changing API requests
   app.use(cookieParser());
+  app.use("/api", createCsrfProtection(allowedOrigins));
 
   const redactResetToken = (url: string) => url
     .replace(/(\/api\/auth\/reset-password\/)[^/?]+/i, '$1[REDACTED]')
@@ -105,8 +125,21 @@ export async function createApp() {
     });
   });
 
-  app.get(["/healthz", "/_ah/health"], (req, res) => {
+  let sqlHydrated = false;
+  let sqlHydrationError: string | null = null;
+
+  app.get(["/healthz", "/_ah/health"], (_req, res) => {
     res.status(200).send("OK");
+  });
+
+  app.get("/health", (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      app: "Learn.co",
+      sqlHydrated,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // Health check endpoint
@@ -119,6 +152,8 @@ export async function createApp() {
       creatorStudio: "active",
       learningStudio: "active",
       omniCopilot: "active",
+      sqlHydrated,
+      ...(sqlHydrationError ? { sqlWarmupStatus: "background_retry" } : {}),
       timestamp: new Date().toISOString(),
     });
   });
@@ -127,11 +162,21 @@ export async function createApp() {
   // /api/auth/signin|signup against the application session store.
   setSessionResolver((token: string) => Database.getSessionUser(token));
 
-  // Hydrate users, sessions, profiles, gamification, and solved question history from Cloud SQL
-  try {
-    await Database.hydrateFromSql();
-  } catch (err) {
-    console.warn("[CloudSQL] Startup hydration skipped:", (err as Error)?.message || err);
+  // Start SQL hydration without blocking HTTP port binding so Cloud Run / load balancer
+  // probes on / and /health succeed immediately on cold start. Auth routes and session
+  // middleware transparently query Cloud SQL on cache miss while hydration finishes.
+  const hydrationTask = Database.hydrateFromSql()
+    .then(() => {
+      sqlHydrated = true;
+    })
+    .catch((err) => {
+      sqlHydrationError = (err as Error)?.message || String(err);
+      console.warn("[CloudSQL] Background startup hydration skipped:", sqlHydrationError);
+    });
+  if (process.env.NODE_ENV === "test") {
+    await hydrationTask;
+  } else {
+    void hydrationTask;
   }
 
   // Mount API Endpoints
@@ -182,9 +227,16 @@ export async function createApp() {
     });
   });
 
+  const isCompiledCjs = typeof __filename === "string" && __filename.endsWith("server.cjs");
   if (process.env.NODE_ENV === "test") {
     // API-only mode for integration tests: skip the SPA/static layer.
-  } else if (process.env.NODE_ENV !== "production") {
+  } else if (process.env.NODE_ENV !== "production" && !isCompiledCjs) {
+    app.get("/sw.js", (_req, res) => {
+      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Service-Worker-Allowed", "/");
+      res.sendFile(path.join(process.cwd(), "public", "sw.js"));
+    });
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -192,6 +244,26 @@ export async function createApp() {
         ws: false,
       },
       appType: "spa",
+    });
+    app.use(async (req, res, next) => {
+      const cleanPath = (req.url || '').split('?')[0];
+      const isHtmlEntry =
+        (req.method === 'GET' || req.method === 'HEAD') &&
+        (cleanPath === '/' || cleanPath === '/index.html');
+      if (!isHtmlEntry) {
+        return next();
+      }
+      try {
+        const templatePath = path.resolve(process.cwd(), 'index.html');
+        const template = fs.readFileSync(templatePath, 'utf8');
+        const transformed = await vite.transformIndexHtml(req.originalUrl, template);
+        ensureCsrfCookie(req, res);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.status(200).send(injectNonceIntoHtml(transformed, String(res.locals.cspNonce || '')));
+      } catch (err) {
+        next(err);
+      }
     });
     app.use(vite.middlewares);
   } else {

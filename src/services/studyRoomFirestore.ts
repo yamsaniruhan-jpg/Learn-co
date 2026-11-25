@@ -6,6 +6,7 @@ import {
   query,
   where,
   setDoc,
+  deleteDoc,
   onSnapshot,
   orderBy,
   limit,
@@ -256,4 +257,15 @@ export function subscribeFirestoreRoomMessages(
       // Ignore permission snapshot errors for unjoined private rooms
     }
   );
+}
+
+export async function deleteFirestoreStudyRoom(roomId: string): Promise<boolean> {
+  if (!isFirebaseConfigured() || !db || !roomId) return false;
+  if (!auth?.currentUser?.uid) return false;
+  try {
+    await deleteDoc(doc(db, 'study_rooms', roomId));
+    return true;
+  } catch {
+    return false;
+  }
 }

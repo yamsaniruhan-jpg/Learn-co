@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   FlaskConical,
   Atom,
@@ -24,7 +24,10 @@ import {
   Eye,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Calculus3DLab } from './Calculus3DLab';
+import { CanvasSkeleton } from '../ui/Skeleton';
+const Calculus3DLab = lazy(() =>
+  import('./Calculus3DLab').then((m) => ({ default: m.Calculus3DLab }))
+);
 import { PhysicsWaveOpticsLab } from './PhysicsWaveOpticsLab';
 import { ChemistryElectroEquilibriumLab } from './ChemistryElectroEquilibriumLab';
 import { CSAlgorithmVisualizerLab } from './CSAlgorithmVisualizerLab';
@@ -612,7 +615,9 @@ export const SimulationsHubView: React.FC<SimulationsHubViewProps> = ({ onNaviga
             </div>
 
             {calculusMode === '3d_spatial' ? (
-              <Calculus3DLab />
+              <Suspense fallback={<CanvasSkeleton label="Loading 3D Calculus WebGL Scene..." />}>
+                <Calculus3DLab />
+              </Suspense>
             ) : (
               <div className="relative aspect-[16/9] w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden p-6 flex flex-col justify-between text-white shadow-inner">
                 <div className="z-10 flex items-center justify-between text-xs font-mono text-indigo-300">

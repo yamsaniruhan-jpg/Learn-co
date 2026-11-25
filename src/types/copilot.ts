@@ -35,6 +35,25 @@ export interface CopilotArtifact {
   savedToCreatorId?: string;
 }
 
+export interface CopilotImageAttachment {
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
+  data: string;
+  name?: string;
+}
+
+export interface CopilotFallbackQuestion {
+  id: string;
+  subjectId: string;
+  topicId: string;
+  difficulty: string;
+  questionText: string;
+  options: string[];
+  correctAnswer: string | string[];
+  explanation: string;
+}
+
+export type CopilotUnavailableReason = 'API_KEY_MISSING' | 'TIMEOUT' | 'MODEL_UNAVAILABLE';
+
 export interface CopilotMessage {
   id: string;
   conversationId: string;
@@ -43,6 +62,10 @@ export interface CopilotMessage {
   content: string;
   mode?: CopilotMode;
   modelUsed?: string;
+  hintOnly?: boolean;
+  imageDataUrl?: string;
+  unavailableReason?: CopilotUnavailableReason;
+  fallbackPracticeQuestions?: CopilotFallbackQuestion[];
   citations?: CopilotCitation[];
   toolCalls?: CopilotToolCall[];
   artifact?: CopilotArtifact;
@@ -90,6 +113,7 @@ export interface CopilotContextPayload {
 export interface CopilotStreamChunk {
   type: 'token' | 'tool_call' | 'tool_result' | 'citation' | 'artifact' | 'error' | 'done';
   content?: string;
+  index?: number;
   toolCall?: CopilotToolCall;
   citation?: CopilotCitation;
   artifact?: CopilotArtifact;
@@ -97,6 +121,9 @@ export interface CopilotStreamChunk {
   conversationId?: string;
   messageId?: string;
   modelUsed?: string;
+  hintOnly?: boolean;
+  unavailableReason?: CopilotUnavailableReason;
+  fallbackPracticeQuestions?: CopilotFallbackQuestion[];
 }
 
 export interface CopilotPromptOptions {
@@ -106,4 +133,7 @@ export interface CopilotPromptOptions {
   learnerLevel?: LearnerLevel;
   context?: CopilotContextPayload;
   selectedModel?: string;
+  hintFirst?: boolean;
+  revealFullSolution?: boolean;
+  imageAttachment?: CopilotImageAttachment;
 }

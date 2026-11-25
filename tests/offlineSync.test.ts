@@ -7,9 +7,8 @@ const attempt = (id: string, userId?: string) => ({
   userAnswer: '42', isCorrect: true, timeSpentSeconds: 12, conceptId: 'c1', hintsUsedCount: 2,
 });
 const accepted = (id: string, newTotalXp = 0) => ({ok:true, json:async()=>({success:true, attempt:{id}, isCorrect:true, verification:'bank', newTotalXp})});
-const signIn = (user: string, token = `token-${user}`) => {
+const signIn = (user: string) => {
   localStorage.setItem('learnco_user', JSON.stringify({ id: user }));
-  localStorage.setItem('learnco_auth_token', token);
 };
 beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 afterEach(() => { vi.unstubAllGlobals(); });

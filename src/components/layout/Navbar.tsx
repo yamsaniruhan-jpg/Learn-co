@@ -85,11 +85,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Command Palette Button on Desktop */}
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-52 lg:w-68 justify-between cursor-pointer h-9"
+            className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] bg-[#F7F5FF] dark:bg-[#1E1B33] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] transition-all text-xs w-52 lg:w-64 justify-between cursor-pointer min-h-[44px]"
           >
             <span className="flex items-center gap-2 truncate">
-              <Search className="w-3.5 h-3.5 text-[#6B6890] shrink-0" />
-              <span className="truncate">Search STEM modules &amp; tools...</span>
+              <Search className="w-4 h-4 text-[#6B6890] shrink-0" />
+              <span className="truncate">Search modules...</span>
             </span>
             <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#FFFFFF] dark:bg-[#2A2647] rounded border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF]">
               ⌘K
@@ -98,14 +98,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right: Single-row compact mobile controls */}
-        <div className="flex min-w-0 flex-nowrap items-center justify-end gap-0.5 sm:gap-2">
+        <div className="flex min-w-0 flex-nowrap items-center justify-end gap-1 sm:gap-2">
           {/* Mobile Search Icon Trigger */}
           <button
             onClick={onOpenSearch}
-            className="md:hidden h-10 w-10 flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] shrink-0"
+            className="md:hidden h-11 w-11 flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] shrink-0 cursor-pointer"
             aria-label="Open Search"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-4.5 h-4.5" />
           </button>
 
           {/* Offline Mode Indicator if disconnected */}
@@ -184,7 +184,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <AIUsageIndicator userTier={user?.subscription} />
           </div>
 
-          {/* Streak Flame */}
+          {/* Streak Flame (tappable on both mobile & desktop to open Streak Modal) */}
+          <div className="sm:hidden shrink-0">
+            <StreakIndicator streak={gamification?.currentStreak ?? 0} size="sm" className="!px-2 !py-1 !text-[11px]" />
+          </div>
           <div className="hidden sm:block">
             <StreakIndicator streak={gamification?.currentStreak ?? 0} size="sm" />
           </div>
@@ -194,9 +197,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <XPIndicator xp={gamification?.xp ?? 0} size="sm" />
           </div>
 
-          {/* In-App PWA Install Action (compact icon on mobile to fit 375px cleanly) */}
+          {/* Direct Home Screen App Install Action */}
           <div className="sm:hidden shrink-0">
-            <PWAInstallButton compact />
+            <PWAInstallButton compact compactLabel="App" />
           </div>
           <div className="hidden sm:block shrink-0">
             <PWAInstallButton />
@@ -205,25 +208,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Notification Bell */}
           <button
             onClick={onOpenNotifications}
-            className="relative h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer shrink-0"
+            className="relative h-11 w-11 flex items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer shrink-0"
             aria-label="Notifications"
           >
-            <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+            <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
             {unreadNotificationsCount > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#6C5CE7] ring-2 ring-[#FFFFFF] dark:ring-[#2A2647]" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#6C5CE7] ring-2 ring-[#FFFFFF] dark:ring-[#2A2647]" />
             )}
           </button>
 
           {/* Theme Toggle (Dark/Light) */}
           <button
             onClick={onToggleTheme}
-            className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer shrink-0"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer shrink-0"
             aria-label="Toggle theme"
           >
             {isDarkMode ? (
-              <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-[#FFB84D]" />
+              <Sun className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-[#FFB84D]" />
             ) : (
-              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-[#6B6890]" />
+              <Moon className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-[#6B6890]" />
             )}
           </button>
 

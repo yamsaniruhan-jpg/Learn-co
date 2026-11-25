@@ -122,7 +122,9 @@ export async function testConnection(): Promise<boolean> {
 }
 
 if (typeof window !== 'undefined' && isFirebaseConfigured()) {
-  void testConnection();
+  setTimeout(() => {
+    void testConnection();
+  }, 1500);
 }
 
 export const app = appInstance;

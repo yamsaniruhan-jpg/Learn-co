@@ -24,8 +24,8 @@ export async function syncClientToFirestore(
 ): Promise<void> {
   try {
     // Never let an older account's asynchronous sync run as a newer session.
-    const token = AuthClient.getToken();
-    const isCurrentAccount = () => Boolean(token && AuthClient.getToken() === token && AuthClient.getCurrentUser()?.id === user?.id);
+    const sessionId = AuthClient.getSessionId();
+    const isCurrentAccount = () => Boolean(sessionId && AuthClient.getSessionId() === sessionId && AuthClient.getCurrentUser()?.id === user?.id);
     if (!isCurrentAccount()) return;
     const currentAuthUser = auth?.currentUser;
     const backendUid = user?.id || currentAuthUser?.uid;

@@ -5,6 +5,7 @@ import { adminAuth } from '../services/firebaseAdmin';
 import { verifyFirebaseIdTokenSafely } from '../services/verifyFirebaseToken';
 import { isOwnerEmail } from '../../src/db/users';
 import { resolveSessionFromSql } from '../../src/db/persistence';
+import { AUTH_COOKIE_NAME } from './csrf';
 
 export interface AuthenticatedRequest extends Request {
   user?: UserAccount | any;
@@ -30,14 +31,27 @@ function setBoundedTokenCache(token: string, entry: AuthIdentity & { expires: nu
   tokenCache.set(token, entry);
 }
 
-async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<AuthIdentity | null> {
+export function extractAuthToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const headerToken = authHeader.substring(7).trim();
+    if (headerToken && headerToken !== 'null' && headerToken !== 'undefined') {
+      return headerToken;
+    }
   }
+  const cookieToken = req.cookies?.[AUTH_COOKIE_NAME];
+  if (typeof cookieToken === 'string') {
+    const trimmed = cookieToken.trim();
+    if (trimmed && trimmed !== 'null' && trimmed !== 'undefined') {
+      return trimmed;
+    }
+  }
+  return null;
+}
 
-  const token = authHeader.substring(7).trim();
-  if (!token || token === 'null' || token === 'undefined') {
+async function resolveAuthenticatedUser(req: AuthenticatedRequest): Promise<AuthIdentity | null> {
+  const token = extractAuthToken(req);
+  if (!token) {
     return null;
   }
 

@@ -17,13 +17,22 @@ function resolveLocalSession(token) {
 }
 
 async function resolveUserFromRequest(req) {
+  let idToken = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const candidate = authHeader.split('Bearer ')[1]?.trim();
+    if (candidate && candidate !== 'null' && candidate !== 'undefined') {
+      idToken = candidate;
+    }
+  }
+  if (!idToken && req.cookies && typeof req.cookies.learnco_auth === 'string') {
+    const candidate = req.cookies.learnco_auth.trim();
+    if (candidate && candidate !== 'null' && candidate !== 'undefined') {
+      idToken = candidate;
+    }
   }
 
-  const idToken = authHeader.split('Bearer ')[1]?.trim();
-  if (!idToken || idToken === 'null' || idToken === 'undefined') {
+  if (!idToken) {
     return null;
   }
 

@@ -1,4 +1,4 @@
-import { AuthClient } from './authClient';
+import { buildApiHeaders } from '../utils/csrf';
 import {
   StudyPlan,
   StudyTask,
@@ -13,11 +13,7 @@ import {
 } from '../types/planner';
 
 function getHeaders(): HeadersInit {
-  const token = AuthClient.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  return buildApiHeaders();
 }
 
 export class PlannerClient {
@@ -33,7 +29,7 @@ export class PlannerClient {
     conflicts: ScheduleConflict[];
     recommendations: PlannerAdaptationRecommendation[];
   }> {
-    const res = await fetch('/api/planner/overview', { headers: getHeaders() });
+    const res = await fetch('/api/planner/overview', { credentials: 'include', headers: getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch planner overview.');
     return res.json();
   }
@@ -207,6 +203,24 @@ export class PlannerClient {
     if (!res.ok) throw new Error('Failed to save schedule settings.');
     const d = await res.json();
     return d.settings;
+  }
+
+  /**
+   * Ask AI to identify top topics and subtopics for chosen subjects
+   */
+  static async identifyTopTopics(input: {
+    subjects: import('../types/curriculum').SubjectId[];
+    targetExamTrack?: string;
+    customFocus?: string;
+  }): Promise<{ topics: import('../types/planner').TopicSubtopicGroup[]; source: 'ai' | 'curated' }> {
+    const res = await fetch('/api/planner/identify-topics', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(input),
+    });
+
+    if (!res.ok) throw new Error('Failed to identify top topics and subtopics.');
+    return res.json();
   }
 
   /**

@@ -49,12 +49,15 @@ export class QuestionSelectionEngine {
       );
     }
 
-    // Filter by chapter/topic/concept if specified
+    // Filter by chapter/topic/subtopic/concept if specified
     if (config.chapterId) {
       candidatePool = candidatePool.filter((q) => q.chapterId === config.chapterId);
     }
     if (config.topicId) {
       candidatePool = candidatePool.filter((q) => q.topicId === config.topicId);
+    }
+    if (config.subtopicId) {
+      candidatePool = candidatePool.filter((q) => q.subtopicId === config.subtopicId);
     }
     if (config.conceptId) {
       candidatePool = candidatePool.filter((q) => q.conceptId === config.conceptId);
@@ -65,7 +68,13 @@ export class QuestionSelectionEngine {
       candidatePool = candidatePool.filter((q) => config.questionTypes!.includes(q.questionType));
     }
 
-    // Fallback if candidate pool is too small: broaden filters
+    // Fallback if candidate pool is empty: preserve subtopic/topic/subject scope before broadening
+    if (candidatePool.length === 0 && config.subtopicId) {
+      candidatePool = MASTER_QUESTION_BANK.filter((q) => q.subtopicId === config.subtopicId);
+    }
+    if (candidatePool.length === 0 && config.topicId) {
+      candidatePool = MASTER_QUESTION_BANK.filter((q) => q.topicId === config.topicId);
+    }
     if (candidatePool.length === 0) {
       candidatePool = config.subjectId
         ? MASTER_QUESTION_BANK.filter((q) => q.subjectId === config.subjectId)
