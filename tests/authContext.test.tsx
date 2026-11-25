@@ -17,7 +17,7 @@ vi.mock('../src/services/clientFirestoreSync', () => ({
   hasMatchingFirebaseIdentity: (a: string, b: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase(),
 }));
 vi.mock('../src/services/firebaseClient', () => ({
-  auth: mocks.auth, googleProvider: {}, signInWithPopup: mocks.popup,
+  auth: mocks.auth, googleProvider: {}, getFirebaseConfigurationError: () => null, signInWithPopup: mocks.popup,
   signInWithRedirect: mocks.redirect, getRedirectResult: mocks.redirectResult,
   signInWithEmailAndPassword: mocks.firebaseSignIn, createUserWithEmailAndPassword: vi.fn(), signOut: mocks.firebaseSignOut,
   onAuthStateChanged: mocks.onAuthStateChanged,
@@ -55,6 +55,17 @@ describe('Google redirect and signup', () => {
     await act(async () => { expect(await snapshot.signInWithGoogle()).toBe('redirecting'); });
     expect(mocks.google).not.toHaveBeenCalled();
     expect(snapshot.isAuthenticated).toBe(false);
+  });
+
+  it('explains a Google access denial without granting a session', async () => {
+    mocks.getToken.mockReturnValue(null);
+    mocks.popup.mockRejectedValue({ code: 'auth/access-denied' });
+    await act(async () => { root.render(<AuthProvider><Probe /></AuthProvider>); });
+    await act(async () => {
+      await expect(snapshot.signInWithGoogle()).rejects.toThrow(/test user/i);
+    });
+    expect(snapshot.isAuthenticated).toBe(false);
+    expect(mocks.google).not.toHaveBeenCalled();
   });
 
   it('surfaces redirect errors', async () => {

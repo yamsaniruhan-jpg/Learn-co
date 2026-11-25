@@ -19,6 +19,7 @@ import { hasMatchingFirebaseIdentity, syncClientToFirestore } from '../services/
 import {
   auth,
   googleProvider,
+  getFirebaseConfigurationError,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -417,7 +418,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let firebaseToken = idToken;
       if (!firebaseToken) {
         if (!auth || !auth.app) {
-          throw new Error('Google authentication is unavailable in this environment. Please use Email & Password.');
+          throw new Error(getFirebaseConfigurationError() || 'Google authentication is unavailable in this environment. Please use Email & Password.');
         }
         let result;
         const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -426,7 +427,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (popupErr: any) {
           const code = popupErr?.code || '';
           if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-            throw new Error('Google sign-in was cancelled before completing. Click the button again to choose your Google account.');
+            throw new Error('The Google sign-in window closed before sign-in completed. If Google showed “Access blocked,” share its error details with the app administrator.');
+          }
+          if (code === 'auth/access-denied') {
+            throw new Error('Google denied access. If the app is in testing, an administrator may need to add your account as a test user. Check Google’s error details.');
           }
           if (code === 'auth/unauthorized-domain') {
             throw new Error('This domain is not authorized for Google Sign-In in Firebase Console. Open the live app URL or sign in with Email & Password.');

@@ -15,19 +15,10 @@ import {
 import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
+import { resolveFirebaseClientConfig } from './firebaseConfig';
 
-const rawConfig = (firebaseConfigData || {}) as Record<string, string | undefined>;
-const env = (import.meta as any).env || {};
-
-const firebaseConfig = {
-  apiKey: rawConfig.apiKey || env.VITE_FIREBASE_API_KEY || '',
-  authDomain: rawConfig.authDomain || env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: rawConfig.projectId || env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: rawConfig.storageBucket || env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: rawConfig.messagingSenderId || env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: rawConfig.appId || env.VITE_FIREBASE_APP_ID || '',
-  measurementId: rawConfig.measurementId || env.VITE_FIREBASE_MEASUREMENT_ID || '',
-};
+const resolvedConfig = resolveFirebaseClientConfig(firebaseConfigData, import.meta.env);
+const firebaseConfig = resolvedConfig.config;
 
 let appInstance: FirebaseApp;
 let authInstance: Auth;
@@ -35,20 +26,25 @@ let dbInstance: Firestore;
 let storageInstance: FirebaseStorage;
 
 try {
+  if (resolvedConfig.error) throw new Error(resolvedConfig.error);
   appInstance = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   authInstance = getAuth(appInstance);
-  dbInstance = getFirestore(appInstance, rawConfig.firestoreDatabaseId || '(default)');
+  dbInstance = getFirestore(appInstance, resolvedConfig.firestoreDatabaseId);
   storageInstance = getStorage(appInstance);
 } catch (err) {
   console.warn('Firebase client initialization warning:', err);
-  appInstance = getApps()[0] || ({} as FirebaseApp);
+  appInstance = resolvedConfig.error ? ({} as FirebaseApp) : getApps()[0] || ({} as FirebaseApp);
   try { authInstance = getAuth(appInstance); } catch { authInstance = {} as Auth; }
   try { dbInstance = getFirestore(appInstance); } catch { dbInstance = {} as Firestore; }
   try { storageInstance = getStorage(appInstance); } catch { storageInstance = {} as FirebaseStorage; }
 }
 
+export function getFirebaseConfigurationError(): string | null {
+  return resolvedConfig.error;
+}
+
 export function isFirebaseConfigured(): boolean {
-  return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && appInstance?.name);
+  return Boolean(!resolvedConfig.error && firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId && appInstance?.name);
 }
 
 export enum OperationType {
