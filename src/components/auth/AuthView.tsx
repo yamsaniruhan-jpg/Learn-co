@@ -176,11 +176,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-200">
+    <div className="max-w-4xl mx-auto space-y-7 animate-in fade-in duration-200">
       {/* Top Header */}
       <div className="text-center space-y-3">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-3xl overflow-hidden bg-[#01000E] border border-indigo-500/40 shadow-lg shadow-indigo-500/25 p-1">
+          <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#09090B] border border-[#6C5CE7]/40 dark:border-[#CCFF00]/40 p-1">
             <img
               src="/logo-mark.png"
               alt="LearnCo Logo"
@@ -188,31 +188,31 @@ export const AuthView: React.FC<AuthViewProps> = ({
             />
           </div>
         </div>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
-          <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+        <div className="inline-flex items-center gap-2 px-3 py-1 border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] text-[#6B6890] dark:text-[#9E9EA9] micro">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#CCFF00]" />
           <span>Your learning space</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-display">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#2D2A4A] dark:text-[#F4F4F6] font-display tracking-tight">
           Welcome to LearnCo
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-          Sign in or create an account to continue learning.
+        <p className="text-xs sm:text-sm text-[#6B6890] dark:text-[#9E9EA9] max-w-lg mx-auto">
+          Sign in or create a LearnCo account to start your session.
         </p>
       </div>
 
       {/* Mode Switcher Tabs */}
       <div className="flex justify-center">
-        <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+        <div className="inline-flex bg-[#F7F5FF] dark:bg-[#09090B] p-1 rounded-xl border border-[#E3DFF5] dark:border-[#232329]">
           <button
             onClick={() => {
               setActiveMode('signin');
               setLocalError(null);
               clearAuthError();
             }}
-            className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeMode === 'signin'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B]'
+                : 'text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6]'
             }`}
           >
             <LogIn className="w-4 h-4" />
@@ -225,10 +225,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
               setLocalError(null);
               clearAuthError();
             }}
-            className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeMode === 'signup'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B]'
+                : 'text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6]'
             }`}
           >
             <UserPlus className="w-4 h-4" />
@@ -242,10 +242,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 setLocalError(null);
                 clearAuthError();
               }}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeMode === 'session'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B]'
+                  : 'text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6]'
               }`}
             >
               <LogOut className="w-4 h-4 text-rose-500" />
@@ -257,7 +257,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
       {/* Success Notification Banner */}
       {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-3 animate-in fade-in">
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-3 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className="font-semibold">{successMessage}</span>
         </div>
@@ -265,7 +265,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
       {/* Error Banner */}
       {(localError || authError) && (
-        <div role="alert" className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs sm:text-sm space-y-2 animate-in fade-in">
+        <div role="alert" className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs sm:text-sm space-y-2 animate-in fade-in">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
             <span className="font-semibold">{localError || authError}</span>
@@ -277,7 +277,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 href={window.location.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-200 hover:bg-rose-100/70 dark:hover:bg-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                className="mt-1 w-full py-2 px-3 rounded-lg bg-white dark:bg-[#16161C] border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-200 hover:bg-rose-100/70 dark:hover:bg-[#1E1E26] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Open App in New Tab for Google Sign-In</span>
@@ -288,7 +288,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               type="button"
               onClick={handleDirectGoogleAuth}
               disabled={isGoogleSubmitting}
-              className="mt-1 w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="mt-1 w-full py-2 px-3 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] disabled:opacity-60 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>{isGoogleSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</span>
@@ -303,7 +303,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 setLocalError(null);
                 clearAuthError();
               }}
-              className="mt-1 w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="mt-1 w-full py-2 px-3 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Create New Account with {email || 'this email'}</span>
@@ -317,7 +317,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 setLocalError(null);
                 clearAuthError();
               }}
-              className="mt-1 w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="mt-1 w-full py-2 px-3 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Sign In to Existing Account ({email || 'Enter Password'})</span>
@@ -330,12 +330,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
       {activeMode === 'signin' && (
         <Card variant="elevated" padding="lg" className="max-w-xl mx-auto space-y-6">
           <div className="space-y-1">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <LogIn className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h3 className="text-base sm:text-lg font-bold text-[#2D2A4A] dark:text-[#F4F4F6] flex items-center gap-2">
+              <LogIn className="w-5 h-5 text-[#6C5CE7] dark:text-[#CCFF00]" />
               <span>Sign in</span>
             </h3>
-            <p className="text-xs text-slate-400">
-              Use your email and password to continue.
+            <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9]">
+              Use Google or your email and password to continue.
             </p>
           </div>
 
@@ -345,7 +345,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               type="button"
               onClick={handleDirectGoogleAuth}
               disabled={isSubmitting || isGoogleSubmitting}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-xs cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#16161C] hover:bg-[#F7F5FF] dark:hover:bg-[#1D1D24] disabled:opacity-60 text-[#2D2A4A] dark:text-[#F4F4F6] font-bold text-xs transition-all flex items-center justify-center gap-3 cursor-pointer"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -368,13 +368,13 @@ export const AuthView: React.FC<AuthViewProps> = ({
               <span>{isGoogleSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</span>
             </button>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9]">
                 Platform owner administration requires verified Google sign-in. Password sessions remain available without owner privileges.
               </p>
               <button
                 type="button"
                 onClick={() => setIsGoogleDialogOpen(true)}
-                className="text-[11px] font-semibold text-slate-400 hover:text-indigo-500 whitespace-nowrap cursor-pointer"
+                className="text-[11px] font-semibold text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#6C5CE7] dark:hover:text-[#CCFF00] whitespace-nowrap cursor-pointer"
               >
                 Specific email &rarr;
               </button>
@@ -385,7 +385,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   href={window.location.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6C5CE7] dark:text-[#CCFF00] hover:underline"
                 >
                   <ExternalLink className="w-3 h-3" />
                   <span>Open in new tab if preview blocks Google popup</span>
@@ -395,20 +395,20 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Or with Email & Password
+            <div className="h-px flex-1 bg-[#E3DFF5] dark:bg-[#232329]" />
+            <span className="micro text-[#6B6890] dark:text-[#9E9EA9]">
+              Or with Email &amp; Password
             </span>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            <div className="h-px flex-1 bg-[#E3DFF5] dark:bg-[#232329]" />
           </div>
 
           <form onSubmit={handleSignInSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label htmlFor="signin-email" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signin-email" className="text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A]" />
                 <input
                   id="signin-email"
                   autoComplete="email"
@@ -417,19 +417,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your.email@example.com"
-                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] focus:outline-hidden focus:ring-1 focus:ring-[#6C5CE7] dark:focus:ring-[#CCFF00]"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <div className="flex justify-between items-center">
-                <label htmlFor="signin-password" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label htmlFor="signin-password" className="text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                   Password
                 </label>
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A]" />
                 <input
                   id="signin-password"
                   autoComplete="current-password"
@@ -438,13 +438,13 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] focus:outline-hidden focus:ring-1 focus:ring-[#6C5CE7] dark:focus:ring-[#CCFF00]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6] cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
@@ -459,7 +459,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               className="w-full"
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              {isSubmitting ? 'Authenticating...' : 'Sign In to Learn.co'}
+              {isSubmitting ? 'Authenticating...' : 'Sign In to LearnCo'}
             </Button>
 
             <div className="text-center">
@@ -470,7 +470,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   setLocalError(null);
                   clearAuthError();
                 }}
-                className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                className="text-xs font-bold text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#6C5CE7] dark:hover:text-[#CCFF00] transition-colors cursor-pointer"
               >
                 Forgot your password?
               </button>
@@ -498,12 +498,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
       {activeMode === 'signup' && (
         <Card variant="elevated" padding="lg" className="max-w-xl mx-auto space-y-6">
           <div className="space-y-1">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span>Create your account</span>
+            <h3 className="text-base sm:text-lg font-bold text-[#2D2A4A] dark:text-[#F4F4F6] flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-[#6C5CE7] dark:text-[#CCFF00]" />
+              <span>Create your LearnCo account</span>
             </h3>
-            <p className="text-xs text-slate-400">
-              Create an account to save your progress.
+            <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9]">
+              Create an account to save your mastery profile and streaks.
             </p>
           </div>
 
@@ -511,7 +511,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             type="button"
             onClick={handleDirectGoogleAuth}
             disabled={isSubmitting || isGoogleSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-xs cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#16161C] hover:bg-[#F7F5FF] dark:hover:bg-[#1D1D24] disabled:opacity-60 text-[#2D2A4A] dark:text-[#F4F4F6] font-bold text-xs transition-all flex items-center justify-center gap-3 cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -535,20 +535,20 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="h-px flex-1 bg-[#E3DFF5] dark:bg-[#232329]" />
+            <span className="micro text-[#6B6890] dark:text-[#9E9EA9]">
               Or create with Email
             </span>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            <div className="h-px flex-1 bg-[#E3DFF5] dark:bg-[#232329]" />
           </div>
 
           <form onSubmit={handleSignUpSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label htmlFor="signup-name" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signup-name" className="text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                 Full Name
               </label>
               <div className="relative">
-                <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A]" />
                 <input
                   id="signup-name"
                   autoComplete="name"
@@ -557,17 +557,17 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. Alex Vance"
-                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] focus:outline-hidden focus:ring-1 focus:ring-[#6C5CE7] dark:focus:ring-[#CCFF00]"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="signup-email" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signup-email" className="text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A]" />
                 <input
                   id="signup-email"
                   autoComplete="email"
@@ -576,17 +576,17 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="alex.vance@stanford.edu"
-                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-3 py-2.5 text-base sm:text-sm rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] focus:outline-hidden focus:ring-1 focus:ring-[#6C5CE7] dark:focus:ring-[#CCFF00]"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="signup-password" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="signup-password" className="text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                 Create Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A]" />
                 <input
                   id="signup-password"
                   autoComplete="new-password"
@@ -595,27 +595,27 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="8+ characters, a letter and a number"
-                  className="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] focus:outline-hidden focus:ring-1 focus:ring-[#6C5CE7] dark:focus:ring-[#CCFF00]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6] cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 space-y-1">
-              <span className="font-bold text-slate-700 dark:text-slate-300 block">
+            <div className="p-3 rounded-lg bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] text-[11px] text-[#6B6890] dark:text-[#9E9EA9] space-y-1">
+              <span className="font-bold text-[#2D2A4A] dark:text-[#F4F4F6] block">
                 Scholar Benefits:
               </span>
               <ul className="list-disc list-inside space-y-0.5">
                 <li>+50 XP Welcome Orientation Credit</li>
                 <li>Daily Practice Allowance (25 questions/day)</li>
-                <li>AI Socratic Mentorship & Concept Graph Analytics</li>
+                <li>Omni Copilot &amp; Concept Graph Analytics</li>
               </ul>
             </div>
 
@@ -627,7 +627,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               className="w-full"
               rightIcon={<Sparkles className="w-4 h-4" />}
             >
-              {isSubmitting ? 'Creating Account...' : 'Create account'}
+              {isSubmitting ? 'Creating Account...' : 'Create LearnCo Account'}
             </Button>
           </form>
         </Card>

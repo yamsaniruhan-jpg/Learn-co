@@ -59,6 +59,7 @@ import { Badge } from '../ui/Badge';
 import { Progress } from '../ui/Progress';
 import { EmptyState } from '../ui/EmptyState';
 import { CardSkeleton } from '../ui/Skeleton';
+import { DASHBOARD_FIGURE_PLATES, STUDIO_FIGURES } from '../../assets/figures';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -296,98 +297,146 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-3.5 sm:space-y-6 animate-in fade-in duration-200">
-      {/* 1. TOP: Luminous Aurora Hero Card & Gemstone Essentials */}
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+      {/* 1. TOP: Architectural Studio Hero Card with Fig. 04 Plate & Three Metrics */}
       <Card
         variant="elevated"
         padding="md"
-        className="space-y-4 sm:space-y-6 sm:p-6 bg-gradient-to-br from-[#EEF2FF] via-[#F5F3FF] to-[#E0F7FA] dark:from-[#211C4A] dark:via-[#2B225A] dark:to-[#123246] border-[#C7D2FE] dark:border-[#493E8A]"
+        className="relative overflow-hidden space-y-5 sm:p-7 bg-[#FFFFFF] dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329]"
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-5">
-          <div className="space-y-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="pointer-events-none absolute inset-0 grid-field-subtle opacity-60 dark:opacity-35" />
+
+        <div className="relative grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-5 lg:gap-7 items-center">
+          <div className="space-y-3 min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
               <Badge
                 variant="primary"
                 size="sm"
-                className="bg-gradient-to-r from-[#5B4CE0] to-[#0891B2] border-transparent text-white font-black"
+                className="bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] border-transparent font-extrabold tracking-wide"
               >
                 Level {xpProgress.level}
               </Badge>
-              <span className="text-xs font-bold text-[#4338CA] dark:text-[#A5B4FC] truncate">
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#6B6890] dark:text-[#9E9EA9] truncate">
                 {user.targetExam || 'Daily STEM Mastery'}
               </span>
             </div>
-            <h1 className="text-xl sm:text-3xl font-black font-display tracking-tight text-[#1E1B4B] dark:text-[#F5F3FF] truncate">
+
+            <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
               Welcome back, {user.fullName.split(' ')[0]}
             </h1>
-            <p className="text-xs sm:text-sm font-medium text-[#475569] dark:text-[#C7D2FE]">
-              Your personalized AI study headquarters &amp; rapid workspace.
+            <p className="text-xs sm:text-sm font-medium text-[#6B6890] dark:text-[#9E9EA9] max-w-xl leading-relaxed">
+              Your personalized AI study headquarters — unified from raw concepts and simulations to active exam calibration.
             </p>
+
+            <div className="pt-1 flex flex-wrap items-center gap-2.5">
+              <Button
+                type="button"
+                variant="primary"
+                size="lg"
+                onClick={() => onNavigate('copilot')}
+                leftIcon={<Bot className="w-4 h-4" />}
+                className="w-full sm:w-auto min-h-[46px] px-5 sm:px-6 text-xs sm:text-sm font-black shrink-0"
+              >
+                Ask AI Doubt
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={onLaunchPractice}
+                leftIcon={<Play className="w-3.5 h-3.5" />}
+                className="w-full sm:w-auto min-h-[46px]"
+              >
+                Quick Drill
+              </Button>
+            </div>
           </div>
 
-          <Button
+          {/* Fig. 04 — Precision STEM workspace visual plate */}
+          <button
             type="button"
-            variant="primary"
-            size="lg"
-            onClick={() => onNavigate('copilot')}
-            leftIcon={<Bot className="w-5 h-5" />}
-            className="w-full md:w-auto min-h-[48px] sm:min-h-[52px] px-5 sm:px-7 text-sm sm:text-base font-black shrink-0 bg-gradient-to-r from-[#5B4CE0] via-[#7C3AED] to-[#0891B2] hover:from-[#4C3FD0] hover:via-[#6D28D9] hover:to-[#0E7490] text-white border-0 shadow-[0_6px_18px_rgba(91,76,224,0.28)]"
+            onClick={() => onNavigate(STUDIO_FIGURES.workspace.targetTab)}
+            className="group relative overflow-hidden rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#09090B] text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6C5CE7] dark:focus-visible:outline-[#CCFF00]"
           >
-            Ask AI Doubt
-          </Button>
+            <div className="aspect-[16/9] w-full overflow-hidden">
+              <img
+                src={STUDIO_FIGURES.workspace.src}
+                alt={STUDIO_FIGURES.workspace.alt}
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090B] via-[#09090B]/35 to-transparent" />
+            <div className="absolute inset-x-3 bottom-2.5 flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#CCFF00]">
+                  {STUDIO_FIGURES.workspace.code} — {STUDIO_FIGURES.workspace.title}
+                </p>
+                <p className="text-[11px] font-medium text-[#D4D4D8] truncate mt-0.5">
+                  {STUDIO_FIGURES.workspace.subtitle}
+                </p>
+              </div>
+              <span className="shrink-0 inline-flex items-center gap-1 rounded border border-[#232329] bg-[#111114]/90 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#F4F4F6] group-hover:border-[#CCFF00]/60">
+                Open
+                <ArrowRight className="w-3 h-3 text-[#CCFF00]" />
+              </span>
+            </div>
+          </button>
         </div>
 
-        {/* Three Gemstone Essentials: Goal, Streak, XP */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5 pt-3 sm:pt-4 border-t border-[#C7D2FE]/70 dark:border-[#433A7D]">
-          {/* Today's Goal — Emerald Mint */}
-          <div className="p-3 sm:p-4 rounded-2xl bg-[#ECFDF5] dark:bg-[#102E28] border border-[#A7F3D0] dark:border-[#1E5C4E] space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-[#065F46] dark:text-[#A7F3D0]">
-              <span>Daily Goal</span>
-              <span className="tabular-nums text-[#064E3B] dark:text-[#ECFDF5]">
+        {/* Three Architectural Metrics: Daily Goal, Streak, Experience */}
+        <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5 pt-4 border-t border-[#E3DFF5] dark:border-[#232329]">
+          {/* Daily Goal */}
+          <div className="p-3.5 sm:p-4 rounded-xl bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-[#6B6890] dark:text-[#9E9EA9]">
+              <span className="font-mono uppercase tracking-[0.1em] text-[10px]">Daily Goal</span>
+              <span className="tabular-nums font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                 {solvedToday}/{dailyGoalTarget} Qs
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#059669] dark:text-[#34D399] shrink-0" />
-              <span className="text-lg sm:text-xl font-black text-[#064E3B] dark:text-[#ECFDF5] tabular-nums">
+              <CheckCircle2 className="w-4 h-4 text-[#00B8A9] dark:text-[#CCFF00] shrink-0" />
+              <span className="text-lg sm:text-xl font-black text-[#2D2A4A] dark:text-[#F4F4F6] tabular-nums">
                 {dailyGoalPercent}%
               </span>
             </div>
             <Progress value={dailyGoalPercent} variant="secondary" size="sm" aria-label="Daily goal progress" />
           </div>
 
-          {/* Streak — Solar Amber */}
+          {/* Streak */}
           <button
             type="button"
             onClick={() => setShowStreakModal(true)}
-            className="p-3 sm:p-4 rounded-2xl bg-[#FFFBEB] dark:bg-[#332216] border border-[#FDE68A] dark:border-[#6B4221] hover:border-[#F59E0B] dark:hover:border-[#FBBF24] text-left space-y-1.5 sm:space-y-2 transition-colors cursor-pointer min-h-[44px]"
+            className="p-3.5 sm:p-4 rounded-xl bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] hover:border-[#6C5CE7] dark:hover:border-[#CCFF00]/60 text-left space-y-1.5 sm:space-y-2 transition-colors cursor-pointer min-h-[44px]"
           >
-            <div className="flex items-center justify-between text-xs font-bold text-[#92400E] dark:text-[#FDE68A]">
-              <span>Streak</span>
-              <span className="text-[#C2410C] dark:text-[#FDBA74] font-extrabold">Log</span>
+            <div className="flex items-center justify-between text-xs font-bold text-[#6B6890] dark:text-[#9E9EA9]">
+              <span className="font-mono uppercase tracking-[0.1em] text-[10px]">Streak</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6C5CE7] dark:text-[#CCFF00] font-bold">
+                Log
+              </span>
             </div>
             <div className="flex items-center gap-2">
-              <Flame className="w-4.5 h-4.5 text-[#EA580C] fill-[#F59E0B] dark:text-[#FBBF24] dark:fill-[#F97316] shrink-0" />
-              <span className="text-lg sm:text-xl font-black text-[#78350F] dark:text-[#FEF3C7] tabular-nums">
+              <Flame className="w-4.5 h-4.5 text-[#FFB84D] fill-[#FFB84D] shrink-0" />
+              <span className="text-lg sm:text-xl font-black text-[#2D2A4A] dark:text-[#F4F4F6] tabular-nums">
                 {currentStreakDays} day{currentStreakDays === 1 ? '' : 's'}
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs font-semibold text-[#92400E] dark:text-[#FDE68A]">
+            <p className="text-[11px] sm:text-xs font-semibold text-[#6B6890] dark:text-[#9E9EA9]">
               Best: {longestStreakDays} days
             </p>
           </button>
 
-          {/* XP — Electric Orchid Violet */}
-          <div className="p-3 sm:p-4 rounded-2xl bg-[#F5F3FF] dark:bg-[#2A1D47] border border-[#DDD6FE] dark:border-[#53388F] space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-[#5B21B6] dark:text-[#DDD6FE]">
-              <span>Experience</span>
-              <span className="tabular-nums text-[#4C1D95] dark:text-[#F5F3FF]">
+          {/* Experience */}
+          <div className="p-3.5 sm:p-4 rounded-xl bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-[#6B6890] dark:text-[#9E9EA9]">
+              <span className="font-mono uppercase tracking-[0.1em] text-[10px]">Experience</span>
+              <span className="tabular-nums font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                 Lv {xpProgress.level}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#7C3AED] fill-[#A855F7] dark:text-[#E879F9] dark:fill-[#C084FC] shrink-0" />
-              <span className="text-lg sm:text-xl font-black text-[#4C1D95] dark:text-[#F5F3FF] tabular-nums">
+              <Zap className="w-4 h-4 text-[#6C5CE7] dark:text-[#CCFF00] shrink-0" />
+              <span className="text-lg sm:text-xl font-black text-[#2D2A4A] dark:text-[#F4F4F6] tabular-nums">
                 {totalUserXp.toLocaleString()} XP
               </span>
             </div>
@@ -396,23 +445,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </Card>
 
-      {/* 2. SECOND TOP: Workspace Hub (Prominent Logo-First Grid with category tabs) */}
+      {/* 2. SECOND SECTION: Workspace Hub (Architectural Tool Grid with category tabs) */}
       <Card
         variant="default"
         padding="md"
-        className="space-y-3 sm:space-y-4 sm:p-6 bg-gradient-to-br from-[#FFFFFF] via-[#FAF8FF] to-[#F0FDFA] dark:from-[#242040] dark:via-[#201D38] dark:to-[#122D31] border-[#C7D2FE] dark:border-[#433A7D]"
+        className="space-y-3.5 sm:space-y-4 sm:p-6 bg-[#FFFFFF] dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329]"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-[#5B4CE0] to-[#0891B2] flex items-center justify-center text-white shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] flex items-center justify-center text-[#6C5CE7] dark:text-[#CCFF00]">
               <Layers className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-[#1E1B4B] dark:text-[#F1EFFF] font-display tracking-tight">
+              <h2 className="text-base sm:text-lg font-black text-[#2D2A4A] dark:text-[#F4F4F6] font-display tracking-tight">
                 Workspace Hub
               </h2>
-              <p className="text-[11px] sm:text-xs font-semibold text-[#57537A] dark:text-[#B4B0D5]">
-                Tap any tool logo for instant access across all study, practice &amp; AI studios.
+              <p className="text-[11px] sm:text-xs font-medium text-[#6B6890] dark:text-[#9E9EA9]">
+                Direct access across all study, practice, and AI studios.
               </p>
             </div>
           </div>
@@ -437,10 +486,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 role="tab"
                 aria-selected={navGroup === tab.id}
                 onClick={() => setNavGroup(tab.id)}
-                className={`min-h-[36px] sm:min-h-[40px] px-2.5 sm:px-3.5 py-1 rounded-xl text-xs font-extrabold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                className={`min-h-[36px] sm:min-h-[38px] px-3 sm:px-3.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer border ${
                   navGroup === tab.id
-                    ? 'bg-gradient-to-r from-[#5B4CE0] to-[#0891B2] text-white shadow-md scale-[1.02]'
-                    : 'bg-[#F5F3FF] dark:bg-[#1E1B33] text-[#57537A] dark:text-[#B4B0D5] hover:bg-[#EDE9FE] dark:hover:bg-[#2A2447] hover:text-[#1E1B4B] dark:hover:text-[#F1EFFF]'
+                    ? 'bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] border-transparent'
+                    : 'bg-[#F7F5FF] dark:bg-[#09090B] text-[#6B6890] dark:text-[#9E9EA9] border-[#E3DFF5] dark:border-[#232329] hover:border-[#6C5CE7] dark:hover:border-[#CCFF00]/50 hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6]'
                 }`}
               >
                 {tab.label}
@@ -449,40 +498,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Logo-First Destination Grid with tight gaps */}
+        {/* Architectural Destination Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-2.5 pt-1">
           {visibleDestinations.map((dest) => {
             const Icon = dest.icon;
-            const groupPalette =
-              dest.group === 'study'
-                ? {
-                    tile: 'bg-[#F0F7FF] dark:bg-[#1A2842] hover:bg-[#E0EFFF] dark:hover:bg-[#223557] border-[#D6E6FF] dark:border-[#2C446B] hover:border-[#3B82F6]',
-                    iconBox: 'bg-[#DBEAFE] dark:bg-[#223B61] border-[#BFDBFE] dark:border-[#355A8F] text-[#1D4ED8] dark:text-[#60A5FA]',
-                  }
-                : dest.group === 'ai'
-                ? {
-                    tile: 'bg-[#FAF5FF] dark:bg-[#2B1D42] hover:bg-[#F3E8FF] dark:hover:bg-[#382557] border-[#E9D5FF] dark:border-[#4B3173] hover:border-[#8B5CF6]',
-                    iconBox: 'bg-[#F3E8FF] dark:bg-[#3B245C] border-[#DDD6FE] dark:border-[#5D3C8F] text-[#7E22CE] dark:text-[#D8B4FE]',
-                  }
-                : {
-                    tile: 'bg-[#FFFBEB] dark:bg-[#2E2417] hover:bg-[#FEF3C7] dark:hover:bg-[#3D2F1D] border-[#FDE68A] dark:border-[#594322] hover:border-[#F59E0B]',
-                    iconBox: 'bg-[#FEF3C7] dark:bg-[#473419] border-[#FCD34D] dark:border-[#705327] text-[#B45309] dark:text-[#FCD34D]',
-                  };
             return (
               <button
                 key={dest.id}
                 type="button"
                 onClick={() => onNavigate(dest.id)}
-                className={`group min-h-[52px] sm:min-h-[60px] p-2 sm:p-2.5 rounded-xl border text-left flex items-center gap-2 sm:gap-2.5 transition-all hover:scale-[1.02] cursor-pointer min-w-0 ${groupPalette.tile}`}
+                className="group min-h-[54px] sm:min-h-[60px] p-2.5 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] hover:border-[#6C5CE7] dark:hover:border-[#CCFF00]/60 hover:bg-[#FFFFFF] dark:hover:bg-[#16161C] text-left flex items-center gap-2.5 transition-all cursor-pointer min-w-0"
               >
-                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg border flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-110 ${groupPalette.iconBox}`}>
-                  <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114] flex items-center justify-center shrink-0 text-[#6C5CE7] dark:text-[#CCFF00] transition-transform group-hover:scale-105">
+                  <Icon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-black text-[#1E1B4B] dark:text-[#F1EFFF] truncate">
+                  <div className="text-xs font-black text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
                     {dest.label}
                   </div>
-                  <div className="text-[10px] font-semibold text-[#57537A] dark:text-[#C7C3E6] truncate">
+                  <div className="text-[10px] font-medium text-[#6B6890] dark:text-[#9E9EA9] truncate">
                     {dest.brief}
                   </div>
                 </div>
@@ -492,27 +526,85 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </Card>
 
-      {/* 3. THIRD SECTION: Next Lesson & Spaced Review / Study Progress */}
+      {/* 3. Studio Visual Plates (Fig. 01 - Fig. 03 matching Landing & Inside Studio) */}
+      <section aria-label="Featured studio environments" className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="h-1.5 w-1.5 shrink-0 bg-[#6C5CE7] dark:bg-[#CCFF00]" />
+            <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#6B6890] dark:text-[#9E9EA9]">
+              Studio plates · Fig. 01 — 03
+            </span>
+          </div>
+          <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.14em] text-[#6B6890] dark:text-[#71717A]">
+            Click any module plate to launch
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+          {DASHBOARD_FIGURE_PLATES.map((fig) => (
+            <button
+              key={fig.id}
+              type="button"
+              onClick={() => onNavigate(fig.targetTab)}
+              className="group relative overflow-hidden rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114] hover:border-[#6C5CE7] dark:hover:border-[#CCFF00]/60 text-left transition-all cursor-pointer flex flex-col"
+            >
+              <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#09090B] border-b border-[#E3DFF5] dark:border-[#232329]">
+                <img
+                  src={fig.src}
+                  alt={fig.alt}
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090B]/85 via-transparent to-transparent" />
+                <div className="absolute inset-x-3 top-2.5 flex items-center justify-between">
+                  <span className="rounded border border-[#232329] bg-[#09090B]/90 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#CCFF00]">
+                    {fig.code}
+                  </span>
+                  <span className="rounded border border-[#232329] bg-[#09090B]/90 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#F4F4F6]">
+                    {fig.badge}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3.5 flex-1 flex flex-col justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-black text-[#2D2A4A] dark:text-[#F4F4F6] font-display flex items-center justify-between gap-2">
+                    <span className="truncate">{fig.title}</span>
+                    <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[#6B6890] dark:text-[#9E9EA9] group-hover:text-[#6C5CE7] dark:group-hover:text-[#CCFF00] transition-colors" />
+                  </h3>
+                  <p className="text-[11px] font-medium text-[#6B6890] dark:text-[#9E9EA9] mt-1 line-clamp-2">
+                    {fig.caption}
+                  </p>
+                </div>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6B6890] dark:text-[#71717A] truncate">
+                  {fig.subtitle}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* 4. FOURTH SECTION: Next Lesson, Spaced Review, Standings & Offline Sync */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5">
         <div className="lg:col-span-7 space-y-3.5 sm:space-y-5">
           <Card
             variant="default"
             padding="md"
-            className="space-y-3 sm:space-y-4 sm:p-6 bg-[#FFFFFF] dark:bg-[#242040] border-[#D8E2FA] dark:border-[#39426E]"
+            className="space-y-3 sm:space-y-4 sm:p-6 bg-[#FFFFFF] dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329]"
           >
             <div className="flex items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm sm:text-base font-black text-[#1E1B4B] dark:text-[#F1EFFF] font-display">
+                <h2 className="text-sm sm:text-base font-black text-[#2D2A4A] dark:text-[#F4F4F6] font-display">
                   Next Scheduled Lesson
                 </h2>
-                <p className="text-[11px] sm:text-xs font-medium text-[#475569] dark:text-[#B4B0D5]">
+                <p className="text-[11px] sm:text-xs font-medium text-[#6B6890] dark:text-[#9E9EA9]">
                   Stay on track with your personalized curriculum roadmap
                 </p>
               </div>
               <Badge
                 variant="secondary"
                 size="sm"
-                className="bg-[#DBEAFE] dark:bg-[#1E3A5F] text-[#1D4ED8] dark:text-[#93C5FD] border-[#BFDBFE] dark:border-[#2E5082]"
+                className="font-mono"
               >
                 {nextLesson.label}
               </Badge>
@@ -533,12 +625,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 }
               />
             ) : (
-              <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-[#EFF6FF] via-[#F0F9FF] to-[#ECFEFF] dark:from-[#192847] dark:via-[#17304D] dark:to-[#123340] border border-[#BFDBFE] dark:border-[#2C4E78] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="p-3.5 sm:p-4 rounded-xl bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1 min-w-0">
-                  <div className="text-sm sm:text-base font-black text-[#0F172A] dark:text-[#F8FAFC] truncate">
+                  <div className="text-sm sm:text-base font-black text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
                     {nextLesson.title}
                   </div>
-                  <p className="text-xs font-semibold text-[#1D4ED8] dark:text-[#7DD3FC]">
+                  <p className="text-xs font-semibold text-[#6B6890] dark:text-[#9E9EA9]">
                     {nextLesson.subtitle}
                   </p>
                 </div>
@@ -549,18 +641,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={onLaunchPractice}
-                    leftIcon={<Play className="w-3.5 h-3.5 text-[#2563EB] dark:text-[#60A5FA]" />}
-                    className="border-[#93C5FD] dark:border-[#3B6496] hover:bg-[#DBEAFE] dark:hover:bg-[#1E3A5F]"
+                    leftIcon={<Play className="w-3.5 h-3.5" />}
                   >
                     Drill
                   </Button>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="primary"
                     size="sm"
                     onClick={() => onNavigate(nextLesson.tab, nextLesson.context)}
                     rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-                    className="bg-gradient-to-r from-[#0891B2] to-[#0D9488] hover:from-[#0E7490] hover:to-[#0F766E] text-white border-0"
                   >
                     Open
                   </Button>
@@ -573,18 +663,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <Card
             variant="default"
             padding="md"
-            className="space-y-2.5 sm:space-y-3 bg-[#FFFFFF] dark:bg-[#242040] border-[#CCEFE9] dark:border-[#255259]"
+            className="space-y-2.5 sm:space-y-3 bg-[#FFFFFF] dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329]"
           >
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-xs sm:text-sm font-black text-[#1E1B4B] dark:text-[#F1EFFF] font-display flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF]" />
+              <h2 className="text-xs sm:text-sm font-black text-[#2D2A4A] dark:text-[#F4F4F6] font-display flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-[#6C5CE7] dark:text-[#CCFF00]" />
                 <span>Spaced Review ({totalDueCount} due)</span>
               </h2>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onNavigate('practice')}
-                className="min-h-[36px] text-[#0F766E] dark:text-[#5EEAD4]"
+                className="min-h-[36px]"
               >
                 Practice
               </Button>
@@ -592,7 +682,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {dueCards.length === 0 ? (
               <EmptyState
-                icon={<CheckCircle2 className="w-5 h-5 text-[#059669] dark:text-[#34D399]" />}
+                icon={<CheckCircle2 className="w-5 h-5 text-[#4CAF8E]" />}
                 title="Reviews caught up"
                 description="No spaced repetition due right now."
                 actionLabel="Practice"
@@ -604,14 +694,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {dueCards.map((card) => (
                   <div
                     key={card.conceptId}
-                    className="p-3 rounded-xl bg-[#F0FDFA] dark:bg-[#132E33] border border-[#99F6E4] dark:border-[#23545B] space-y-2"
+                    className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] space-y-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="text-[10px] font-extrabold text-[#0F766E] dark:text-[#5EEAD4] uppercase">
+                        <span className="font-mono text-[10px] font-bold text-[#6C5CE7] dark:text-[#CCFF00] uppercase">
                           {card.subjectId}
                         </span>
-                        <h3 className="text-xs font-black text-[#134E4A] dark:text-[#F0FDFA] truncate">
+                        <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
                           {card.conceptTitle}
                         </h3>
                       </div>
@@ -624,25 +714,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             conceptId: card.conceptId,
                           })
                         }
-                        className="min-h-[36px] bg-[#0D9488] hover:bg-[#0F766E]"
+                        className="min-h-[34px]"
                       >
                         Drill
                       </Button>
                     </div>
-                    <div className="flex items-center gap-1 pt-1.5 border-t border-[#99F6E4]/80 dark:border-[#23545B]">
+                    <div className="flex items-center gap-1 pt-1.5 border-t border-[#E3DFF5] dark:border-[#232329]">
                       {(
                         [
-                          { label: 'Again', quality: 0, tone: 'text-[#BE123C] dark:text-[#FDA4AF]' },
-                          { label: 'Hard', quality: 2, tone: 'text-[#B45309] dark:text-[#FCD34D]' },
-                          { label: 'Good', quality: 4, tone: 'text-[#0E7490] dark:text-[#67E8F9]' },
-                          { label: 'Easy', quality: 5, tone: 'text-[#047857] dark:text-[#6EE7B7]' },
+                          { label: 'Again', quality: 0, tone: 'text-[#F25F5C]' },
+                          { label: 'Hard', quality: 2, tone: 'text-[#FFB84D]' },
+                          { label: 'Good', quality: 4, tone: 'text-[#00B8A9]' },
+                          { label: 'Easy', quality: 5, tone: 'text-[#4CAF8E]' },
                         ] as Array<{ label: string; quality: SM2Quality; tone: string }>
                       ).map((opt) => (
                         <button
                           key={opt.label}
                           type="button"
                           onClick={() => handleSM2Grade(card, opt.quality)}
-                          className={`flex-1 min-h-[32px] rounded-md bg-[#FFFFFF] dark:bg-[#1D3C42] border border-[#CCFBF1] dark:border-[#2D626A] text-[10px] font-extrabold transition-colors cursor-pointer ${opt.tone}`}
+                          className={`flex-1 min-h-[32px] rounded-md bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] hover:border-[#6C5CE7] dark:hover:border-[#CCFF00]/50 text-[10px] font-extrabold transition-colors cursor-pointer ${opt.tone}`}
                         >
                           {opt.label}
                         </button>
@@ -661,14 +751,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <Card
             variant="default"
             padding="md"
-            className="space-y-2 bg-[#FFFDF5] dark:bg-[#292238] border-[#FDE68A] dark:border-[#5C441E]"
+            className="space-y-2 bg-[#FFFFFF] dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329]"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-[#78350F] dark:text-[#FEF3C7] flex items-center gap-1.5">
-                <Trophy className="w-3.5 h-3.5 text-[#D97706] dark:text-[#FBBF24]" />
+              <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F4F4F6] flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-[#FFB84D]" />
                 <span>Cohort Standings</span>
               </h3>
-              <Button variant="ghost" size="sm" onClick={() => onNavigate('leaderboard')} className="min-h-[36px] text-[#B45309] dark:text-[#FCD34D]">
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('leaderboard')} className="min-h-[36px]">
                 Ranks
               </Button>
             </div>
@@ -686,11 +776,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <Card
             variant="subtle"
             padding="md"
-            className="space-y-2.5 bg-gradient-to-br from-[#ECFDF5] to-[#F0FDFA] dark:from-[#122D2A] dark:to-[#122B36] border-[#A7F3D0] dark:border-[#245A52]"
+            className="space-y-2.5 bg-[#FFFFFF] dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329]"
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-xs font-black text-[#064E3B] dark:text-[#ECFDF5] flex items-center gap-1.5">
-                <Smartphone className="w-3.5 h-3.5 text-[#059669] dark:text-[#34D399]" />
+              <h3 className="text-xs font-black text-[#2D2A4A] dark:text-[#F4F4F6] flex items-center gap-1.5">
+                <Smartphone className="w-3.5 h-3.5 text-[#00B8A9] dark:text-[#CCFF00]" />
                 <span>Offline &amp; App</span>
               </h3>
               <Badge variant="success" size="sm">
@@ -698,7 +788,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {olympiadPack ? `${olympiadPack.questions.length} Qs` : 'Ready'}
               </Badge>
             </div>
-            <div className="text-[10px] sm:text-[11px] font-bold text-[#065F46] dark:text-[#A7F3D0]">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-[#6B6890] dark:text-[#9E9EA9]">
               {pendingOfflineCount} queued ·{' '}
               {lastSyncedAt
                 ? `Synced ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -710,23 +800,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {!isInstalled && (
                 <PWAInstallButton
                   label="Add to Home Screen"
-                  className="min-h-[38px] px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#5B4CE0] to-[#0891B2] hover:from-[#4C3FD0] hover:to-[#0E7490] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                 />
               )}
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 disabled={packDownloading}
                 onClick={() => void handleSyncPackAndCloud()}
                 leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${packDownloading ? 'animate-spin' : ''}`} />}
-                className="min-h-[38px] bg-[#059669] hover:bg-[#047857] text-white text-xs"
+                className="min-h-[38px] text-xs"
               >
                 {packDownloading ? 'Syncing...' : olympiadPack ? 'Sync Pack' : 'Cache Qs'}
               </Button>
             </div>
             {syncStatusMsg && (
-              <p role="status" className="text-[11px] font-bold text-[#047857] dark:text-[#6EE7B7]">
+              <p role="status" className="text-[11px] font-bold text-[#4CAF8E]">
                 {syncStatusMsg}
               </p>
             )}

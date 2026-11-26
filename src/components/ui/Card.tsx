@@ -19,18 +19,18 @@ export const Card: React.FC<CardProps> = ({
     lg: 'p-4 sm:p-6',
   };
 
-  // Requirement: Solid opaque surfaces (#FFFFFF light, #2A2647 dark), crisp borders, compact mobile fit
+  // Solid architectural surfaces (#FFFFFF light, #111114 obsidian dark) with hairline borders
   const variantStyles = {
     default:
-      'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl shadow-[0_1px_4px_rgba(45,42,74,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.28)]',
+      'bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] rounded-xl shadow-[0_1px_3px_rgba(45,42,74,0.04)] dark:shadow-none',
     subtle:
-      'bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl',
+      'bg-[#F7F5FF] dark:bg-[#09090B] border border-[#E3DFF5] dark:border-[#232329] rounded-xl',
     elevated:
-      'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl shadow-[0_6px_18px_rgba(45,42,74,0.07)] dark:shadow-[0_6px_18px_rgba(0,0,0,0.36)]',
+      'bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#2A2A32] rounded-xl shadow-[0_6px_18px_rgba(45,42,74,0.07)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)]',
     interactive:
-      'bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl shadow-[0_1px_4px_rgba(45,42,74,0.05)] hover:shadow-[0_6px_18px_rgba(108,92,231,0.12)] hover:border-[#6C5CE7] dark:hover:border-[#8577ED] transition-all duration-150 cursor-pointer',
+      'bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] rounded-xl shadow-[0_1px_3px_rgba(45,42,74,0.04)] hover:shadow-[0_6px_18px_rgba(108,92,231,0.12)] hover:border-[#6C5CE7] dark:hover:border-[#CCFF00]/60 transition-all duration-150 cursor-pointer',
     bordered:
-      'bg-transparent border border-dashed border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl',
+      'bg-transparent border border-dashed border-[#E3DFF5] dark:border-[#2A2A32] rounded-xl',
   };
 
   return (

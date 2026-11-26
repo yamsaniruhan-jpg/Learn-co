@@ -2,17 +2,21 @@
  * Outbound email for account & mentorship flows (password reset, mentor
  * applications, student mentorship requests & mentor acceptance).
  *
- * There is no mail provider configured by default unless RESEND_API_KEY or
- * SMTP_URL is set, and silently pretending to send would be worse than not
- * sending at all. This module therefore has one strict rule: it only returns
- * `delivered: true` when an external mail relay actually accepted the message.
+ * There is no mail provider configured by default unless RESEND_API_KEY,
+ * SMTP_URL, SMTP_HOST+SMTP_USER+SMTP_PASS, GMAIL_USER+GMAIL_APP_PASSWORD, or
+ * GMAIL_ACCESS_TOKEN is set. Silently pretending to send would be worse than
+ * not sending at all. This module therefore has one strict rule: it only
+ * returns `delivered: true` when an external mail relay actually accepted the
+ * message.
  *
- * Configure whichever provider you use via environment variables:
+ * Configure whichever provider you use via environment variables / Secrets:
  *
- *   RESEND_API_KEY  + MAIL_FROM   -> Resend HTTP API
- *   SMTP_URL        + MAIL_FROM   -> any SMTP relay (optional, uses nodemailer)
+ *   RESEND_API_KEY          + MAIL_FROM   -> Resend HTTP API
+ *   GMAIL_USER              + GMAIL_APP_PASSWORD -> Gmail SMTP (smtp.gmail.com:465)
+ *   SMTP_URL                + MAIL_FROM   -> any SMTP relay (uses nodemailer)
+ *   SMTP_HOST + SMTP_USER   + SMTP_PASS   -> any SMTP relay (uses nodemailer)
  *
- * With neither set, `isMailerConfigured()` is false. Password recovery is
+ * With none set, `isMailerConfigured()` is false. Password recovery is
  * unavailable until a provider is configured; reset links are never logged.
  */
 import crypto from 'crypto';
@@ -40,7 +44,40 @@ const DEFAULT_MAIL_FROM = 'LearnCo <no-reply@learnco.app>';
 const RUNTIME_HMAC_SECRET = crypto.randomBytes(32).toString('hex');
 
 function getMailFrom(): string {
-  return process.env.MAIL_FROM || DEFAULT_MAIL_FROM;
+  const configured = process.env.MAIL_FROM?.trim();
+  if (configured) return configured;
+  const gmailUser = process.env.GMAIL_USER?.trim();
+  if (gmailUser && isValidEmailAddress(gmailUser)) {
+    return `LearnCo <${gmailUser}>`;
+  }
+  const smtpUser = process.env.SMTP_USER?.trim();
+  if (smtpUser && isValidEmailAddress(smtpUser)) {
+    return `LearnCo <${smtpUser}>`;
+  }
+  return DEFAULT_MAIL_FROM;
+}
+
+function hasCustomSmtpConfig(): boolean {
+  return Boolean(
+    process.env.SMTP_HOST?.trim() &&
+    process.env.SMTP_USER?.trim() &&
+    process.env.SMTP_PASS?.trim()
+  );
+}
+
+function hasGmailAppPasswordConfig(): boolean {
+  return Boolean(
+    process.env.GMAIL_USER?.trim() &&
+    process.env.GMAIL_APP_PASSWORD?.trim()
+  );
+}
+
+function hasAnySmtpConfig(): boolean {
+  return Boolean(
+    process.env.SMTP_URL?.trim() ||
+    hasCustomSmtpConfig() ||
+    hasGmailAppPasswordConfig()
+  );
 }
 
 function getActionSecret(): string {
@@ -52,24 +89,27 @@ export function isValidEmailAddress(email: string): boolean {
 }
 
 export function isMailerConfigured(): boolean {
-  if (process.env.NODE_ENV === 'test') {
-    return !!(process.env.RESEND_API_KEY || process.env.SMTP_URL);
-  }
-  return true;
+  return Boolean(
+    process.env.RESEND_API_KEY?.trim() ||
+    hasAnySmtpConfig() ||
+    process.env.GMAIL_ACCESS_TOKEN?.trim()
+  );
 }
 
 export function getMailerStatus(): MailerStatus {
-  const provider: MailerStatus['provider'] = process.env.RESEND_API_KEY
+  const provider: MailerStatus['provider'] = process.env.RESEND_API_KEY?.trim()
     ? 'resend'
-    : process.env.SMTP_URL
+    : (hasAnySmtpConfig() || process.env.GMAIL_ACCESS_TOKEN?.trim())
     ? 'smtp'
     : 'none';
-  const configured = isMailerConfigured();
+  const configured = provider !== 'none';
   return {
     configured,
-    provider: provider !== 'none' ? provider : configured ? 'smtp' : 'none',
+    provider,
     mailFrom: getMailFrom(),
-    missingEnvVars: [],
+    missingEnvVars: configured
+      ? []
+      : ['RESEND_API_KEY or GMAIL_USER + GMAIL_APP_PASSWORD or SMTP_URL'],
   };
 }
 
@@ -194,15 +234,46 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
   }
 
   // Secondary path: SMTP via nodemailer, loaded lazily so the dependency is
-  // optional and never required at boot.
-  if (process.env.SMTP_URL) {
+  // optional and never required at boot. Supports SMTP_URL, custom SMTP_HOST,
+  // or Gmail SMTP with GMAIL_USER + GMAIL_APP_PASSWORD.
+  if (hasAnySmtpConfig()) {
     try {
       const specifier = 'nodemailer';
       const mod: any = await import(/* @vite-ignore */ specifier).catch(() => null);
       if (!mod) {
         return { delivered: false, provider: 'none', reason: 'nodemailer_not_installed' };
       }
-      const transporter = mod.createTransport(process.env.SMTP_URL);
+
+      let transportConfig: any;
+      if (process.env.SMTP_URL?.trim()) {
+        transportConfig = process.env.SMTP_URL.trim();
+      } else if (hasCustomSmtpConfig()) {
+        const port = Number(process.env.SMTP_PORT || 587);
+        const secure = process.env.SMTP_SECURE
+          ? process.env.SMTP_SECURE === 'true'
+          : port === 465;
+        transportConfig = {
+          host: process.env.SMTP_HOST!.trim(),
+          port,
+          secure,
+          auth: {
+            user: process.env.SMTP_USER!.trim(),
+            pass: process.env.SMTP_PASS!.trim(),
+          },
+        };
+      } else {
+        transportConfig = {
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          auth: {
+            user: process.env.GMAIL_USER!.trim(),
+            pass: process.env.GMAIL_APP_PASSWORD!.replace(/\s+/g, ''),
+          },
+        };
+      }
+
+      const transporter = mod.createTransport(transportConfig);
       const info = await transporter.sendMail({
         from,
         to: message.to.trim(),
@@ -212,13 +283,14 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
         html: message.html,
       });
       return { delivered: true, provider: 'smtp', id: info?.messageId };
-    } catch {
-      console.error('[mailer] SMTP send failed.');
-      return { delivered: false, provider: 'none', reason: 'smtp_failed' };
+    } catch (err: any) {
+      const safeCode = err?.code || err?.responseCode || 'smtp_error';
+      console.error('[mailer] SMTP send failed:', safeCode);
+      return { delivered: false, provider: 'none', reason: `smtp_failed:${safeCode}` };
     }
   }
 
-  const googleToken = (message as any).googleAccessToken || process.env.GMAIL_ACCESS_TOKEN;
+  const googleToken = (message as any).googleAccessToken || process.env.GMAIL_ACCESS_TOKEN?.trim();
   if (googleToken) {
     try {
       const mimeMessage = [
@@ -250,17 +322,11 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
         return { delivered: true, provider: 'gmail', id: body?.id };
       }
       console.warn('[mailer] Gmail API status:', res.status);
+      return { delivered: false, provider: 'none', reason: `gmail_${res.status}` };
     } catch (e: any) {
-      console.warn('[mailer] Gmail API error:', e?.message || e);
+      console.warn('[mailer] Gmail API error:', e?.code || 'network_error');
+      return { delivered: false, provider: 'none', reason: 'gmail_unreachable' };
     }
-  }
-
-  // Fallback path: In development/preview or when mail relay is offline,
-  // record message delivery so password recovery and mentorship notifications succeed.
-  if (process.env.NODE_ENV !== 'test') {
-    const fallbackId = `preview-mail-${Date.now()}`;
-    console.log(`[mailer] Dispatching notification to ${message.to.trim()} (${message.subject}) [id: ${fallbackId}]`);
-    return { delivered: true, provider: 'smtp', id: fallbackId };
   }
 
   return { delivered: false, provider: 'none', reason: 'not_configured' };

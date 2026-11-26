@@ -270,7 +270,7 @@ export const PasswordResetFlow: React.FC<PasswordResetFlowProps> = ({
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
-            Live inbox delivery is currently disabled because no email relay (<code>RESEND_API_KEY</code> or <code>SMTP_URL</code>) is configured on this server. Submitting will log the reset link to the server console for the administrator instead of emailing your inbox.
+            Password reset emails cannot be delivered yet because no email relay (<code>RESEND_API_KEY</code>, <code>GMAIL_USER</code> + <code>GMAIL_APP_PASSWORD</code>, or <code>SMTP_URL</code>) is configured on this server. Ask the site administrator to add one in Secrets, or sign in with Google.
           </span>
         </div>
       )}

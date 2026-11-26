@@ -109,6 +109,7 @@ const AuthView = lazyNamed(
   () => import('./components/auth/AuthView'),
   'AuthView'
 );
+const LandingSite = lazy(() => import('./components/site/LandingSite'));
 const Leaderboard = lazyNamed(
   () => import('./components/leaderboard/Leaderboard'),
   'Leaderboard'
@@ -192,6 +193,7 @@ export default function App() {
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [isContextPanelOpen, setIsContextPanelOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [selectedSubjectId, setSelectedSubjectId] = useState<SubjectId>('math');
   const [practiceLaunchContext, setPracticeLaunchContext] = useState<PracticeNavigationContext | null>(null);
   const [isFlashCheckOpen, setIsFlashCheckOpen] = useState<boolean>(false);
@@ -203,7 +205,7 @@ export default function App() {
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('learnco_theme');
-    return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return saved ? saved === 'dark' : true;
   });
 
   useEffect(() => {
@@ -425,131 +427,96 @@ export default function App() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 space-y-4">
-        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+      <div className="min-h-screen bg-[#09090B] text-[#F4F4F6] flex flex-col items-center justify-center p-6 space-y-4">
+        <Loader2 className="w-10 h-10 text-[#CCFF00] animate-spin" />
         <div className="text-center space-y-1">
-          <h2 className="text-lg font-bold">Initializing Learn.co Secure Kernel</h2>
-          <p className="text-xs text-slate-400">Verifying session token and loading user matrix...</p>
+          <h2 className="text-lg font-bold font-display">Initializing LearnCo Workspace</h2>
+          <p className="text-xs text-[#9E9EA9]">Verifying session token and loading study environment...</p>
         </div>
       </div>
     );
   }
 
-  // If user is not signed in: Flagship Live Website + Auth Portal
-  if (!isAuthenticated || resetToken) {
+  // If user arrives from a password reset link: show focused reset screen immediately
+  if (resetToken) {
     return (
-      <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col font-sans selection:bg-[#6C5CE7] selection:text-white">
-        <header className="w-full border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] px-4 sm:px-6 py-3.5 flex items-center justify-between gap-2 shadow-xs">
+      <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] flex flex-col font-sans selection:bg-[#6C5CE7] dark:selection:bg-[#CCFF00] selection:text-white dark:selection:text-[#09090B]">
+        <header className="w-full border-b border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114] px-4 sm:px-6 py-3.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <BrandLogo size="md" />
-            <span className="hidden md:inline-block text-xs font-semibold text-[#6B6890] dark:text-[#B4B0D5] border-l border-[#E3DFF5] dark:border-[#3D3861] pl-3 whitespace-nowrap">
-              7 Subjects · IPhO · IChO · IBHO · IJSO · ICT
-            </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <PWAInstallButton />
             <button
               onClick={toggleTheme}
-              className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+              className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-[#6B6890] dark:text-[#9E9EA9] hover:bg-[#F7F5FF] dark:hover:bg-[#16161C] transition-colors cursor-pointer"
               aria-label="Toggle theme"
             >
               {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </header>
-
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Flagship Platform Overview */}
-            <section className="lg:col-span-6 space-y-6 order-2 lg:order-1">
-              <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-[#6C5CE7] dark:text-[#A594FF]">
-                  Learn.co Academic Platform · Web &amp; Installable Mobile App
-                </div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-[#2D2A4A] dark:text-[#F1EFFF] leading-[1.1]">
-                  First-Principles STEM &amp; Olympiad Mastery
-                </h1>
-                <p className="text-sm sm:text-base text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
-                  Study AP Calculus BC, Physics, Chemistry, Biology, English, Data Science, and Computer Science with interactive 3D and quantitative virtual laboratories, verified mentor workflows, and offline-ready practice sync.
-                </p>
+        <main className="flex-1 w-full max-w-xl mx-auto px-4 sm:px-6 py-10">
+          <Suspense
+            fallback={
+              <div className="p-8 rounded-xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-[#6C5CE7] dark:text-[#CCFF00] animate-spin" />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
-                  <div className="text-xs font-bold uppercase tracking-wide text-[#6C5CE7] dark:text-[#A594FF]">
-                    International Olympiads
-                  </div>
-                  <div className="text-sm font-black mt-1">IPhO · IChO · IBHO · IJSO · ICT</div>
-                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
-                    Dedicated olympiad chapters, competition theorems, and non-repeating calibrated problem ladders.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
-                  <div className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-                    11 Virtual Laboratories
-                  </div>
-                  <div className="text-sm font-black mt-1">3D WebGL, Optics, Dijkstra &amp; Bayes</div>
-                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
-                    Manipulate parameters in thin-film optics, Nernst cells, enzyme kinetics, ROC thresholds, and prosody scansion.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
-                  <div className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                    Android, iOS &amp; Desktop PWA
-                  </div>
-                  <div className="text-sm font-black mt-1">Direct Home Screen App &amp; Offline Sync</div>
-                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
-                    Add straight to your phone Home Screen or Desktop Apps with automatic offline practice queueing and cloud sync.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] shadow-xs">
-                  <div className="text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
-                    Verified Mentorship
-                  </div>
-                  <div className="text-sm font-black mt-1">Email Dispatch &amp; Approval Flow</div>
-                  <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-1 leading-relaxed">
-                    Connect with subject mentors through verified email notifications and real Firestore session tracking.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
-                    Add Learn.co to Your Home Screen
-                  </div>
-                  <div className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">
-                    Installs directly on Android, iPhone, iPad, or Desktop browsers — zero file download needed.
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  <PWAInstallButton />
-                </div>
-              </div>
-            </section>
-
-            {/* Right Sign-In / Sign-Up Card */}
-            <section className="lg:col-span-6 w-full max-w-xl mx-auto lg:max-w-none order-1 lg:order-2">
-              <Suspense
-                fallback={
-                  <div className="p-8 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-[#6C5CE7] animate-spin" />
-                  </div>
-                }
-              >
-                <AuthView
-                  initialResetToken={resetToken}
-                  onExitReset={() => setResetToken(null)}
-                  onNavigateToTab={() => setActiveTab('dashboard')}
-                />
-              </Suspense>
-            </section>
-          </div>
+            }
+          >
+            <AuthView
+              initialResetToken={resetToken}
+              onExitReset={() => setResetToken(null)}
+              onNavigateToTab={() => setActiveTab('dashboard')}
+            />
+          </Suspense>
         </main>
       </div>
+    );
+  }
+
+  // If user is not signed in: Editorial Landing Site + Direct Sign In / Create Account Modal + Embedded Auth Portal
+  if (!isAuthenticated) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#09090B] text-white flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-[#CCFF00] animate-spin" />
+          </div>
+        }
+      >
+        <LandingSite
+          pwaInstallSlot={<PWAInstallButton />}
+          onOpenAuth={(mode = 'signin') => {
+            setAuthModalMode(mode === 'signup' ? 'signup' : 'signin');
+            setIsAuthModalOpen(true);
+          }}
+          authSlot={
+            <Suspense
+              fallback={
+                <div className="p-8 rounded-xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-[#6C5CE7] dark:text-[#CCFF00] animate-spin" />
+                </div>
+              }
+            >
+              <AuthView
+                initialResetToken={resetToken}
+                onExitReset={() => setResetToken(null)}
+                onNavigateToTab={() => setActiveTab('dashboard')}
+              />
+            </Suspense>
+          }
+        />
+        {isAuthModalOpen && (
+          <Suspense fallback={null}>
+            <AuthModal
+              isOpen={isAuthModalOpen}
+              initialMode={authModalMode}
+              onClose={() => setIsAuthModalOpen(false)}
+            />
+          </Suspense>
+        )}
+      </Suspense>
     );
   }
 
@@ -562,8 +529,8 @@ export default function App() {
     return (
       <Suspense
         fallback={
-          <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-[#6C5CE7] animate-spin" />
+          <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#09090B] flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-[#6C5CE7] dark:text-[#CCFF00] animate-spin" />
           </div>
         }
       >
@@ -573,9 +540,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col font-sans selection:bg-[#6C5CE7] selection:text-white">
+    <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] flex flex-col font-sans selection:bg-[#6C5CE7] dark:selection:bg-[#CCFF00] selection:text-white dark:selection:text-[#09090B]">
       {/* Top Universal Navigation Bar */}
-      <Suspense fallback={<div className="h-16 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647]" />}>
+      <Suspense fallback={<div className="h-16 border-b border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114]" />}>
         <Navbar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -586,7 +553,10 @@ export default function App() {
           isDarkMode={isDarkMode}
           onToggleTheme={toggleTheme}
           onOpenProfile={() => setActiveTab('profile')}
-          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onOpenAuthModal={() => {
+            setAuthModalMode('signin');
+            setIsAuthModalOpen(true);
+          }}
           onOpenFlashCheck={() => setIsFlashCheckOpen(true)}
           onToggleZenMode={() => setIsZenMode((prev) => !prev)}
           isZenMode={isZenMode}
@@ -610,27 +580,27 @@ export default function App() {
         {/* Dynamic Center Stage Canvas with Zen Focus Canvas */}
         <Suspense fallback={<div className="flex-1" />}>
           <ZenFocusCanvas isActive={isZenMode} onExit={() => setIsZenMode(false)}>
-          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-3 py-4 sm:p-6 lg:p-8 pb-24 md:pb-8 bg-[#F7F5FF] dark:bg-[#1E1B33] transition-colors">
+          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-3 py-4 sm:p-6 lg:p-8 pb-24 md:pb-8 bg-[#F7F5FF] dark:bg-[#09090B] transition-colors">
             <ErrorBoundary
               fallbackTitle="STEM Workspace View Error"
               fallbackMessage="An unexpected issue occurred while rendering this tab. You can reload this view below."
             >
             {arrivalReminder && arrivalReminder.accountId === practiceAccountId && !isWalkthroughOpen && (
-              <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_rgba(45,42,74,0.06)] animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="max-w-7xl mx-auto mb-6 p-4 rounded-xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] text-[#2D2A4A] dark:text-[#F4F4F6] flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-xl bg-[#6C5CE7] text-white shrink-0 mt-0.5 shadow-xs">
+                  <div className="p-2.5 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] shrink-0 mt-0.5">
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-black text-sm text-[#2D2A4A] dark:text-[#F1EFFF]">
+                      <h4 className="font-black text-sm text-[#2D2A4A] dark:text-[#F4F4F6]">
                         {arrivalReminder.title}
                       </h4>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#4CAF8E] text-white">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#4CAF8E] text-white">
                         0 AI Tokens · Free
                       </span>
                     </div>
-                    <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] mt-0.5 font-medium">
+                    <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9] mt-0.5 font-medium">
                       {arrivalReminder.message}
                     </p>
                   </div>
@@ -642,13 +612,13 @@ export default function App() {
                       setActiveTab(arrivalReminder.actionUrl);
                       setArrivalReminder(null);
                     }}
-                    className="px-4 py-2 min-h-[40px] rounded-xl bg-[#6C5CE7] hover:bg-[#5b4bc4] text-white text-xs font-black shadow-[0_2px_6px_rgba(108,92,231,0.25)] transition-colors cursor-pointer"
+                    className="px-4 py-2 min-h-[40px] rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] hover:bg-[#5b4bc4] dark:hover:bg-[#d9ff33] text-white dark:text-[#09090B] text-xs font-black transition-colors cursor-pointer"
                   >
                     {arrivalReminder.actionLabel}
                   </button>
                   <button
                     onClick={() => setArrivalReminder(null)}
-                    className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-[#6B6890] hover:text-[#2D2A4A] dark:text-[#B4B0D5] dark:hover:text-[#F1EFFF] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+                    className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-[#6B6890] hover:text-[#2D2A4A] dark:text-[#9E9EA9] dark:hover:text-[#F4F4F6] hover:bg-[#F7F5FF] dark:hover:bg-[#16161C] transition-colors cursor-pointer"
                     aria-label="Dismiss smart reminder"
                   >
                     <X className="w-4 h-4" />
@@ -660,8 +630,8 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
-                  <Loader2 className="w-8 h-8 text-[#6C5CE7] animate-spin" />
-                  <p className="text-xs font-bold text-[#6B6890] dark:text-[#B4B0D5]">
+                  <Loader2 className="w-8 h-8 text-[#6C5CE7] dark:text-[#CCFF00] animate-spin" />
+                  <p className="text-xs font-bold text-[#6B6890] dark:text-[#9E9EA9]">
                     Loading workspace module...
                   </p>
                 </div>
@@ -772,19 +742,19 @@ export default function App() {
                 (isAdmin ? (
                   <AdminStudioView />
                 ) : (
-                  <div className="max-w-xl mx-auto mt-12 p-8 rounded-3xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-center space-y-4 shadow-sm">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+                  <div className="max-w-xl mx-auto mt-12 p-8 rounded-xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] text-center space-y-4">
+                    <div className="w-12 h-12 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
                       <ShieldCheck className="w-6 h-6" />
                     </div>
-                    <h2 className="text-lg font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+                    <h2 className="text-lg font-black text-[#2D2A4A] dark:text-[#F4F4F6]">
                       Administrator Access Required
                     </h2>
-                    <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
+                    <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9]">
                       Admin Studio is restricted to verified administrators. Return to your learning dashboard to continue studying.
                     </p>
                     <button
                       onClick={() => setActiveTab('dashboard')}
-                      className="px-5 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] text-white text-xs font-bold cursor-pointer"
+                      className="px-5 py-2.5 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] hover:bg-[#5B4BC4] dark:hover:bg-[#d9ff33] text-white dark:text-[#09090B] text-xs font-bold cursor-pointer"
                     >
                       Back to Dashboard
                     </button>
@@ -892,7 +862,11 @@ export default function App() {
       {/* Auth Modal (Sign In / Sign Up) */}
       {isAuthModalOpen && (
         <Suspense fallback={null}>
-          <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            initialMode={authModalMode}
+            onClose={() => setIsAuthModalOpen(false)}
+          />
         </Suspense>
       )}
 

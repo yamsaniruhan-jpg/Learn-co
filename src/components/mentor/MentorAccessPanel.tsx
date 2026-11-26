@@ -311,7 +311,7 @@ export const MentorAccessPanel: React.FC<MentorAccessPanelProps> = ({
           <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
-              Notice: No server email relay (<code>RESEND_API_KEY</code> / <code>SMTP_URL</code>) is configured in this deployment. Your application will still be stored in Firestore and the Owner Queue, and we will give you a one-click <strong>Send via Email App</strong> button after submission.
+              Notice: No server email relay (<code>RESEND_API_KEY</code>, <code>GMAIL_USER</code> + <code>GMAIL_APP_PASSWORD</code>, or <code>SMTP_URL</code>) is configured yet. Your application will still be saved in Firestore and the Owner Queue, and we will give you a one-click <strong>Send Copy via Email App</strong> button right after submission.
             </span>
           </div>
         )}

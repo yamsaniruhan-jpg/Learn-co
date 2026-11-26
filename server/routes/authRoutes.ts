@@ -479,7 +479,9 @@ router.post('/forgot-password', resetIpLimiter, resetEmailLimiter, async (req, r
     if (!isMailerConfigured()) {
       // This is a deployment-wide condition, independent of account existence.
       // Do not generate a credential that cannot be delivered securely.
-      res.status(503).json({ error: 'Password reset email is currently unavailable. Please contact support.' });
+      res.status(503).json({
+        error: 'Password reset email is unavailable because no email relay (RESEND_API_KEY, Gmail SMTP, or SMTP_URL) is configured on this server. Please ask the administrator or use Google Sign-In.',
+      });
       return;
     }
     const ttlMinutes = 30;
