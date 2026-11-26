@@ -59,11 +59,38 @@ export default function OmniCopilot() {
     return () => window.removeEventListener('learnco:open-copilot', handleOpen);
   }, []);
 
+  const getTodayKey = () => `learnco_omni_photo_uploads_${new Date().toISOString().split('T')[0]}`;
+
+  const getTodayPhotoCount = () => {
+    try {
+      const val = localStorage.getItem(getTodayKey());
+      return val ? parseInt(val, 10) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const incrementTodayPhotoCount = () => {
+    try {
+      const current = getTodayPhotoCount();
+      localStorage.setItem(getTodayKey(), String(current + 1));
+    } catch {}
+  };
+
   const handleImagePick = async (file) => {
     if (!file) return;
+    const todayCount = getTodayPhotoCount();
+    if (todayCount >= 3) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'error', content: 'Daily photo upload limit reached (3/3 photos used today). You can continue asking questions with text.', timestamp: Date.now() },
+      ]);
+      return;
+    }
     try {
       const prepared = await prepareQuestionImage(file);
       setAttachedImage(prepared);
+      incrementTodayPhotoCount();
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -367,10 +394,14 @@ export default function OmniCopilot() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="min-w-[44px] min-h-[44px] rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] flex items-center justify-center shrink-0 cursor-pointer"
+            title={`Upload photo (${Math.max(0, 3 - getTodayPhotoCount())} remaining today, limit 3/day)`}
+            className="min-w-[44px] min-h-[44px] rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] flex items-center justify-center shrink-0 cursor-pointer relative"
             aria-label="Upload photo of a question"
           >
             <ImagePlus className="w-4 h-4" />
+            <span className="absolute -top-1 -right-1 bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] text-[9px] font-bold px-1 rounded-full">
+              {Math.max(0, 3 - getTodayPhotoCount())}
+            </span>
           </button>
           <textarea
             value={input}
