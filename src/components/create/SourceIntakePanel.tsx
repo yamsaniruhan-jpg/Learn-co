@@ -29,9 +29,11 @@ import { uploadUserFile, auth } from '../../services/firebaseClient';
 import { hasMatchingFirebaseIdentity } from '../../services/clientFirestoreSync';
 import { useAuth } from '../../context/AuthContext';
 import { CreatorClient } from '../../services/creatorClient';
+import { extractTextFromFileClient } from '../../utils/guestMode';
 
 interface SourceIntakePanelProps {
   onGenerate: (params: GenerateResourceRequest) => Promise<void>;
+  onGuestFallbackGenerate?: (params: GenerateResourceRequest, file?: File | null) => Promise<void>;
   onStorageStatus: (status: string) => void;
   onSourceSaved?: () => void;
   isGenerating: boolean;
@@ -46,6 +48,7 @@ interface SourceIntakePanelProps {
 
 export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
   onGenerate,
+  onGuestFallbackGenerate,
   onStorageStatus,
   onSourceSaved,
   isGenerating,
@@ -321,32 +324,56 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
     }
   };
 
+  const handleGuestFallbackClick = async () => {
+    if (!onGuestFallbackGenerate || isGenerating || isUploading) return;
+    setIntakeError('');
+    let guestSourceText = sourceType === 'text' ? textContent : undefined;
+    if (sourceType === 'pdf' && uploadedFile) {
+      guestSourceText = await extractTextFromFileClient(uploadedFile);
+    }
+    const payload: GenerateResourceRequest = {
+      sourceType: sourceType === 'pdf' && uploadedFile ? 'text' : sourceType,
+      sourceText: guestSourceText,
+      sourceUrl: sourceType === 'url' ? urlInput : undefined,
+      resourceType: selectedResourceType,
+      title: title.trim() || `Mastery ${selectedResourceType.replace(/_/g, ' ')}`,
+      subjectId,
+      difficulty,
+      options: {
+        depthLevel,
+        includeFormulas,
+        includeBloomTaxonomy,
+      },
+    };
+    await onGuestFallbackGenerate(payload, uploadedFile);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* 1. SOURCE INTAKE SELECTOR */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-5 shadow-xs">
+      <div className="p-6 rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] space-y-5 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs">
+            <h2 className="text-base font-bold text-[#2D2A4A] dark:text-white flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-[#6C5CE7] text-white flex items-center justify-center text-xs">
                 1
               </span>
               <span>Intake Source Material</span>
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8] mt-0.5">
               Upload documents, paste lecture notes, or scrape STEM articles to synthesize.
             </p>
           </div>
 
           {/* Intake Mode Switcher */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto">
+          <div className="flex bg-[#F7F5FF] dark:bg-[#16161C] p-1 rounded-xl border border-[#E3DFF5] dark:border-[#232329] overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setSourceType('text')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 sourceType === 'text'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#232329] text-[#6C5CE7] dark:text-[#CCFF00] shadow-xs'
+                  : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -356,10 +383,10 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
             <button
               type="button"
               onClick={() => setSourceType('pdf')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 sourceType === 'pdf'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#232329] text-[#6C5CE7] dark:text-[#CCFF00] shadow-xs'
+                  : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
               }`}
             >
               <UploadCloud className="w-3.5 h-3.5" />
@@ -369,10 +396,10 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
             <button
               type="button"
               onClick={() => setSourceType('url')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 sourceType === 'url'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#232329] text-[#6C5CE7] dark:text-[#CCFF00] shadow-xs'
+                  : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
@@ -389,9 +416,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
               value={textContent}
               onChange={(e) => setTextContent(e.target.value)}
               placeholder="Paste raw lecture text, textbook excerpts, problem sets, or mathematical proofs..."
-              className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-4 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF]/60 dark:bg-[#16161C] text-xs sm:text-sm text-[#2D2A4A] dark:text-white placeholder:text-[#6B6890] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
             />
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#9D9BB8]">
               <span>Supports LaTeX mathematical equations ($x^2$, $\nabla f$)</span>
               <span>{textContent.split(/\s+/).filter(Boolean).length} words</span>
             </div>
@@ -416,27 +443,27 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 className={`p-8 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all ${
                   isDragging
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20'
-                    : 'border-slate-300 dark:border-slate-700 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                    ? 'border-[#6C5CE7] bg-[#F3F0FF] dark:bg-[#1C1A2E]'
+                    : 'border-[#E3DFF5] dark:border-[#2E2D3D] hover:border-[#6C5CE7] hover:bg-[#F7F5FF] dark:hover:bg-[#16161C]'
                 }`}
               >
-                <UploadCloud className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                <UploadCloud className="w-10 h-10 text-[#6C5CE7] dark:text-[#A594FF] mx-auto mb-2" />
+                <p className="text-sm font-bold text-[#2D2A4A] dark:text-white">
                   Drop your PDF, TXT, Markdown, or CSV lecture notes here
                 </p>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8] mt-1">
                   or click to browse from device (up to 7 MB)
                 </p>
               </div>
             ) : (
-              <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 flex flex-wrap items-center justify-between gap-3">
+              <div className="p-4 rounded-xl border border-[#6C5CE7]/30 bg-[#F3F0FF]/60 dark:bg-[#16161C] flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2.5 bg-indigo-600 text-white rounded-lg shrink-0">
+                  <div className="p-2.5 bg-[#6C5CE7] text-white rounded-lg shrink-0">
                     <File className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                      <h4 className="text-xs font-bold text-[#2D2A4A] dark:text-white truncate">
                         {uploadedFile.name}
                       </h4>
                       {savedSourceId && (
@@ -445,7 +472,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-[#6B6890] dark:text-[#9D9BB8]">
                       {(uploadedFile.size / 1024).toFixed(1)} KB • {savedSourceId ? 'Uploaded & ready for synthesis' : 'Ready to upload & synthesize'}
                     </p>
                   </div>
@@ -472,7 +499,7 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                   <button
                     type="button"
                     onClick={() => { setUploadedFile(null); setSavedSourceId(null); onStorageStatus(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                    className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400"
+                    className="p-1.5 rounded-lg hover:bg-[#EDE9FE] dark:hover:bg-[#232329] text-[#6B6890]"
                     aria-label="Remove selected file"
                   >
                     <X className="w-4 h-4" />
@@ -491,21 +518,37 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://en.wikipedia.org/wiki/Euler%27s_formula or textbook URL..."
-                className="flex-1 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="flex-1 p-3.5 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF]/60 dark:bg-[#16161C] text-xs sm:text-sm text-[#2D2A4A] dark:text-white placeholder:text-[#6B6890] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
               />
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-[#6B6890] dark:text-[#9D9BB8]">
               The AI Engine cleans HTML boilerplate, strips ads, and extracts core principles.
             </p>
           </div>
         )}
 
-        {intakeError && <p role="alert" className="text-xs text-red-600">{intakeError}</p>}
+        {intakeError && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex flex-wrap items-center justify-between gap-2">
+            <p role="alert" className="text-xs text-rose-700 dark:text-rose-200 font-semibold">
+              {intakeError}
+            </p>
+            {onGuestFallbackGenerate && !isGenerationLimitReached && (
+              <button
+                type="button"
+                onClick={handleGuestFallbackClick}
+                disabled={isGenerating || isUploading}
+                className="px-3.5 py-1.5 rounded-xl bg-[#CCFF00] hover:bg-[#B8E600] text-[#09090B] text-xs font-extrabold shadow-sm cursor-pointer shrink-0"
+              >
+                Retry &amp; Create in Guest Mode (Not Saved)
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Resource Title & Domain Config */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-[#E3DFF5] dark:border-[#232329]">
           <div className="sm:col-span-1 space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-bold text-[#2D2A4A] dark:text-[#D4D2E8]">
               Artifact Title
             </label>
             <input
@@ -513,18 +556,18 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Lagrangian Mechanics Mastery"
-              className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF]/60 dark:bg-[#16161C] text-xs text-[#2D2A4A] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-bold text-[#2D2A4A] dark:text-[#D4D2E8]">
               Subject Pillar
             </label>
             <select
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value as SubjectId)}
-              className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+              className="w-full p-2.5 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF]/60 dark:bg-[#16161C] text-xs text-[#2D2A4A] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] font-semibold"
             >
               <option value="math">Mathematics (Pure & Applied)</option>
               <option value="physics">Physics & Mechanics</option>
@@ -535,13 +578,13 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-bold text-[#2D2A4A] dark:text-[#D4D2E8]">
               Target Difficulty
             </label>
             <select
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as DifficultyLevel)}
-              className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+              className="w-full p-2.5 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF]/60 dark:bg-[#16161C] text-xs text-[#2D2A4A] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] font-semibold"
             >
               <option value="easy">Introductory / Foundational</option>
               <option value="medium">Intermediate Undergraduate</option>
@@ -552,15 +595,15 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
       </div>
 
       {/* 2. TARGET SYNTHESIS ARTIFACT PICKER (8 Types) */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-5 shadow-xs">
+      <div className="p-6 rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] space-y-5 shadow-xs">
         <div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs">
+          <h2 className="text-base font-bold text-[#2D2A4A] dark:text-white flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-[#6C5CE7] text-white flex items-center justify-center text-xs">
               2
             </span>
             <span>Select Output Pedagogical Format</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8] mt-0.5">
             Choose how you want this knowledge structured for active retention.
           </p>
         </div>
@@ -574,37 +617,37 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                 onClick={() => setSelectedResourceType(item.type)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
                   isSelected
-                    ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/30 ring-2 ring-indigo-500/20 shadow-xs'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-700'
+                    ? 'border-[#6C5CE7] bg-[#F3F0FF] dark:bg-[#1C1A2E] ring-2 ring-[#6C5CE7]/20 shadow-xs'
+                    : 'border-[#E3DFF5] dark:border-[#232329] bg-white dark:bg-[#16161C] hover:border-[#6C5CE7]/60'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+                  <div className="p-2 rounded-lg bg-[#F7F5FF] dark:bg-[#111114]">
                     {item.icon}
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B6890] dark:text-[#9D9BB8]">
                     {item.badge}
                   </span>
                 </div>
 
                 <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-xs sm:text-sm font-bold text-[#2D2A4A] dark:text-white">
                     {item.name}
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                  <p className="text-[11px] text-[#6B6890] dark:text-[#9D9BB8] mt-1 line-clamp-2">
                     {item.desc}
                   </p>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                <div className="pt-2 border-t border-[#E3DFF5] dark:border-[#232329] flex items-center justify-between text-[11px]">
                   <span
                     className={`font-bold ${
-                      isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
+                      isSelected ? 'text-[#6C5CE7] dark:text-[#CCFF00]' : 'text-[#6B6890] dark:text-[#9D9BB8]'
                     }`}
                   >
                     {isSelected ? 'Selected' : 'Select'}
                   </span>
-                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
+                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#CCFF00]" />}
                 </div>
               </div>
             );
@@ -616,22 +659,22 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600"
+            className="flex items-center gap-1.5 text-xs font-bold text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#6C5CE7] cursor-pointer"
           >
             <span>Advanced Pedagogical Parameters</span>
             {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
 
           {showAdvanced && (
-            <div className="mt-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs animate-in fade-in duration-150">
+            <div className="mt-3 p-4 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs animate-in fade-in duration-150">
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                <label className="font-bold text-[#2D2A4A] dark:text-[#D4D2E8] block mb-1">
                   Analytical Rigor
                 </label>
                 <select
                   value={depthLevel}
                   onChange={(e) => setDepthLevel(e.target.value as any)}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-semibold"
+                  className="w-full p-2 rounded-lg border border-[#E3DFF5] dark:border-[#232329] bg-white dark:bg-[#111114] text-xs font-semibold text-[#2D2A4A] dark:text-white"
                 >
                   <option value="simplified">Simplified / Intuitive</option>
                   <option value="standard">Standard Undergraduate</option>
@@ -645,9 +688,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                   id="includeFormulas"
                   checked={includeFormulas}
                   onChange={(e) => setIncludeFormulas(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-[#E3DFF5] text-[#6C5CE7] focus:ring-[#6C5CE7]"
                 />
-                <label htmlFor="includeFormulas" className="font-semibold text-slate-700 dark:text-slate-300">
+                <label htmlFor="includeFormulas" className="font-semibold text-[#2D2A4A] dark:text-[#D4D2E8]">
                   Force LaTeX Equation Derivations
                 </label>
               </div>
@@ -658,9 +701,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
                   id="includeBloomTaxonomy"
                   checked={includeBloomTaxonomy}
                   onChange={(e) => setIncludeBloomTaxonomy(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-[#E3DFF5] text-[#6C5CE7] focus:ring-[#6C5CE7]"
                 />
-                <label htmlFor="includeBloomTaxonomy" className="font-semibold text-slate-700 dark:text-slate-300">
+                <label htmlFor="includeBloomTaxonomy" className="font-semibold text-[#2D2A4A] dark:text-[#D4D2E8]">
                   Tag Bloom Taxonomy Cognitive Levels
                 </label>
               </div>
@@ -670,10 +713,10 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
       </div>
 
       {/* 3. GENERATION SUBMIT BUTTON */}
-      <div className="flex items-center justify-between p-6 rounded-2xl bg-indigo-900 text-white border border-indigo-700/80 shadow-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-[#16161C] text-white border border-[#232329] shadow-md">
         <div>
-          <h3 className="text-sm font-bold">Ready to Synthesize Artifact</h3>
-          <p className="text-xs text-indigo-200 mt-0.5">
+          <h3 className="text-sm font-bold text-white">Ready to Synthesize Artifact</h3>
+          <p className="text-xs text-[#B4B0D5] mt-0.5">
             Will generate a verified <strong>{selectedResourceType.replace(/_/g, ' ')}</strong> grounded in first principles.
           </p>
         </div>
@@ -684,9 +727,9 @@ export const SourceIntakePanel: React.FC<SourceIntakePanelProps> = ({
           size="lg"
           disabled={isGenerating || isUploading || isGenerationLimitReached || (sourceType === 'pdf' && !uploadedFile && !(prefillSource?.sourceType === 'pdf' && prefillSource?.sourceId)) || (sourceType === 'text' && !textContent.trim()) || (sourceType === 'url' && !urlInput.trim())}
           leftIcon={(isGenerating || isUploading) ? <Loader2 className="w-4 h-4 animate-spin" /> : isGenerationLimitReached ? <X className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-          className={isGenerationLimitReached ? "bg-red-500 text-white cursor-not-allowed" : "bg-white text-indigo-950 hover:bg-indigo-50 font-bold px-6 shadow-sm"}
+          className={isGenerationLimitReached ? "bg-red-500 text-white cursor-not-allowed" : "bg-[#CCFF00] text-[#09090B] hover:bg-[#B8E600] font-extrabold px-6 shadow-sm"}
         >
-          {isGenerating ? 'Synthesizing...' : isGenerationLimitReached ? 'Daily Limit Reached' : 'Synthesize Resource'}
+          {isGenerating ? 'Synthesizing...' : isGenerationLimitReached ? 'Limit Reached' : 'Synthesize Resource'}
         </Button>
       </div>
     </form>

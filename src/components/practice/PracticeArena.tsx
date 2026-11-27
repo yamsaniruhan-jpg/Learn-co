@@ -12,6 +12,12 @@ import { gradeQuestionAnswer } from '../../utils/gradeAnswer';
 import { practiceStorageKey } from '../../utils/localPractice';
 import { readStoredArray } from '../../utils/storageSafety';
 import { buildApiHeaders } from '../../utils/csrf';
+import {
+  canConsumeGuestQuota,
+  consumeGuestQuota,
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+} from '../../utils/guestMode';
 import confetti from 'canvas-confetti';
 import { FormattedMathText } from '../common/FormattedMathText';
 import {
@@ -110,9 +116,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
 
   if (!currentQuestion) {
     return (
-      <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-        <p className="text-slate-500">No questions available in this session.</p>
-        <button onClick={onExit} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold">
+      <div className="p-8 text-center bg-white dark:bg-[#111114] rounded-2xl border border-[#E3DFF5] dark:border-[#232329]">
+        <p className="text-[#6B6890] dark:text-[#9D9BB8]">No questions available in this session.</p>
+        <button onClick={onExit} className="mt-4 px-4 py-2 bg-[#6C5CE7] hover:bg-[#5B4BD6] text-white rounded-xl text-xs font-semibold cursor-pointer">
           Return
         </button>
       </div>
@@ -268,7 +274,30 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
       const hintsCount = hintsRevealed[questionId] || 0;
 
       if (!sessionId) {
-        setSubmitError('Please sign in to submit answers and earn verified XP.');
+        if (!canConsumeGuestQuota('practiceQuestions', 1)) {
+          setSubmitError(
+            `Guest practice limit reached (${GUEST_LIMITS.practiceQuestions}/${GUEST_LIMITS.practiceQuestions} questions used). Sign in to unlock 25/day + saved XP.`
+          );
+          return;
+        }
+        consumeGuestQuota('practiceQuestions', 1);
+        const rem = getGuestQuotaRemaining().practiceRemaining;
+        setIsSubmitted((prev) => ({ ...prev, [questionId]: true }));
+        setSubmissionFeedback((prev) => ({
+          ...prev,
+          [questionId]: {
+            isCorrect,
+            xpEarned: 0,
+            verification: 'guest',
+            dailyQuotaRemaining: rem,
+            isGuestPreview: true,
+          },
+        }));
+        if (isCorrect) {
+          sounds.playSuccess();
+        } else {
+          sounds.playFailure();
+        }
         return;
       }
 
@@ -480,29 +509,29 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top Practice Arena Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 font-bold font-mono text-xs">
+          <div className="px-3 py-1.5 rounded-xl bg-[#F3F0FF] dark:bg-[#1C1A2E] text-[#6C5CE7] dark:text-[#C5BAFF] font-bold font-mono text-xs">
             Question {currentIndex + 1} of {questions.length}
           </div>
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[#F7F5FF] dark:bg-[#16161C] text-[#6B6890] dark:text-[#C8C6DC] border border-[#E3DFF5] dark:border-[#232329]">
             {currentQuestion.subjectId}
           </span>
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 capitalize">
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#F7F5FF] dark:bg-[#16161C] text-[#6B6890] dark:text-[#C8C6DC] border border-[#E3DFF5] dark:border-[#232329] capitalize">
             {currentQuestion.difficulty.replace('_', ' ')}
           </span>
         </div>
 
         {/* Live Timer & Controls */}
         <div className="flex items-center gap-4 text-xs font-mono">
-          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
-            <Clock className="w-3.5 h-3.5 text-indigo-500" />
+          <div className="flex items-center gap-1.5 text-[#2D2A4A] dark:text-[#E2E0F0] font-semibold bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] px-3 py-1.5 rounded-lg">
+            <Clock className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#A594FF]" />
             <span>{formatTime(totalTimerSeconds)}</span>
           </div>
 
           <button
             onClick={() => setIsTimerPaused(!isTimerPaused)}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            className="p-1.5 text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white rounded hover:bg-[#F7F5FF] dark:hover:bg-[#16161C] cursor-pointer"
             title={isTimerPaused ? 'Resume Timer' : 'Pause Timer'}
           >
             {isTimerPaused ? <Play className="w-4 h-4 text-emerald-500" /> : <Pause className="w-4 h-4" />}
@@ -515,7 +544,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
 
           <button
             onClick={onExit}
-            className="text-xs text-slate-400 hover:text-rose-500 font-sans font-medium transition-colors cursor-pointer"
+            className="text-xs text-[#6B6890] dark:text-[#9D9BB8] hover:text-rose-500 font-sans font-medium transition-colors cursor-pointer"
           >
             Exit Arena
           </button>
@@ -533,13 +562,13 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
               key={q.id}
               onClick={() => setCurrentIndex(idx)}
               className={`h-2 rounded-full transition-all cursor-pointer ${
-                isCur ? 'w-8 bg-indigo-600' : 'w-full'
+                isCur ? 'w-8 bg-[#6C5CE7]' : 'w-full'
               } ${
                 isDone
                   ? isCorr
                     ? 'bg-emerald-500'
                     : 'bg-rose-500'
-                  : 'bg-slate-200 dark:bg-slate-800'
+                  : 'bg-[#E3DFF5] dark:bg-[#232329]'
               }`}
             />
           );
@@ -547,26 +576,26 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
       </div>
 
       {/* Main Question Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+      <div className="bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
         {/* Question Type & Topic Info */}
-        <div className="flex items-center justify-between text-xs text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <span className="font-semibold text-slate-700 dark:text-slate-300">
+        <div className="flex items-center justify-between text-xs text-[#6B6890] dark:text-[#9D9BB8] border-b border-[#E3DFF5] dark:border-[#232329] pb-3">
+          <span className="font-semibold text-[#2D2A4A] dark:text-[#E2E0F0]">
             {currentQuestion.topicId}
           </span>
-          <span className="capitalize font-mono text-[11px] px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <span className="capitalize font-mono text-[11px] px-2 py-0.5 rounded bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329]">
             {currentQuestion.questionType.replace('_', ' ')}
           </span>
         </div>
 
         {/* Question Statement */}
-        <div className="text-base sm:text-lg font-medium text-slate-900 dark:text-slate-100 leading-relaxed font-serif">
+        <div className="text-base sm:text-lg font-medium text-[#2D2A4A] dark:text-white leading-relaxed font-serif">
           <FormattedMathText text={currentQuestion.questionText} />
         </div>
 
         {/* Optional Code Snippet */}
         {currentQuestion.codeSnippet && (
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed">
-            <div className="text-[10px] text-slate-500 uppercase mb-1 font-sans">
+          <div className="p-4 rounded-xl bg-[#09090B] border border-[#232329] text-zinc-200 font-mono text-xs overflow-x-auto leading-relaxed">
+            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-sans">
               {currentQuestion.codeSnippet.language}
             </div>
             <pre>{currentQuestion.codeSnippet.code}</pre>
@@ -601,16 +630,16 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                       : isWrongOpt
                       ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-900 dark:text-rose-200'
                       : isSelected
-                      ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-600 text-indigo-900 dark:text-indigo-200 shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-slate-700'
+                      ? 'bg-[#F3F0FF] dark:bg-[#1C1A2E] border-[#6C5CE7] text-[#2D2A4A] dark:text-[#E2DEFF] shadow-sm'
+                      : 'bg-white dark:bg-[#16161C] border-[#E3DFF5] dark:border-[#232329] text-[#2D2A4A] dark:text-[#D4D2E8] hover:border-[#6C5CE7]/60'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <span
                       className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs font-bold shrink-0 ${
                         isSelected
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          ? 'bg-[#6C5CE7] text-white'
+                          : 'bg-[#F7F5FF] dark:bg-[#111114] text-[#6B6890] dark:text-[#9D9BB8]'
                       }`}
                     >
                       {letter}
@@ -631,7 +660,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         {/* 2. Multiple Choice (Multi-Correct) */}
         {currentQuestion.questionType === 'multiple_choice' && (
           <div className="space-y-3">
-            <div className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
+            <div className="text-xs text-[#6C5CE7] dark:text-[#A594FF] font-semibold">
               • Multiple Correct Options: Select all valid statements
             </div>
             {currentQuestion.options?.map((opt, oIdx) => {
@@ -654,16 +683,16 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                       : isWrongSelected
                       ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-900 dark:text-rose-200'
                       : isSelected
-                      ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-600 text-indigo-900 dark:text-indigo-200'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                      ? 'bg-[#F3F0FF] dark:bg-[#1C1A2E] border-[#6C5CE7] text-[#2D2A4A] dark:text-[#E2DEFF]'
+                      : 'bg-white dark:bg-[#16161C] border-[#E3DFF5] dark:border-[#232329] text-[#2D2A4A] dark:text-[#D4D2E8]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <span
                       className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs font-bold shrink-0 ${
                         isSelected
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          ? 'bg-[#6C5CE7] text-white'
+                          : 'bg-[#F7F5FF] dark:bg-[#111114] text-[#6B6890] dark:text-[#9D9BB8]'
                       }`}
                     >
                       {letter}
@@ -682,8 +711,8 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
 
         {/* 3. Numerical Value Input */}
         {currentQuestion.questionType === 'numerical' && (
-          <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+          <div className="p-5 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] space-y-3">
+            <label className="text-xs font-semibold text-[#2D2A4A] dark:text-[#D4D2E8] block">
               Enter Exact Numerical Value (or within tolerance):
             </label>
             <div className="flex items-center gap-3 max-w-xs">
@@ -694,14 +723,14 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                 disabled={isCurrentSubmitted}
                 value={numericalInput}
                 onChange={(e) => handleNumericalChange(e.target.value)}
-                className="w-full text-base font-mono font-bold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full text-base font-mono font-bold px-4 py-2.5 rounded-xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] text-[#2D2A4A] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
               />
               {currentQuestion.numericalUnit && (
-                <span className="text-xs font-mono text-slate-500">{currentQuestion.numericalUnit}</span>
+                <span className="text-xs font-mono text-[#6B6890] dark:text-[#9D9BB8]">{currentQuestion.numericalUnit}</span>
               )}
             </div>
             {isCurrentSubmitted && (
-              <div className="text-xs text-slate-500 font-mono">
+              <div className="text-xs text-[#6B6890] dark:text-[#9D9BB8] font-mono">
                 Authoritative Correct Value: <span className="text-emerald-500 font-bold">{currentQuestion.correctAnswer}</span>
               </div>
             )}
@@ -727,8 +756,8 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                       : isWrongSelected
                       ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-900 dark:text-rose-200'
                       : isSelected
-                      ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-600 text-indigo-900 dark:text-indigo-200 shadow-md'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                      ? 'bg-[#F3F0FF] dark:bg-[#1C1A2E] border-[#6C5CE7] text-[#2D2A4A] dark:text-[#E2DEFF] shadow-md'
+                      : 'bg-white dark:bg-[#16161C] border-[#E3DFF5] dark:border-[#232329] text-[#2D2A4A] dark:text-[#D4D2E8] hover:border-[#6C5CE7]/60'
                   }`}
                 >
                   {tf}
@@ -741,16 +770,16 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         {/* ========================================================================= */}
         {/* HINTS ACCORDION & SOCRATIC COPILOT                                        */}
         {/* ========================================================================= */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+        <div className="pt-2 border-t border-[#E3DFF5] dark:border-[#232329] space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               {currentQuestion.hints && currentQuestion.hints.length > 0 && (
                 <button
                   onClick={revealNextHint}
                   disabled={isCurrentSubmitted || (hintsRevealed[questionId] || 0) >= currentQuestion.hints.length}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-[#F7F5FF] hover:bg-[#EDE9FE] dark:bg-[#16161C] dark:hover:bg-[#1C1A2E] disabled:opacity-40 text-[#2D2A4A] dark:text-[#D4D2E8] border border-[#E3DFF5] dark:border-[#232329] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                  <HelpCircle className="w-3.5 h-3.5 text-[#6C5CE7]" />
                   <span>
                     Reveal Progressive Hint ({hintsRevealed[questionId] || 0}/{currentQuestion.hints.length})
                   </span>
@@ -760,14 +789,14 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
               <button
                 onClick={requestAiSocraticHint}
                 disabled={isLoadingAiHint || isCurrentSubmitted}
-                className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-[#F3F0FF] hover:bg-[#EAE4FF] dark:bg-[#1C1A2E] dark:hover:bg-[#25213D] text-[#6C5CE7] dark:text-[#C5BAFF] border border-[#6C5CE7]/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Bot className="w-3.5 h-3.5 text-purple-500" />
+                <Bot className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#A594FF]" />
                 <span>{isLoadingAiHint ? 'Generating Hint...' : 'Socratic AI Guidance'}</span>
               </button>
             </div>
 
-            <div className="text-[11px] text-slate-400">
+            <div className="text-[11px] text-[#6B6890] dark:text-[#9D9BB8]">
               No XP penalty for using hints in practice mode
             </div>
           </div>
@@ -795,9 +824,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
               {aiHints[questionId].map((aiH, aiIdx) => (
                 <div
                   key={aiIdx}
-                  className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/40 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2"
+                  className="p-3 rounded-lg bg-[#F3F0FF] dark:bg-[#1C1A2E] border border-[#6C5CE7]/30 text-xs text-[#2D2A4A] dark:text-[#E2DEFF] flex items-start gap-2"
                 >
-                  <Bot className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
+                  <Bot className="w-4 h-4 text-[#6C5CE7] dark:text-[#A594FF] shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <span className="font-bold block mb-0.5">Socratic Tutor Observation:</span>
                     <FormattedMathText text={aiH} />
@@ -808,10 +837,10 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           )}
         </div>
 
-        <fieldset disabled={isCurrentSubmitted || isSubmitting} className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-2 disabled:opacity-70">
-          <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-slate-100">How confident are you? (optional)</legend>
-          <p className="text-xs text-slate-600 dark:text-slate-400">Choose before submitting. Stored only on this device, not sent to the server. It does not affect your score.</p>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-800 dark:text-slate-200">
+        <fieldset disabled={isCurrentSubmitted || isSubmitting} className="rounded-xl border border-[#E3DFF5] dark:border-[#232329] p-4 space-y-2 disabled:opacity-70">
+          <legend className="px-1 text-sm font-semibold text-[#2D2A4A] dark:text-white">How confident are you? (optional)</legend>
+          <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8]">Choose before submitting. Stored only on this device, not sent to the server. It does not affect your score.</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#2D2A4A] dark:text-[#D4D2E8]">
             {([
               ['none', 'Prefer not to say'], ['unsure', 'Unsure'], ['somewhat', 'Somewhat sure'], ['confident', 'Confident'],
             ] as const).map(([value, label]) => (
@@ -839,6 +868,11 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                 : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800'
             }`}
           >
+            {currentFeedback?.isGuestPreview && (
+              <p role="status" className="text-xs font-semibold text-[#6C5CE7] dark:text-[#C5BAFF]">
+                Guest Mode self-check (nothing saved) · Sign in to save XP &amp; streaks.
+              </p>
+            )}
             {currentFeedback?.verification === 'unverified' && (
               <p role="status" className="text-xs text-amber-900 dark:text-amber-200">
                 This question is not in the server question bank. Its answer is self-checked and earns no server XP.
@@ -850,7 +884,9 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                   <>
                     <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                     <span className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
-                      {currentFeedback?.queuedOffline
+                      {currentFeedback?.isGuestPreview
+                        ? 'Correct! (Guest Preview — 0 XP saved)'
+                        : currentFeedback?.queuedOffline
                         ? 'Correct (provisional) — queued for server verification'
                         : `Correct! +${currentFeedback?.xpEarned ?? 0} XP Awarded`}
                     </span>
@@ -859,7 +895,11 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
                   <>
                     <XCircle className="w-5 h-5 text-rose-500" />
                     <span className="font-bold text-sm text-rose-900 dark:text-rose-200">
-                      {currentFeedback?.queuedOffline ? 'Incorrect (provisional) — queued for server verification' : 'Incorrect (logged to practice history)'}
+                      {currentFeedback?.isGuestPreview
+                        ? 'Incorrect (Guest Preview — nothing saved)'
+                        : currentFeedback?.queuedOffline
+                        ? 'Incorrect (provisional) — queued for server verification'
+                        : 'Incorrect (logged to practice history)'}
                     </span>
                   </>
                 )}
@@ -874,18 +914,18 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
             </div>
 
             {/* Explanation & Step-by-Step Breakdown */}
-            <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-800 dark:text-slate-200">
-              <div className="font-semibold text-slate-900 dark:text-white">Explanation:</div>
+            <div className="space-y-2 pt-2 border-t border-[#E3DFF5]/60 dark:border-[#232329]/80 text-xs text-[#2D2A4A] dark:text-[#D4D2E8]">
+              <div className="font-semibold text-[#2D2A4A] dark:text-white">Explanation:</div>
               <div className="leading-relaxed">
                 <FormattedMathText text={currentQuestion.explanation} />
               </div>
 
               {currentQuestion.stepByStepSolution && currentQuestion.stepByStepSolution.length > 0 && (
                 <div className="space-y-1.5 pt-2">
-                  <div className="font-semibold text-slate-900 dark:text-white">Step-by-Step Invariant Derivation:</div>
+                  <div className="font-semibold text-[#2D2A4A] dark:text-white">Step-by-Step Invariant Derivation:</div>
                   {currentQuestion.stepByStepSolution.map((st, sIdx) => (
                     <div key={sIdx} className="flex items-start gap-2">
-                      <span className="font-mono text-indigo-500 font-bold shrink-0">{sIdx + 1}.</span>
+                      <span className="font-mono text-[#6C5CE7] dark:text-[#A594FF] font-bold shrink-0">{sIdx + 1}.</span>
                       <div className="flex-1">
                         <FormattedMathText text={st} inline />
                       </div>
@@ -905,14 +945,14 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
         )}
 
         {/* Action Controls */}
-        <div className="pt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+        <div className="pt-4 flex items-center justify-between border-t border-[#E3DFF5] dark:border-[#232329]">
           <button
             onClick={() => {
               setSubmitError(null);
               setCurrentIndex(Math.max(0, currentIndex - 1));
             }}
             disabled={currentIndex === 0}
-            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 disabled:opacity-30 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            className="px-4 py-2 bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] disabled:opacity-30 text-[#2D2A4A] dark:text-[#D4D2E8] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
           >
             Previous
           </button>
@@ -921,7 +961,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
             <button
               onClick={handleSubmitAttempt}
               disabled={!userHasSelected || isSubmitting}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+              className="px-6 py-2.5 bg-[#6C5CE7] hover:bg-[#5B4BD6] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{isSubmitting ? 'Checking with Server...' : 'Submit Answer'}</span>
@@ -929,7 +969,7 @@ export const PracticeArena: React.FC<PracticeArenaProps> = ({
           ) : (
             <button
               onClick={handleNextOrFinish}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer hover:scale-[1.02]"
+              className="px-6 py-2.5 bg-[#6C5CE7] hover:bg-[#5B4BD6] text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer hover:scale-[1.02]"
             >
               <span>{currentIndex < questions.length - 1 ? 'Next Question' : 'View Session Results'}</span>
               <ArrowRight className="w-3.5 h-3.5" />

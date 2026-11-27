@@ -65,12 +65,12 @@ const FallbackQuestionCard: React.FC<{ q: CopilotFallbackQuestion; index: number
   const isRight = chosen !== null && chosen.trim().toLowerCase() === String(expected).trim().toLowerCase();
 
   return (
-    <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-[#E3DFF5] dark:border-[#3D3861] space-y-2.5">
+    <div className="p-3.5 rounded-xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] space-y-2.5">
       <div className="flex items-center justify-between gap-2 text-[11px]">
-        <span className="font-bold text-[#6C5CE7] dark:text-[#A598FF] uppercase tracking-wide">
+        <span className="font-bold text-[#6C5CE7] dark:text-[#CCFF00] uppercase tracking-wide">
           Topic Practice #{index + 1} · {q.subjectId.toUpperCase()}
         </span>
-        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium capitalize">
+        <span className="px-2 py-0.5 rounded-md bg-[#F7F5FF] dark:bg-[#16161C] text-[#6B6890] dark:text-[#9E9EA9] font-medium capitalize">
           {q.difficulty.replace('_', ' ')}
         </span>
       </div>
@@ -189,53 +189,53 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
       }`}
     >
       {/* Avatar */}
-      <div
-        className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
-          isUser
-            ? 'bg-[#6C5CE7] text-white'
-            : 'bg-[#F0EDFA] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A598FF] border border-[#E3DFF5] dark:border-[#3D3861]'
-        }`}
-      >
-        {isUser ? userFullName[0]?.toUpperCase() || 'U' : <Sparkles className="w-4 h-4" />}
-      </div>
-
-      {/* Message Body Content */}
-      <div className="space-y-2 max-w-[88%] sm:max-w-[92%] flex-1 min-w-0">
-        {/* Header Metadata */}
         <div
-          className={`flex flex-wrap items-center gap-2 text-[11px] text-[#6B6890] dark:text-[#B4B0D5] px-1 ${
-            isUser ? 'justify-end' : 'justify-start'
+          className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
+            isUser
+              ? 'bg-[#6C5CE7] text-white'
+              : 'bg-[#F0EDFA] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00] border border-[#E3DFF5] dark:border-[#232329]'
           }`}
         >
-          <span className="font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]">
-            {isUser ? userFullName : 'Omni Copilot'}
-          </span>
-          {!isUser && message.modelUsed && (
-            <span
-              data-testid="copilot-model-badge"
-              className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#F0EDFA] dark:bg-[#24203E] text-[#5B4BC4] dark:text-[#C2BAFF] border border-[#E3DFF5] dark:border-[#3D3861]"
-            >
-              Model: {message.modelUsed.replace(' (⚡ Zero-Cost Cache)', '')}
-            </span>
-          )}
-          {message.hintOnly && (
-            <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold">
-              Hint first
-            </span>
-          )}
-          <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          {isUser ? userFullName[0]?.toUpperCase() || 'U' : <Sparkles className="w-4 h-4" />}
         </div>
 
-        {/* Message Bubble */}
-        <div
-          className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed transition-colors ${
-            isUser
-              ? 'bg-[#6C5CE7] text-white rounded-tr-xs'
-              : isUnavailable
-              ? 'bg-amber-50/70 dark:bg-amber-950/30 text-[#2D2A4A] dark:text-[#F1EFFF] rounded-tl-xs border border-amber-200 dark:border-amber-800'
-              : 'bg-white dark:bg-[#2A2647] text-[#2D2A4A] dark:text-[#F1EFFF] rounded-tl-xs border border-[#E3DFF5] dark:border-[#3D3861]'
-          }`}
-        >
+        {/* Message Body Content */}
+        <div className="space-y-2 max-w-[88%] sm:max-w-[92%] flex-1 min-w-0">
+          {/* Header Metadata */}
+          <div
+            className={`flex flex-wrap items-center gap-2 text-[11px] text-[#6B6890] dark:text-[#9E9EA9] px-1 ${
+              isUser ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            <span className="font-semibold text-[#2D2A4A] dark:text-[#F4F4F6]">
+              {isUser ? userFullName : 'Omni Copilot'}
+            </span>
+            {!isUser && message.modelUsed && (
+              <span
+                data-testid="copilot-model-badge"
+                className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#F0EDFA] dark:bg-[#16161C] text-[#5B4BC4] dark:text-[#C2BAFF] border border-[#E3DFF5] dark:border-[#232329]"
+              >
+                Model: {message.modelUsed.replace(' (⚡ Zero-Cost Cache)', '')}
+              </span>
+            )}
+            {message.hintOnly && (
+              <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold">
+                Hint first
+              </span>
+            )}
+            <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+
+          {/* Message Bubble */}
+          <div
+            className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed transition-colors ${
+              isUser
+                ? 'bg-[#6C5CE7] text-white rounded-tr-xs'
+                : isUnavailable
+                ? 'bg-amber-50/70 dark:bg-amber-950/30 text-[#2D2A4A] dark:text-[#F4F4F6] rounded-tl-xs border border-amber-200 dark:border-amber-800'
+                : 'bg-[#FFFFFF] dark:bg-[#16161C] text-[#2D2A4A] dark:text-[#F4F4F6] rounded-tl-xs border border-[#E3DFF5] dark:border-[#232329]'
+            }`}
+          >
           {isUser ? (
             <div className="space-y-2">
               {message.imageDataUrl && (
@@ -369,15 +369,15 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
 
         {/* Citations & Source Attribution */}
         {!isUser && message.citations && message.citations.length > 0 && (
-          <div className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-xl p-2.5 space-y-1.5 text-xs">
+          <div className="bg-[#F7F5FF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] rounded-xl p-2.5 space-y-1.5 text-xs">
             <button
               type="button"
               onClick={() => setShowCitations((prev) => !prev)}
               aria-expanded={showCitations}
-              className="min-h-[44px] w-full flex items-center justify-between font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-[11px] cursor-pointer px-1"
+              className="min-h-[44px] w-full flex items-center justify-between font-semibold text-[#2D2A4A] dark:text-[#F4F4F6] hover:text-[#6C5CE7] dark:hover:text-[#CCFF00] text-[11px] cursor-pointer px-1"
             >
               <div className="flex items-center gap-1.5">
-                <Bookmark className="w-3.5 h-3.5 text-indigo-500" />
+                <Bookmark className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#CCFF00]" />
                 <span>Retrieved reference material ({message.citations.length})</span>
               </div>
               {showCitations ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -385,24 +385,24 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
 
             {showCitations && (
               <div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] text-[#6B6890] dark:text-[#9E9EA9]">
                   Retrieved as context; verify claims directly against source notes.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
                   {message.citations.map((cit, idx) => (
                     <div
                       key={idx}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] space-y-0.5"
+                      className="p-2 rounded-lg bg-white dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] text-[11px] space-y-0.5"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 truncate">
+                        <span className="font-bold text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
                           {cit.title}
                         </span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 uppercase font-mono">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F0EDFA] dark:bg-[#111114] text-[#6C5CE7] dark:text-[#CCFF00] uppercase font-mono">
                           {cit.sourceType.replace('_', ' ')}
                         </span>
                       </div>
-                      <p className="text-slate-500 dark:text-slate-400 line-clamp-2 text-[10px]">
+                      <p className="text-[#6B6890] dark:text-[#9E9EA9] line-clamp-2 text-[10px]">
                         "{cit.snippet}"
                       </p>
                     </div>
@@ -415,7 +415,7 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
 
         {/* Embedded Practice Question Artifact */}
         {!isUser && message.artifact?.type === 'practice_question' && (
-          <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-slate-800 border border-[#E3DFF5] dark:border-slate-700 space-y-3">
+          <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-[#6C5CE7] text-white">
@@ -578,14 +578,14 @@ export const CopilotMessageItem: React.FC<CopilotMessageItemProps> = ({
                 <button
                   type="button"
                   onClick={() => onQuickAction('Explain that simpler with a quick intuition check.')}
-                  className="min-h-[44px] px-3 py-1 rounded-lg bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="min-h-[44px] px-3 py-1 rounded-lg bg-[#F0EDFA] dark:bg-[#16161C] hover:bg-[#E3DFF5] dark:hover:bg-[#232329] text-[#5B4BC4] dark:text-[#C2BAFF] text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   Simpler
                 </button>
                 <button
                   type="button"
                   onClick={() => onQuickAction('Show a full rigorous proof and check boundary cases.')}
-                  className="min-h-[44px] px-3 py-1 rounded-lg bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="min-h-[44px] px-3 py-1 rounded-lg bg-[#F0EDFA] dark:bg-[#16161C] hover:bg-[#E3DFF5] dark:hover:bg-[#232329] text-[#5B4BC4] dark:text-[#C2BAFF] text-[11px] font-semibold transition-colors cursor-pointer"
                 >
                   Deeper proof
                 </button>

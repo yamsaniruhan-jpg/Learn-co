@@ -8,7 +8,7 @@ import Mentorship from "./Mentorship";
 import FinalCta from "./FinalCta";
 import SiteFooter from "./SiteFooter";
 
-export default function LandingSite({ authSlot, pwaInstallSlot, onOpenAuth }) {
+export default function LandingSite({ authSlot, pwaInstallSlot, onOpenAuth, onExploreGuest }) {
   const handleLaunchApp = (mode = "signin") => {
     if (typeof onOpenAuth === "function") {
       onOpenAuth(mode);
@@ -24,7 +24,7 @@ export default function LandingSite({ authSlot, pwaInstallSlot, onOpenAuth }) {
     <div className="landing-site min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       <SiteHeader onLaunchApp={handleLaunchApp} />
       <main>
-        <Hero onLaunchApp={handleLaunchApp} />
+        <Hero onLaunchApp={handleLaunchApp} onExploreGuest={onExploreGuest} />
         <Features />
         <Workflow />
         <Pillars />

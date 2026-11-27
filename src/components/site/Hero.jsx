@@ -11,7 +11,7 @@ const SPECS = [
   { value: "8 Core", label: "Platform highlights" },
 ];
 
-export default function Hero({ onLaunchApp }) {
+export default function Hero({ onLaunchApp, onExploreGuest }) {
   const fig = STUDIO_FIGURES.ecosystem;
 
   const triggerLaunch = (e, mode = "signin") => {
@@ -83,6 +83,15 @@ export default function Hero({ onLaunchApp }) {
                 >
                   Create LearnCo account
                 </a>
+                {onExploreGuest && (
+                  <button
+                    type="button"
+                    onClick={onExploreGuest}
+                    className="inline-flex items-center gap-2 border border-primary/40 bg-primary/10 px-5 py-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 cursor-pointer"
+                  >
+                    Explore as guest
+                  </button>
+                )}
                 <a href="#ecosystem" className="micro text-muted-foreground underline decoration-border underline-offset-8 transition-colors hover:text-foreground">
                   See what&apos;s inside
                 </a>

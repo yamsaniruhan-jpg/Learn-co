@@ -131,17 +131,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl max-h-[88vh] bg-[#FFFFFF] dark:bg-[#2A2647] rounded-3xl border border-[#E3DFF5] dark:border-[#3D3861] shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#09090B]/80 dark:bg-[#09090B]/90 animate-in fade-in duration-150">
+      <div className="w-full max-w-2xl max-h-[88vh] bg-[#FFFFFF] dark:bg-[#111114] rounded-3xl border border-[#E3DFF5] dark:border-[#232329] shadow-[0_12px_36px_rgba(45,42,74,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF]/70 dark:bg-[#16161C]">
           <div className="flex items-center gap-3">
-            <img src="/logo-mark.png" alt="LearnCo" className="w-9 h-9 rounded-2xl object-cover border border-indigo-500/30 shrink-0" />
+            <img src="/logo-mark.png" alt="LearnCo" className="w-9 h-9 rounded-2xl object-cover border border-[#6C5CE7]/30 shrink-0" />
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#6C5CE7] dark:text-[#A594FF]">
                 Save &amp; Export Clean Study File
               </span>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
+              <h2 className="text-base sm:text-lg font-black text-[#2D2A4A] dark:text-white">
                 {toCleanDocumentText(resource.title)}
               </h2>
             </div>
@@ -149,7 +149,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+            className="p-2 text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white hover:bg-[#EDE9FE] dark:hover:bg-[#232329] rounded-full transition-colors cursor-pointer"
             aria-label="Close export modal"
           >
             <X className="w-5 h-5" />
@@ -157,14 +157,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         </div>
 
         {/* Format Selector Pills (Default: Normal Text) */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100 dark:bg-slate-800">
+        <div className="p-4 sm:p-5 border-b border-[#E3DFF5] dark:border-[#232329] bg-white dark:bg-[#111114] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 p-1 rounded-full bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329]">
             <button
               onClick={() => setFormat('normal')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer ${
                 format === 'normal'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-[#6C5CE7] text-white shadow-xs'
+                  : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
               }`}
             >
               Normal Text
@@ -173,8 +173,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={() => setFormat('markdown')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 format === 'markdown'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-[#6C5CE7] text-white shadow-xs'
+                  : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
               }`}
             >
               Markdown
@@ -183,8 +183,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={() => setFormat('json')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 format === 'json'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-[#6C5CE7] text-white shadow-xs'
+                  : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
               }`}
             >
               JSON
@@ -203,12 +203,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         </div>
 
         {/* Clean Readable Preview Canvas */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950/60 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-[#F7F5FF]/50 dark:bg-[#09090B]/60 text-xs sm:text-sm text-[#2D2A4A] dark:text-[#E2E0F0] leading-relaxed whitespace-pre-wrap select-text">
           {exportText}
         </div>
 
         {/* Action Footer */}
-        <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 bg-white dark:bg-[#111114] border-t border-[#E3DFF5] dark:border-[#232329] flex flex-wrap items-center justify-between gap-3">
           <Button
             variant="outline"
             size="sm"

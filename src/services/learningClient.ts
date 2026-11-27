@@ -17,6 +17,11 @@ import {
   loadCurriculumOfflineFallback,
   loadSubjectCurriculum,
 } from '../data/curriculumLoader';
+import {
+  generateGuestPracticeQuestions,
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+} from '../utils/guestMode';
 
 export interface CurriculumResponse {
   success: boolean;
@@ -37,6 +42,7 @@ export interface StartSessionResponse {
   sessionId: string;
   config: PracticeSessionConfig;
   questions: QuestionBankItem[];
+  isGuestPreview?: boolean;
   quota: {
     solvedToday: number;
     dailyLimit: number;
@@ -182,10 +188,38 @@ export class LearningClient {
     return this.getCachedSeenQuestionIds();
   }
 
+  private static async buildGuestSession(config: PracticeSessionConfig): Promise<StartSessionResponse> {
+    const remaining = getGuestQuotaRemaining().practiceRemaining;
+    if (remaining <= 0) {
+      throw new Error(
+        `Guest practice limit reached (${GUEST_LIMITS.practiceQuestions}/${GUEST_LIMITS.practiceQuestions} questions used). Sign in to unlock 25/day + saved XP.`
+      );
+    }
+    const questions = await generateGuestPracticeQuestions(config, remaining);
+    return {
+      success: true,
+      sessionId: `session-guest-${Date.now()}`,
+      config: { ...config, questionCount: questions.length },
+      questions,
+      isGuestPreview: true,
+      quota: {
+        solvedToday: GUEST_LIMITS.practiceQuestions - remaining,
+        dailyLimit: GUEST_LIMITS.practiceQuestions,
+        remaining,
+        isLimitReached: false,
+      },
+    };
+  }
+
   /**
-   * Start a calibrated or custom practice session (verifies daily quota on server)
+   * Start a calibrated or custom practice session (verifies daily quota on server).
+   * Requires sign-in on first attempt; if user presses Retry in Guest Mode (`allowGuestFallback`),
+   * generates up to the remaining guest limit ephemerally without saving XP.
    */
-  static async startPracticeSession(config: PracticeSessionConfig): Promise<StartSessionResponse> {
+  static async startPracticeSession(
+    config: PracticeSessionConfig,
+    options?: { allowGuestFallback?: boolean }
+  ): Promise<StartSessionResponse> {
     const shouldDeduplicate = config.mode !== 'mistake_remediation';
     const mergedExclude = shouldDeduplicate
       ? this.compactExcludeIds(config.excludeQuestionIds)
@@ -195,6 +229,15 @@ export class LearningClient {
       ? { ...config, excludeQuestionIds: mergedExclude }
       : config;
 
+    if (!AuthClient.hasSession()) {
+      if (options?.allowGuestFallback) {
+        return this.buildGuestSession(payloadConfig);
+      }
+      throw new Error(
+        'Authentication required. Sign in to save verified XP, or press Retry to practice in Guest Mode (up to 5 questions).'
+      );
+    }
+
     const res = await fetch('/api/learning/session/start', {
       method: 'POST',
       credentials: 'include',
@@ -202,10 +245,20 @@ export class LearningClient {
       body: JSON.stringify({ config: payloadConfig }),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to start practice session');
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      if (options?.allowGuestFallback) {
+        return this.buildGuestSession(payloadConfig);
+      }
+      throw new Error(
+        'Authentication required. Sign in to save verified XP, or press Retry to practice in Guest Mode (up to 5 questions).'
+      );
     }
+
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to start practice session (${res.status})`);
+    }
+
     if (shouldDeduplicate && Array.isArray(data?.questions)) {
       data.questions.forEach((q: { id?: string }) => {
         if (q?.id) this.seenQuestionIds.add(q.id);

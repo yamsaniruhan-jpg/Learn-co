@@ -7,7 +7,19 @@ import {
 } from '../../types/creator';
 import { CreatorClient } from '../../services/creatorClient';
 import { AuthClient } from '../../services/authClient';
-import { creatorPracticeTransferKey } from '../../utils/creatorPracticeTransfer';
+import {
+  creatorPracticeTransferKey,
+  writeGuestCreatorPracticeTransfer,
+} from '../../utils/creatorPracticeTransfer';
+import {
+  canConsumeGuestQuota,
+  consumeGuestQuota,
+  extractTextFromFileClient,
+  generateGuestCreatorResource,
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+  GUEST_QUOTA_UPDATED_EVENT,
+} from '../../utils/guestMode';
 import { SourceIntakePanel } from './SourceIntakePanel';
 import { ResourceViewer } from './ResourceViewer';
 import { ResourceLibrary } from './ResourceLibrary';
@@ -63,6 +75,11 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isGenerationLimitReached, setIsGenerationLimitReached] = useState<boolean>(false);
   const [quota, setQuota] = useState<{ sources: any, artifacts: any, urls: any } | null>(null);
+  const [creationAuthError, setCreationAuthError] = useState<string | null>(null);
+  const [pendingRetryRequest, setPendingRetryRequest] = useState<{
+    params: GenerateResourceRequest;
+    file?: File | null;
+  } | null>(null);
 
   // Modals state
   const [editingResource, setEditingResource] = useState<CreatorResource | null>(null);
@@ -97,10 +114,67 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
+  const applySampleGuestWorkspace = () => {
+    const fallbackResources: CreatorResource[] = [
+      {
+        id: 'res-sample-1',
+        userId: 'default_user',
+        title: 'Calculus & Differential Equations Masterclass',
+        resourceType: 'flashcards',
+        subjectId: 'math',
+        difficulty: 'hard',
+        version: 1,
+        status: 'ready',
+        isPublic: true,
+        tags: ['calculus', 'exam-prep'],
+        content: {
+          flashcards: [
+            { id: 'fc-1', front: 'What is the derivative of e^(kx)?', back: 'k * e^(kx)', hint: 'Chain rule' },
+            { id: 'fc-2', front: 'State the Fundamental Theorem of Calculus Part 1.', back: 'd/dx int_a^x f(t)dt = f(x)', hint: 'Differentiation of integral' },
+          ],
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    const fallbackSources: CreatorSource[] = [
+      {
+        id: 'src-sample-1',
+        userId: 'default_user',
+        title: 'Advanced Calculus Lecture Notes (PDF)',
+        sourceType: 'pdf',
+        originalContent: 'Calculus primer covering limits, continuity, Taylor series, and vector calculus.',
+        extractedText: 'Calculus primer covering limits, continuity, Taylor series, and vector calculus.',
+        status: 'ready',
+        wordCount: 120,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        fileSize: 1024500,
+      },
+    ];
+    const guestState = getGuestQuotaRemaining().state;
+    const isGuestCapHit = guestState.creationsUsed >= GUEST_LIMITS.creations;
+    setResources((prev) => (prev.some((r) => r.id.startsWith('res-guest-')) ? prev : fallbackResources));
+    setSources(fallbackSources);
+    setQuota({
+      sources: { used: 0, limit: 2, isLimitReached: false },
+      artifacts: { used: guestState.creationsUsed, limit: GUEST_LIMITS.creations, isLimitReached: isGuestCapHit },
+      urls: { used: 0, limit: 2, isLimitReached: false },
+    });
+    setIsGenerationLimitReached(isGuestCapHit);
+    setActiveResource((prev) => prev || fallbackResources[0]);
+  };
+
   // Load initial resources and sources
   const loadData = async () => {
     setIsLoadingResources(true);
     setLoadError('');
+    if (!isAuthenticated || !AuthClient.hasSession()) {
+      applySampleGuestWorkspace();
+      setIsLoadingResources(false);
+      return;
+    }
+
     try {
       const [resList, srcList, q] = await Promise.all([
         CreatorClient.getResources(),
@@ -112,59 +186,11 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       setQuota(q);
       setIsGenerationLimitReached(q.artifacts.isLimitReached);
 
-      // Default active resource if none
       if (!activeResource && resList.length > 0) {
         setActiveResource(resList[0]);
       }
-    } catch (err: any) {
-      console.warn('Failed loading creator studio data, loading fallback sample assets:', err);
-      const fallbackResources: CreatorResource[] = [
-        {
-          id: 'res-sample-1',
-          userId: 'default_user',
-          title: 'Calculus & Differential Equations Masterclass',
-          resourceType: 'flashcards',
-          subjectId: 'math',
-          difficulty: 'hard',
-          version: 1,
-          status: 'ready',
-          isPublic: true,
-          tags: ['calculus', 'exam-prep'],
-          content: {
-            flashcards: [
-              { id: 'fc-1', front: 'What is the derivative of e^(kx)?', back: 'k * e^(kx)', hint: 'Chain rule' },
-              { id: 'fc-2', front: 'State the Fundamental Theorem of Calculus Part 1.', back: 'd/dx int_a^x f(t)dt = f(x)', hint: 'Differentiation of integral' },
-            ],
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-      const fallbackSources: CreatorSource[] = [
-        {
-          id: 'src-sample-1',
-          userId: 'default_user',
-          title: 'Advanced Calculus Lecture Notes (PDF)',
-          sourceType: 'pdf',
-          originalContent: 'Calculus primer covering limits, continuity, Taylor series, and vector calculus.',
-          extractedText: 'Calculus primer covering limits, continuity, Taylor series, and vector calculus.',
-          status: 'ready',
-          wordCount: 120,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          fileSize: 1024500,
-        },
-      ];
-      setResources(fallbackResources);
-      setSources(fallbackSources);
-      setQuota({
-        sources: { used: 1, limit: 10, isLimitReached: false },
-        artifacts: { used: 1, limit: 20, isLimitReached: false },
-        urls: { used: 0, limit: 10, isLimitReached: false },
-      });
-      if (!activeResource && fallbackResources.length > 0) {
-        setActiveResource(fallbackResources[0]);
-      }
+    } catch {
+      applySampleGuestWorkspace();
     } finally {
       setIsLoadingResources(false);
     }
@@ -174,8 +200,30 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     loadData();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (isAuthenticated && AuthClient.hasSession()) return;
+    const syncGuestQuota = () => {
+      const { state } = getGuestQuotaRemaining();
+      const hit = state.creationsUsed >= GUEST_LIMITS.creations;
+      setIsGenerationLimitReached(hit);
+      setQuota({
+        sources: { used: 0, limit: 2, isLimitReached: false },
+        artifacts: { used: state.creationsUsed, limit: GUEST_LIMITS.creations, isLimitReached: hit },
+        urls: { used: 0, limit: 2, isLimitReached: false },
+      });
+    };
+    window.addEventListener(GUEST_QUOTA_UPDATED_EVENT, syncGuestQuota);
+    return () => window.removeEventListener(GUEST_QUOTA_UPDATED_EVENT, syncGuestQuota);
+  }, [isAuthenticated]);
+
   // Fetch full resource details + versions when selecting
   const handleSelectResource = async (res: CreatorResource) => {
+    if (!AuthClient.hasSession() || res.id.startsWith('res-guest-') || res.id.startsWith('res-sample-')) {
+      setActiveResource(res);
+      setActiveVersions([]);
+      setActiveTab('synthesizer');
+      return;
+    }
     try {
       const detail = await CreatorClient.getResource(res.id);
       setActiveResource(detail.resource);
@@ -187,8 +235,69 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
+  const handleGuestGenerate = async (params: GenerateResourceRequest, file?: File | null) => {
+    if (!canConsumeGuestQuota('creations', 1)) {
+      setIsGenerationLimitReached(true);
+      setCreationAuthError(null);
+      setPendingRetryRequest(null);
+      showToast(
+        `Guest creation limit reached (${GUEST_LIMITS.creations}/${GUEST_LIMITS.creations} PDFs/resources used). Sign in to unlock 20/day + permanent library.`,
+        'error'
+      );
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      let sourceText = params.sourceText;
+      if (file && !sourceText) {
+        sourceText = await extractTextFromFileClient(file);
+      }
+      const nextState = consumeGuestQuota('creations', 1);
+      const guestResource = generateGuestCreatorResource({ ...params, sourceText });
+      setResources((prev) => [guestResource, ...prev]);
+      setActiveResource(guestResource);
+      setActiveVersions([
+        {
+          id: `ver-${guestResource.id}-1`,
+          resourceId: guestResource.id,
+          versionNumber: 1,
+          content: guestResource.content,
+          changelog: 'Guest ephemeral synthesis',
+          createdAt: guestResource.createdAt,
+        },
+      ]);
+      setCreationAuthError(null);
+      setPendingRetryRequest(null);
+      setQuota({
+        sources: { used: 0, limit: 2, isLimitReached: false },
+        artifacts: {
+          used: nextState.creationsUsed,
+          limit: GUEST_LIMITS.creations,
+          isLimitReached: nextState.creationsUsed >= GUEST_LIMITS.creations,
+        },
+        urls: { used: 0, limit: 2, isLimitReached: false },
+      });
+      setIsGenerationLimitReached(nextState.creationsUsed >= GUEST_LIMITS.creations);
+      setActiveTab('synthesizer');
+      showToast('Created in Guest Mode (nothing saved). Export or Save/Print Clean PDF below.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Handle generation pipeline
   const handleGenerate = async (params: GenerateResourceRequest) => {
+    setCreationAuthError(null);
+    setPendingRetryRequest(null);
+
+    if (!AuthClient.hasSession()) {
+      setPendingRetryRequest({ params, file: null });
+      setCreationAuthError(
+        `Authentication required to save PDFs and resources to your library. Press Retry below to generate ephemerally in Guest Mode (up to ${GUEST_LIMITS.creations} resources, nothing saved).`
+      );
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const newResource = await CreatorClient.generateResource(params);
@@ -209,14 +318,19 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         ? 'AI is unavailable. A template-based draft was created; please review it carefully.'
         : `Successfully synthesized "${newResource.title}"!`);
 
-      // Refresh sources in background
       CreatorClient.getSources().then(setSources).catch(() => {});
     } catch (err: any) {
-      if (err.message.includes('429') || err.message.includes('limit reached')) {
+      const msg = err?.message || 'Generation failed.';
+      if (/401|auth|sign in|unauthorized/i.test(msg)) {
+        setPendingRetryRequest({ params, file: null });
+        setCreationAuthError(
+          `Authentication required to save PDFs and resources to your library. Press Retry below to generate ephemerally in Guest Mode (up to ${GUEST_LIMITS.creations} resources, nothing saved).`
+        );
+      } else if (msg.includes('429') || msg.includes('limit reached')) {
         setIsGenerationLimitReached(true);
         showToast('Daily generation limit reached. Please try again tomorrow.', 'error');
       } else {
-        showToast(err.message || 'Generation failed.', 'error');
+        showToast(msg, 'error');
       }
     } finally {
       setIsGenerating(false);
@@ -295,7 +409,90 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     try {
       const accountId = AuthClient.getCurrentUser()?.id;
       const sessionId = AuthClient.getSessionId();
-      if (!accountId || !sessionId) throw new Error('Sign in to transfer this resource to practice.');
+      if (!accountId || !sessionId) {
+        const guestQuestions: any[] = [];
+        if (Array.isArray(res.content?.quiz) && res.content.quiz.length > 0) {
+          res.content.quiz.forEach((q: any, idx: number) => {
+            const opts = Array.isArray(q.options) && q.options.length > 0 ? q.options : ['True', 'False'];
+            const correctIdx = typeof q.correctIndex === 'number' && opts[q.correctIndex] ? q.correctIndex : 0;
+            guestQuestions.push({
+              id: q.id || `guest-xfer-q-${idx + 1}`,
+              subjectId: res.subjectId,
+              topicId: res.title,
+              questionType: 'single_choice',
+              difficulty: res.difficulty || 'medium',
+              bloomLevel: q.bloomLevel || 'Understand',
+              questionText: q.question,
+              options: opts,
+              correctAnswer: opts[correctIdx],
+              explanation: q.explanation || res.title,
+              examTracks: ['all'],
+            });
+          });
+        } else if (Array.isArray(res.content?.flashcards) && res.content.flashcards.length > 0) {
+          res.content.flashcards.slice(0, 5).forEach((fc: any, idx: number) => {
+            guestQuestions.push({
+              id: fc.id || `guest-xfer-fc-${idx + 1}`,
+              subjectId: res.subjectId,
+              topicId: res.title,
+              questionType: 'single_choice',
+              difficulty: res.difficulty || 'medium',
+              bloomLevel: 'Remember',
+              questionText: fc.front,
+              options: [
+                fc.back,
+                'Depends only on boundary constants outside the system.',
+                'Does not satisfy invariance principles.',
+                'Insufficient information without numerical approximation.',
+              ],
+              correctAnswer: fc.back,
+              explanation: fc.back,
+              hints: fc.hint ? [fc.hint] : undefined,
+              examTracks: ['all'],
+            });
+          });
+        } else if (Array.isArray(res.content?.worksheet?.problems) && res.content.worksheet.problems.length > 0) {
+          res.content.worksheet.problems.slice(0, 5).forEach((prob: any, idx: number) => {
+            guestQuestions.push({
+              id: prob.id || `guest-xfer-ws-${idx + 1}`,
+              subjectId: res.subjectId,
+              topicId: res.title,
+              questionType: 'single_choice',
+              difficulty: res.difficulty || 'medium',
+              bloomLevel: 'Apply',
+              questionText: prob.prompt,
+              options: [
+                prob.solution,
+                'Only holds when all terms equal zero.',
+                'Requires negating every governing coefficient.',
+                'Undefined outside discrete intervals.',
+              ],
+              correctAnswer: prob.solution,
+              explanation: prob.solution,
+              hints: prob.hint ? [prob.hint] : undefined,
+              examTracks: ['all'],
+            });
+          });
+        }
+
+        if (guestQuestions.length === 0) {
+          throw new Error('Generate a quiz, flashcard deck, or worksheet to practice these items.');
+        }
+
+        writeGuestCreatorPracticeTransfer({
+          resourceId: res.id,
+          resourceTitle: res.title,
+          subjectId: res.subjectId,
+          questions: guestQuestions.slice(0, GUEST_LIMITS.practiceQuestions),
+          timestamp: Date.now(),
+        });
+        showToast('Transferred to Practice Arena for Guest preview (nothing saved)...');
+        if (onNavigateToPractice) {
+          setTimeout(() => onNavigateToPractice(), 350);
+        }
+        return;
+      }
+
       const result = await CreatorClient.addToPractice(res.id);
       if (AuthClient.getCurrentUser()?.id !== accountId || AuthClient.getSessionId() !== sessionId) {
         throw new Error('Your session changed before the transfer completed. Please try again.');
@@ -377,14 +574,14 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         </div>
 
         {/* Studio Sub-Navigation Tabs */}
-        <div className="flex bg-[#FFFFFF] dark:bg-[#2A2647] p-1 rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto shrink-0">
+        <div className="flex bg-[#FFFFFF] dark:bg-[#111114] p-1 rounded-2xl border border-[#E3DFF5] dark:border-[#232329] overflow-x-auto max-w-full scrollbar-none w-full sm:w-auto shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('synthesizer')}
             className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'synthesizer'
-                ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white shadow-xs'
-                : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
+                ? 'bg-[#6C5CE7] text-white shadow-xs'
+                : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -396,8 +593,8 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onClick={() => setActiveTab('library')}
             className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'library'
-                ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white shadow-xs'
-                : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
+                ? 'bg-[#6C5CE7] text-white shadow-xs'
+                : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -409,8 +606,8 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onClick={() => setActiveTab('sources')}
             className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'sources'
-                ? 'bg-[#6C5CE7] dark:bg-[#8577ED] text-white shadow-xs'
-                : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
+                ? 'bg-[#6C5CE7] text-white shadow-xs'
+                : 'text-[#6B6890] dark:text-[#9D9BB8] hover:text-[#2D2A4A] dark:hover:text-white'
             }`}
           >
             <FolderTree className="w-3.5 h-3.5" />
@@ -418,6 +615,26 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
           </button>
         </div>
       </div>
+
+      {creationAuthError && (
+        <div
+          role="alert"
+          className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-700 dark:text-rose-200 font-semibold"
+        >
+          <span>{creationAuthError}</span>
+          {pendingRetryRequest && (
+            <button
+              type="button"
+              onClick={() => handleGuestGenerate(pendingRetryRequest.params, pendingRetryRequest.file)}
+              disabled={isGenerating}
+              className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#CCFF00] hover:bg-[#B8E600] text-[#09090B] font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry &amp; Generate in Guest Mode (Not Saved)</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {isLoadingResources ? (
         <ScreenSkeleton label="Loading Creator Studio artifacts and sources..." />
@@ -450,7 +667,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
                       New Synthesis
                     </Button>
 
-                    <span className="text-xs text-[#6B6890] dark:text-[#B4B0D5]">
+                    <span className="text-xs text-[#6B6890] dark:text-[#9D9BB8]">
                       Viewing Active Synthesized Artifact
                     </span>
                   </div>
@@ -478,6 +695,7 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
               ) : (
                 <SourceIntakePanel
                   onGenerate={handleGenerate}
+                  onGuestFallbackGenerate={handleGuestGenerate}
                   onStorageStatus={setStorageStatus}
                   onSourceSaved={refreshSourcesAndQuota}
                   isGenerating={isGenerating}
@@ -540,12 +758,12 @@ export const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       )}
 
       {pendingDeleteTarget && (
-        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-black text-[#2D2A4A] dark:text-[#F1EFFF]">
+        <div className="fixed inset-0 z-50 bg-[#09090B]/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-black text-[#2D2A4A] dark:text-white">
               {pendingDeleteTarget.type === 'resource' ? 'Delete Resource Artifact?' : 'Delete Source Document?'}
             </h3>
-            <p className="text-xs text-[#6B6890] dark:text-[#B4B0D5] leading-relaxed">
+            <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8] leading-relaxed">
               This action permanently removes the selected {pendingDeleteTarget.type} from your studio library.
             </p>
             <div className="flex justify-end gap-2 pt-2">

@@ -44,10 +44,25 @@ import { Button } from '../ui/Button';
 import { ScreenSkeleton } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { CopilotClient } from '../../services/copilotClient';
+import { AuthClient } from '../../services/authClient';
 import { CopilotSidebar } from './CopilotSidebar';
 import { CopilotMessageItem } from './CopilotMessageItem';
 import { FormattedMathText } from '../common/FormattedMathText';
-import { prepareQuestionImage } from '../../utils/imageAttachment';
+import {
+  canUploadPhotoToday,
+  DAILY_COPILOT_PHOTO_LIMIT,
+  getTodayPhotoUploadsRemaining,
+  prepareQuestionImage,
+  recordPhotoUploadToday,
+} from '../../utils/imageAttachment';
+import {
+  canConsumeGuestQuota,
+  consumeGuestQuota,
+  generateGuestDoubtReply,
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+  GUEST_QUOTA_UPDATED_EVENT,
+} from '../../utils/guestMode';
 
 interface CopilotViewProps {
   user: UserProfile;
@@ -103,13 +118,37 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   const [streamingArtifact, setStreamingArtifact] = useState<CopilotArtifact | undefined>();
   const [pendingConfirmAction, setPendingConfirmAction] = useState<'delete_all' | 'clear_chat' | null>(null);
   const [statusNotice, setStatusNotice] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
+  const [photoRemaining, setPhotoRemaining] = useState<number>(() => getTodayPhotoUploadsRemaining());
+  const [guestDoubtsRemaining, setGuestDoubtsRemaining] = useState<number>(
+    () => getGuestQuotaRemaining().doubtsRemaining
+  );
+  const [failedRetryPayload, setFailedRetryPayload] = useState<{
+    prompt: string;
+    hintFirst: boolean;
+    revealFullSolution: boolean;
+    hadImage: boolean;
+    isAuthError: boolean;
+  } | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Load conversations on mount
+  // Load conversations on mount & sync photo/guest quotas
   useEffect(() => {
     loadConversations();
+    const syncQuotas = () => {
+      setPhotoRemaining(getTodayPhotoUploadsRemaining());
+      setGuestDoubtsRemaining(getGuestQuotaRemaining().doubtsRemaining);
+    };
+    syncQuotas();
+    window.addEventListener(GUEST_QUOTA_UPDATED_EVENT, syncQuotas);
+    window.addEventListener('learnco_photo_quota_updated', syncQuotas);
+    window.addEventListener('focus', syncQuotas);
+    return () => {
+      window.removeEventListener(GUEST_QUOTA_UPDATED_EVENT, syncQuotas);
+      window.removeEventListener('learnco_photo_quota_updated', syncQuotas);
+      window.removeEventListener('focus', syncQuotas);
+    };
   }, []);
 
   // Update initialContext when prop changes
@@ -327,6 +366,13 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
   const handleImageFileSelected = async (file?: File | null) => {
     if (!file) return;
+    if (!canUploadPhotoToday()) {
+      setStatusNotice({
+        type: 'error',
+        message: `Daily photo upload limit reached (${DAILY_COPILOT_PHOTO_LIMIT}/${DAILY_COPILOT_PHOTO_LIMIT} photos used today). You can keep asking text questions.`,
+      });
+      return;
+    }
     try {
       const prepared = await prepareQuestionImage(file);
       setAttachedImage(prepared);
@@ -338,21 +384,37 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
   const handleSendMessage = async (
     customPrompt?: string,
-    overrides?: { hintFirst?: boolean; revealFullSolution?: boolean }
+    overrides?: {
+      hintFirst?: boolean;
+      revealFullSolution?: boolean;
+      guestRetry?: boolean;
+      skipUserEcho?: boolean;
+      hadImage?: boolean;
+    }
   ) => {
     const rawText = (customPrompt ?? inputPrompt).trim();
-    const pendingImage = attachedImage;
+    const pendingImage = overrides?.skipUserEcho ? null : attachedImage;
     if ((!rawText && !pendingImage) || isStreaming) return;
 
     const textToSend = rawText || 'Solve and explain the question shown in this photo.';
     const useHintFirst = overrides?.hintFirst ?? hintFirst;
     const revealFullSolution = overrides?.revealFullSolution ?? false;
+    const hadImage = Boolean(pendingImage || overrides?.hadImage);
 
-    if (!customPrompt) setInputPrompt('');
-    setAttachedImage(null);
+    if (!overrides?.skipUserEcho) {
+      if (!customPrompt) setInputPrompt('');
+      setAttachedImage(null);
+    }
     setStatusNotice(null);
-    setIsStreaming(true);
-    setIsReconnecting(false);
+    setFailedRetryPayload(null);
+
+    if (pendingImage) {
+      recordPhotoUploadToday();
+      setPhotoRemaining(getTodayPhotoUploadsRemaining());
+      try {
+        window.dispatchEvent(new Event('learnco_photo_quota_updated'));
+      } catch {}
+    }
 
     // Ensure we have an active conversation
     let currentConvId = activeConversationId;
@@ -368,28 +430,61 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
         setActiveConversation(newConv);
         setConversations((prev) => [newConv, ...prev]);
       } catch {
-        if (!customPrompt) setInputPrompt(rawText);
-        if (pendingImage) setAttachedImage(pendingImage);
-        setIsStreaming(false);
+        if (!customPrompt && !overrides?.skipUserEcho) setInputPrompt(rawText);
+        if (pendingImage && !overrides?.skipUserEcho) setAttachedImage(pendingImage);
         setStatusNotice({ type: 'error', message: 'Could not start a conversation. Check your connection and try again.' });
         return;
       }
     }
 
-    const userMsg: CopilotMessage = {
-      id: `usr-${Date.now()}`,
-      conversationId: currentConvId,
-      userId: user.id || 'guest',
-      role: 'user',
-      content: textToSend,
-      mode: activeMode,
-      imageDataUrl: pendingImage?.previewUrl,
-      timestamp: new Date().toISOString(),
-    };
+    if (!overrides?.skipUserEcho) {
+      const userMsg: CopilotMessage = {
+        id: `usr-${Date.now()}`,
+        conversationId: currentConvId,
+        userId: user.id || 'guest',
+        role: 'user',
+        content: textToSend,
+        mode: activeMode,
+        imageDataUrl: pendingImage?.previewUrl,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+    }
 
-    setMessages((prev) => [...prev, userMsg]);
+    // Retry-to-continue Guest Preview execution (up to 3 ephemeral doubts per session)
+    if (overrides?.guestRetry) {
+      if (!canConsumeGuestQuota('doubts', 1)) {
+        setStatusNotice({
+          type: 'error',
+          message: `Guest doubt limit reached (${GUEST_LIMITS.doubts}/${GUEST_LIMITS.doubts} free doubts used). Sign in to unlock unlimited cloud AI & saved history.`,
+        });
+        return;
+      }
+      consumeGuestQuota('doubts', 1);
+      setGuestDoubtsRemaining(getGuestQuotaRemaining().doubtsRemaining);
+      const replyContent = generateGuestDoubtReply(textToSend, {
+        mode: activeMode,
+        hintFirst: useHintFirst,
+        revealFullSolution,
+        hasImage: hadImage,
+      });
+      const assistantMsg: CopilotMessage = {
+        id: `ai-guest-${Date.now()}`,
+        conversationId: currentConvId,
+        userId: user.id || 'guest',
+        role: 'assistant',
+        content: replyContent,
+        mode: activeMode,
+        modelUsed: 'guest-preview (not saved)',
+        hintOnly: useHintFirst && !revealFullSolution,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      return;
+    }
 
     setIsStreaming(true);
+    setIsReconnecting(false);
     setStreamingContent('');
     setStreamingCitations([]);
     setStreamingArtifact(undefined);
@@ -460,15 +555,44 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             setStreamingCitations([]);
             setStreamingArtifact(undefined);
 
-            loadConversations();
+            if (AuthClient.hasSession()) {
+              loadConversations();
+            }
           },
           onError: (errMsg) => {
             setIsReconnecting(false);
             setIsStreaming(false);
+            const isAuthErr = /401|auth|sign in/i.test(errMsg || '') || !AuthClient.hasSession();
+            const left = getGuestQuotaRemaining().doubtsRemaining;
+            const retryMsg = isAuthErr
+              ? `Authentication required for cloud history and full Gemini AI. Press Retry to generate a Guest Preview answer (${left}/${GUEST_LIMITS.doubts} doubts left, nothing saved).`
+              : errMsg || 'The response was interrupted. Tap Retry below to continue.';
+
+            setFailedRetryPayload({
+              prompt: textToSend,
+              hintFirst: useHintFirst,
+              revealFullSolution,
+              hadImage,
+              isAuthError: isAuthErr,
+            });
             setStatusNotice({
               type: 'error',
-              message: errMsg || 'The response was interrupted. Tap Retry below or check the conversation.',
+              message: retryMsg,
             });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `unavail-${Date.now()}`,
+                conversationId: currentConvId!,
+                userId: user.id || 'guest',
+                role: 'assistant',
+                content: retryMsg,
+                mode: activeMode,
+                modelUsed: 'unavailable',
+                unavailableReason: 'MODEL_UNAVAILABLE',
+                timestamp: new Date().toISOString(),
+              },
+            ]);
           },
         },
         controller.signal,
@@ -476,6 +600,14 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       );
     } catch (err: any) {
       if (err.name !== 'AbortError') {
+        const isAuthErr = !AuthClient.hasSession();
+        setFailedRetryPayload({
+          prompt: textToSend,
+          hintFirst: useHintFirst,
+          revealFullSolution,
+          hadImage,
+          isAuthError: isAuthErr,
+        });
         setStatusNotice({ type: 'error', message: 'The response could not be completed. Retry or check your connection.' });
       }
       setIsStreaming(false);
@@ -489,9 +621,10 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       ? messages.slice(0, idx).reverse().find((m) => m.role === 'user')
       : [...messages].reverse().find((m) => m.role === 'user');
     const questionText = precedingUser?.content || 'the previous question';
+    const isGuestPreview = Boolean(hintMsg.modelUsed?.includes('guest-preview') || !AuthClient.hasSession());
     handleSendMessage(
       `Provide the full Answer, Step-by-step explanation, and Check yourself for: ${questionText}`,
-      { hintFirst: false, revealFullSolution: true }
+      { hintFirst: false, revealFullSolution: true, guestRetry: isGuestPreview }
     );
   };
 
@@ -501,8 +634,25 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       ? messages.slice(0, idx).reverse().find((m) => m.role === 'user')
       : [...messages].reverse().find((m) => m.role === 'user');
     if (precedingUser?.content) {
-      handleSendMessage(precedingUser.content, { hintFirst });
+      const isAuthFallback = !AuthClient.hasSession() || /auth|401|guest/i.test(failedMsg.content);
+      handleSendMessage(precedingUser.content, {
+        hintFirst,
+        guestRetry: isAuthFallback,
+        skipUserEcho: true,
+        hadImage: Boolean(precedingUser.imageDataUrl),
+      });
     }
+  };
+
+  const handleRetryFailedBanner = () => {
+    if (!failedRetryPayload) return;
+    handleSendMessage(failedRetryPayload.prompt, {
+      hintFirst: failedRetryPayload.hintFirst,
+      revealFullSolution: failedRetryPayload.revealFullSolution,
+      guestRetry: failedRetryPayload.isAuthError || !AuthClient.hasSession(),
+      skipUserEcho: true,
+      hadImage: failedRetryPayload.hadImage,
+    });
   };
 
   const handleStopStreaming = () => {
@@ -527,7 +677,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
   ];
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-7.5rem)] sm:h-[calc(100vh-6.5rem)] flex bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in duration-200">
+    <div className="max-w-7xl mx-auto h-[calc(100vh-7.5rem)] sm:h-[calc(100vh-6.5rem)] flex bg-[#FFFFFF] dark:bg-[#111114] rounded-2xl border border-[#E3DFF5] dark:border-[#232329] shadow-sm overflow-hidden animate-in fade-in duration-200">
       {/* 1. Left Session Sidebar */}
       <CopilotSidebar
         conversations={conversations}
@@ -563,15 +713,15 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       />
 
       {/* 2. Center Main Chat Canvas */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F7F5FF]/70 dark:bg-[#09090B]">
         {/* Top Control Header */}
-        <div className="min-h-[56px] px-3 sm:px-4 py-1.5 border-b border-[#E3DFF5] dark:border-[#3D3861] bg-[#FFFFFF] dark:bg-[#2A2647] flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xs">
+        <div className="min-h-[56px] px-3 sm:px-4 py-1.5 border-b border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114] flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xs">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Mobile Sessions Toggle Button */}
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A594FF] border border-[#E3DFF5] dark:border-[#3D3861] shrink-0 cursor-pointer"
+              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00] border border-[#E3DFF5] dark:border-[#232329] shrink-0 cursor-pointer"
               title="Open Chat Sessions & Modes"
               aria-label="Open sessions"
             >
@@ -579,14 +729,14 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             </button>
 
             {/* Sub-Tab Switcher: Live Tutoring Chat vs Session History */}
-            <div className="flex items-center bg-[#F7F5FF] dark:bg-[#1E1B33] p-1 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861]">
+            <div className="flex items-center bg-[#F7F5FF] dark:bg-[#16161C] p-1 rounded-xl border border-[#E3DFF5] dark:border-[#232329]">
               <button
                 type="button"
                 onClick={() => setCopilotViewTab('chat')}
                 className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   copilotViewTab === 'chat'
-                    ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A594FF] shadow-xs'
-                    : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
+                    ? 'bg-[#FFFFFF] dark:bg-[#111114] text-[#6C5CE7] dark:text-[#CCFF00] shadow-xs'
+                    : 'text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6]'
                 }`}
               >
                 <Bot className="w-3.5 h-3.5" />
@@ -597,8 +747,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 onClick={() => setCopilotViewTab('history')}
                 className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   copilotViewTab === 'history'
-                    ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A594FF] shadow-xs'
-                    : 'text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF]'
+                    ? 'bg-[#FFFFFF] dark:bg-[#111114] text-[#6C5CE7] dark:text-[#CCFF00] shadow-xs'
+                    : 'text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6]'
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
@@ -607,7 +757,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
             </div>
 
             <div className="hidden sm:flex items-center gap-1.5 min-w-0">
-              <h2 className="text-xs sm:text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+              <h2 className="text-xs sm:text-sm font-bold text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
                 {activeConversation?.title || 'Ask a Doubt'}
               </h2>
             </div>
@@ -615,18 +765,18 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Model Selector Dropdown */}
-            <div className="flex items-center gap-1 bg-[#F7F5FF] dark:bg-[#1E1B33] px-2 py-1 rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] min-h-[44px]">
-              <Cpu className="w-3.5 h-3.5 text-[#6B6890] ml-1 shrink-0" />
+            <div className="flex items-center gap-1 bg-[#F7F5FF] dark:bg-[#16161C] px-2 py-1 rounded-xl border border-[#E3DFF5] dark:border-[#232329] min-h-[44px]">
+              <Cpu className="w-3.5 h-3.5 text-[#6B6890] dark:text-[#9E9EA9] ml-1 shrink-0" />
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 aria-label="Select AI model"
-                className="bg-transparent text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] outline-hidden pr-2 cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-[#2D2A4A] dark:text-[#F4F4F6] outline-hidden pr-2 cursor-pointer"
               >
-                <option value="gemini-2.5-flash" className="dark:bg-[#2A2647]">Gemini 2.5 Flash (Recommended)</option>
-                <option value="gemini-2.5-pro" className="dark:bg-[#2A2647]">Gemini 2.5 Pro (Deep Reasoning)</option>
-                <option value="gemini-flash-latest" className="dark:bg-[#2A2647]">Gemini Flash Latest</option>
-                <option value="gemini-2.5-flash-lite" className="dark:bg-[#2A2647]">Gemini 2.5 Flash-Lite</option>
+                <option value="gemini-2.5-flash" className="dark:bg-[#16161C]">Gemini 2.5 Flash (Recommended)</option>
+                <option value="gemini-2.5-pro" className="dark:bg-[#16161C]">Gemini 2.5 Pro (Deep Reasoning)</option>
+                <option value="gemini-flash-latest" className="dark:bg-[#16161C]">Gemini Flash Latest</option>
+                <option value="gemini-2.5-flash-lite" className="dark:bg-[#16161C]">Gemini 2.5 Flash-Lite</option>
               </select>
             </div>
 
@@ -636,7 +786,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
               onClick={handleClearConversation}
               title="Clear message history in active session"
               aria-label="Clear conversation"
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] hover:text-[#F25F5C] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33] transition-colors cursor-pointer"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#F25F5C] hover:bg-[#F7F5FF] dark:hover:bg-[#16161C] transition-colors cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -648,8 +798,8 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
               aria-label="Toggle study context"
               className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all cursor-pointer ${
                 isContextDrawerOpen
-                  ? 'bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] dark:text-[#A594FF]'
-                  : 'text-[#6B6890] dark:text-[#B4B0D5] hover:bg-[#F7F5FF] dark:hover:bg-[#1E1B33]'
+                  ? 'bg-[#F0EDFA] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00]'
+                  : 'text-[#6B6890] dark:text-[#9E9EA9] hover:bg-[#F7F5FF] dark:hover:bg-[#16161C]'
               }`}
               title="Toggle Study Context & Knowledge Matrix"
             >
@@ -662,41 +812,53 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
         {statusNotice && (
           <div
             role={statusNotice.type === 'error' ? 'alert' : 'status'}
-            className={`px-4 py-2 border-b flex items-center justify-between text-xs shrink-0 ${
+            className={`px-4 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 ${
               statusNotice.type === 'error'
                 ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200'
                 : 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200'
             }`}
           >
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {statusNotice.type === 'error' ? (
                 <AlertTriangle className="w-4 h-4 shrink-0" />
               ) : (
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
               )}
-              <span className="font-medium truncate">{statusNotice.message}</span>
+              <span className="font-medium">{statusNotice.message}</span>
             </div>
-            <button
-              onClick={() => setStatusNotice(null)}
-              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 shrink-0 cursor-pointer"
-              aria-label="Dismiss notice"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {statusNotice.type === 'error' && failedRetryPayload && (
+                <button
+                  type="button"
+                  onClick={handleRetryFailedBanner}
+                  className="px-3 py-1.5 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>{failedRetryPayload.isAuthError ? 'Retry in Guest Mode' : 'Retry'}</span>
+                </button>
+              )}
+              <button
+                onClick={() => setStatusNotice(null)}
+                className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 shrink-0 cursor-pointer"
+                aria-label="Dismiss notice"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
 
         {/* Active Study Context Banner if present */}
         {activeContextNote && (
-          <div className="px-4 py-2 bg-indigo-50/90 dark:bg-indigo-950/50 border-b border-indigo-200 dark:border-indigo-900 flex items-center justify-between text-xs text-indigo-950 dark:text-indigo-200 shrink-0">
+          <div className="px-4 py-2 bg-[#F3F0FF]/90 dark:bg-[#16161C] border-b border-[#E3DFF5] dark:border-[#232329] flex items-center justify-between text-xs text-[#2D2A4A] dark:text-[#E2DEFF] shrink-0">
             <div className="flex items-center gap-2 truncate">
-              <Info className="w-4 h-4 text-indigo-600 shrink-0" />
+              <Info className="w-4 h-4 text-[#6C5CE7] dark:text-[#A594FF] shrink-0" />
               <span className="font-semibold">Active Context:</span>
               <span className="truncate opacity-90">{activeContextNote}</span>
             </div>
             <button
               onClick={() => setActiveContextNote('')}
-              className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline shrink-0 ml-2 font-bold cursor-pointer"
+              className="text-[11px] text-[#6C5CE7] dark:text-[#CCFF00] hover:underline shrink-0 ml-2 font-bold cursor-pointer"
             >
               Clear Context
             </button>
@@ -707,14 +869,14 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
         {copilotViewTab === 'history' ? (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
             {/* History Control Card */}
-            <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Bookmark className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-base sm:text-lg font-bold text-[#2D2A4A] dark:text-white flex items-center gap-2">
+                    <Bookmark className="w-5 h-5 text-[#6C5CE7] dark:text-[#A594FF]" />
                     <span>Tutoring Session History & Saved Archives</span>
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9] mt-1">
                     Review past Socratic dialogues, save and export complete transcripts, or purge history.
                   </p>
                 </div>
@@ -722,7 +884,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                   <button
                     onClick={handleExportHistory}
                     disabled={conversations.length === 0}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    className="px-3.5 py-2 rounded-xl bg-[#F3F0FF] dark:bg-[#16161C] hover:bg-[#EDE9FE] dark:hover:bg-[#1C1A2E] border border-[#E3DFF5] dark:border-[#232329] text-[#6C5CE7] dark:text-[#C5BAFF] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                     title="Save & Download All History as JSON"
                   >
                     <FileText className="w-4 h-4" />
@@ -750,7 +912,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                     CopilotClient.listConversations(e.target.value).then(setConversations);
                   }}
                   placeholder="Filter saved sessions by title or keyword..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:border-indigo-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] text-xs text-[#2D2A4A] dark:text-white placeholder:text-[#6B6890] focus:outline-hidden focus:border-[#6C5CE7]"
                 />
               </div>
             </div>
@@ -774,36 +936,36 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                     key={conv.id}
                     className={`p-4 rounded-xl border transition-all space-y-3 ${
                       activeConversationId === conv.id
-                        ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-300 dark:border-indigo-700 shadow-xs'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                        ? 'bg-[#F3F0FF] dark:bg-[#16161C] border-[#6C5CE7]/60 shadow-xs'
+                        : 'bg-white dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329] hover:border-[#6C5CE7]/40'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1 min-w-0">
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                        <h4 className="text-xs sm:text-sm font-bold text-[#2D2A4A] dark:text-white truncate">
                           {conv.title}
                         </h4>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-2 text-[10px] text-[#6B6890] dark:text-[#9E9EA9]">
                           <span>{new Date(conv.updatedAt).toLocaleDateString()}</span>
                           <span>•</span>
-                          <span className="capitalize text-purple-600 dark:text-purple-400 font-semibold">
+                          <span className="capitalize text-[#6C5CE7] dark:text-[#A594FF] font-semibold">
                             {conv.mode ? conv.mode.replace('_', ' ') : 'Socratic'}
                           </span>
                           <span>•</span>
-                          <span className="uppercase text-indigo-600 dark:text-indigo-400 font-semibold">
+                          <span className="uppercase text-[#6C5CE7] dark:text-[#CCFF00] font-semibold">
                             {conv.learnerLevel || 'Intermediate'}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <div className="flex items-center justify-between pt-2 border-t border-[#E3DFF5] dark:border-[#232329] text-xs">
                       <button
                         onClick={() => {
                           selectConversation(conv.id);
                           setCopilotViewTab('chat');
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 text-xs cursor-pointer flex items-center gap-1 shadow-2xs"
+                        className="px-3 py-1.5 rounded-lg bg-[#6C5CE7] text-white font-bold hover:bg-[#5B4BD6] text-xs cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <span>Open in Chat</span>
                         <ChevronRight className="w-3.5 h-3.5" />
@@ -812,7 +974,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleExportSingleSession(conv)}
-                          className="px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg text-[#6B6890] dark:text-[#D4D2E8] hover:text-[#6C5CE7] hover:bg-[#F7F5FF] dark:hover:bg-[#16161C] text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                           title="Save this session transcript as Markdown"
                         >
                           <FileText className="w-3.5 h-3.5" />
@@ -820,7 +982,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                         </button>
                         <button
                           onClick={() => handleDeleteConversation(conv.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg text-[#6B6890] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
                           title="Delete this session"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -887,7 +1049,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                     <Sparkles className="w-4 h-4 animate-spin" />
                   </div>
                   <div className="space-y-2 flex-1 max-w-[92%]">
-                    <div className="flex items-center justify-between text-[11px] text-[#6C5CE7] dark:text-[#A598FF] font-semibold px-1">
+                    <div className="flex items-center justify-between text-[11px] text-[#6C5CE7] dark:text-[#CCFF00] font-semibold px-1">
                       <span>
                         {isReconnecting
                           ? 'Connection dropped — recovering response...'
@@ -905,7 +1067,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                       </button>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white dark:bg-[#2A2647] text-[#2D2A4A] dark:text-[#F1EFFF] rounded-tl-xs border border-[#E3DFF5] dark:border-[#3D3861]">
+                    <div className="p-4 rounded-2xl bg-[#FFFFFF] dark:bg-[#16161C] text-[#2D2A4A] dark:text-[#F4F4F6] rounded-tl-xs border border-[#E3DFF5] dark:border-[#232329]">
                       {streamingContent ? (
                         <div className="prose prose-sm dark:prose-invert max-w-none text-xs sm:text-sm space-y-2 whitespace-pre-wrap leading-relaxed">
                           <FormattedMathText text={streamingContent} preferNormalText />
@@ -930,7 +1092,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 className={`min-h-[44px] px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7] ${
                   hintFirst
                     ? 'bg-amber-100 dark:bg-amber-950/70 border-amber-400 dark:border-amber-600 text-amber-950 dark:text-amber-200'
-                    : 'bg-white dark:bg-[#2A2647] border-[#E3DFF5] dark:border-[#3D3861] text-[#2D2A4A] dark:text-[#F1EFFF] hover:border-[#6C5CE7]'
+                    : 'bg-[#FFFFFF] dark:bg-[#16161C] border-[#E3DFF5] dark:border-[#232329] text-[#2D2A4A] dark:text-[#F4F4F6] hover:border-[#6C5CE7]'
                 }`}
               >
                 <Lightbulb className="w-3.5 h-3.5" />
@@ -939,41 +1101,41 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
               <button
                 type="button"
                 onClick={() => setInputPrompt('Why does SN2 inversion require backside nucleophilic attack?')}
-                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] border border-[#E3DFF5] dark:border-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#16161C] hover:bg-[#E3DFF5] dark:hover:bg-[#232329] border border-[#E3DFF5] dark:border-[#232329] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
               >
                 SN2 inversion
               </button>
               <button
                 type="button"
                 onClick={() => setInputPrompt('Check extrema when f\'(c) = 0 and f\'\'(c) = 0.')}
-                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] border border-[#E3DFF5] dark:border-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#16161C] hover:bg-[#E3DFF5] dark:hover:bg-[#232329] border border-[#E3DFF5] dark:border-[#232329] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
               >
                 Extrema test
               </button>
               <button
                 type="button"
                 onClick={() => setInputPrompt('Derive the gradient descent step-size limit.')}
-                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#24203E] hover:bg-[#E3DFF5] dark:hover:bg-[#3D3861] border border-[#E3DFF5] dark:border-[#3D3861] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
+                className="min-h-[44px] px-3 py-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#16161C] hover:bg-[#E3DFF5] dark:hover:bg-[#232329] border border-[#E3DFF5] dark:border-[#232329] text-[#5B4BC4] dark:text-[#C2BAFF] text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer"
               >
                 Gradient descent
               </button>
             </div>
 
             {/* Bottom Input Prompt Bar */}
-            <div className="p-3 sm:p-4 bg-white dark:bg-[#2A2647] border-t border-[#E3DFF5] dark:border-[#3D3861] shrink-0 space-y-2">
+            <div className="p-3 sm:p-4 bg-[#FFFFFF] dark:bg-[#111114] border-t border-[#E3DFF5] dark:border-[#232329] shrink-0 space-y-2">
               {attachedImage && (
-                <div className="flex items-center gap-3 p-2 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861]">
+                <div className="flex items-center gap-3 p-2 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329]">
                   <img
                     src={attachedImage.previewUrl}
                     alt="Question preview"
-                    className="w-12 h-12 rounded-lg object-cover border border-[#E3DFF5] dark:border-[#3D3861]"
+                    className="w-12 h-12 rounded-lg object-cover border border-[#E3DFF5] dark:border-[#232329]"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF] truncate">
+                    <p className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F4F4F6] truncate">
                       {attachedImage.attachment.name || 'Question photo attached'}
                     </p>
-                    <p className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5]">
-                      Ready to analyze with Gemini vision
+                    <p className="text-[11px] text-[#6B6890] dark:text-[#9E9EA9]">
+                      Ready to analyze ({photoRemaining}/{DAILY_COPILOT_PHOTO_LIMIT} photos remaining today)
                     </p>
                   </div>
                   <button
@@ -992,7 +1154,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                   e.preventDefault();
                   handleSendMessage();
                 }}
-                className="relative flex items-center gap-1.5 bg-[#F7F5FF] dark:bg-[#1E1B33] rounded-2xl border border-[#E3DFF5] dark:border-[#3D3861] focus-within:border-[#6C5CE7] focus-within:ring-2 focus-within:ring-[#6C5CE7]/20 transition-all p-1.5"
+                className="relative flex items-center gap-1.5 bg-[#F7F5FF] dark:bg-[#16161C] rounded-2xl border border-[#E3DFF5] dark:border-[#232329] focus-within:border-[#6C5CE7] dark:focus-within:border-[#CCFF00] focus-within:ring-2 focus-within:ring-[#6C5CE7]/20 transition-all p-1.5"
               >
                 <input
                   ref={fileInputRef}
@@ -1008,11 +1170,14 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  title="Attach photo or screenshot of a question"
+                  title={`Attach photo or screenshot (${photoRemaining}/${DAILY_COPILOT_PHOTO_LIMIT} left today)`}
                   aria-label="Upload photo of a question"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] hover:bg-white dark:hover:bg-[#2A2647] transition-colors shrink-0 cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] relative flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#6C5CE7] dark:hover:text-[#CCFF00] hover:bg-white dark:hover:bg-[#111114] transition-colors shrink-0 cursor-pointer"
                 >
                   <ImagePlus className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-1 bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] text-[9px] font-bold px-1 rounded-full">
+                    {photoRemaining}
+                  </span>
                 </button>
 
                 <textarea
@@ -1041,7 +1206,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                       ? 'Ask a doubt or paste a screenshot (Hint-First ON)...'
                       : 'Ask a doubt, type an equation, or paste a screenshot...'
                   }
-                  className="flex-1 bg-transparent px-2 py-2.5 text-xs sm:text-sm text-[#2D2A4A] dark:text-[#F1EFFF] placeholder:text-[#6B6890] focus:outline-none resize-none max-h-32"
+                  className="flex-1 bg-transparent px-2 py-2.5 text-xs sm:text-sm text-[#2D2A4A] dark:text-[#F4F4F6] placeholder:text-[#6B6890] focus:outline-none resize-none max-h-32"
                 />
 
                 <div className="flex items-center gap-1.5 pr-1 shrink-0">
@@ -1069,8 +1234,11 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                 </div>
               </form>
 
-              <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#B4B0D5] px-1">
-                <span>Model: {selectedModel} · AI can be wrong — always verify key steps.</span>
+              <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#9E9EA9] px-1">
+                <span>
+                  Model: {selectedModel} · Photos left today: {photoRemaining}/{DAILY_COPILOT_PHOTO_LIMIT}
+                  {!AuthClient.hasSession() ? ` · Guest doubts left: ${guestDoubtsRemaining}/${GUEST_LIMITS.doubts}` : ''}
+                </span>
                 <span className="hidden sm:inline font-mono text-[10px]">Paste screenshot or Shift+Enter</span>
               </div>
             </div>
@@ -1080,60 +1248,60 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
 
       {/* 3. Right Context Drawer */}
       {isContextDrawerOpen && (
-        <aside className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 overflow-y-auto space-y-4 shrink-0 animate-in slide-in-from-right-4 duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-              <Brain className="w-4 h-4 text-indigo-600" />
+        <aside className="w-80 border-l border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114] p-4 overflow-y-auto space-y-4 shrink-0 animate-in slide-in-from-right-4 duration-200">
+          <div className="flex items-center justify-between pb-2 border-b border-[#E3DFF5] dark:border-[#232329]">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6] uppercase tracking-wider">
+              <Brain className="w-4 h-4 text-[#6C5CE7] dark:text-[#CCFF00]" />
               <span>Learner Matrix & Context</span>
             </div>
             <button
               onClick={() => setIsContextDrawerOpen(false)}
-              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              className="text-xs text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6] cursor-pointer"
             >
               Close
             </button>
           </div>
 
           {/* User Gamification Card */}
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <div className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] space-y-2">
+            <span className="text-[10px] font-bold text-[#6B6890] dark:text-[#9E9EA9] uppercase tracking-wider block">
               Active Scholar Profile
             </span>
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-800 dark:text-slate-200">
+            <div className="flex items-center justify-between text-xs font-semibold text-[#2D2A4A] dark:text-[#F4F4F6]">
               <span>{user.fullName}</span>
-              <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-[#F0EDFA] dark:bg-[#111114] text-[#6C5CE7] dark:text-[#CCFF00] font-bold border border-[#E3DFF5] dark:border-[#232329]">
                 Level {user.level} ({user.xp} XP)
               </span>
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between text-[11px] text-[#6B6890] dark:text-[#9E9EA9]">
               <span>Streak: {user.currentStreak} Days</span>
               <span>Quota: {user.dailyQuestionsSolvedToday}/{user.dailyAllowanceLimit}</span>
             </div>
           </div>
 
           {/* Active Target Exam */}
-          <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900 space-y-1 text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-purple-950 dark:text-purple-200 text-[11px]">
-              <Target className="w-3.5 h-3.5 text-purple-600" />
+          <div className="p-3 rounded-xl bg-[#F0EDFA]/70 dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] space-y-1 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-[#2D2A4A] dark:text-[#F4F4F6] text-[11px]">
+              <Target className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#CCFF00]" />
               <span>Target Benchmark</span>
             </div>
-            <p className="text-slate-600 dark:text-slate-300 text-[11px]">
+            <p className="text-[#6B6890] dark:text-[#9E9EA9] text-[11px]">
               {user.targetExam || 'Advanced STEM Olympiad'}
             </p>
           </div>
 
           {/* Quick RAG Search Tool */}
           <div className="space-y-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-[10px] font-bold text-[#6B6890] dark:text-[#9E9EA9] uppercase tracking-wider block">
               Creator Studio Notebook
             </span>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs space-y-2">
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
+            <div className="p-3 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] text-xs space-y-2">
+              <p className="text-[11px] text-[#6B6890] dark:text-[#9E9EA9]">
                 Copilot automatically retrieves relevant notes, flashcards, and derivations from your Creator Studio during conversations.
               </p>
               <button
                 onClick={() => onNavigateToTab && onNavigateToTab('create')}
-                className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-300 text-[11px] font-bold hover:bg-indigo-100 cursor-pointer"
+                className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] text-[11px] font-bold hover:opacity-90 cursor-pointer"
               >
                 <span>Open Creator Studio</span>
                 <ChevronRight className="w-3 h-3" />
@@ -1144,19 +1312,19 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
       )}
       {/* In-App Confirmation Modal */}
       {pendingConfirmAction && (
-        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-[#2D2A4A]/80 dark:bg-[#09090B]/90 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] shadow-2xl p-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                <h3 className="text-sm font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
                   {pendingConfirmAction === 'delete_all'
                     ? 'Delete All Tutoring History?'
                     : 'Clear Session Messages?'}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-xs text-[#6B6890] dark:text-[#9E9EA9] leading-relaxed">
                   {pendingConfirmAction === 'delete_all'
                     ? 'This will permanently delete all saved Omni Copilot conversations and cannot be undone.'
                     : 'This will remove all messages in the current tutoring session.'}

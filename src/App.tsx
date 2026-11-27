@@ -12,6 +12,13 @@ import { useLocalPractice } from './utils/localPractice';
 import { useLocalNotifications } from './utils/localNotifications';
 import { lazyNamed, lazyWithRetry } from './utils/lazyNamed';
 import {
+  clearGuestSessionData,
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+  GUEST_MODE_STORAGE_KEY,
+  GUEST_QUOTA_UPDATED_EVENT,
+} from './utils/guestMode';
+import {
   Sparkles,
   ShieldCheck,
   Loader2,
@@ -202,6 +209,30 @@ export default function App() {
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(() => {
     return !localStorage.getItem('learnco_walkthrough_seen');
   });
+
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(GUEST_MODE_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [guestRemaining, setGuestRemaining] = useState(() => getGuestQuotaRemaining());
+
+  // Automatically clear Guest Mode banner/flag once authenticated
+  useEffect(() => {
+    if (isAuthenticated && isGuestMode) {
+      clearGuestSessionData();
+      setIsGuestMode(false);
+    }
+  }, [isAuthenticated, isGuestMode]);
+
+  useEffect(() => {
+    const syncGuestQuota = () => setGuestRemaining(getGuestQuotaRemaining());
+    syncGuestQuota();
+    window.addEventListener(GUEST_QUOTA_UPDATED_EVENT, syncGuestQuota);
+    return () => window.removeEventListener(GUEST_QUOTA_UPDATED_EVENT, syncGuestQuota);
+  }, []);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('learnco_theme');
@@ -401,27 +432,30 @@ export default function App() {
 
   // Convert auth profile to legacy UserProfile view format
   const effectiveLegacyUser: UserProfile = {
-    id: user?.id || 'guest-learner',
-    userId: user?.id || profile?.userId || 'guest-learner',
+    id: user?.id || (isGuestMode ? 'guest_scholar_id' : 'guest-learner'),
+    userId: user?.id || profile?.userId || (isGuestMode ? 'guest_scholar_id' : 'guest-learner'),
     fullName:
       profile?.displayName ||
       profile?.fullName ||
-      (user?.email ? user.email.split('@')[0] : 'Guest Scholar'),
-    email: user?.email || profile?.email || 'guest@learn.co',
+      (user?.email ? user.email.split('@')[0] : isGuestMode ? 'Guest Scholar' : 'Guest Scholar'),
+    email: user?.email || profile?.email || (isGuestMode ? 'guest@learnco.ai' : 'guest@learn.co'),
     avatarUrl: profile?.avatarUrl || '',
     role: (isAdmin ? 'admin' : profile?.role || user?.role || 'student') as any,
     joinedDate: profile?.joinedDate || new Date().toISOString().split('T')[0],
-    xp: gamification?.xp ?? 0,
-    level: gamification?.level ?? 1,
-    currentStreak: gamification?.currentStreak ?? 0,
-    longestStreak: gamification?.longestStreak ?? 0,
-    dailyAllowanceLimit: DAILY_PRACTICE_LIMIT,
-    dailyQuestionsSolvedToday: gamification?.dailyQuestionsSolvedToday || 0,
+    xp: gamification?.xp ?? (isGuestMode ? 450 : 0),
+    level: gamification?.level ?? (isGuestMode ? 2 : 1),
+    currentStreak: gamification?.currentStreak ?? (isGuestMode ? 3 : 0),
+    longestStreak: gamification?.longestStreak ?? (isGuestMode ? 5 : 0),
+    dailyAllowanceLimit: !isAuthenticated && isGuestMode ? GUEST_LIMITS.practiceQuestions : DAILY_PRACTICE_LIMIT,
+    dailyQuestionsSolvedToday:
+      !isAuthenticated && isGuestMode
+        ? guestRemaining.state.practiceQuestionsUsed
+        : gamification?.dailyQuestionsSolvedToday || 0,
     targetExam: profile?.targetExam || 'Advanced STEM Diagnostics',
     targetScore: profile?.targetScore || 'Top 1% Percentile',
     examDate: profile?.examDate || '2026-11-15',
     subjects: profile?.subjects || ['math', 'cs'],
-    studyTimeMinutesThisWeek: profile?.studyTimeMinutesThisWeek ?? 0,
+    studyTimeMinutesThisWeek: profile?.studyTimeMinutesThisWeek ?? (isGuestMode ? 120 : 0),
   };
 
   // Loading state
@@ -475,8 +509,8 @@ export default function App() {
     );
   }
 
-  // If user is not signed in: Editorial Landing Site + Direct Sign In / Create Account Modal + Embedded Auth Portal
-  if (!isAuthenticated) {
+  // If user is not signed in and not in guest mode: Editorial Landing Site + Direct Sign In / Create Account Modal + Embedded Auth Portal
+  if (!isAuthenticated && !isGuestMode) {
     return (
       <Suspense
         fallback={
@@ -491,6 +525,10 @@ export default function App() {
             setAuthModalMode(mode === 'signup' ? 'signup' : 'signin');
             setIsAuthModalOpen(true);
           }}
+          onExploreGuest={() => {
+            localStorage.setItem('learnco_guest_mode', 'true');
+            setIsGuestMode(true);
+          }}
           authSlot={
             <Suspense
               fallback={
@@ -503,6 +541,10 @@ export default function App() {
                 initialResetToken={resetToken}
                 onExitReset={() => setResetToken(null)}
                 onNavigateToTab={() => setActiveTab('dashboard')}
+                onExploreGuest={() => {
+                  localStorage.setItem('learnco_guest_mode', 'true');
+                  setIsGuestMode(true);
+                }}
               />
             </Suspense>
           }
@@ -513,6 +555,11 @@ export default function App() {
               isOpen={isAuthModalOpen}
               initialMode={authModalMode}
               onClose={() => setIsAuthModalOpen(false)}
+              onExploreGuest={() => {
+                localStorage.setItem('learnco_guest_mode', 'true');
+                setIsGuestMode(true);
+                setIsAuthModalOpen(false);
+              }}
             />
           </Suspense>
         )}
@@ -541,6 +588,37 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F7F5FF] dark:bg-[#09090B] text-[#2D2A4A] dark:text-[#F4F4F6] flex flex-col font-sans selection:bg-[#6C5CE7] dark:selection:bg-[#CCFF00] selection:text-white dark:selection:text-[#09090B]">
+      {isGuestMode && !isAuthenticated && (
+        <div role="status" className="bg-gradient-to-r from-[#6C5CE7] via-[#7C3AED] to-[#00B8A9] text-white px-4 py-2.5 flex items-center justify-between gap-3 text-xs font-bold shadow-sm z-40">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles className="w-4 h-4 shrink-0 text-[#CCFF00]" />
+            <span className="truncate">
+              Exploring as <strong>Guest</strong> (nothing saved) · Limits: {guestRemaining.practiceRemaining}/{GUEST_LIMITS.practiceQuestions} problems · {guestRemaining.doubtsRemaining}/{GUEST_LIMITS.doubts} doubts · {guestRemaining.creationsRemaining}/{GUEST_LIMITS.creations} PDFs
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setAuthModalMode('signin');
+                setIsAuthModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11px] font-black cursor-pointer transition-colors"
+            >
+              Sign In / Save Progress
+            </button>
+            <button
+              onClick={() => {
+                clearGuestSessionData();
+                setIsGuestMode(false);
+              }}
+              className="p-1 text-white/80 hover:text-white cursor-pointer"
+              aria-label="Exit guest mode"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* Top Universal Navigation Bar */}
       <Suspense fallback={<div className="h-16 border-b border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114]" />}>
         <Navbar
@@ -570,10 +648,11 @@ export default function App() {
           <Sidebar
             activeTab={activeTab}
             setActiveTab={setActiveTab}
-            dailyAllowanceRemaining={Math.max(
-              0,
-              DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
-            )}
+            dailyAllowanceRemaining={
+              !isAuthenticated && isGuestMode
+                ? guestRemaining.practiceRemaining
+                : Math.max(0, DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0))
+            }
           />
         </Suspense>
 
@@ -875,10 +954,11 @@ export default function App() {
         <MobileAllTabsNav
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          dailyAllowanceRemaining={Math.max(
-            0,
-            DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0)
-          )}
+          dailyAllowanceRemaining={
+            !isAuthenticated && isGuestMode
+              ? guestRemaining.practiceRemaining
+              : Math.max(0, DAILY_PRACTICE_LIMIT - (gamification?.dailyQuestionsSolvedToday ?? 0))
+          }
         />
       </Suspense>
 

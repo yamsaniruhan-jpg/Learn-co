@@ -15,7 +15,16 @@ import { PracticeArena } from './PracticeArena';
 import { ConfidenceSummary } from './ConfidenceSummary';
 import { useLocalPractice } from '../../utils/localPractice';
 import { OfflineStorageManager } from '../../utils/offlineStorage';
-import { creatorPracticeTransferKey, readCreatorPracticeTransfer } from '../../utils/creatorPracticeTransfer';
+import {
+  creatorPracticeTransferKey,
+  readCreatorPracticeTransfer,
+  clearGuestCreatorPracticeTransfer,
+} from '../../utils/creatorPracticeTransfer';
+import {
+  GUEST_LIMITS,
+  GUEST_QUOTA_UPDATED_EVENT,
+  getGuestQuotaRemaining,
+} from '../../utils/guestMode';
 import { PracticeResultsView } from './PracticeResultsView';
 import { PracticeConfigModal } from '../learn/PracticeConfigModal';
 import { RecommendedPracticeView } from './RecommendedPracticeView';
@@ -67,7 +76,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
   initialPracticeContext,
   onConsumePracticeContext,
 }) => {
-  const { gamification, refreshUserData, user } = useAuth();
+  const { gamification, refreshUserData, user, isAuthenticated } = useAuth();
   const { attempts: localAttempts } = useLocalPractice(user?.id || null);
   const [activeTab, setActiveTab] = useState<
     'hub' | 'contest' | 'ict_runner' | 'recommendations' | 'weak_topics' | 'history' | 'bank'
@@ -116,16 +125,33 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
     accountId: string;
   } | null>(null);
 
+  const [guestPracticeRemaining, setGuestPracticeRemaining] = useState<number>(
+    () => getGuestQuotaRemaining().practiceRemaining
+  );
+  const [lastFailedConfig, setLastFailedConfig] = useState<PracticeSessionConfig | null>(null);
+  const [drillNeedsGuestRetry, setDrillNeedsGuestRetry] = useState<boolean>(false);
+
+  useEffect(() => {
+    const syncGuest = () => setGuestPracticeRemaining(getGuestQuotaRemaining().practiceRemaining);
+    syncGuest();
+    window.addEventListener(GUEST_QUOTA_UPDATED_EVENT, syncGuest);
+    return () => window.removeEventListener(GUEST_QUOTA_UPDATED_EVENT, syncGuest);
+  }, [user?.id, isAuthenticated]);
+
   useEffect(() => {
     const checkCreatorSession = () => {
       const accountId = typeof user?.id === 'string' ? user.id : null;
       const parsed = readCreatorPracticeTransfer(accountId);
-      setCreatorImportSession(parsed && accountId ? {
-        resourceTitle: parsed.resourceTitle || 'Creator Studio Custom Resource',
-        questions: parsed.questions,
-        resourceId: parsed.resourceId,
-        accountId,
-      } : null);
+      setCreatorImportSession(
+        parsed
+          ? {
+              resourceTitle: parsed.resourceTitle || 'Creator Studio Custom Resource',
+              questions: parsed.questions,
+              resourceId: parsed.resourceId,
+              accountId: accountId || 'guest',
+            }
+          : null
+      );
     };
 
     checkCreatorSession();
@@ -153,7 +179,10 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
   const [isLoadingHub, setIsLoadingHub] = useState<boolean>(true);
   const [hubError, setHubError] = useState<string | null>(null);
 
-  const dailyQuotaRemaining = Math.max(0, 25 - (gamification?.dailyQuestionsSolvedToday || 0));
+  const dailyQuotaRemaining =
+    isAuthenticated && user
+      ? Math.max(0, 25 - (gamification?.dailyQuestionsSolvedToday || 0))
+      : guestPracticeRemaining;
 
   const loadHubData = async () => {
     setIsLoadingHub(true);
@@ -265,7 +294,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
     }
   }, [localAttempts]);
 
-  const handleLaunchSession = async (config: PracticeSessionConfig) => {
+  const handleLaunchSession = async (config: PracticeSessionConfig, allowGuestFallback = false) => {
     setIsConfigModalOpen(false);
     setDrillError(null);
     setLaunchingDrill(true);
@@ -276,14 +305,19 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           ...(config.excludeQuestionIds ?? []),
         ])
       ).slice(-1200);
-      const session = await LearningClient.startPracticeSession({
-        ...config,
-        excludeQuestionIds: mergedExcluded,
-      });
+      const session = await LearningClient.startPracticeSession(
+        {
+          ...config,
+          excludeQuestionIds: mergedExcluded,
+        },
+        { allowGuestFallback }
+      );
       if (session && session.questions && session.questions.length > 0) {
         session.questions.forEach((q) => seenQuestionIdsRef.current.add(q.id));
+        setLastFailedConfig(null);
+        setDrillNeedsGuestRetry(false);
         setActivePracticeSession({
-          config,
+          config: { ...config, questionCount: session.questions.length },
           questions: session.questions,
         });
         setSessionResults(null);
@@ -291,8 +325,11 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
         setDrillError('No questions matched that selection. Try resetting filters.');
       }
     } catch (err: any) {
-      console.error('Failed to start session:', err);
-      setDrillError(err?.message || 'Unable to generate sub-questions right now.');
+      const msg = err?.message || 'Unable to generate sub-questions right now.';
+      const canGuestRetry = !allowGuestFallback && (!AuthClient.hasSession() || /auth|401|retry|sign in/i.test(msg));
+      setLastFailedConfig(config);
+      setDrillNeedsGuestRetry(canGuestRetry);
+      setDrillError(msg);
     } finally {
       setLaunchingDrill(false);
     }
@@ -438,34 +475,39 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
             </div>
 
             {/* Daily Practice Limit Live Quota */}
-            <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861] shrink-0 text-center min-w-[168px]">
-              <div className="text-[11px] uppercase tracking-wider text-[#6B6890] dark:text-[#B4B0D5] font-bold mb-1">
-                Daily Quota
+            <div className="p-4 rounded-2xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] shrink-0 text-center min-w-[176px]">
+              <div className="text-[11px] uppercase tracking-wider text-[#6B6890] dark:text-[#9D9BB8] font-bold mb-1">
+                {isAuthenticated && user ? 'Daily Quota' : 'Guest Practice Limit'}
               </div>
-              <div className="text-2xl font-black text-[#2D2A4A] dark:text-[#F1EFFF] tabular-nums">
-                <span className="text-[#6C5CE7] dark:text-[#A594FF]">{dailyQuotaRemaining}</span> / 25
+              <div className="text-2xl font-black text-[#2D2A4A] dark:text-white tabular-nums">
+                <span className="text-[#6C5CE7] dark:text-[#CCFF00]">
+                  {isAuthenticated && user ? dailyQuotaRemaining : guestPracticeRemaining}
+                </span>{' '}
+                / {isAuthenticated && user ? 25 : GUEST_LIMITS.practiceQuestions}
               </div>
-              <div className="text-[11px] text-[#6B6890] dark:text-[#B4B0D5] mt-0.5">Questions left today</div>
+              <div className="text-[11px] text-[#6B6890] dark:text-[#9D9BB8] mt-0.5">
+                {isAuthenticated && user ? 'Questions left today' : 'Guest questions left (not saved)'}
+              </div>
             </div>
           </Card>
 
           {/* Creator Studio Imported Resource Banner */}
-          {creatorImportSession && creatorImportSession.accountId === user?.id && (
-            <div className="p-5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border-2 border-indigo-500/40 dark:border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md animate-in fade-in slide-in-from-top-2">
+          {creatorImportSession && creatorImportSession.accountId === (user?.id || 'guest') && (
+            <div className="p-5 rounded-2xl bg-[#F3F0FF] dark:bg-[#16161C] border-2 border-[#6C5CE7]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-sm shrink-0">
+                <div className="p-2.5 rounded-xl bg-[#6C5CE7] text-white shadow-sm shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                      Creator Studio Import
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#6C5CE7]/15 dark:bg-[#6C5CE7]/30 text-[#6C5CE7] dark:text-[#C5BAFF]">
+                      {user?.id ? 'Creator Studio Import' : 'Creator Guest Preview'}
                     </span>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <h3 className="text-sm font-bold text-[#2D2A4A] dark:text-white">
                       {creatorImportSession.resourceTitle}
                     </h3>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8] mt-0.5">
                     {creatorImportSession.questions.length} problems transferred and ready to solve in Practice Arena.
                   </p>
                 </div>
@@ -474,10 +516,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.removeItem(creatorPracticeTransferKey(creatorImportSession.accountId));
+                    if (user?.id) {
+                      localStorage.removeItem(creatorPracticeTransferKey(creatorImportSession.accountId));
+                    } else {
+                      clearGuestCreatorPracticeTransfer();
+                    }
                     setCreatorImportSession(null);
                   }}
-                  className="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-xl text-[#6B6890] dark:text-[#9D9BB8] hover:bg-[#EDE9FE] dark:hover:bg-[#232329] transition-colors cursor-pointer"
                 >
                   Dismiss
                 </button>
@@ -494,10 +540,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                       },
                       questions: creatorImportSession.questions,
                     });
-                    localStorage.removeItem(creatorPracticeTransferKey(creatorImportSession.accountId));
+                    if (user?.id) {
+                      localStorage.removeItem(creatorPracticeTransferKey(creatorImportSession.accountId));
+                    } else {
+                      clearGuestCreatorPracticeTransfer();
+                    }
                     setCreatorImportSession(null);
                   }}
-                  className="flex-1 sm:flex-none px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2 text-xs font-bold rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BD6] text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   <span>Start Practice Now</span>
@@ -507,7 +557,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           )}
 
           {/* Sub Navigation Bar */}
-          <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto pb-1">
+          <div className="flex border-b border-[#E3DFF5] dark:border-[#232329] gap-1 overflow-x-auto pb-1">
             {[
               { id: 'hub', label: 'Practice Hub & Ladders', icon: Target },
               { id: 'contest', label: 'Olympiad Mock Contest', icon: Trophy },
@@ -525,8 +575,8 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                      ? 'bg-[#6C5CE7] text-white shadow-sm'
+                      : 'text-[#6B6890] dark:text-[#9D9BB8] hover:bg-[#F3F0FF] dark:hover:bg-[#16161C]'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -559,14 +609,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
 
               {/* Guided 4-Step Subtopic Drill Workflow: Subject -> Topic -> Subtopic -> Create Sub-Questions */}
               {curriculumSubjects.length > 0 && (
-                <div className="rounded-2xl bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] p-5 sm:p-6 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="rounded-2xl bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] p-5 sm:p-6 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E3DFF5] dark:border-[#232329] pb-3">
                     <div>
-                      <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                      <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6C5CE7] dark:text-[#A594FF]">
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>Guided Subtopic Generator · 100+ Multi-Model Problems per Topic</span>
                       </div>
-                      <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                      <h2 className="text-base sm:text-lg font-black text-[#2D2A4A] dark:text-white mt-0.5">
                         Select Subject → Topic → Subtopic → Create Sub-Questions
                       </h2>
                     </div>
@@ -574,7 +624,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                       aria-label="Exam track filter"
                       value={drillExamTrack}
                       onChange={(e) => setDrillExamTrack(e.target.value as ExamTrackId)}
-                      className="min-h-[40px] px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer"
+                      className="min-h-[40px] px-3 py-1.5 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-xs font-semibold text-[#2D2A4A] dark:text-[#E2E0F0] cursor-pointer"
                     >
                       <option value="all">All Exams (Universal)</option>
                       <option value="jee_advanced">JEE Advanced</option>
@@ -587,22 +637,39 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                   </div>
 
                   {drillError && (
-                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-600 dark:text-rose-300 font-semibold">
-                      {drillError}
+                    <div
+                      role="alert"
+                      className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-700 dark:text-rose-200 font-semibold"
+                    >
+                      <span>{drillError}</span>
+                      {lastFailedConfig && (
+                        <button
+                          type="button"
+                          onClick={() => handleLaunchSession(lastFailedConfig, drillNeedsGuestRetry)}
+                          className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#CCFF00] hover:bg-[#B8E600] text-[#09090B] font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>
+                            {drillNeedsGuestRetry
+                              ? 'Retry & Generate in Guest Mode'
+                              : 'Retry'}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {/* Step 1: Subject */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-[#6B6890] dark:text-[#9D9BB8]">
                         1. Subject
                       </label>
                       <select
                         aria-label="Select Subject"
                         value={activeDrillSubject?.id || drillSubjectId}
                         onChange={(e) => setDrillSubjectId(e.target.value as SubjectId)}
-                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-xs font-bold text-[#2D2A4A] dark:text-white cursor-pointer"
                       >
                         {curriculumSubjects.map((s) => (
                           <option key={s.id} value={s.id}>
@@ -614,14 +681,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
 
                     {/* Step 2: Topic */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-[#6B6890] dark:text-[#9D9BB8]">
                         2. Topic
                       </label>
                       <select
                         aria-label="Select Topic"
                         value={activeDrillTopic?.id || ''}
                         onChange={(e) => setDrillTopicId(e.target.value)}
-                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-xs font-bold text-[#2D2A4A] dark:text-white cursor-pointer"
                       >
                         {availableDrillTopics.map((t) => (
                           <option key={t.id} value={t.id}>
@@ -633,14 +700,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
 
                     {/* Step 3: Subtopic */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-[#6B6890] dark:text-[#9D9BB8]">
                         3. Subtopic
                       </label>
                       <select
                         aria-label="Select Subtopic"
                         value={activeDrillSubtopic?.id || ''}
                         onChange={(e) => setDrillSubtopicId(e.target.value)}
-                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-xs font-bold text-[#2D2A4A] dark:text-white cursor-pointer"
                       >
                         {availableDrillSubtopics.map((st) => (
                           <option key={st.id} value={st.id}>
@@ -656,13 +723,13 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                     <div className="space-y-1.5 min-w-0">
                       {activeDrillSubtopic && activeDrillSubtopic.concepts.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          <span className="text-[11px] font-semibold text-[#6B6890] dark:text-[#9D9BB8]">
                             Concepts covered:
                           </span>
                           {activeDrillSubtopic.concepts.map((c) => (
                             <span
                               key={c.id}
-                              className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold border border-indigo-200/70 dark:border-indigo-800/50"
+                              className="px-2 py-0.5 rounded-lg bg-[#F3F0FF] dark:bg-[#1C1A2E] text-[#6C5CE7] dark:text-[#C5BAFF] text-[11px] font-semibold border border-[#6C5CE7]/25"
                             >
                               {c.title}
                             </span>
@@ -676,7 +743,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                         aria-label="Question count"
                         value={drillCount}
                         onChange={(e) => setDrillCount(Number(e.target.value))}
-                        className="min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                        className="min-h-[44px] px-3 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-xs font-bold text-[#2D2A4A] dark:text-[#E2E0F0] cursor-pointer"
                       >
                         {[5, 10, 15, 20].map((cnt) => (
                           <option key={cnt} value={cnt}>
@@ -689,7 +756,7 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                         aria-label="Difficulty mode"
                         value={drillDifficulty}
                         onChange={(e) => setDrillDifficulty(e.target.value as any)}
-                        className="min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                        className="min-h-[44px] px-3 py-2 rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-xs font-bold text-[#2D2A4A] dark:text-[#E2E0F0] cursor-pointer"
                       >
                         <option value="calibrated_ladder">Multi-Model Ladder</option>
                         <option value="easy">Easy Foundation</option>
@@ -717,9 +784,9 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                             mode: 'standard',
                           });
                         }}
-                        className="min-h-[44px] px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-extrabold shadow-md flex items-center gap-2 transition cursor-pointer"
+                        className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BD6] disabled:opacity-60 text-white text-xs font-extrabold shadow-md flex items-center gap-2 transition cursor-pointer"
                       >
-                        <Zap className="w-4 h-4 fill-current text-amber-300" />
+                        <Zap className="w-4 h-4 fill-current text-[#CCFF00]" />
                         <span>{launchingDrill ? 'Creating...' : '4. Create Sub-Questions'}</span>
                       </button>
                     </div>
@@ -732,41 +799,41 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('contest')}
-                  className="min-h-[44px] p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 text-left shadow-sm flex items-center justify-between gap-4 transition-all cursor-pointer"
+                  className="min-h-[44px] p-5 rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] hover:border-[#6C5CE7] text-left shadow-sm flex items-center justify-between gap-4 transition-all cursor-pointer"
                 >
                   <div className="space-y-1">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#6C5CE7] dark:text-[#A594FF]">
                       Timed Simulation &middot; IPhO &middot; IChO &middot; IBHO &middot; IJSO &middot; ICT
                     </div>
-                    <div className="text-base font-black text-slate-900 dark:text-white">
+                    <div className="text-base font-black text-[#2D2A4A] dark:text-white">
                       Launch Olympiad Mock Contest
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8]">
                       30 / 60 / 120 min timed papers with question flagging palette, sealed keys until submission, and medal standing.
                     </p>
                   </div>
-                  <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center shrink-0">
-                    <Trophy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  <div className="w-11 h-11 rounded-2xl bg-[#F3F0FF] dark:bg-[#1C1A2E] flex items-center justify-center shrink-0">
+                    <Trophy className="w-5 h-5 text-[#6C5CE7] dark:text-[#A594FF]" />
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab('ict_runner')}
-                  className="min-h-[44px] p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500 text-left shadow-sm flex items-center justify-between gap-4 transition-all cursor-pointer"
+                  className="min-h-[44px] p-5 rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] hover:border-emerald-400 dark:hover:border-emerald-500 text-left shadow-sm flex items-center justify-between gap-4 transition-all cursor-pointer"
                 >
                   <div className="space-y-1">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                       ICT Coding Lab &middot; Isolated Web Worker Sandbox
                     </div>
-                    <div className="text-base font-black text-slate-900 dark:text-white">
+                    <div className="text-base font-black text-[#2D2A4A] dark:text-white">
                       Open ICT In-Browser Code Runner
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-[#6B6890] dark:text-[#9D9BB8]">
                       Write JavaScript solutions for Kadane DP, Rotated Binary Search, Knapsack, Dijkstra &amp; Fenwick Tree and run hidden test suites offline.
                     </p>
                   </div>
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center shrink-0">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
                     <Code2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                 </button>
@@ -775,10 +842,10 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
               {/* Subject 5-Question Ladder Starters */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  <h3 className="text-sm font-bold text-[#2D2A4A] dark:text-white uppercase tracking-wider">
                     Launch Calibrated 5-Question Ladders by Subject
                   </h3>
-                  <span className="text-xs text-slate-400">Easy &rarr; Medium &rarr; Hard progression</span>
+                  <span className="text-xs text-[#6B6890] dark:text-[#9D9BB8]">Easy &rarr; Medium &rarr; Hard progression</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
@@ -794,18 +861,18 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                     <button
                       key={subj.id}
                       onClick={() => handleStartQuickSubject(subj.id as SubjectId)}
-                      className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-indigo-400 dark:hover:border-indigo-500 shadow-sm flex flex-col justify-between space-y-3 transition-all hover:scale-[1.02] cursor-pointer"
+                      className="p-5 rounded-2xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] text-left hover:border-[#6C5CE7] shadow-sm flex flex-col justify-between space-y-3 transition-all hover:scale-[1.02] cursor-pointer"
                     >
                       <div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white mb-1">
+                        <div className="text-xs font-bold text-[#2D2A4A] dark:text-white mb-1">
                           {subj.name}
                         </div>
-                        <div className="text-[11px] text-slate-400 line-clamp-2">
+                        <div className="text-[11px] text-[#6B6890] dark:text-[#9D9BB8] line-clamp-2">
                           {subj.desc}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                      <div className="flex items-center justify-between pt-2 border-t border-[#E3DFF5] dark:border-[#232329] text-[11px] text-[#6C5CE7] dark:text-[#A594FF] font-bold">
                         <span>Start 5-Q Ladder</span>
                         <Zap className="w-3.5 h-3.5 fill-current text-amber-500" />
                       </div>
@@ -841,10 +908,10 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                     {weakTopics.slice(0, 2).map((w) => (
                       <div
                         key={w.topicId}
-                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs"
+                        className="p-3 rounded-xl bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] flex items-center justify-between text-xs"
                       >
                         <div>
-                          <div className="font-bold text-slate-900 dark:text-slate-100">{w.topicTitle}</div>
+                          <div className="font-bold text-[#2D2A4A] dark:text-white">{w.topicTitle}</div>
                           <div className="text-[11px] text-rose-500 font-medium">Accuracy: {w.accuracyRate}%</div>
                         </div>
                         <button
@@ -891,13 +958,13 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
           {/* TAB 5: QUESTION BANK EXPLORER */}
           {activeTab === 'bank' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#111114] p-4 rounded-xl border border-[#E3DFF5] dark:border-[#232329]">
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-slate-400" />
+                  <Filter className="w-4 h-4 text-[#6B6890] dark:text-[#9D9BB8]" />
                   <select
                     value={bankSubjectFilter}
                     onChange={(e) => setBankSubjectFilter(e.target.value)}
-                    className="text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 cursor-pointer"
+                    className="text-xs bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] rounded-lg px-2.5 py-1.5 text-[#2D2A4A] dark:text-[#E2E0F0] cursor-pointer"
                   >
                     <option value="all">All Subjects</option>
                     <option value="math">Mathematics</option>
@@ -911,13 +978,13 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                 </div>
 
                 <div className="relative flex-1 max-w-sm ml-auto">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-[#6B6890] dark:text-[#9D9BB8] absolute left-3 top-1/2 transform -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Search question bank..."
                     value={bankSearchQuery}
                     onChange={(e) => setBankSearchQuery(e.target.value)}
-                    className="w-full text-xs pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400"
+                    className="w-full text-xs pl-9 pr-3 py-1.5 bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] rounded-lg text-[#2D2A4A] dark:text-[#E2E0F0] placeholder-[#6B6890]"
                   />
                 </div>
               </div>
@@ -941,14 +1008,14 @@ export const PracticeView: React.FC<PracticeViewProps> = ({
                   bankQuestions.map((q) => (
                     <div
                       key={q.id}
-                      className="bg-[#FFFFFF] dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] rounded-2xl p-5 shadow-xs space-y-3"
+                      className="bg-[#FFFFFF] dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] rounded-2xl p-5 shadow-xs space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <Badge variant="primary" size="sm">
                             {q.subjectId.toUpperCase()}
                           </Badge>
-                          <span className="text-xs font-semibold text-[#2D2A4A] dark:text-[#F1EFFF]">
+                          <span className="text-xs font-semibold text-[#2D2A4A] dark:text-white">
                             {q.topicId}
                           </span>
                           <Badge variant="outline" size="sm">

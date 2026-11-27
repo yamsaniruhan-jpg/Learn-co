@@ -107,28 +107,28 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
   ];
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 select-none">
+    <div className="flex flex-col h-full bg-[#FFFFFF] dark:bg-[#111114] select-none">
       {/* Top Header & New Conversation Button */}
-      <div className="p-4 border-b border-slate-200/80 dark:border-slate-800/80 space-y-3">
+      <div className="p-4 border-b border-[#E3DFF5] dark:border-[#232329] space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400">
+            <div className="p-1.5 rounded-xl bg-[#F0EDFA] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00]">
               <Bot className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+              <h2 className="text-xs font-bold text-[#2D2A4A] dark:text-[#F4F4F6] uppercase tracking-wider">
                 Sessions & Memory
               </h2>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F0EDFA] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00] border border-[#E3DFF5] dark:border-[#232329]">
               {conversations.length} Active
             </span>
             {onCloseMobile && (
               <button
                 onClick={onCloseMobile}
-                className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#2D2A4A] dark:hover:text-[#F1EFFF] cursor-pointer"
+                className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#2D2A4A] dark:hover:text-[#F4F4F6] cursor-pointer"
                 aria-label="Close drawer"
               >
                 <X className="w-4 h-4" />
@@ -142,7 +142,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
             onNewConversation();
             if (onCloseMobile) onCloseMobile();
           }}
-          className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#5B4BC4] active:scale-[0.99] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+          className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#6C5CE7] dark:bg-[#CCFF00] hover:bg-[#5B4BC4] dark:hover:bg-[#d9ff33] active:scale-[0.99] text-white dark:text-[#09090B] text-xs font-bold shadow-xs transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Tutoring Session</span>
@@ -150,13 +150,13 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
 
         {/* Search Conversations */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6890] dark:text-[#71717A]" />
           <input
             type="text"
             placeholder="Search past tutoring chats..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-8.5 pr-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all outline-hidden"
+            className="w-full pl-8.5 pr-3 py-1.5 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] focus:border-[#6C5CE7] dark:focus:border-[#CCFF00] focus:bg-white dark:focus:bg-[#09090B] text-xs text-[#2D2A4A] dark:text-[#F4F4F6] placeholder:text-[#6B6890] transition-all outline-hidden"
           />
         </div>
       </div>
@@ -180,8 +180,8 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
                 onClick={() => onSelectConversation(conv.id)}
                 className={`group relative p-2.5 rounded-xl text-xs transition-all cursor-pointer border ${
                   isActive
-                    ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/80 text-indigo-950 dark:text-indigo-100 shadow-xs'
-                    : 'bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60 border-transparent text-slate-700 dark:text-slate-300'
+                    ? 'bg-[#F0EDFA] dark:bg-[#16161C] border-[#6C5CE7]/40 dark:border-[#CCFF00]/50 text-[#2D2A4A] dark:text-[#F4F4F6] shadow-xs'
+                    : 'bg-transparent hover:bg-[#F7F5FF] dark:hover:bg-[#16161C]/70 border-transparent text-[#6B6890] dark:text-[#9E9EA9]'
                 }`}
               >
                 {isEditing ? (
@@ -306,12 +306,12 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
       </div>
 
       {/* Bottom Configuration: Learner Level & Mode Selector */}
-      <div className="p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/70 space-y-3">
+      <div className="p-3 border-t border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#09090B] space-y-3">
         {/* Learner Level Selection */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="text-[10px] font-bold text-[#6B6890] dark:text-[#9E9EA9] uppercase tracking-wider flex items-center gap-1">
+              <GraduationCap className="w-3.5 h-3.5 text-[#6C5CE7] dark:text-[#CCFF00]" />
               <span>Learner Rigor Level</span>
             </span>
           </div>
@@ -322,8 +322,8 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
                 onClick={() => onChangeLearnerLevel(lvl.id)}
                 className={`min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-semibold text-left transition-all cursor-pointer ${
                   learnerLevel === lvl.id
-                    ? 'bg-[#6C5CE7] text-white shadow-2xs'
-                    : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861] hover:border-[#6C5CE7]/40'
+                    ? 'bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] shadow-2xs font-bold'
+                    : 'bg-[#FFFFFF] dark:bg-[#16161C] text-[#6B6890] dark:text-[#9E9EA9] border border-[#E3DFF5] dark:border-[#232329] hover:border-[#6C5CE7]/40'
                 }`}
               >
                 {lvl.label}
@@ -334,7 +334,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
 
         {/* Quick Mode Switches */}
         <div>
-          <span className="text-[10px] font-bold text-[#6B6890] dark:text-[#B4B0D5] uppercase tracking-wider block mb-1.5">
+          <span className="text-[10px] font-bold text-[#6B6890] dark:text-[#9E9EA9] uppercase tracking-wider block mb-1.5">
             Active Pedagogical Mode
           </span>
           <div className="grid grid-cols-2 gap-1.5">
@@ -344,8 +344,8 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
                 onClick={() => onChangeMode(m.id)}
                 className={`min-h-[44px] flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold transition-all cursor-pointer ${
                   activeMode === m.id
-                    ? 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6C5CE7] dark:text-[#A99DF5] border border-[#6C5CE7] shadow-2xs'
-                    : 'bg-[#FFFFFF] dark:bg-[#2A2647] text-[#6B6890] dark:text-[#B4B0D5] border border-[#E3DFF5] dark:border-[#3D3861]'
+                    ? 'bg-[#FFFFFF] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00] border border-[#6C5CE7] dark:border-[#CCFF00] shadow-2xs'
+                    : 'bg-[#FFFFFF] dark:bg-[#111114] text-[#6B6890] dark:text-[#9E9EA9] border border-[#E3DFF5] dark:border-[#232329]'
                 }`}
               >
                 {m.icon}
@@ -356,7 +356,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
         </div>
 
         {/* Save & Delete All History Actions */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E3DFF5] dark:border-[#3D3861]">
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E3DFF5] dark:border-[#232329]">
           <button
             onClick={onExportHistory}
             className="min-h-[44px] flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-[#4CAF8E]/12 hover:bg-[#4CAF8E]/20 text-[#247A5E] dark:text-[#7ADEC0] text-[11px] font-bold border border-[#4CAF8E]/30 transition-colors cursor-pointer"
@@ -381,7 +381,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-72 lg:w-80 flex-col h-full border-r border-slate-200 dark:border-slate-800 shrink-0 select-none">
+      <aside className="hidden md:flex w-72 lg:w-80 flex-col h-full border-r border-[#E3DFF5] dark:border-[#232329] shrink-0 select-none">
         {sidebarContent}
       </aside>
 
@@ -389,7 +389,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-[#2D2A4A]/80 dark:bg-[#100E1C]/90"
+            className="fixed inset-0 bg-[#2D2A4A]/80 dark:bg-[#09090B]/90"
             onClick={onCloseMobile}
           />
           <div className="relative w-4/5 max-w-xs h-full z-10 animate-in slide-in-from-left duration-200 shadow-2xl">

@@ -5,6 +5,39 @@ const MAX_DIMENSION = 1024;
 const MAX_BYTES = 4 * 1024 * 1024;
 // Large upload parser on /api/copilot/chat and /api/copilot/stream handles up to 10 MB.
 export const MAX_SAFE_IMAGE_BASE64_CHARS = 4_000_000;
+export const DAILY_COPILOT_PHOTO_LIMIT = 3;
+
+export function getPhotoQuotaDateKey(): string {
+  return `learnco_omni_photo_uploads_${new Date().toISOString().split('T')[0]}`;
+}
+
+export function getTodayPhotoUploadsUsed(): number {
+  try {
+    const raw = localStorage.getItem(getPhotoQuotaDateKey());
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function getTodayPhotoUploadsRemaining(): number {
+  return Math.max(0, DAILY_COPILOT_PHOTO_LIMIT - getTodayPhotoUploadsUsed());
+}
+
+export function canUploadPhotoToday(): boolean {
+  return getTodayPhotoUploadsRemaining() > 0;
+}
+
+export function recordPhotoUploadToday(): number {
+  try {
+    const next = Math.min(DAILY_COPILOT_PHOTO_LIMIT, getTodayPhotoUploadsUsed() + 1);
+    localStorage.setItem(getPhotoQuotaDateKey(), String(next));
+    return next;
+  } catch {
+    return 0;
+  }
+}
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

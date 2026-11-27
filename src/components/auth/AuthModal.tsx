@@ -14,6 +14,7 @@ import {
   UserPlus,
   LogIn,
   ExternalLink,
+  Compass,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { GoogleSignInDialog } from './GoogleSignInDialog';
@@ -24,12 +25,14 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'signin' | 'signup';
+  onExploreGuest?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   initialMode = 'signin',
+  onExploreGuest,
 }) => {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, authError, clearAuthError, refreshUserData } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>(initialMode);
@@ -413,6 +416,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
             </form>
+
+            {onExploreGuest && (
+              <div className="pt-3 border-t border-[#E3DFF5] dark:border-[#232329] text-center mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onExploreGuest();
+                  }}
+                  className="w-full py-2 px-3 rounded-lg border border-dashed border-[#6C5CE7] dark:border-[#CCFF00]/60 bg-[#F7F5FF] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00] font-extrabold text-xs flex items-center justify-center gap-1.5 hover:bg-[#EDE9FE] dark:hover:bg-[#232329] transition-colors cursor-pointer"
+                >
+                  <Compass className="w-4 h-4" />
+                  <span>Explore App as Guest (No account needed)</span>
+                </button>
+              </div>
+            )}
           </div>
           )}
         </div>

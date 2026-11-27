@@ -12,9 +12,30 @@ import {
 } from '../types/copilot';
 import { SubjectId } from '../types/curriculum';
 import { buildApiHeaders } from '../utils/csrf';
+import { AuthClient } from './authClient';
 
 function getAuthHeader(includeContentType = true): Record<string, string> {
   return buildApiHeaders(undefined, includeContentType);
+}
+
+function buildGuestConversation(params: {
+  title?: string;
+  mode?: CopilotMode;
+  learnerLevel?: LearnerLevel;
+  subjectId?: SubjectId;
+}): CopilotConversation {
+  return {
+    id: `conv-guest-${Date.now()}`,
+    userId: 'guest_scholar_id',
+    title: params.title || 'New Socratic Chat',
+    mode: params.mode || 'socratic_hint',
+    learnerLevel: params.learnerLevel || 'intermediate',
+    subjectId: params.subjectId || 'math',
+    pinned: false,
+    messageCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export class CopilotClient {
@@ -22,6 +43,9 @@ export class CopilotClient {
    * List conversations
    */
   static async listConversations(search?: string): Promise<CopilotConversation[]> {
+    if (!AuthClient.hasSession()) {
+      return [];
+    }
     try {
       const query = search ? `?search=${encodeURIComponent(search)}` : '';
       const response = await fetch(`/api/copilot/conversations${query}`, {
@@ -31,6 +55,10 @@ export class CopilotClient {
           ...getAuthHeader(),
         },
       });
+
+      if (response.status === 401) {
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch conversations (${response.status})`);
@@ -48,8 +76,15 @@ export class CopilotClient {
    * Get single conversation details & messages
    */
   static async getConversation(
-    conversationId: string
+    conversationId: string,
+    options?: { skipSessionGuard?: boolean }
   ): Promise<{ conversation: CopilotConversation; messages: CopilotMessage[] } | null> {
+    if (conversationId.startsWith('conv-guest-')) {
+      return null;
+    }
+    if (!options?.skipSessionGuard && !AuthClient.hasSession()) {
+      return null;
+    }
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}`, {
         credentials: 'include',
@@ -83,6 +118,10 @@ export class CopilotClient {
     learnerLevel?: LearnerLevel;
     subjectId?: SubjectId;
   }): Promise<CopilotConversation> {
+    if (!AuthClient.hasSession()) {
+      return buildGuestConversation(params);
+    }
+
     const response = await fetch('/api/copilot/conversations', {
       method: 'POST',
       credentials: 'include',
@@ -93,8 +132,13 @@ export class CopilotClient {
       body: JSON.stringify(params),
     });
 
+    if (response.status === 401) {
+      return buildGuestConversation(params);
+    }
+
     if (!response.ok) {
-      throw new Error(`Failed to create conversation (${response.status})`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData?.error || `Failed to create conversation (${response.status})`);
     }
 
     const data = await response.json();
@@ -108,6 +152,9 @@ export class CopilotClient {
     conversationId: string,
     updates: Partial<CopilotConversation>
   ): Promise<CopilotConversation | null> {
+    if (!AuthClient.hasSession() || conversationId.startsWith('conv-guest-')) {
+      return null;
+    }
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}`, {
         method: 'PATCH',
@@ -132,6 +179,9 @@ export class CopilotClient {
    * Delete conversation
    */
   static async deleteConversation(conversationId: string): Promise<boolean> {
+    if (!AuthClient.hasSession() || conversationId.startsWith('conv-guest-')) {
+      return true;
+    }
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}`, {
         method: 'DELETE',
@@ -151,6 +201,9 @@ export class CopilotClient {
    * Clear messages in conversation
    */
   static async clearConversation(conversationId: string): Promise<boolean> {
+    if (!AuthClient.hasSession() || conversationId.startsWith('conv-guest-')) {
+      return true;
+    }
     try {
       const response = await fetch(`/api/copilot/conversations/${conversationId}/clear`, {
         method: 'POST',
@@ -170,6 +223,9 @@ export class CopilotClient {
    * Delete all conversations
    */
   static async deleteAllConversations(): Promise<boolean> {
+    if (!AuthClient.hasSession()) {
+      return true;
+    }
     try {
       const response = await fetch('/api/copilot/conversations', {
         method: 'DELETE',
@@ -189,6 +245,9 @@ export class CopilotClient {
    * Export all history
    */
   static async exportHistory(): Promise<any> {
+    if (!AuthClient.hasSession()) {
+      return null;
+    }
     try {
       const response = await fetch('/api/copilot/history/export', {
         credentials: 'include',
@@ -229,7 +288,8 @@ export class CopilotClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Copilot request failed with status ${response.status}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData?.error || `Copilot request failed with status ${response.status}`);
     }
 
     return await response.json();
@@ -276,7 +336,12 @@ export class CopilotClient {
       });
 
       if (!response.ok) {
-        throw new Error(`Streaming failed with status ${response.status}`);
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          explicitServerError = errData?.error || 'Authentication required (401). Please sign in or press Retry to continue in Guest Mode.';
+          throw new Error(explicitServerError);
+        }
+        throw new Error(errData?.error || `Streaming failed with status ${response.status}`);
       }
 
       if (!response.body) {
@@ -342,7 +407,7 @@ export class CopilotClient {
           await new Promise((r) => setTimeout(r, 250));
 
           if (seenConvId && accumulated.length > 0) {
-            const existing = await CopilotClient.getConversation(seenConvId);
+            const existing = await CopilotClient.getConversation(seenConvId, { skipSessionGuard: true });
             const lastAssistant = existing?.messages
               ?.slice()
               .reverse()

@@ -14,7 +14,21 @@ import {
 } from 'lucide-react';
 import { apiCall } from '../client/firebase';
 import { FormattedMathText } from './common/FormattedMathText';
-import { prepareQuestionImage } from '../utils/imageAttachment';
+import {
+  canUploadPhotoToday,
+  DAILY_COPILOT_PHOTO_LIMIT,
+  getTodayPhotoUploadsRemaining,
+  prepareQuestionImage,
+  recordPhotoUploadToday,
+} from '../utils/imageAttachment';
+import {
+  canConsumeGuestQuota,
+  consumeGuestQuota,
+  generateGuestDoubtReply,
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+  GUEST_QUOTA_UPDATED_EVENT,
+} from '../utils/guestMode';
 
 const MODES = [
   { id: 'general', Icon: Bot, label: 'General' },
@@ -38,6 +52,10 @@ export default function OmniCopilot() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState('general');
   const [isOpen, setIsOpen] = useState(false);
+  const [photoRemaining, setPhotoRemaining] = useState(() => getTodayPhotoUploadsRemaining());
+  const [guestDoubtsRemaining, setGuestDoubtsRemaining] = useState(
+    () => getGuestQuotaRemaining().doubtsRemaining
+  );
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -46,6 +64,22 @@ export default function OmniCopilot() {
   };
 
   useEffect(scrollToBottom, [messages]);
+
+  useEffect(() => {
+    const syncQuotas = () => {
+      setPhotoRemaining(getTodayPhotoUploadsRemaining());
+      setGuestDoubtsRemaining(getGuestQuotaRemaining().doubtsRemaining);
+    };
+    syncQuotas();
+    window.addEventListener(GUEST_QUOTA_UPDATED_EVENT, syncQuotas);
+    window.addEventListener('learnco_photo_quota_updated', syncQuotas);
+    window.addEventListener('focus', syncQuotas);
+    return () => {
+      window.removeEventListener(GUEST_QUOTA_UPDATED_EVENT, syncQuotas);
+      window.removeEventListener('learnco_photo_quota_updated', syncQuotas);
+      window.removeEventListener('focus', syncQuotas);
+    };
+  }, []);
 
   useEffect(() => {
     const handleOpen = (event) => {
@@ -59,38 +93,22 @@ export default function OmniCopilot() {
     return () => window.removeEventListener('learnco:open-copilot', handleOpen);
   }, []);
 
-  const getTodayKey = () => `learnco_omni_photo_uploads_${new Date().toISOString().split('T')[0]}`;
-
-  const getTodayPhotoCount = () => {
-    try {
-      const val = localStorage.getItem(getTodayKey());
-      return val ? parseInt(val, 10) : 0;
-    } catch {
-      return 0;
-    }
-  };
-
-  const incrementTodayPhotoCount = () => {
-    try {
-      const current = getTodayPhotoCount();
-      localStorage.setItem(getTodayKey(), String(current + 1));
-    } catch {}
-  };
-
   const handleImagePick = async (file) => {
     if (!file) return;
-    const todayCount = getTodayPhotoCount();
-    if (todayCount >= 3) {
+    if (!canUploadPhotoToday()) {
       setMessages((prev) => [
         ...prev,
-        { role: 'error', content: 'Daily photo upload limit reached (3/3 photos used today). You can continue asking questions with text.', timestamp: Date.now() },
+        {
+          role: 'error',
+          content: `Daily photo upload limit reached (${DAILY_COPILOT_PHOTO_LIMIT}/${DAILY_COPILOT_PHOTO_LIMIT} photos used today). You can continue asking questions with text.`,
+          timestamp: Date.now(),
+        },
       ]);
       return;
     }
     try {
       const prepared = await prepareQuestionImage(file);
       setAttachedImage(prepared);
-      incrementTodayPhotoCount();
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -101,26 +119,71 @@ export default function OmniCopilot() {
 
   const sendMessage = async (overridePrompt, overrides = {}) => {
     const rawText = (overridePrompt ?? input).trim();
-    const pendingImg = attachedImage;
+    const pendingImg = overrides.skipUserEcho ? null : attachedImage;
     if ((!rawText && !pendingImg) || isLoading) return;
 
     const textToSend = rawText || 'Solve and explain the question shown in this photo.';
     const useHintFirst = overrides.hintFirst ?? hintFirst;
     const revealFullSolution = overrides.revealFullSolution ?? false;
+    const mappedMode = MODE_MAP[mode] || 'socratic_hint';
 
-    const userMessage = {
-      role: 'user',
-      content: textToSend,
-      imageDataUrl: pendingImg?.previewUrl,
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    if (!overridePrompt) setInput('');
-    setAttachedImage(null);
+    if (!overrides.skipUserEcho) {
+      const userMessage = {
+        role: 'user',
+        content: textToSend,
+        imageDataUrl: pendingImg?.previewUrl,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      if (!overridePrompt) setInput('');
+      setAttachedImage(null);
+    }
+
+    if (pendingImg) {
+      recordPhotoUploadToday();
+      setPhotoRemaining(getTodayPhotoUploadsRemaining());
+      try {
+        window.dispatchEvent(new Event('learnco_photo_quota_updated'));
+      } catch {}
+    }
+
+    if (overrides.guestRetry) {
+      if (!canConsumeGuestQuota('doubts', 1)) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'error',
+            content: `Guest doubt limit reached (${GUEST_LIMITS.doubts}/${GUEST_LIMITS.doubts} free doubts used). Sign in to unlock unlimited cloud AI tutoring & saved chat history.`,
+            timestamp: Date.now(),
+          },
+        ]);
+        return;
+      }
+      consumeGuestQuota('doubts', 1);
+      setGuestDoubtsRemaining(getGuestQuotaRemaining().doubtsRemaining);
+      const replyText = generateGuestDoubtReply(textToSend, {
+        mode: mappedMode,
+        hintFirst: useHintFirst,
+        revealFullSolution,
+        hasImage: Boolean(pendingImg || overrides.hadImage),
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: replyText,
+          model: 'guest-preview (not saved)',
+          hintOnly: useHintFirst && !revealFullSolution,
+          originalQuestion: textToSend,
+          timestamp: Date.now(),
+        },
+      ]);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const mappedMode = MODE_MAP[mode] || 'socratic_hint';
       const res = await apiCall('/copilot/chat', {
         method: 'POST',
         body: JSON.stringify({
@@ -132,7 +195,7 @@ export default function OmniCopilot() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         const replyText =
@@ -152,11 +215,17 @@ export default function OmniCopilot() {
           },
         ]);
       } else {
+        const isAuthError = res.status === 401;
+        const left = getGuestQuotaRemaining().doubtsRemaining;
         setMessages((prev) => [
           ...prev,
           {
             role: 'error',
-            content: data.error || 'Something went wrong. Please try again.',
+            isAuthError,
+            hadImage: Boolean(pendingImg),
+            content: isAuthError
+              ? `Authentication required for cloud history and full AI models. Press Retry to answer in Guest Mode (${left}/${GUEST_LIMITS.doubts} free doubts left, nothing saved).`
+              : data.error || 'Something went wrong. Please try again.',
             originalQuestion: textToSend,
             timestamp: Date.now(),
           },
@@ -167,7 +236,9 @@ export default function OmniCopilot() {
         ...prev,
         {
           role: 'error',
-          content: 'Connection error. Check your internet and tap Retry.',
+          isAuthError: true,
+          hadImage: Boolean(pendingImg),
+          content: 'Connection or authentication issue. Tap Retry to continue with Guest Preview or try again.',
           originalQuestion: textToSend,
           timestamp: Date.now(),
         },
@@ -199,7 +270,7 @@ export default function OmniCopilot() {
   }
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-[calc(100vw-2rem)] sm:w-[26rem] h-[540px] sm:h-[620px] bg-white dark:bg-[#2A2647] rounded-2xl shadow-2xl flex flex-col z-50 border border-[#E3DFF5] dark:border-[#3D3861] overflow-hidden">
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-[calc(100vw-2rem)] sm:w-[26rem] h-[540px] sm:h-[620px] bg-[#FFFFFF] dark:bg-[#111114] rounded-2xl shadow-2xl flex flex-col z-50 border border-[#E3DFF5] dark:border-[#232329] overflow-hidden">
       {/* Header */}
       <div className="bg-[#6C5CE7] text-white p-3.5 flex justify-between items-center">
         <div className="flex items-center gap-2.5">
@@ -208,7 +279,7 @@ export default function OmniCopilot() {
           </div>
           <div>
             <h3 className="font-bold text-sm leading-tight">Omni Copilot</h3>
-            <p className="text-[11px] opacity-90">1-line answer · steps · check yourself</p>
+            <p className="text-[11px] opacity-90">1-line answer · steps · {photoRemaining}/{DAILY_COPILOT_PHOTO_LIMIT} photos today</p>
           </div>
         </div>
         <button
@@ -222,7 +293,7 @@ export default function OmniCopilot() {
       </div>
 
       {/* Mode & Hint-First Row */}
-      <div className="flex items-center justify-between gap-2 px-2.5 py-2 bg-[#F7F5FF] dark:bg-[#1E1B33] border-b border-[#E3DFF5] dark:border-[#3D3861]">
+      <div className="flex items-center justify-between gap-2 px-2.5 py-2 bg-[#F7F5FF] dark:bg-[#16161C] border-b border-[#E3DFF5] dark:border-[#232329]">
         <div className="flex gap-1 overflow-x-auto">
           {MODES.map((m) => {
             const ModeIcon = m.Icon;
@@ -234,7 +305,7 @@ export default function OmniCopilot() {
                 className={`min-h-[36px] px-2.5 py-1 rounded-lg text-xs whitespace-nowrap flex items-center gap-1 transition cursor-pointer ${
                   mode === m.id
                     ? 'bg-[#6C5CE7] text-white font-bold'
-                    : 'text-[#6B6890] dark:text-[#B4B0D5] hover:bg-white dark:hover:bg-[#2A2647]'
+                    : 'text-[#6B6890] dark:text-[#9E9EA9] hover:bg-white dark:hover:bg-[#1E1E26]'
                 }`}
               >
                 <ModeIcon className="w-3.5 h-3.5" />
@@ -250,7 +321,7 @@ export default function OmniCopilot() {
           className={`min-h-[36px] px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 cursor-pointer border ${
             hintFirst
               ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-400 text-amber-950 dark:text-amber-200'
-              : 'bg-white dark:bg-[#2A2647] border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5]'
+              : 'bg-white dark:bg-[#111114] border-[#E3DFF5] dark:border-[#232329] text-[#6B6890] dark:text-[#9E9EA9]'
           }`}
         >
           <Lightbulb className="w-3.5 h-3.5" />
@@ -259,17 +330,17 @@ export default function OmniCopilot() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[#FFFFFF] dark:bg-[#09090B]">
         {messages.length === 0 && (
-          <div className="text-center text-[#6B6890] dark:text-[#B4B0D5] mt-12 space-y-3 px-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#F0EDFA] dark:bg-[#1E1B33] text-[#6C5CE7] flex items-center justify-center mx-auto">
+          <div className="text-center text-[#6B6890] dark:text-[#9E9EA9] mt-12 space-y-3 px-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#F0EDFA] dark:bg-[#16161C] text-[#6C5CE7] dark:text-[#CCFF00] flex items-center justify-center mx-auto border border-[#E3DFF5] dark:border-[#232329]">
               <Bot className="w-6 h-6" />
             </div>
-            <p className="text-sm font-bold text-[#2D2A4A] dark:text-[#F1EFFF]">
-              Ask a doubt or upload a photo
+            <p className="text-sm font-bold text-[#2D2A4A] dark:text-[#F4F4F6]">
+              Ask a doubt or upload a photo ({photoRemaining}/{DAILY_COPILOT_PHOTO_LIMIT} left today)
             </p>
             <p className="text-xs leading-relaxed">
-              Toggle <strong>Hint</strong> above if you want a clue first instead of the full answer.
+              Toggle <strong>Hint</strong> above if you want a clue first. Guest doubts left this session: <strong>{guestDoubtsRemaining}/{GUEST_LIMITS.doubts}</strong>.
             </p>
           </div>
         )}
@@ -280,8 +351,8 @@ export default function OmniCopilot() {
                 msg.role === 'user'
                   ? 'bg-[#6C5CE7] text-white'
                   : msg.role === 'error' || msg.role === 'unavailable'
-                  ? 'bg-amber-50 dark:bg-amber-950/40 text-[#2D2A4A] dark:text-[#F1EFFF] border border-amber-300 dark:border-amber-800'
-                  : 'bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] border border-[#E3DFF5] dark:border-[#3D3861]'
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-[#2D2A4A] dark:text-[#F4F4F6] border border-amber-300 dark:border-amber-800'
+                  : 'bg-[#F7F5FF] dark:bg-[#16161C] text-[#2D2A4A] dark:text-[#F4F4F6] border border-[#E3DFF5] dark:border-[#232329]'
               }`}
             >
               {msg.imageDataUrl && (
@@ -307,6 +378,7 @@ export default function OmniCopilot() {
                     sendMessage(`Reveal full solution for: ${msg.originalQuestion || 'previous question'}`, {
                       hintFirst: false,
                       revealFullSolution: true,
+                      guestRetry: msg.model?.includes('guest-preview'),
                     })
                   }
                   className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#6C5CE7] text-white text-xs font-bold cursor-pointer"
@@ -319,11 +391,17 @@ export default function OmniCopilot() {
               {(msg.role === 'error' || msg.role === 'unavailable') && msg.originalQuestion && (
                 <button
                   type="button"
-                  onClick={() => sendMessage(msg.originalQuestion)}
-                  className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#6C5CE7] text-white text-xs font-bold cursor-pointer"
+                  onClick={() =>
+                    sendMessage(msg.originalQuestion, {
+                      guestRetry: Boolean(msg.isAuthError),
+                      skipUserEcho: true,
+                      hadImage: Boolean(msg.hadImage),
+                    })
+                  }
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] text-xs font-bold cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry</span>
+                  <span>{msg.isAuthError ? 'Retry in Guest Mode' : 'Retry'}</span>
                 </button>
               )}
 
@@ -335,7 +413,7 @@ export default function OmniCopilot() {
                   {msg.fallbackPracticeQuestions.slice(0, 2).map((q) => (
                     <div
                       key={q.id}
-                      className="p-2 rounded-lg bg-white dark:bg-[#2A2647] border border-[#E3DFF5] dark:border-[#3D3861] text-[11px]"
+                      className="p-2 rounded-lg bg-white dark:bg-[#111114] border border-[#E3DFF5] dark:border-[#232329] text-[11px]"
                     >
                       <FormattedMathText text={q.questionText} preferNormalText />
                     </div>
@@ -344,7 +422,7 @@ export default function OmniCopilot() {
               )}
 
               {msg.model && msg.role === 'assistant' && (
-                <p className="text-[10px] text-[#6B6890] dark:text-[#B4B0D5] pt-1 border-t border-[#E3DFF5] dark:border-[#3D3861]">
+                <p className="text-[10px] text-[#6B6890] dark:text-[#9E9EA9] pt-1 border-t border-[#E3DFF5] dark:border-[#232329]">
                   Model: {msg.model} · AI can be wrong
                 </p>
               )}
@@ -353,7 +431,7 @@ export default function OmniCopilot() {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-[#F7F5FF] dark:bg-[#1E1B33] rounded-2xl px-3.5 py-2.5 text-xs font-semibold text-[#6B6890]">
+            <div className="bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329] rounded-2xl px-3.5 py-2.5 text-xs font-semibold text-[#6B6890] dark:text-[#9E9EA9]">
               Solving...
             </div>
           </div>
@@ -362,12 +440,12 @@ export default function OmniCopilot() {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-[#E3DFF5] dark:border-[#3D3861] bg-white dark:bg-[#2A2647] space-y-2">
+      <div className="p-3 border-t border-[#E3DFF5] dark:border-[#232329] bg-[#FFFFFF] dark:bg-[#111114] space-y-2">
         {attachedImage && (
-          <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-xl bg-[#F7F5FF] dark:bg-[#1E1B33] border border-[#E3DFF5] dark:border-[#3D3861]">
+          <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-xl bg-[#F7F5FF] dark:bg-[#16161C] border border-[#E3DFF5] dark:border-[#232329]">
             <div className="flex items-center gap-2 min-w-0">
               <img src={attachedImage.previewUrl} alt="Question preview" className="w-8 h-8 rounded object-cover" />
-              <span className="text-[11px] truncate">{attachedImage.attachment.name || 'Question image'}</span>
+              <span className="text-[11px] truncate text-[#2D2A4A] dark:text-[#F4F4F6]">{attachedImage.attachment.name || 'Question image'}</span>
             </div>
             <button
               type="button"
@@ -394,13 +472,13 @@ export default function OmniCopilot() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            title={`Upload photo (${Math.max(0, 3 - getTodayPhotoCount())} remaining today, limit 3/day)`}
-            className="min-w-[44px] min-h-[44px] rounded-xl border border-[#E3DFF5] dark:border-[#3D3861] text-[#6B6890] dark:text-[#B4B0D5] hover:text-[#6C5CE7] flex items-center justify-center shrink-0 cursor-pointer relative"
+            title={`Upload photo (${photoRemaining} remaining today, limit ${DAILY_COPILOT_PHOTO_LIMIT}/day)`}
+            className="min-w-[44px] min-h-[44px] rounded-xl border border-[#E3DFF5] dark:border-[#232329] bg-[#F7F5FF] dark:bg-[#16161C] text-[#6B6890] dark:text-[#9E9EA9] hover:text-[#6C5CE7] dark:hover:text-[#CCFF00] flex items-center justify-center shrink-0 cursor-pointer relative"
             aria-label="Upload photo of a question"
           >
             <ImagePlus className="w-4 h-4" />
             <span className="absolute -top-1 -right-1 bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] text-[9px] font-bold px-1 rounded-full">
-              {Math.max(0, 3 - getTodayPhotoCount())}
+              {photoRemaining}
             </span>
           </button>
           <textarea
@@ -409,14 +487,14 @@ export default function OmniCopilot() {
             onKeyDown={handleKeyDown}
             placeholder={hintFirst ? 'Ask for a hint...' : 'Ask anything...'}
             rows={1}
-            className="flex-1 min-h-[44px] resize-none border border-[#E3DFF5] dark:border-[#3D3861] rounded-xl px-3 py-2.5 text-xs sm:text-sm bg-[#F7F5FF] dark:bg-[#1E1B33] text-[#2D2A4A] dark:text-[#F1EFFF] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
+            className="flex-1 min-h-[44px] resize-none border border-[#E3DFF5] dark:border-[#232329] rounded-xl px-3 py-2.5 text-xs sm:text-sm bg-[#F7F5FF] dark:bg-[#16161C] text-[#2D2A4A] dark:text-[#F4F4F6] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] dark:focus:ring-[#CCFF00]"
             maxLength={4000}
           />
           <button
             type="button"
             onClick={() => sendMessage()}
             disabled={(!input.trim() && !attachedImage) || isLoading}
-            className="min-w-[44px] min-h-[44px] rounded-xl bg-[#6C5CE7] text-white flex items-center justify-center hover:bg-[#5B4BC4] disabled:opacity-50 shrink-0 cursor-pointer transition"
+            className="min-w-[44px] min-h-[44px] rounded-xl bg-[#6C5CE7] dark:bg-[#CCFF00] text-white dark:text-[#09090B] flex items-center justify-center hover:bg-[#5B4BC4] dark:hover:bg-[#d9ff33] disabled:opacity-50 shrink-0 cursor-pointer transition"
             aria-label="Send message"
           >
             <ArrowUp className="w-4 h-4" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Bell,
@@ -28,6 +28,11 @@ import { DAILY_PRACTICE_LIMIT } from '../../types/auth';
 import { useNetworkStatus } from '../../utils/offlineStorage';
 import { AIUsageIndicator } from '../common/AIUsageIndicator';
 import { PWAInstallButton } from '../common/PWAInstallButton';
+import {
+  getGuestQuotaRemaining,
+  GUEST_LIMITS,
+  GUEST_QUOTA_UPDATED_EVENT,
+} from '../../utils/guestMode';
 
 interface NavbarProps {
   activeTab: string;
@@ -63,9 +68,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, profile, gamification, isAuthenticated, signOut } = useAuth();
   const { isOnline } = useNetworkStatus();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [guestPracticeRemaining, setGuestPracticeRemaining] = useState(
+    () => getGuestQuotaRemaining().practiceRemaining
+  );
+
+  useEffect(() => {
+    const sync = () => setGuestPracticeRemaining(getGuestQuotaRemaining().practiceRemaining);
+    sync();
+    window.addEventListener(GUEST_QUOTA_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(GUEST_QUOTA_UPDATED_EVENT, sync);
+  }, []);
 
   const solvedToday = gamification?.dailyQuestionsSolvedToday ?? 0;
-  const allowanceRemaining = Math.max(0, DAILY_PRACTICE_LIMIT - solvedToday);
+  const activeLimit = isAuthenticated ? DAILY_PRACTICE_LIMIT : GUEST_LIMITS.practiceQuestions;
+  const allowanceRemaining = isAuthenticated
+    ? Math.max(0, DAILY_PRACTICE_LIMIT - solvedToday)
+    : guestPracticeRemaining;
 
   return (
     <header className="sticky top-0 z-30 w-full bg-[#FFFFFF] dark:bg-[#111114] border-b border-[#E3DFF5] dark:border-[#232329] transition-colors">
@@ -175,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F0EDFA] dark:bg-[#16161C] text-[#2D2A4A] dark:text-[#F4F4F6] text-xs font-bold border border-[#E3DFF5] dark:border-[#232329] min-h-[38px] tabular-nums font-mono">
             <span className="text-[10px] uppercase tracking-wider text-[#6B6890] dark:text-[#9E9EA9]">Quota</span>
             <span className="text-[#6C5CE7] dark:text-[#CCFF00] font-black">
-              {allowanceRemaining}/{DAILY_PRACTICE_LIMIT}
+              {allowanceRemaining}/{activeLimit}
             </span>
           </div>
 
